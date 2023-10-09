@@ -6047,35 +6047,6 @@ functions (which they are not).  Inherits from `default'.")
             ;; (matcher subexp facespec)
 	    '("^[ \t]*format[ \t]+\\([a-zA-Z_][a-zA-Z_0-9:]*\\)[ \t]*=[ \t]*$"
 	      1 font-lock-function-name-face)
-            ;; -------- bareword hash key: $foo{bar}, $foo[1]{bar}
-            ;; (matcher (subexp facespec) ...
-            `(,(rx (or (in "]}\\%@>*&")
-                       (sequence "$" (eval cperl--normal-identifier-rx)))
-                   (0+ blank) "{" (0+ blank)
-                   (group-n 1 (sequence (opt "-")
-                                        (eval cperl--basic-identifier-rx)))
-                   (0+ blank) "}")
-;;	    '("\\([]}\\%@>*&]\\|\\$[a-zA-Z0-9_:]*\\)[ \t]*{[ \t]*\\(-?[a-zA-Z0-9_:]+\\)[ \t]*}"
-	      (1 font-lock-string-face t)
-              ;; -------- anchored bareword hash key: $foo{bar}{baz}
-              ;; ... (anchored-matcher pre-form post-form subex-highlighters)
-              (,(rx point
-                    (0+ blank) "{" (0+ blank)
-                    (group-n 1 (sequence (opt "-")
-                                         (eval cperl--basic-identifier-rx)))
-                    (0+ blank) "}")
-	       ;; ("\\=[ \t]*{[ \t]*\\(-?[a-zA-Z0-9_:]+\\)[ \t]*}"
-	       nil nil
-	       (1 font-lock-string-face t)))
-            ;; -------- hash element assignments with bareword key => value
-            ;; (matcher subexp facespec)
-            `(,(rx (in "[ \t{,()")
-                   (group-n 1 (sequence (opt "-")
-                                        (eval cperl--basic-identifier-rx)))
-                   (0+ blank) "=>")
-              1 font-lock-string-face t)
-            ;;	    '("[[ \t{,(]\\(-?[a-zA-Z0-9_:]+\\)[ \t]*=>" 1
-            ;;	      font-lock-string-face t)
             ;; -------- labels
             ;; (matcher subexp facespec)
             `(,(rx
@@ -6175,32 +6146,33 @@ functions (which they are not).  Inherits from `default'.")
 	  (setq
 	   t-font-lock-keywords-1
 	   `(
-             ;; -------- arrays and hashes.  Access to elements is fixed below
-             ;; (matcher subexp facespec)
-             ;; facespec is an expression to distinguish between arrays and hashes
-             (,(rx (group-n 1 (group-n 2 (or (in "@%") "$#"))
-                            (eval cperl--normal-identifier-rx)))
-              1
-;;	     ("\\(\\([@%]\\|\\$#\\)[a-zA-Z_:][a-zA-Z0-9_:]*\\)" 1
-	      (if (eq (char-after (match-beginning 2)) ?%)
-		  'cperl-hash-face
-		'cperl-array-face)
-	      nil)
-             ;; -------- access to array/hash elements
-             ;; (matcher subexp facespec)
-             ;; facespec is an expression to distinguish between arrays and hashes
-             (,(rx (group-n 1 (group-n 2 (in "$@%"))
-                            (eval cperl--normal-identifier-rx))
-                   (0+ blank)
-                   (group-n 3 (in "[{")))
-;;	     ("\\(\\([$@%]+\\)[a-zA-Z_:][a-zA-Z0-9_:]*\\)[ \t]*\\([[{]\\)"
-	      1
-	      (if (= (- (match-end 2) (match-beginning 2)) 1)
-		  (if (eq (char-after (match-beginning 3)) ?{)
-		      'cperl-hash-face
-		    'cperl-array-face)             ; arrays and hashes
-		font-lock-variable-name-face)      ; Just to put something
-	      t)                                   ; override previous
+            ;; -------- bareword hash key: $foo{bar}, $foo[1]{bar}
+            ;; (matcher (subexp facespec) ...
+            (,(rx (or (in "]}\\%@>*&")
+                       (sequence "$" (eval cperl--normal-identifier-rx)))
+                   (0+ blank) "{" (0+ blank)
+                   (group-n 1 (sequence (opt "-")
+                                        (eval cperl--basic-identifier-rx)))
+                   (0+ blank) "}")
+;;	    '("\\([]}\\%@>*&]\\|\\$[a-zA-Z0-9_:]*\\)[ \t]*{[ \t]*\\(-?[a-zA-Z0-9_:]+\\)[ \t]*}"
+	      (1 font-lock-string-face)
+              ;; -------- anchored bareword hash key: $foo{bar}{baz}
+              ;; ... (anchored-matcher pre-form post-form subex-highlighters)
+              (,(rx point
+                    (0+ blank) "{" (0+ blank)
+                    (group-n 1 (sequence (opt "-")
+                                         (eval cperl--basic-identifier-rx)))
+                    (0+ blank) "}")
+	       ;; ("\\=[ \t]*{[ \t]*\\(-?[a-zA-Z0-9_:]+\\)[ \t]*}"
+	       nil nil
+	       (1 font-lock-string-face)))
+            ;; -------- hash element assignments with bareword key => value
+            ;; (matcher subexp facespec)
+            (,(rx (in "[ \t{,()")
+                   (group-n 1 (sequence (opt "-")
+                                        (eval cperl--basic-identifier-rx)))
+                   (0+ blank) "=>")
+              1 font-lock-string-face)
              ;; -------- @$ array dereferences, $#$ last array index
              ;; (matcher (subexp facespec) (subexp facespec))
              (,(rx (group-n 1 (or "@" "$#"))
@@ -6219,6 +6191,32 @@ functions (which they are not).  Inherits from `default'.")
 	     ;; ("\\(%\\)\\(\\$+\\([a-zA-Z_:][a-zA-Z0-9_:]*\\|[^ \t\n]\\)\\)"
 	      (1 'cperl-hash-face)
 	      (2 font-lock-variable-name-face))
+             ;; -------- access to array/hash elements
+             ;; (matcher subexp facespec)
+             ;; facespec is an expression to distinguish between arrays and hashes
+             (,(rx (group-n 1 (group-n 2 (in "$@%"))
+                            (eval cperl--normal-identifier-rx))
+                   (0+ blank)
+                   (group-n 3 (in "[{")))
+;;	     ("\\(\\([$@%]+\\)[a-zA-Z_:][a-zA-Z0-9_:]*\\)[ \t]*\\([[{]\\)"
+	      1
+	      (if (= (- (match-end 2) (match-beginning 2)) 1)
+		  (if (eq (char-after (match-beginning 3)) ?{)
+		      'cperl-hash-face
+		    'cperl-array-face)             ; arrays and hashes
+		font-lock-variable-name-face)      ; Just to put something
+	      nil)                                 ; do not override previous
+             ;; -------- "Pure" arrays and hashes.
+             ;; (matcher subexp facespec)
+             ;; facespec is an expression to distinguish between arrays and hashes
+             (,(rx (group-n 1 (group-n 2 (or (in "@%") "$#"))
+                            (eval cperl--normal-identifier-rx)))
+              1
+;;	     ("\\(\\([@%]\\|\\$#\\)[a-zA-Z_:][a-zA-Z0-9_:]*\\)" 1
+	      (if (eq (char-after (match-beginning 2)) ?%)
+		  'cperl-hash-face
+		'cperl-array-face)
+	      nil)
 ;;("\\([smy]\\|tr\\)\\([^a-z_A-Z0-9]\\)\\(\\([^\n\\]*||\\)\\)\\2")
 ;;; Too much noise from \s* @s[ and friends
 	     ;;("\\(\\<\\([msy]\\|tr\\)[ \t]*\\([^ \t\na-zA-Z0-9_]\\)\\|\\(/\\)\\)"
