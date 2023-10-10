@@ -32,7 +32,7 @@
 
 ;;; Units operations.
 
-;;; Units table last updated 9-Jan-91 by Ulrich Mueller (ulm@vsnhd1.cern.ch)
+;;; Units table last updated 9-Jan-91 by Ulrich Müller (ulm@vsnhd1.cern.ch)
 ;;; with some additions by Przemek Klosowski (przemek@rrdstrad.nist.gov)
 ;;; Updated April 2002 by Jochen Küpper
 
@@ -57,12 +57,13 @@
     ( ft      "12 in"                "Foot")
     ( yd      "3 ft"                 "Yard" )
     ( mi      "5280 ft"              "Mile" )
-    ( au      "149597870691. m"      "Astronomical Unit" nil
-              "149597870691 m (*)")
-              ;; (approx) NASA JPL (https://neo.jpl.nasa.gov/glossary/au.html)
+    ( au      "149597870700 m"       "Astronomical Unit")
+              ;; "149 597 870 700 m exactly"
+              ;; http://www.iau.org/static/resolutions/IAU2012_English.pdf
     ( lyr     "c yr"                 "Light Year" )
-    ( pc      "3.0856775854*10^16 m" "Parsec  (**)" nil
-              "3.0856775854 10^16 m (*)") ;; (approx) ESUWM
+    ( pc      "(648000/pi) au"       "Parsec (**)")
+              ;; "The parsec is defined as exactly (648 000/π) au"
+              ;; http://www.iau.org/static/resolutions/IAU2015_English.pdf
     ( nmi     "1852 m"               "Nautical Mile" )
     ( fath    "6 ft"                 "Fathom" )
     ( fur     "660 ft"               "Furlong")
@@ -182,6 +183,8 @@
 
     ;; Temperature
     ( K       nil                    "*Kelvin"            K )
+    ;; FIXME: Add °C and °F, but it requires that we sort out input etc for
+    ;; the ° sign.
     ( dC      "K"                    "Degree Celsius"     C )
     ( degC    "K"                    "Degree Celsius"     C )
     ( dF      "(5/9) K"              "Degree Fahrenheit"  F )
@@ -314,7 +317,9 @@ NAME      is the unit symbol.
 DEF       is a string defining the unit as a Calc expression; nil if base unit.
 DESC      is a string describing the unit (to a human reader).
           A leading asterisk indicates that the unit is first in its group.
-TEMP-UNIT is an additional symbol tabulated for temperature units (?) or nil.
+TEMP-UNIT is `K', `C' or `F' for temperature units and is used to identify
+          the unit when doing absolute temperature conversion
+          (`calc-convert-temperature').  For other units, nil.
 HUMAN-DEF is a string defining the unit (to a human reader).
           If absent or nil, DEF is used.
 
