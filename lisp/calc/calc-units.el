@@ -181,9 +181,7 @@
     ( hpm     "75 m kgf/s"           "Metric Horsepower") ;;ESUWM
 
     ;; Temperature
-    ( K       nil                    "*Degree Kelvin"     K )
-    ( dK      "K"                    "Degree Kelvin"      K )
-    ( degK    "K"                    "Degree Kelvin"      K )
+    ( K       nil                    "*Kelvin"            K )
     ( dC      "K"                    "Degree Celsius"     C )
     ( degC    "K"                    "Degree Celsius"     C )
     ( dF      "(5/9) K"              "Degree Fahrenheit"  F )
@@ -307,8 +305,22 @@
               "22.710947 10^-3 m^3/mol (*)")
     ;; Logarithmic units
     ( Np      nil    "*Neper")
-    ( dB      "(ln(10)/20) Np" "decibel")))
+    ( dB      "(ln(10)/20) Np" "decibel"))
+  "List of predefined units for Calc.
 
+Each element is (NAME DEF DESC TEMP-UNIT HUMAN-DEF), where:
+
+NAME      is the unit symbol.
+DEF       is a string defining the unit as a Calc expression; nil if base unit.
+DESC      is a string describing the unit (to a human reader).
+          A leading asterisk indicates that the unit is first in its group.
+TEMP-UNIT is an additional symbol tabulated for temperature units (?) or nil.
+HUMAN-DEF is a string defining the unit (to a human reader).
+          If absent or nil, DEF is used.
+
+(*) in HUMAN-DEF means that the definition is approximate, otherwise exact.
+(**) in DESC means that the unit name is different in TeX and LaTeX
+     display modes.")
 
 (defvar math-additional-units nil
   "Additional units table for user-defined units.
