@@ -70,6 +70,10 @@ yield the values intended."
   :type '(repeat character)
   :group 'eshell-arg)
 
+;; TODO: do we need to add a :set function to auto-append
+;; `eshell-delimiter-argument-list'?  What if entries are removed from
+;; `eshell-delimiter-argument-list'?  We can also not care and keep
+;; this as-is.
 (defcustom eshell-special-chars-outside-quoting
   (append eshell-delimiter-argument-list '(?# ?! ?\\ ?\" ?\'))
   "Characters that require escaping outside of double quotes.
@@ -84,11 +88,13 @@ If POS is nil, the location of point is checked."
     (or (= pos (point-max))
 	(memq (char-after pos) eshell-delimiter-argument-list))))
 
+;; TODO: a lot of λ's here.  Do we need to convert them into named
+;; (internal, helper) functions?
 (defcustom eshell-parse-argument-hook
   (list
    ;; a term such as #<buffer NAME>, or #<process NAME> is a buffer
    ;; or process reference
-   'eshell-parse-special-reference
+   #'eshell-parse-special-reference
 
    ;; numbers convert to numbers if they stand alone
    (lambda ()
@@ -135,16 +141,16 @@ If POS is nil, the location of point is checked."
          (eshell-finish-arg))))
 
    ;; parse backslash and the character after
-   'eshell-parse-backslash
+   #'eshell-parse-backslash
 
    ;; text beginning with ' is a literally quoted
-   'eshell-parse-literal-quote
+   #'eshell-parse-literal-quote
 
    ;; text beginning with " is interpolably quoted
-   'eshell-parse-double-quote
+   #'eshell-parse-double-quote
 
    ;; argument delimiter
-   'eshell-parse-delimiter)
+   #'eshell-parse-delimiter)
   "Define how to process Eshell command line arguments.
 When each function on this hook is called, point will be at the
 current position within the argument list.  The function should either

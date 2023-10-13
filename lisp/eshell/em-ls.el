@@ -86,7 +86,7 @@ Changing this without using customize has no effect."
 
 (defcustom eshell-ls-default-blocksize 1024
   "The default blocksize to use when display file sizes with -s."
-  :type 'integer)
+  :type 'natnum)
 
 (defcustom eshell-ls-exclude-regexp nil
   "Unless -a is specified, files matching this regexp will not be shown."
@@ -214,6 +214,7 @@ calling FUNC with FILE as an argument."
 	    ;; Otherwise call FUNC.
 	    (,(eval func) ,file)))))
 
+;; TODO: original type was wrong?
 (defcustom eshell-ls-highlight-alist nil
   "This alist correlates test functions to color.
 The format of the members of this alist is
@@ -223,7 +224,10 @@ The format of the members of this alist is
 If TEST-SEXP evals to non-nil, that face will be used to highlight the
 name of the file.  The first match wins.  `file' and `attrs' are in
 scope during the evaluation of TEST-SEXP."
-  :type '(repeat (cons function face)))
+  :type
+  '(alist
+    :key-type (sexp :tag "Test sexp, `file' and `attrs' in scope")
+    :value-type face))
 
 (defvar block-size)
 (defvar dereference-links)

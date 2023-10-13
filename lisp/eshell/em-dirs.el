@@ -153,7 +153,7 @@ directories gets pushed, and its size is unlimited.
 explicitly very much, but every once in a while would like to return to
 a previously visited directory without having to type in the whole
 thing again."
-  :type 'integer)
+  :type 'natnum)
 
 (defcustom eshell-last-dir-unique t
   "If non-nil, `eshell-last-dir-ring' contains only unique entries."

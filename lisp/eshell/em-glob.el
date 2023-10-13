@@ -110,8 +110,9 @@ This mimics the behavior of zsh if non-nil, but bash if nil."
   :type '(repeat character)
   :group 'eshell-glob)
 
+;; TODO: convert the λ into named function?
 (defcustom eshell-glob-translate-alist
-  '((?\] . "]")
+  `((?\] . "]")
     (?\[ . "[")
     (?^  . "^")
     (??  . ".")
@@ -120,14 +121,14 @@ This mimics the behavior of zsh if non-nil, but bash if nil."
     (?\( . "\\(")
     (?\) . "\\)")
     (?\| . "\\|")
-    (?#  . (lambda (str pos)
-	     (if (and (< (1+ pos) (length str))
-		      (memq (aref str (1+ pos)) '(?* ?# ?+ ??)))
-		 (cons (if (eq (aref str (1+ pos)) ??)
-			   "?"
-			 (if (eq (aref str (1+ pos)) ?*)
-			     "*" "+")) (+ pos 2))
-	       (cons "*" (1+ pos))))))
+    (?#  . ,(lambda (str pos)
+	      (if (and (< (1+ pos) (length str))
+		       (memq (aref str (1+ pos)) '(?* ?# ?+ ??)))
+		  (cons (cond ((eq (aref str (1+ pos)) ??) "?")
+                              ((eq (aref str (1+ pos)) ?*) "*")
+                              (t "+"))
+                        (+ pos 2))
+	        (cons "*" (1+ pos))))))
   "An alist for translation of extended globbing characters."
   :type '(alist :key-type character
 		:value-type (choice string function))

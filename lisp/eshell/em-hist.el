@@ -74,6 +74,7 @@
   :version "24.1"			; removed eshell-hist-initialize
   :type 'hook)
 
+;; TODO: named function?  Maybe not, obsolete function.
 (defcustom eshell-hist-unload-hook
   (list
    (lambda ()
@@ -101,7 +102,7 @@ The value `erase' mirrors the \"erasedups\" value of HISTCONTROL
 in bash, and any other non-nil value mirrors the \"ignoredups\"
 value."
   :type '(choice (const :tag "Don't ignore anything" nil)
-                 (const :tag "Ignore consecutive duplicates" t)
+                 (other :tag "Ignore consecutive duplicates" t)
                  (const :tag "Only keep last duplicate" erase)))
 
 (defcustom eshell-save-history-on-exit t
@@ -116,7 +117,7 @@ If set to t, history will always be saved, silently."
 		 (const :tag "Ask" ask)
 		 (const :tag "Always save" t)))
 
-(defcustom eshell-input-filter 'eshell-input-filter-default
+(defcustom eshell-input-filter #'eshell-input-filter-default
   "Predicate for filtering additions to input history.
 Takes one argument, the input.  If non-nil, the input may be saved on
 the input history list.  Default is to save anything that isn't all
@@ -171,6 +172,7 @@ element, regardless of any text on the command line.  In that case,
   "The regexp used to identity history modifiers."
   :type 'regexp)
 
+;; TODO: this type is used in multiple places.
 (defcustom eshell-hist-rebind-keys-alist
   '(([(control ?p)]   . eshell-previous-input)
     ([(control ?n)]   . eshell-next-input)
@@ -185,9 +187,11 @@ element, regardless of any text on the command line.  In that case,
     ([up]             . eshell-previous-matching-input-from-input)
     ([down]           . eshell-next-matching-input-from-input))
   "History keys to bind differently if point is in input text."
-  :type '(repeat (cons (vector :tag "Keys to bind"
-			       (repeat :inline t sexp))
-		       (function :tag "Command"))))
+  :type '(alist :key-type (vector :tag "Keys to bind"
+                                  (repeat :inline t sexp))
+                ;; TODO: isn't there a key or key-sequencec type that
+                ;; can be used for the purpose of the :key-type?
+                :value-type (function :tag "Command")))
 
 ;;; Internal Variables:
 

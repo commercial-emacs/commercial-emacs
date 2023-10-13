@@ -86,8 +86,8 @@ visual fashion.  A likely entry is
 because git shows logs and diffs using a pager by default.
 
 See also `eshell-visual-commands' and `eshell-visual-options'."
-  :type '(repeat (cons (string :tag "Command")
-		       (repeat (string :tag "Subcommand"))))
+  :type '(alist :key-type (string :tag "Command")
+                :value-type (repeat (string :tag "Subcommand")))
   :version "24.4")
 
 (defcustom eshell-visual-options
@@ -107,8 +107,8 @@ documentation with a pager and \"git --paginate <command>\"
 always uses a pager for output.
 
 See also `eshell-visual-commands' and `eshell-visual-subcommands'."
-  :type '(repeat (cons (string :tag "Command")
-		       (repeat (string :tag "Option"))))
+  :type '(alist :key-type (string :tag "Command")
+                :value-type (repeat (string :tag "Option")))
   :version "24.4")
 
 ;; If you change this from term-term-name, you need to ensure that the

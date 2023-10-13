@@ -247,13 +247,16 @@ command will wait for completion (in the background) before finishing
 the command."
   :type '(repeat function))
 
+;; TODO: let-binding used multiple times.  Convert to `define-widget'?
 (defcustom eshell-subcommand-bindings
   '((eshell-in-subcommand-p t)
     (eshell-in-pipeline-p nil)
     (default-directory default-directory))
   "A list of `let' bindings for subcommand environments."
   :version "29.1"		       ; removed `process-environment'
-  :type 'sexp
+  :type '(repeat (choice (symbol :tag "Bind symbol to nil")
+                         (list (symbol :tag "Symbol name")
+                               (sexp :tag "Bound value"))))
   :risky t)
 
 (defvar eshell-ensure-newline-p nil

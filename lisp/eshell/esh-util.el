@@ -40,14 +40,17 @@ and not printed as a string.  This causes Lisp functions to behave
 similarly to external commands, as far as successful result output."
   :type 'boolean)
 
+;; TODO: should we require existing file?
 (defcustom eshell-group-file "/etc/group"
   "If non-nil, the name of the group file on your system."
   :type '(choice (const :tag "No group file" nil) file))
 
+;; TODO: should we require existing file?
 (defcustom eshell-passwd-file "/etc/passwd"
   "If non-nil, the name of the passwd file on your system."
   :type '(choice (const :tag "No passwd file" nil) file))
 
+;; TODO: should we require existing file?
 (defcustom eshell-hosts-file "/etc/hosts"
   "The name of the /etc/hosts file.
 Use `pcomplete-hosts-file' instead; this variable is obsolete and
@@ -63,13 +66,14 @@ has no effect."
 Setting this to nil is offered as an aid to debugging only."
   :type 'boolean)
 
+;; TODO: could wid-edit.el define a "file-mode" customization type?
 (defcustom eshell-private-file-modes #o600 ; umask 177
   "The file-modes value to use for creating \"private\" files."
-  :type 'integer)
+  :type 'natnum)
 
 (defcustom eshell-private-directory-modes #o700 ; umask 077
   "The file-modes value to use for creating \"private\" directories."
-  :type 'integer)
+  :type 'natnum)
 
 (defcustom eshell-tar-regexp
   "\\.t\\(ar\\(\\.\\(gz\\|bz2\\|xz\\|Z\\)\\)?\\|gz\\|a[zZ]\\|z2\\)\\'"
@@ -94,6 +98,7 @@ a non-nil value, will be passed strings, not numbers, even when an
 argument matches `eshell-number-regexp'."
   :type 'boolean)
 
+;; TODO: docstring is unclear; maybe change to an alist type?
 (defcustom eshell-ange-ls-uids nil
   "List of user/host/id strings, used to determine remote ownership."
   :type '(repeat (cons :tag "Host for User/UID map"
