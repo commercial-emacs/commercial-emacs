@@ -96,6 +96,7 @@
 ;;; Code:
 
 (require 'comint)
+(require 'eshell)
 (require 'pcomplete)
 (eval-when-compile (require 'files-x)) ;with-connection-local-variables
 (require 'subr-x)
@@ -376,6 +377,17 @@ Useful for shells like zsh that has this feature."
   :type 'boolean
   :group 'shell
   :version "29.1")
+
+(defcustom sticky-shell-get-prompt
+  #'sticky-shell-prompt-above-visible
+  "Function used by `sticky-shell-mode' to pick the prompt to show in the header.
+Available values are: `sticky-shell-latest-prompt',
+`sticky-shell-prompt-above-visible',
+`sticky-shell-prompt-above-cursor',
+or you can write your own function and assign it to this variable."
+  :group 'shell
+  :type 'function)
+
 
 (defvar shell-mode-map
   (let ((map (make-sparse-keymap)))
@@ -1813,6 +1825,59 @@ this function when switching `comint-fontify-input-mode' in order
 to make `shell-highlight-undef-mode' redo its setup."
   (when shell-highlight-undef-mode
     (shell-highlight-undef-mode 1)))
+
+;;; Show a header with relevant prompt
+(defun sticky-shell-current-line-trimmed ()
+  "Return the current line and remove trailing whitespace."
+  (let ((prompt (or (thing-at-point 'line) "")))
+    (string-trim-right prompt "[ \t\n\r]+"))) ; remove the newline ending char
+
+(defun shell-previous-prompt (n)
+  "Move to end of Nth previous prompt in the buffer.
+Depending on the current mode, call `comint-previous-prompt'
+or `eshell-previous-prompt'."
+  (if (derived-mode-p 'eshell-mode)
+      (eshell-previous-prompt n)
+    (comint-previous-prompt n)))
+
+(defun sticky-shell-latest-prompt ()
+  "Get the latest prompt that was run."
+  (interactive)
+  (save-excursion
+    (goto-char (point-max))
+    (forward-line -1)
+    (shell-previous-prompt 1)
+    (sticky-shell-current-line-trimmed)))
+
+(defun sticky-shell-prompt-above-visible ()
+  "Get the prompt above the top visible line in the current window.
+This ensures that the prompt in the header corresponds to top output-line"
+  (interactive)
+  (save-excursion
+    (goto-char (window-start))
+    (shell-previous-prompt 1)
+    (sticky-shell-current-line-trimmed)))
+
+(defun sticky-shell-prompt-above-cursor ()
+  "Get the prompt above the cursor's current line."
+  (interactive)
+  (save-excursion
+    (move-beginning-of-line 1)
+    (shell-previous-prompt 1)
+    (sticky-shell-current-line-trimmed)))
+
+;;;###autoload
+(define-minor-mode sticky-shell-mode
+  "Minor mode to show the previous prompt as a sticky header.
+Which prompt to pick depends on the value of `sticky-shell-get-prompt'."
+  :group 'comint
+  :global nil
+  :lighter nil
+  (if sticky-shell-mode
+      (setq-local header-line-format
+                  (list '(:eval
+                          (funcall sticky-shell-get-prompt))))
+    (setq-local header-line-format nil)))
 
 (provide 'shell)
 
