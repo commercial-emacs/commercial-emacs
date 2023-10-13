@@ -543,6 +543,23 @@ is ordered from most recently created to least recently created bookmark."
                                 (t (time-less-p ty tx)))))))
           (t copy))))
 
+(defun bookmark-completing-read--collection (string pred action)
+  (if (eq action 'metadata)
+      `(metadata (category . bookmark)
+                 ,@(when completions-detailed
+                     '((affixation-function . bookmark-completing-read--affixation-function))))
+    (complete-with-action action bookmark-alist string pred)))
+
+(defun bookmark-completing-read--affixation-function (bookmarks)
+  (seq-map (lambda (record)
+             (list record
+                   nil
+                   (propertize (format "  %-11s  %s"
+                                       (or (bookmark-type-from-full-record record) "")
+                                       (bookmark-location record))
+                               'face 'completions-annotations)))
+           bookmarks))
+
 (defun bookmark-completing-read (prompt &optional default)
   "Prompting with PROMPT, read a bookmark name in completion.
 PROMPT will get a \": \" stuck on the end no matter what, so you
@@ -557,13 +574,8 @@ If DEFAULT is nil then return empty string for empty input."
     (let* ((completion-ignore-case bookmark-completion-ignore-case)
            (default (unless (equal "" default) default)))
       (completing-read (format-prompt prompt default)
-                       (lambda (string pred action)
-                         (if (eq action 'metadata)
-                             '(metadata (category . bookmark))
-                             (complete-with-action
-                              action bookmark-alist string pred)))
+                       #'bookmark-completing-read--collection
                        nil 0 nil 'bookmark-history default))))
-
 
 (defmacro bookmark-maybe-historicize-string (string)
   "Put STRING into the bookmark prompt history, if caller non-interactive.
