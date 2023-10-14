@@ -1472,25 +1472,27 @@ please check its value")
     ;; Load that user's init file, or the default one, or none.
     (startup--load-user-init-file
      (lambda ()
-       (cond
-	((eq startup-init-directory xdg-dir) nil)
-        ((eq system-type 'ms-dos)
-         (concat "~" init-file-user "/_emacs"))
-        ((not (eq system-type 'windows-nt))
-         (concat "~" init-file-user "/.emacs"))
-        ;; Else deal with the Windows situation.
-        ((directory-files "~" nil "\\`\\.emacs\\(\\.elc?\\)?\\'")
-         ;; Prefer .emacs on Windows.
-         "~/.emacs")
-        ((directory-files "~" nil "\\`_emacs\\(\\.elc?\\)?\\'")
-         ;; Also support _emacs for compatibility, but warn about it.
-         (push `(initialization
-                 ,(format-message
-                   "`_emacs' init file is deprecated, please use `.emacs'"))
-               delayed-warnings-list)
-         "~/_emacs")
-        (t ;; But default to .emacs if _emacs does not exist.
-         "~/.emacs")))
+       (if (eq startup-init-directory xdg-dir)
+           nil
+         (expand-file-name
+          (cond
+           ((eq system-type 'ms-dos)
+            (concat "~" init-file-user "/_emacs"))
+           ((not (eq system-type 'windows-nt))
+            (concat "~" init-file-user "/.emacs"))
+           ;; Else deal with the Windows situation.
+           ((directory-files "~" nil "\\`\\.emacs\\(\\.elc?\\)?\\'")
+            ;; Prefer .emacs on Windows.
+            "~/.emacs")
+           ((directory-files "~" nil "\\`_emacs\\(\\.elc?\\)?\\'")
+            ;; Also support _emacs for compatibility, but warn about it.
+            (push `(initialization
+                    ,(format-message
+                      "`_emacs' init file is deprecated, please use `.emacs'"))
+                  delayed-warnings-list)
+            "~/_emacs")
+           (t ;; But default to .emacs if _emacs does not exist.
+            "~/.emacs")))))
      (lambda ()
        (expand-file-name
         "init.el"
