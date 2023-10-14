@@ -4592,14 +4592,6 @@ unstop_threads (void)
 {
 }
 
-/* Must be higher than highest synchronously generated signal handled,
- * i.e., SIGSEGV, due to Linux signal handling pecularities. Katzman
- * and Melis.
- */
-#ifndef SIG_STOP_FOR_GC // choose you own signal if you must
-#define SIG_STOP_FOR_GC (SIGUSR2)
-#endif
-
 /* Subroutine of Fgarbage_collect that does most of the work.  */
 
 bool
@@ -4622,7 +4614,7 @@ garbage_collect (void)
     {
       if (thr == current_thread)
 	continue;
-      int err = pthread_kill (thr->thread_id, SIG_STOP_FOR_GC);
+      int err = pthread_kill (thr->thread_id, SIGRTMIN);
       if (err == ESRCH)
 	continue; // THR already completed
       else if (err)
