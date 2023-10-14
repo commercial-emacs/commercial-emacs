@@ -419,7 +419,8 @@ is called as a function to find the defun's beginning."
 				       "\\(?:" defun-prompt-regexp "\\)\\s(")
 			     "^\\s(")
 			                      nil 'move arg))
-                    (nth 8 (syntax-ppss))))
+                    (save-match-data
+                      (nth 8 (syntax-ppss)))))
            found)
 	 (progn (goto-char (1- (match-end 0)))
                 t)))
