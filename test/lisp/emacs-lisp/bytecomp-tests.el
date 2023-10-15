@@ -1427,38 +1427,60 @@ byte-compiled.  Run with dynamic binding."
        (let ((elc (concat ,file-name-var ".elc")))
          (if (file-exists-p elc) (delete-file elc))))))
 
+(defun bytecomp-tests--log-from-compilation (source)
+  "Compile the string SOURCE and return the compilation log output."
+  (let ((text-quoting-style 'grave)
+        (byte-compile-log-buffer (generate-new-buffer " *Compile-Log*")))
+    (with-current-buffer byte-compile-log-buffer
+      (let ((inhibit-read-only t)) (erase-buffer)))
+    (bytecomp-tests--with-temp-file el-file
+      (write-region source nil el-file)
+      (byte-compile-file el-file))
+    (with-current-buffer byte-compile-log-buffer
+      (buffer-string))))
+
+(ert-deftest bytecomp-tests--lexical-binding-cookie ()
+  (cl-flet ((cookie-warning (source)
+              (string-search
+               "file has no `lexical-binding' directive on its first line"
+               (bytecomp-tests--log-from-compilation source))))
+    (let ((some-code "(defun my-fun () 12)\n"))
+      (should-not (cookie-warning
+                   (concat ";;; -*-lexical-binding:t-*-\n" some-code)))
+      (should-not (cookie-warning
+                   (concat ";;; -*-lexical-binding:nil-*-\n" some-code)))
+      (should (cookie-warning some-code)))))
+
 (ert-deftest bytecomp-tests--unescaped-char-literals ()
   "Check that byte compiling warns about unescaped character
 literals (Bug#20852)."
   (should (boundp 'lread--unescaped-character-literals))
   (bytecomp-tests--with-temp-file source
-    (write-region "(list ?) ?( ?; ?\" ?[ ?])" nil source)
-    (bytecomp-tests--with-temp-file destination
-      (let ((byte-compile-dest-file-function (lambda (_) destination))
-            (byte-compile-error-on-warn nil)
-            (debug-on-error nil))
-        (byte-compile-file source)
-        (should (with-current-buffer byte-compile-log-buffer
-                  (save-excursion
-                    (goto-char (point-min))
-                    (re-search-forward
-                     (regexp-quote
-                      (concat "unescaped character literals "
-                              "`?\"', `?(', `?)', `?;', `?[', `?]' "
-                              "detected, "
-                              "`?\\\"', `?\\(', `?\\)', `?\\;', `?\\[', "
-                              "`?\\]' expected!"))
-                     nil t)))))))
-  ;; But don't warn in subsequent compilations (Bug#36068).
-  (bytecomp-tests--with-temp-file source
-    (write-region "(list 1 2 3)" nil source)
-    (bytecomp-tests--with-temp-file destination
-      (let ((byte-compile-dest-file-function (lambda (_) destination)))
-        (should (byte-compile-file source))))))
+      (write-region (concat ";;; -*-lexical-binding:t-*-\n"
+                            "(list ?) ?( ?; ?\" ?[ ?])")
+                    nil source)
+      (bytecomp-tests--with-temp-file destination
+        (let* ((byte-compile-dest-file-function (lambda (_) destination))
+               (err (should-error (byte-compile-file source))))
+          (should (equal (cdr err)
+                         `(,(concat "unescaped character literals "
+                                    "`?\"', `?(', `?)', `?;', `?[', `?]' "
+                                    "detected, "
+                                    "`?\\\"', `?\\(', `?\\)', `?\\;', `?\\[', "
+                                    "`?\\]' expected!")))))))
+    ;; But don't warn in subsequent compilations (Bug#36068).
+    (bytecomp-tests--with-temp-file source
+      (write-region (concat ";;; -*-lexical-binding:t-*-\n"
+                            "(list 1 2 3)")
+                    nil source)
+      (bytecomp-tests--with-temp-file destination
+        (let ((byte-compile-dest-file-function (lambda (_) destination)))
+          (should (byte-compile-file source))))))
 
 (ert-deftest bytecomp-tests-function-put ()
   "Check `function-put' operates during compilation."
   (bytecomp-tests--with-temp-file source
+    (insert  ";;; -*-lexical-binding:t-*-\n")
     (dolist (form '((function-put 'bytecomp-tests--foo 'foo 1)
                     (function-put 'bytecomp-tests--foo 'bar 2)
                     (defmacro bytecomp-tests--foobar ()
@@ -1735,7 +1757,8 @@ writable (Bug#44631)."
            (byte-compile-error-on-warn t))
       (unwind-protect
           (progn
-            (write-region "" nil input-file nil nil nil 'excl)
+            (write-region ";;; -*-lexical-binding:t-*-\n"
+                          nil input-file nil nil nil 'excl)
             (write-region "" nil output-file nil nil nil 'excl)
             (set-file-modes input-file #o400)
             (set-file-modes output-file #o200)
@@ -1799,7 +1822,8 @@ mountpoint (Bug#44631)."
     (let* ((default-directory directory)
            (byte-compile-dest-file-function (lambda (_) "test.elc"))
            (byte-compile-error-on-warn t))
-      (write-region "" nil "test.el" nil nil nil 'excl)
+      (write-region  ";;; -*-lexical-binding:t-*-\n"
+                     nil "test.el" nil nil nil 'excl)
       (should (byte-compile-file "test.el"))
       (should (file-regular-p "test.elc"))
       (should (cl-plusp (file-attribute-size

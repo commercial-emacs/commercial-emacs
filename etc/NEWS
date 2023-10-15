@@ -770,14 +770,6 @@ This can help avoid some awkward skip conditions.  For example
 '(skip-unless (not noninteractive))' can be changed to the easier
 to read '(skip-when noninteractive)'.
 
-** Checkdoc
-
----
-*** New checkdock warning if not using lexical-binding.
-Checkdoc now warns if the first line of an Emacs Lisp file does not
-end with a "-*- lexical-binding: t -*-" cookie.  Customize the user
-option 'checkdoc-lexical-binding-flag' to nil to disable this warning.
-
 ** URL
 
 +++
@@ -1067,12 +1059,12 @@ It is needed to inform the compiler about which dialect of ELisp
 your code is using: the modern dialect with lexical binding or
 the old dialect with only dynamic binding.
 
-Lexical binding avoids some name conflicts and allows the compiler to
-detect more mistakes and generate more efficient code, so it is
-recommended.  For how to adapt your code to lexical binding, see the
-manual section "(elisp) Converting to Lexical Binding".
+Lexical binding avoids some name conflicts and allows the compiler
+to detect more mistakes and generate more efficient code.  To adapt
+your code to lexical binding, see the "(elisp) Converting to Lexical
+Binding" section in the manual.
 
-If your code cannot be converted to lexical binding, you can insert
+If you are unable to convert the code to lexical binding, you can insert
 the line
 
     ;;; -*- lexical-binding: nil -*-
