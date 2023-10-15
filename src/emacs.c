@@ -2965,16 +2965,12 @@ DEFUN ("program-version", Fprogram_version, Sprogram_version, 0, 0, 0,
     : version;
 }
 
-/* Perform an orderly shutdown of Emacs.  Autosave any modified
-   buffers, kill any child processes, clean up the terminal modes (if
-   we're in the foreground), and other stuff like that.  Don't perform
-   any redisplay; this may be called when Emacs is shutting down in
-   the background, or after its X connection has died.
+/* Called by signal handlers, X protocol error handlers, and
+   Fkill_emacs.
 
-   If SIG is a signal number, print a message for it.
-
-   This is called by fatal signal handlers, X protocol error handlers,
-   and Fkill_emacs.  */
+   Autosave modified buffers, kill all child processes, clean up the
+   terminal modes.
+*/
 
 void
 shut_down_emacs (int sig, Lisp_Object stuff)
@@ -3027,9 +3023,7 @@ shut_down_emacs (int sig, Lisp_Object stuff)
 #endif
 
   stuff_buffered_input (stuff);
-
-  inhibit_sentinels = 1;
-  kill_buffer_processes (Qnil);
+  kill_sentinels_then_processes ();
   Fdo_auto_save (Qt, Qnil);
 
   unlock_all_files ();

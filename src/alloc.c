@@ -4587,10 +4587,12 @@ mark_stack_push (Lisp_Object *value)
   return mark_stack_push_n (value, 1);
 }
 
+#ifdef HAVE_GCC_TLS
 static void
 unstop_threads (void)
 {
 }
+#endif
 
 /* Subroutine of Fgarbage_collect that does most of the work.  */
 

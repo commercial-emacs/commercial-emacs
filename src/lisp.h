@@ -4547,6 +4547,7 @@ extern bool inhibit_window_system;
 /* Defined in process.c.  */
 struct Lisp_Process;
 extern void child_signal_init (void);
+extern void kill_sentinels_then_processes (void);
 extern void kill_buffer_processes (Lisp_Object);
 extern int wait_reading_process_output (intmax_t, int, int, bool,
 					struct Lisp_Process *, int);

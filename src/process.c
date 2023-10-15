@@ -142,10 +142,6 @@ extern int sys_select (int, fd_set *, fd_set *, fd_set *,
 
 static bool kbd_is_on_hold;
 
-/* Nonzero means don't run process sentinels.  This is used
-   when exiting.  */
-bool inhibit_sentinels;
-
 union u_sockaddr
 {
   struct sockaddr sa;
@@ -909,9 +905,9 @@ PROCESS may be a process, a buffer, the name of a process or buffer, or
 nil, indicating the current buffer's process.
 
 Interactively, it will kill the current buffer's process.  */)
-  (register Lisp_Object process)
+  (Lisp_Object process)
 {
-  register struct Lisp_Process *p;
+  struct Lisp_Process *p;
   bool mess = false;
 
   /* We use this to see whether we were called interactively.  */
@@ -931,7 +927,7 @@ Interactively, it will kill the current buffer's process.  */)
 	 completion.  Free the request if completely canceled. */
 
       bool canceled = gai_cancel (p->dns_request) != EAI_NOTCANCELED;
-      if (!canceled && !inhibit_sentinels)
+      if (! canceled && ! NILP (p->sentinel))
 	{
 	  struct gaicb const *req = p->dns_request;
 	  while (gai_suspend (&req, 1, NULL) != 0)
@@ -7028,10 +7024,6 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
   Lisp_Object restore_deactivate = Vdeactivate_mark;
   struct Lisp_Process *p = XPROCESS (proc);
   specpdl_ref count = SPECPDL_INDEX ();
-
-  if (inhibit_sentinels)
-    return;
-
   record_unwind_current_buffer ();
 
   /* Inhibit quit to avoid disrupting a filter.  */
@@ -7066,8 +7058,7 @@ status_notify (struct Lisp_Process *deleting_process)
   FOR_EACH_PROCESS (tail, proc)
     {
       Lisp_Object symbol;
-      register struct Lisp_Process *p = XPROCESS (proc);
-
+      struct Lisp_Process *p = XPROCESS (proc);
       if (p->tick != p->update_tick)
 	{
 	  /* If process is still active, read any output that remains.  */
@@ -7374,14 +7365,23 @@ the process output.  */)
   return XPROCESS (process)->inherit_coding_system_flag ? Qt : Qnil;
 }
 
-/* Kill all processes associated with `buffer'.
-   If `buffer' is nil, kill all processes.  */
+void
+kill_sentinels_then_processes (void)
+{
+  Lisp_Object tail, proc;
+  FOR_EACH_PROCESS (tail, proc)
+    /* hope shutdown sustains Finternal_default_process_sentinel.  */
+    pset_sentinel (XPROCESS (proc), Qnil);
+  kill_buffer_processes (Qnil);
+}
+
+/* If BUFFER is nil, kill all processes.  Otherwise kill only
+   processes associated with BUFFER.  */
 
 void
 kill_buffer_processes (Lisp_Object buffer)
 {
   Lisp_Object tail, proc;
-
   FOR_EACH_PROCESS (tail, proc)
     if (NILP (buffer) || EQ (XPROCESS (proc)->buffer, buffer))
       {
@@ -7652,15 +7652,10 @@ DEFUN ("make-jsonrpc-thread--body", Fmake_jsonrpc_thread__body,
 }
 #endif
 
-/* This is not called "init_process" because that is the name of a
-   Mach system call, so it would cause problems on Darwin systems.  */
+/* The name "init_process" was already taken by Mach.  */
 void
 init_process_emacs (int sockfd)
 {
-  int i;
-
-  inhibit_sentinels = 0;
-
 #if defined HAVE_GLIB && !defined WINDOWSNT
   /* Tickle Glib's child-handling code.  Ask Glib to install a
      watch source for Emacs itself which will initialize glib's
@@ -7726,7 +7721,7 @@ init_process_emacs (int sockfd)
 
   Vprocess_alist = Qnil;
   deleted_pid_list = Qnil;
-  for (i = 0; i < FD_SETSIZE; i++)
+  for (int i = 0; i < FD_SETSIZE; i++)
     {
       chan_process[i] = Qnil;
     }

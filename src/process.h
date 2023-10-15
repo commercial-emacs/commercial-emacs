@@ -251,10 +251,6 @@ pset_gnutls_cred_type (struct Lisp_Process *p, Lisp_Object val)
 }
 #endif
 
-/* True means don't run process sentinels.  This is used
-   when exiting.  */
-extern bool inhibit_sentinels;
-
 /* Exit statuses for GNU programs that exec other programs.  */
 enum
 {
