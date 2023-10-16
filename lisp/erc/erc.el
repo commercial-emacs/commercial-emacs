@@ -531,6 +531,8 @@ See also: `erc-remove-server-user' and
 
 Removes all users in the current channel.  This is called by
 `erc-server-PART' and `erc-server-QUIT'."
+  (when (erc--target-channel-p erc--target)
+    (setf (erc--target-channel-joined-p erc--target) nil))
   (when (and erc-server-connected
              (erc-server-process-alive)
              (hash-table-p erc-channel-users))
@@ -1389,16 +1391,6 @@ buffer during local-module setup and `erc-mode-hook' activation.")
              #'make-erc--target)
            :string string :symbol (intern (erc-downcase string))))
 
-(defvar-local erc--target nil
-  "Info about a buffer's target, if any.")
-
-;; Temporary internal getter to ease transition to `erc--target'
-;; everywhere.  Will be replaced by updated `erc-default-target'.
-(defun erc--default-target ()
-  "Return target string or nil."
-  (when erc--target
-    (erc--target-string erc--target)))
-
 (defun erc-once-with-server-event (event f)
   "Run function F the next time EVENT occurs in the `current-buffer'.
 
@@ -1415,7 +1407,7 @@ Please be sure to use this function in server-buffers.  In
 channel-buffers it may not work at all, as it uses the LOCAL
 argument of `add-hook' and `remove-hook' to ensure multiserver
 capabilities."
-  (unless (erc-server-buffer-p)
+  (unless (erc--server-buffer-p)
     (error
      "You should only run `erc-once-with-server-event' in a server buffer"))
   (let ((fun (make-symbol "fun"))
@@ -1472,26 +1464,37 @@ the process buffer."
   (and (processp erc-server-process)
        (buffer-live-p (process-buffer erc-server-process))))
 
-(defun erc-server-buffer-p (&optional buffer)
+(define-obsolete-function-alias
+  'erc-server-buffer-p 'erc-server-or-unjoined-channel-buffer-p "30.1")
+(defun erc-server-or-unjoined-channel-buffer-p (&optional buffer)
   "Return non-nil if argument BUFFER is an ERC server buffer.
-
-If BUFFER is nil, the current buffer is used."
+If BUFFER is nil, use the current buffer.  For historical
+reasons, also return non-nil for channel buffers the client has
+parted or from which it's been kicked."
   (with-current-buffer (or buffer (current-buffer))
     (and (eq major-mode 'erc-mode)
          (null (erc-default-target)))))
+
+(defun erc--server-buffer-p (&optional buffer)
+  "Return non-nil if BUFFER is an ERC server buffer.
+Without BUFFER, use the current buffer."
+  (if buffer
+      (with-current-buffer buffer
+        (and (eq major-mode 'erc-mode) (null erc--target)))
+    (and (eq major-mode 'erc-mode) (null erc--target))))
 
 (defun erc-open-server-buffer-p (&optional buffer)
   "Return non-nil if BUFFER is an ERC server buffer with an open IRC process.
 
 If BUFFER is nil, the current buffer is used."
-  (and (erc-server-buffer-p buffer)
+  (and (erc--server-buffer-p buffer)
        (erc-server-process-alive buffer)))
 
 (defun erc-query-buffer-p (&optional buffer)
   "Return non-nil if BUFFER is an ERC query buffer.
 If BUFFER is nil, the current buffer is used."
   (with-current-buffer (or buffer (current-buffer))
-    (let ((target (erc-default-target)))
+    (let ((target (erc-target)))
       (and (eq major-mode 'erc-mode)
            target
            (not (memq (aref target 0) '(?# ?& ?+ ?!)))))))
@@ -1855,7 +1858,10 @@ All strings are compared according to IRC protocol case rules, see
 
 (defun erc-get-buffer (target &optional proc)
   "Return the buffer matching TARGET in the process PROC.
-If PROC is not supplied, all processes are searched."
+Without PROC, search all ERC buffers.  For historical reasons,
+skip buffers for channels the client has \"PART\"ed or from which
+it's been \"KICK\"ed.  Expect users to use a different function
+for finding targets independent of \"JOIN\"edness."
   (let ((downcased-target (erc-downcase target)))
     (catch 'buffer
       (erc-buffer-filter
@@ -2463,10 +2469,13 @@ in here get called with three parameters, SERVER, PORT and NICK."
   :type '(repeat function))
 
 (defcustom erc-after-connect nil
-  "Functions called after connecting to a server.
-This functions in this variable gets executed when an end of MOTD
-has been received.  All functions in here get called with the
-parameters SERVER and NICK."
+  "Abnormal hook run upon establishing a logical IRC connection.
+Runs on MOTD's end when `erc-server-connected' becomes non-nil.
+ERC calls members with `erc-server-announced-name', falling back
+to the 376/422 message's \"sender\", as well as the current nick,
+as given by the 376/422 message's \"target\" parameter, which is
+typically the same as that reported by `erc-current-nick'."
+  :package-version '(ERC . "5.6") ; FIXME sync on release
   :group 'erc-hooks
   :type '(repeat function))
 
@@ -4581,10 +4590,7 @@ the message given by REASON."
     ;; kill them
     (run-at-time
      4 nil
-     (lambda ()
-       (dolist (buffer (erc-buffer-list (lambda (buf)
-                                          (not (erc-server-buffer-p buf)))))
-         (kill-buffer buffer)))))
+     #'erc-buffer-do (lambda () (when erc--target (kill-buffer)))))
   t)
 
 (defalias 'erc-cmd-GQ #'erc-cmd-GQUIT)
@@ -5687,9 +5693,7 @@ See also: `erc-echo-notice-in-user-buffers',
         (erc-load-script f)))))
 
 (defun erc-connection-established (proc parsed)
-  "Run just after connection.
-
-Set user modes and run `erc-after-connect' hook."
+  "Set user mode and run `erc-after-connect' hook in server buffer."
   (with-current-buffer (process-buffer proc)
     (unless erc-server-connected ; only once per session
       (let ((server (or erc-server-announced-name
@@ -5708,14 +5712,11 @@ Set user modes and run `erc-after-connect' hook."
         (erc-update-mode-line)
         (erc-set-initial-user-mode nick buffer)
         (erc-server-setup-periodical-ping buffer)
-        (run-hook-with-args 'erc-after-connect server nick))))
-
-  (when erc-unhide-query-prompt
-    (erc-with-all-buffers-of-server proc
-      nil ; FIXME use `erc--target' after bug#48598
-      (when (and (erc-default-target)
-                 (not (erc-channel-p (car erc-default-recipients))))
-        (erc--unhide-prompt)))))
+        (when erc-unhide-query-prompt
+          (erc-with-all-buffers-of-server erc-server-process nil
+            (when (and erc--target (not (erc--target-channel-p erc--target)))
+              (erc--unhide-prompt))))
+        (run-hook-with-args 'erc-after-connect server nick)))))
 
 (defun erc-set-initial-user-mode (nick buffer)
   "If `erc-user-mode' is non-nil for NICK, set the user modes.
@@ -7003,28 +7004,16 @@ See also `erc-downcase'."
 ;; default target handling
 
 (defun erc--current-buffer-joined-p ()
-  "Return whether the current target buffer is joined."
-  ;; This may be a reliable means of detecting subscription status,
-  ;; but it's also roundabout and awkward.  Perhaps it's worth
-  ;; discussing adding a joined slot to `erc--target' for this.
+  "Return non-nil if the current buffer is a channel and is joined."
   (cl-assert erc--target)
   (and (erc--target-channel-p erc--target)
-       (erc-get-channel-user (erc-current-nick)) t))
-
-;; While `erc-default-target' happens to return nil in channel buffers
-;; you've parted or from which you've been kicked, using it to detect
-;; whether a channel is currently joined may become unreliable in the
-;; future.  For now, third-party code can use
-;;
-;;   (erc-get-channel-user (erc-current-nick))
-;;
-;; A predicate may be provided eventually.  For retrieving a target's
-;; name regardless of subscription or connection status, new library
-;; code should use `erc--default-target'.  Third-party code should
-;; continue to use `erc-default-target'.
+       (erc--target-channel-joined-p erc--target)
+       t))
 
 (defun erc-default-target ()
-  "Return the current default target (as a character string) or nil if none."
+  "Return the current channel or query target, if any.
+For historical reasons, return nil in channel buffers if not
+currently joined."
   (let ((tgt (car erc-default-recipients)))
     (cond
      ((not tgt) nil)
@@ -7586,15 +7575,14 @@ If it doesn't exist, create it."
   (unless (file-attributes dir) (make-directory dir))
   (or (file-accessible-directory-p dir) (error "Cannot access %s" dir)))
 
+;; FIXME make function obsolete or alias to something less confusing.
 (defun erc-kill-query-buffers (process)
-  "Kill all buffers of PROCESS.
-Does nothing if PROCESS is not a process object."
+  "Kill all target buffers of PROCESS, including channel buffers.
+Do nothing if PROCESS is not a process object."
   ;; here, we only want to match the channel buffers, to avoid
   ;; "selecting killed buffers" b0rkage.
   (when (processp process)
-    (erc-with-all-buffers-of-server process
-      (lambda ()
-	(not (erc-server-buffer-p)))
+    (erc-with-all-buffers-of-server process (lambda () erc--target)
       (kill-buffer (current-buffer)))))
 
 (defun erc-nick-at-point ()
@@ -8255,6 +8243,7 @@ See also `kill-buffer'."
   :group 'erc-hooks
   :type 'hook)
 
+;; FIXME alias and deprecate current *-function suffixed name.
 (defun erc-kill-buffer-function ()
   "Function to call when an ERC buffer is killed.
 This function should be on `kill-buffer-hook'.
@@ -8268,7 +8257,7 @@ or `erc-kill-buffer-hook' if any other buffer."
     (cond
      ((eq (erc-server-buffer) (current-buffer))
       (run-hooks 'erc-kill-server-hook))
-     ((erc-channel-p (or (erc-default-target) (buffer-name)))
+     ((erc--target-channel-p erc--target)
       (run-hooks 'erc-kill-channel-hook))
      (t
       (run-hooks 'erc-kill-buffer-hook)))))
