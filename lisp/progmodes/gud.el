@@ -973,6 +973,7 @@ It is passed through `gud-gdb-marker-filter' before we look at it."
       (setq gud-gdb-fetch-lines-string string)
       "")))
 
+
 ;; gdb speedbar functions
 
 ;; Part of the macro expansion of dframe-with-attached-buffer.
@@ -3839,6 +3840,147 @@ so they have been disabled."))
                                 #'gud-tooltip-process-output)
 		  (gud-basic-call cmd))
 		expr))))))))
+
+
+;; 'gud-lldb-history' and 'gud-gud-lldb-command-name' are required
+;; because gud-symbol uses their values if they are present.  Their
+;; names are deduced from the minor-mode name.
+(defvar gud-lldb-history nil)
+
+(defcustom gud-gud-lldb-command-name "lldb"
+  "Default command to run an executable under LLDB in text command mode."
+  :type 'string)
+
+(defun gud-lldb-marker-filter (string)
+  "Deduce interesting stuff from output STRING."
+  (cond (;; Process 72668 stopped
+         ;; * thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+         ;;     frame #0: ...) at emacs.c:1310:9 [opt]
+         (string-match (rx (and line-start (0+ blank) "frame"
+                                (0+ not-newline) " at "
+                                (group (1+ (not ":")))
+                                ":"
+                                (group (1+ digit))))
+                       string)
+         (setq gud-last-frame
+               (cons (match-string 1 string)
+                     (string-to-number (match-string 2 string)))))
+        (;; Process 72874 exited with status = 9 (0x00000009) killed
+         (string-match (rx "Process " (1+ digit) " exited with status")
+                       string)
+         (setq gud-last-last-frame nil)
+         (setq gud-overlay-arrow-position nil)))
+  string)
+
+;;;###autoload
+(defun lldb (command-line)
+  "Run lldb passing it COMMAND-LINE as arguments.
+If COMMAND-LINE names a program FILE to debug, lldb will run in
+a buffer named *gud-FILE*, and the directory containing FILE
+becomes the initial working directory and source-file directory
+for your debugger.  If you don't want `default-directory' to
+change to the directory of FILE, specify FILE without leading
+directories, in which case FILE should reside either in the
+directory of the buffer from which this command is invoked, or
+it can be found by searching PATH.
+
+If COMMAND-LINE requests that lldb attaches to a process PID, lldb
+will run in *gud-PID*, otherwise it will run in *gud*; in these
+cases the initial working directory is the `default-directory' of
+the buffer in which this command was invoked."
+  (interactive (list (gud-query-cmdline 'lldb)))
+
+  (when (and gud-comint-buffer
+	     (buffer-name gud-comint-buffer)
+	     (get-buffer-process gud-comint-buffer)
+	     (with-current-buffer gud-comint-buffer (eq gud-minor-mode 'gud-lldb)))
+    (gdb-restore-windows)
+    ;; FIXME: Copied from gud-gdb, but what does that even say?
+    (error "Multiple debugging requires restarting in text command mode"))
+
+  (gud-common-init command-line nil 'gud-lldb-marker-filter)
+  (setq-local gud-minor-mode 'lldb)
+
+  (gud-def gud-break
+           "breakpoint set --joint-specifier %f:%l"
+           "\C-b"
+           "Set breakpoint at current line.")
+  (gud-def gud-tbreak
+           "_regexp-break %f:%l"
+           "\C-t"
+	   "Set temporary breakpoint at current line.")
+  (gud-def gud-remove
+           "breakpoint clear  --line %l --file %f"
+           "\C-d"
+           "Remove breakpoint at current line")
+  (gud-def gud-step "thread step-in --count %p"
+           "\C-s"
+           "Step one source line with display.")
+  (gud-def gud-stepi
+           "thread step-inst --count %p"
+           "\C-i"
+           "Step one instruction with display.")
+  (gud-def gud-next
+           "thread step-over --count %p"
+           "\C-n"
+           "Step one line (skip functions).")
+  (gud-def gud-nexti
+           "thread step-inst-over --count %p"
+           nil
+           "Step one instruction (skip functions).")
+  (gud-def gud-cont
+           "process continue --ignore-count %p"
+           "\C-r"
+           "Continue with display.")
+  (gud-def gud-finish
+           "thread step-out"
+           "\C-f"
+           "Finish executing current function.")
+  (gud-def gud-jump
+	   (progn
+             (gud-call "_regexp-break %f:%l" arg)
+             (gud-call "_regexp-jump %f:%l"))
+	   "\C-j"
+           "Set execution address to current line.")
+  (gud-def gud-up
+           "_regexp-up up %p"
+           "<"
+           "Up N stack frames (numeric arg).")
+  (gud-def gud-down
+           "_regexp-down %p"
+           ">"
+           "Down N stack frames (numeric arg).")
+  (gud-def gud-print
+           "dwim-print %e"
+           "\C-p"
+           "Evaluate C expression at point.")
+  (gud-def gud-pstar
+           "dwim-print *%e"
+           nil
+	   "Evaluate C dereferenced pointer expression at point.")
+
+  ;; For debugging Emacs only.
+  (gud-def gud-pv
+           "xprint %e"
+           "\C-v"
+           "Print the value of the lisp variable.")
+
+  (gud-def gud-until
+           "thread until %l"
+           "\C-u"
+           "Continue to current line.")
+  (gud-def gud-run
+           ;; Extension for process launch --tty?
+           "process launch -X true"
+	   nil
+           "Run the program.")
+
+  (gud-set-repeat-map-property 'gud-gdb-repeat-map)
+  (setq comint-prompt-regexp "^(lldb) *")
+  (setq paragraph-start comint-prompt-regexp)
+  (setq gud-running nil)
+  (setq gud-filter-pending-text nil)
+  (run-hooks 'gud-lldb-mode-hook))
 
 (provide 'gud)
 
