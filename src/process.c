@@ -921,21 +921,12 @@ Interactively, it will kill the current buffer's process.  */)
   p = XPROCESS (process);
 
 #ifdef HAVE_GETADDRINFO_A
-  if (p->dns_request)
+  if (p->dns_request
+      && gai_cancel (p->dns_request) == EAI_NOTCANCELED)
     {
-      /* Cancel the request.  Unless shutting down, wait until
-	 completion.  Free the request if completely canceled. */
-
-      bool canceled = gai_cancel (p->dns_request) != EAI_NOTCANCELED;
-      if (! canceled && ! NILP (p->sentinel))
-	{
-	  struct gaicb const *req = p->dns_request;
-	  while (gai_suspend (&req, 1, NULL) != 0)
-	    continue;
-	  canceled = true;
-	}
-      if (canceled)
-	free_dns_request (process);
+      while (gai_suspend ((const struct gaicb * const *) &p->dns_request, 1, NULL))
+	sleep (0.05);
+      free_dns_request (process);
     }
 #endif
 
@@ -7370,8 +7361,19 @@ kill_sentinels_then_processes (void)
 {
   Lisp_Object tail, proc;
   FOR_EACH_PROCESS (tail, proc)
+    {
     /* hope shutdown sustains Finternal_default_process_sentinel.  */
     pset_sentinel (XPROCESS (proc), Qnil);
+#ifdef HAVE_GETADDRINFO_A
+      struct gaicb *gcb = XPROCESS (proc)->dns_request;
+      if (gcb)
+	{
+	  /* Fdelete_process waits for reply; we don't. */
+	  gai_cancel (gcb);
+	  free_dns_request (proc);
+	}
+#endif
+    }
   kill_buffer_processes (Qnil);
 }
 
