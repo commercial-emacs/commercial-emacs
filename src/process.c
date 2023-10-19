@@ -6902,17 +6902,15 @@ handle_child_signal (int sig)
 
   /* Find the process that signaled us, which could have
      been Fdelete_process'd.  */
-  for (Lisp_Object tail = deleted_pid_list, head = XCAR (tail);
-       CONSP (tail);
-       tail = XCDR (tail), head = XCAR (tail))
+  for (Lisp_Object tail = deleted_pid_list; CONSP (tail); tail = XCDR (tail))
     {
-      bool all_pids_are_fixnums
+      static const bool q_fixnum
 	= (MOST_NEGATIVE_FIXNUM <= TYPE_MINIMUM (pid_t)
 	   && TYPE_MAXIMUM (pid_t) <= MOST_POSITIVE_FIXNUM);
-      if (CONSP (head) &&
-	  (all_pids_are_fixnums ? FIXNUMP (xpid) : INTEGERP (xpid)))
+      Lisp_Object head = XCAR (tail);
+      Lisp_Object xpid = CONSP (head) ? XCAR (head) : Qnil;
+      if (q_fixnum ? FIXNUMP (xpid) : INTEGERP (xpid))
 	{
-	  Lisp_Object xpid = XCAR (head);
 	  intmax_t deleted_pid;
 	  bool ok = integer_to_intmax (xpid, &deleted_pid);
 	  eassert (ok);
@@ -6959,6 +6957,7 @@ handle_child_signal (int sig)
   if (changed)
     child_signal_notify (); /* Wake up wait_reading_process_output.  */
 
+
   lib_child_handler (sig);
 #ifdef NS_IMPL_GNUSTEP
   /* NSTask in GNUstep sets its child handler each time it is called.
@@ -6971,12 +6970,6 @@ static void
 deliver_child_signal (int sig)
 {
   handle_signal (sig, handle_child_signal);
-}
-
-static void
-deliver_gc_signal (int sig)
-{
-  handle_signal (sig, handle_gc_signal);
 }
 
 static Lisp_Object
@@ -7559,17 +7552,6 @@ catch_child_signal (void)
   unblock_child_signal (&oldset);
 }
 
-void
-catch_gc_signal (void)
-{
-  struct sigaction action;
-  sigset_t oldset;
-  emacs_sigaction_init (&action, deliver_gc_signal);
-  block_gc_signal (&oldset);
-  sigaction (SIGRTMIN, &action, 0);
-  unblock_gc_signal (&oldset);
-}
-
 /* Limit the number of open files to the value it had at startup.  */
 
 void
@@ -7687,8 +7669,6 @@ init_process_emacs (int sockfd)
 #else
   catch_child_signal ();
 #endif
-
-  catch_gc_signal ();
 
 #ifdef HAVE_SETRLIMIT
   /* Don't allocate more than FD_SETSIZE file descriptors for Emacs itself.  */

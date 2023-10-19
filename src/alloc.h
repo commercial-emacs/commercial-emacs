@@ -10,11 +10,6 @@
 #include <signal.h>		/* For SIGABRT, SIGDANGER.  */
 #include <sys/mman.h>
 
-#ifdef HAVE_PTHREAD
-#include <pthread.h>
-#include <semaphore.h>
-#endif
-
 #include "lisp.h"
 #include "bignum.h"
 #include "dispextern.h"
