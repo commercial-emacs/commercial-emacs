@@ -2067,9 +2067,6 @@ init_signals (void)
 #ifdef SIGTALRM
   sigaction (SIGTALRM, &thread_fatal_action, 0);
 #endif
-#ifdef SIGRTMIN
-  sigaction (SIGRTMIN, &thread_fatal_action, 0);
-#endif
 }
 
 #ifndef HAVE_RANDOM

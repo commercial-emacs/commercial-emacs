@@ -261,7 +261,7 @@ static int external_sock_fd;
 /* File descriptor that becomes readable when we receive SIGCHLD.  */
 static int child_signal_read_fd = -1;
 /* The write end thereof.  The SIGCHLD handler writes to this file
-   descriptor to notify `wait_reading_process_output' of process
+   descriptor to notify wait_reading_process_output of process
    status changes.  */
 static int child_signal_write_fd = -1;
 #ifndef WINDOWSNT
@@ -5148,7 +5148,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
       got_some_output = max (got_some_output, status_notify (wait_proc));
 
-      /* `set_waiting_for_input' is a Blandyism that claims to have emacs
+      /* set_waiting_for_input is a Blandyism that claims to have emacs
 	 react immediately to C-g and signals.
 	 Passing a writable reference to timeout so that signal handlers
 	 can manipulate timeout out-of-band in the code that follows
@@ -6786,7 +6786,7 @@ process has been transmitted to the serial port.  */)
    'wait_reading_process_output' and pass a non-NULL signal mask to
    'pselect' to avoid the need for the self-pipe.  */
 
-/* Set up `child_signal_read_fd' and `child_signal_write_fd'.  */
+/* Set up child_signal_read_fd and child_signal_write_fd.  */
 
 void
 child_signal_init (void)
@@ -6803,8 +6803,8 @@ child_signal_init (void)
     report_file_error ("Creating pipe for child signal", Qnil);
   if (FD_SETSIZE <= fds[0])
     {
-      /* Since we need to `pselect' on the read end, it has to fit
-	 into an `fd_set'.  */
+      /* Since we need to pselect on the read end, it has to fit
+	 into an fd_set.  */
       emacs_close (fds[0]);
       emacs_close (fds[1]);
       report_file_errno ("Creating pipe for child signal", Qnil,
@@ -6855,7 +6855,7 @@ child_signal_notify (void)
      if (emacs_write (fd, &dummy, 1) != 1)
        emacs_perror ("writing to child signal FD");
 
-     But this calls `emacs_perror', which in turn invokes a localized
+     But this calls emacs_perror, which in turn invokes a localized
      version of strerror, which is not reentrant and must not be
      called within a signal handler:
 
@@ -6886,53 +6886,33 @@ child_signal_notify (void)
 static void dummy_handler (int sig) {}
 static signal_handler_t volatile lib_child_handler;
 
-/* Handle a SIGCHLD signal by looking for known child processes of
-   Emacs whose status have changed.  For each one found, record its
-   new status.
+/* Record changed statuses of child processes.
 
-   All we do is change the status; we do not run sentinels or print
-   notifications.  That is saved for the next time keyboard input is
-   done, in order to avoid timing errors.
+   To avoid timing issues, do not run sentinels or print notifications,
+   which are processed by subsequent keyboard input.
 
-   ** WARNING: this can be called during garbage collection.
-   Therefore, it must not be fooled by the presence of mark bits in
-   Lisp objects.
+   As SIGCHLD could occur during gc, objects may have flagged mark bits.
 
-   ** USG WARNING: Although it is not obvious from the documentation
-   in signal(2), on a USG system the SIGCLD handler MUST NOT call
-   signal() before executing at least one wait(), otherwise the
-   handler will be called again, resulting in an infinite loop.  The
-   relevant portion of the documentation reads "SIGCLD signals will be
-   queued and the signal-catching function will be continually
-   reentered until the queue is empty".  Invoking signal() causes the
-   kernel to reexamine the SIGCLD queue.  Fred Fish, UniSoft Systems
-   Inc.
-
-   ** Malloc WARNING: This should never call malloc either directly or
-   indirectly; if it does, that is a bug.  */
+   Signal handlers should never call malloc.  */
 
 static void
 handle_child_signal (int sig)
 {
-  Lisp_Object tail, proc;
   bool changed = false;
 
-  /* Find the process that signaled us, and record its status.  */
-
-  /* The process can have been deleted by Fdelete_process, or have
-     been started asynchronously by Fcall_process.  */
-  for (tail = deleted_pid_list; CONSP (tail); tail = XCDR (tail))
+  /* Find the process that signaled us, which could have
+     been Fdelete_process'd.  */
+  for (Lisp_Object tail = deleted_pid_list, head = XCAR (tail);
+       CONSP (tail);
+       tail = XCDR (tail), head = XCAR (tail))
     {
       bool all_pids_are_fixnums
 	= (MOST_NEGATIVE_FIXNUM <= TYPE_MINIMUM (pid_t)
 	   && TYPE_MAXIMUM (pid_t) <= MOST_POSITIVE_FIXNUM);
-      Lisp_Object head = XCAR (tail);
-      Lisp_Object xpid;
-      if (! CONSP (head))
-	continue;
-      xpid = XCAR (head);
-      if (all_pids_are_fixnums ? FIXNUMP (xpid) : INTEGERP (xpid))
+      if (CONSP (head) &&
+	  (all_pids_are_fixnums ? FIXNUMP (xpid) : INTEGERP (xpid)))
 	{
+	  Lisp_Object xpid = XCAR (head);
 	  intmax_t deleted_pid;
 	  bool ok = integer_to_intmax (xpid, &deleted_pid);
 	  eassert (ok);
@@ -6946,12 +6926,12 @@ handle_child_signal (int sig)
 	}
     }
 
-  /* Otherwise, if it is asynchronous, it is in Vprocess_alist.  */
+  /* Otherwise find the signaller in Vprocess_alist.  */
+  Lisp_Object tail, proc;
   FOR_EACH_PROCESS (tail, proc)
     {
-      struct Lisp_Process *p = XPROCESS (proc);
       int status;
-
+      struct Lisp_Process *p = XPROCESS (proc);
       if (p->alive
 	  && child_status_changed (p->pid, &status, WUNTRACED | WCONTINUED))
 	{
@@ -6977,8 +6957,7 @@ handle_child_signal (int sig)
     }
 
   if (changed)
-    /* Wake up `wait_reading_process_output'.  */
-    child_signal_notify ();
+    child_signal_notify (); /* Wake up wait_reading_process_output.  */
 
   lib_child_handler (sig);
 #ifdef NS_IMPL_GNUSTEP
@@ -6992,6 +6971,12 @@ static void
 deliver_child_signal (int sig)
 {
   handle_signal (sig, handle_child_signal);
+}
+
+static void
+deliver_gc_signal (int sig)
+{
+  handle_signal (sig, handle_gc_signal);
 }
 
 static Lisp_Object
@@ -7362,8 +7347,8 @@ kill_sentinels_then_processes (void)
   Lisp_Object tail, proc;
   FOR_EACH_PROCESS (tail, proc)
     {
-    /* hope shutdown sustains Finternal_default_process_sentinel.  */
-    pset_sentinel (XPROCESS (proc), Qnil);
+      /* hope shutdown sustains Finternal_default_process_sentinel.  */
+      pset_sentinel (XPROCESS (proc), Qnil);
 #ifdef HAVE_GETADDRINFO_A
       struct gaicb *gcb = XPROCESS (proc)->dns_request;
       if (gcb)
@@ -7516,8 +7501,8 @@ DEFUN ("num-processors", Fnum_processors, Snum_processors, 0, 1, 0,
 Each usable thread execution unit counts as a processor.
 By default, count the number of available processors,
 overridable via the OMP_NUM_THREADS environment variable.
-If optional argument QUERY is `current', ignore OMP_NUM_THREADS.
-If QUERY is `all', also count processors not available.  */)
+If optional argument QUERY is 'current, ignore OMP_NUM_THREADS.
+If QUERY is 'all, also count processors not available.  */)
   (Lisp_Object query)
 {
 #ifndef MSDOS
@@ -7572,6 +7557,17 @@ catch_child_signal (void)
 	 ? dummy_handler
 	 : old_action.sa_handler);
   unblock_child_signal (&oldset);
+}
+
+void
+catch_gc_signal (void)
+{
+  struct sigaction action;
+  sigset_t oldset;
+  emacs_sigaction_init (&action, deliver_gc_signal);
+  block_gc_signal (&oldset);
+  sigaction (SIGRTMIN, &action, 0);
+  unblock_gc_signal (&oldset);
 }
 
 /* Limit the number of open files to the value it had at startup.  */
@@ -7692,6 +7688,8 @@ init_process_emacs (int sockfd)
   catch_child_signal ();
 #endif
 
+  catch_gc_signal ();
+
 #ifdef HAVE_SETRLIMIT
   /* Don't allocate more than FD_SETSIZE file descriptors for Emacs itself.  */
   if (getrlimit (RLIMIT_NOFILE, &nofile_limit) != 0)
@@ -7724,9 +7722,8 @@ init_process_emacs (int sockfd)
   Vprocess_alist = Qnil;
   deleted_pid_list = Qnil;
   for (int i = 0; i < FD_SETSIZE; i++)
-    {
-      chan_process[i] = Qnil;
-    }
+    chan_process[i] = Qnil;
+
   memset (proc_decode_coding_system, 0, sizeof proc_decode_coding_system);
   memset (proc_encode_coding_system, 0, sizeof proc_encode_coding_system);
 #ifdef DATAGRAM_SOCKETS

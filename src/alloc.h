@@ -12,6 +12,7 @@
 
 #ifdef HAVE_PTHREAD
 #include <pthread.h>
+#include <semaphore.h>
 #endif
 
 #include "lisp.h"
