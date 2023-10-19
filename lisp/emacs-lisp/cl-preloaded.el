@@ -57,7 +57,7 @@
     (cons list sequence)
     ;; Markers aren't `numberp', yet they are accepted wherever integers are
     ;; accepted, pretty much.
-    (marker integer-or-marker number-or-marker atom)
+    (marker number-or-marker atom)
     (overlay atom) (float number number-or-marker atom)
     (window-configuration atom) (process atom) (window atom)
     ;; FIXME: We'd want to put `function' here, but that's only true
@@ -65,7 +65,7 @@
     (subr atom)
     ;; FIXME: We should probably reverse the order between
     ;; `compiled-function' and `byte-code-function' since arguably
-    ;; `subr' is also "compiled functions" but not "byte code functions",
+    ;; `subr' and also "compiled functions" but not "byte code functions",
     ;; but it would require changing the value returned by `type-of' for
     ;; byte code objects, which risks breaking existing code, which doesn't
     ;; seem worth the trouble.
