@@ -3490,8 +3490,7 @@ Of course, we really can't know that for sure, so it's just a heuristic."
                  (symbol	. symbolp)
                  (vector	. vectorp)
                  (window	. windowp)
-                 ;; FIXME: Do we really want to consider these types?
-                 (number-or-marker . number-or-marker-p)
+                 ;; FIXME: Do we really want to consider this a type?
                  (integer-or-marker . integer-or-marker-p)
                  ))
   (put type 'cl-deftype-satisfies pred))
