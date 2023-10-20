@@ -192,7 +192,6 @@ static Lisp_Object value_to_lisp (emacs_value);
 static emacs_value allocate_emacs_value (emacs_env *, Lisp_Object);
 static emacs_value lisp_to_value (emacs_env *, Lisp_Object);
 static enum emacs_funcall_exit module_non_local_exit_check (emacs_env *);
-static void module_assert_thread (void);
 static void module_assert_runtime (struct emacs_runtime *);
 static void module_assert_env (emacs_env *);
 static AVOID module_abort (const char *, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
@@ -330,7 +329,6 @@ module_decode_utf_8 (const char *str, ptrdiff_t len)
 
 #define MODULE_FUNCTION_BEGIN_NO_CATCH(error_retval)                    \
   do {                                                                  \
-    module_assert_thread ();                                            \
     module_assert_env (env);                                            \
     if (module_non_local_exit_check (env) != emacs_funcall_exit_return) \
       return error_retval;                                              \
@@ -363,7 +361,6 @@ CHECK_USER_PTR (Lisp_Object obj)
 static emacs_env *
 module_get_environment (struct emacs_runtime *runtime)
 {
-  module_assert_thread ();
   module_assert_runtime (runtime);
   return runtime->private_members->env;
 }
@@ -486,7 +483,6 @@ module_free_global_ref (emacs_env *env, emacs_value global_value)
 static enum emacs_funcall_exit
 module_non_local_exit_check (emacs_env *env)
 {
-  module_assert_thread ();
   module_assert_env (env);
   return env->private_members->pending_non_local_exit;
 }
@@ -494,7 +490,6 @@ module_non_local_exit_check (emacs_env *env)
 static void
 module_non_local_exit_clear (emacs_env *env)
 {
-  module_assert_thread ();
   module_assert_env (env);
   env->private_members->pending_non_local_exit = emacs_funcall_exit_return;
 }
@@ -503,7 +498,6 @@ static enum emacs_funcall_exit
 module_non_local_exit_get (emacs_env *env,
                            emacs_value *symbol, emacs_value *data)
 {
-  module_assert_thread ();
   module_assert_env (env);
   struct emacs_env_private *p = env->private_members;
   if (p->pending_non_local_exit != emacs_funcall_exit_return)
@@ -519,7 +513,6 @@ static void
 module_non_local_exit_signal (emacs_env *env,
                               emacs_value symbol, emacs_value data)
 {
-  module_assert_thread ();
   module_assert_env (env);
   if (module_non_local_exit_check (env) == emacs_funcall_exit_return)
     module_non_local_exit_signal_1 (env, value_to_lisp (symbol),
@@ -529,7 +522,6 @@ module_non_local_exit_signal (emacs_env *env,
 static void
 module_non_local_exit_throw (emacs_env *env, emacs_value tag, emacs_value value)
 {
-  module_assert_thread ();
   module_assert_env (env);
   if (module_non_local_exit_check (env) == emacs_funcall_exit_return)
     module_non_local_exit_throw_1 (env, value_to_lisp (tag),
@@ -1221,15 +1213,6 @@ module_function_data (const struct Lisp_Module_Function *function)
 
 
 /* Helper functions.  */
-
-static void
-module_assert_thread (void)
-{
-  if (!module_assertions)
-    return;
-  if (gc_in_progress)
-    module_abort ("Module function called during garbage collection");
-}
 
 static void
 module_assert_runtime (struct emacs_runtime *runtime)

@@ -884,29 +884,20 @@ static void
 haikufont_close (struct font *font)
 {
   struct haikufont_info *info = (struct haikufont_info *) font;
-  int i;
-
-  if (font_data_structures_may_be_ill_formed ())
-    return;
-
   block_input ();
   if (info && info->be_font)
     BFont_close (info->be_font);
 
-  for (i = 0; i < info->metrics_nrows; i++)
-    {
-      if (info->metrics[i])
-	xfree (info->metrics[i]);
-    }
+  for (int i = 0; i < info->metrics_nrows; i++)
+    if (info->metrics[i])
+      xfree (info->metrics[i]);
 
   if (info->metrics)
     xfree (info->metrics);
 
-  for (i = 0; i < 0x100; ++i)
-    {
-      if (info->glyphs[i])
-	xfree (info->glyphs[i]);
-    }
+  for (int i = 0; i < 0x100; ++i)
+    if (info->glyphs[i])
+      xfree (info->glyphs[i]);
 
   xfree (info->glyphs);
   unblock_input ();

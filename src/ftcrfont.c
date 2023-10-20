@@ -324,11 +324,7 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 static void
 ftcrfont_close (struct font *font)
 {
-  if (font_data_structures_may_be_ill_formed ())
-    return;
-
   struct font_info *ftcrfont_info = (struct font_info *) font;
-
   block_input ();
 #ifdef HAVE_LIBOTF
   if (ftcrfont_info->otf)

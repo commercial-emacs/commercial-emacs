@@ -11073,10 +11073,6 @@ w32_reset_stack_overflow_guard (void)
 static void
 stack_overflow_handler (void)
 {
-  /* Hard GC error may lead to stack overflow caused by
-     too nested calls to mark_object.  No way to survive.  */
-  if (gc_in_progress)
-    terminate_due_to_signal (SIGSEGV, 40);
 #ifdef _WIN64
   /* See ms-w32.h: MinGW64's longjmp crashes if invoked in this context.  */
   __builtin_longjmp (return_to_command_loop, 1);

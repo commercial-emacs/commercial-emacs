@@ -10988,37 +10988,19 @@ handle_keyboard_quit (bool in_signal_handler)
 
       write_stdout ("Emacs is resuming after an emergency escape.\n");
 
-      /* It doesn't work to autosave while GC is in progress;
-	 the code used for auto-saving doesn't cope with the mark bit.  */
-      if (! gc_in_progress)
+      write_stdout ("Auto-save? (y or n) ");
+      c = read_stdin ();
+      if (c == 'y' || c == 'Y')
 	{
-	  write_stdout ("Auto-save? (y or n) ");
-	  c = read_stdin ();
-	  if (c == 'y' || c == 'Y')
-	    {
-	      Fdo_auto_save (Qt, Qnil);
+	  Fdo_auto_save (Qt, Qnil);
 #ifdef MSDOS
-	      write_stdout ("\r\nAuto-save done");
+	  write_stdout ("\r\nAuto-save done");
 #else
-	      write_stdout ("Auto-save done\n");
+	  write_stdout ("Auto-save done\n");
 #endif
-	    }
-	  while (c != '\n')
-	    c = read_stdin ();
 	}
-      else
-	{
-	  /* During GC, it must be safe to reenable quitting again.  */
-	  Vinhibit_quit = Qnil;
-	  write_stdout
-	    (
-#ifdef MSDOS
-	     "\r\n"
-#endif
-	     "Garbage collection in progress; cannot auto-save now\r\n"
-	     "but will instead do a real quit"
-	     " after garbage collection ends\r\n");
-	}
+      while (c != '\n')
+	c = read_stdin ();
 
 #ifdef MSDOS
       write_stdout ("\r\nAbort?  (y or n) ");

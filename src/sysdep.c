@@ -1855,17 +1855,11 @@ handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
 {
   if (mgc_handle_sigsegv (siginfo->si_addr))
     return;
-
-  /* Hard GC error may lead to stack overflow caused by
-     too nested calls to mark_object.  No way to survive.  */
-  bool fatal = gc_in_progress;
-
+  else if (
 #ifdef HAVE_PTHREAD
-  if (!fatal && !pthread_equal (pthread_self (), main_thread_id))
-    fatal = true;
+      pthread_equal (pthread_self (), main_thread_id) &&
 #endif
-
-  if (!fatal && stack_overflow (siginfo))
+      stack_overflow (siginfo))
     siglongjmp (return_to_command_loop, 1);
 
   /* Otherwise we can't do anything with this.  */

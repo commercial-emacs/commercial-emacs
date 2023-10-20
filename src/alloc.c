@@ -106,8 +106,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 # define symbol_free_list (main_thread->m_symbol_free_list)
 #endif
 
-bool gc_inhibited;
-
 struct Lisp_String *(*static_string_allocator) (void);
 struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t len, bool q_clear);
 INTERVAL (*static_interval_allocator) (void);
@@ -117,7 +115,7 @@ INTERVAL (*static_interval_allocator) (void);
 EMACS_INT bytes_since_gc;
 EMACS_INT bytes_between_gc;
 Lisp_Object Vmemory_full;
-bool gc_in_progress;
+static bool gc_inhibited;
 
 /* Last recorded live and free-list counts.  */
 static struct
@@ -2080,9 +2078,7 @@ free_by_pvtype (struct Lisp_Vector *vector)
 	{
 	  struct font *font = PSEUDOVEC_STRUCT (vector, font);
 	  struct font_driver const *drv = font->driver;
-
-	  /* DRV could be NULL for interrupts on startup. Bug#16140  */
-	  if (drv)
+	  if (drv) /* NULL when Bug#16140.  */
 	    {
 	      eassume (valid_font_driver (drv));
 	      drv->close_font (font);
@@ -4599,12 +4595,10 @@ garbage_collect (void)
 
   eassert (weak_hash_tables == NULL);
 
-  if (gc_inhibited || gc_in_progress)
+  if (gc_inhibited)
     return false;
 
   block_input ();
-
-  gc_in_progress = true;
 
   eassert (mark_stack_empty_p ());
 
@@ -4683,8 +4677,6 @@ garbage_collect (void)
   bytes_since_gc = 0;
 
   update_bytes_between_gc ();
-
-  gc_in_progress = false;
 
   /* Unblock as late as possible since it could signal (Bug#43389).  */
   unblock_input ();
@@ -5891,7 +5883,6 @@ static void init_runtime (void);
 void
 init_alloc_once (void)
 {
-  gc_inhibited = false;
   gc_cons_threshold = GC_DEFAULT_THRESHOLD;
 
   PDUMPER_REMEMBER_SCALAR (buffer_slot_defaults.header);

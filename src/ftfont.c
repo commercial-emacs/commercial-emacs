@@ -1491,14 +1491,9 @@ ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 void
 ftfont_close (struct font *font)
 {
-  if (font_data_structures_may_be_ill_formed ())
-    return;
-
   struct font_info *ftfont_info = (struct font_info *) font;
-  Lisp_Object val, cache;
-
-  val = Fcons (font->props[FONT_FILE_INDEX], make_fixnum (ftfont_info->index));
-  cache = ftfont_lookup_cache (val, FTFONT_CACHE_FOR_FACE);
+  Lisp_Object val = Fcons (font->props[FONT_FILE_INDEX], make_fixnum (ftfont_info->index));
+  Lisp_Object cache = ftfont_lookup_cache (val, FTFONT_CACHE_FOR_FACE);
   eassert (CONSP (cache));
   val = XCDR (cache);
   struct ftfont_cache_data *cache_data = xmint_pointer (val);
