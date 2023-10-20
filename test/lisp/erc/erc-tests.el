@@ -69,26 +69,25 @@
     (with-current-buffer (get-buffer-create "#foo")
       (erc-mode)
       (setq erc-server-process proc-exnet)
-      (setq erc-default-recipients '("#foo")))
+      (setq erc--target (erc--target-from-string "#foo")))
 
     (with-current-buffer (get-buffer-create "#spam")
       (erc-mode)
       (setq erc-server-process proc-onet)
-      (setq erc-default-recipients '("#spam")))
+      (setq erc--target (erc--target-from-string "#spam")))
 
     (with-current-buffer (get-buffer-create "#bar")
       (erc-mode)
       (setq erc-server-process proc-onet)
-      (setq erc-default-recipients '("#bar")))
+      (setq erc--target (erc--target-from-string "#bar")))
 
     (with-current-buffer (get-buffer-create "#baz")
       (erc-mode)
       (setq erc-server-process proc-exnet)
-      (setq erc-default-recipients '("#baz")))
+      (setq erc--target (erc--target-from-string "#baz")))
 
     (should (eq (get-buffer-process "ExampleNet") proc-exnet))
-    (erc-with-all-buffers-of-server (get-buffer-process "ExampleNet")
-      nil
+    (erc-with-all-buffers-of-server (get-buffer-process "ExampleNet") nil
       (kill-buffer))
 
     (should-not (get-buffer "ExampleNet"))
@@ -102,8 +101,7 @@
            (calls 0)
            (get-test (lambda () (cl-incf calls) test)))
 
-      (erc-with-all-buffers-of-server proc-onet
-        (funcall get-test)
+      (erc-with-all-buffers-of-server proc-onet (funcall get-test)
         (kill-buffer))
 
       (should (= calls 1)))
@@ -812,7 +810,7 @@
 
 (ert-deftest erc--target-from-string ()
   (should (equal (erc--target-from-string "#chan")
-                 #s(erc--target-channel "#chan" \#chan)))
+                 #s(erc--target-channel "#chan" \#chan nil)))
 
   (should (equal (erc--target-from-string "Bob")
                  #s(erc--target "Bob" bob)))
@@ -820,7 +818,7 @@
   (let ((erc--isupport-params (make-hash-table)))
     (puthash 'CHANTYPES  '("&#") erc--isupport-params)
     (should (equal (erc--target-from-string "&Bitlbee")
-                   #s(erc--target-channel-local "&Bitlbee" &bitlbee)))))
+                   #s(erc--target-channel-local "&Bitlbee" &bitlbee nil)))))
 
 (ert-deftest erc--modify-local-map ()
   (when (and (bound-and-true-p erc-irccontrols-mode)
@@ -1846,6 +1844,7 @@
         (erc-mode)
         (setq erc-server-process (buffer-local-value 'erc-server-process
                                                      (get-buffer "ExampleNet"))
+              erc--target (erc--target-from-string "#chan")
               erc-default-recipients '("#chan")
               erc-channel-users (make-hash-table :test 'equal)
               erc-network 'ExampleNet)
@@ -1937,6 +1936,69 @@
                1 2 (font-lock-face erc-nick-prefix-face help-echo "operator")
                2 5 (erc-speaker "Bob" font-lock-face erc-nick-default-face)
                5 12 (font-lock-face erc-default-face))))))
+
+(ert-deftest erc--route-insertion ()
+  (erc-tests--send-prep)
+  (erc-tests--set-fake-server-process "sleep" "1")
+  (setq erc-networks--id (erc-networks--id-create 'foonet))
+
+  (let* ((erc-modules) ; for `erc--open-target'
+         (server-buffer (current-buffer))
+         (spam-buffer (save-excursion (erc--open-target "#spam")))
+         (chan-buffer (save-excursion (erc--open-target "#chan")))
+         calls)
+    (cl-letf (((symbol-function 'erc-insert-line)
+               (lambda (&rest r) (push (cons 'line-1 r) calls))))
+
+      (with-current-buffer chan-buffer
+
+        (ert-info ("Null `buffer' routes to live server-buffer")
+          (erc--route-insertion "null" nil)
+          (should (equal (pop calls) `(line-1 "null" ,server-buffer)))
+          (should-not calls))
+
+        (ert-info ("Cons `buffer' routes to live members")
+          ;; Copies a let-bound `erc--msg-props' before mutating.
+          (let* ((table (map-into '(erc-msg msg) 'hash-table))
+                 (erc--msg-props table))
+            (erc--route-insertion "cons" (list server-buffer spam-buffer))
+            (should-not (eq table erc--msg-props)))
+          (should (equal (pop calls) `(line-1 "cons" ,spam-buffer)))
+          (should (equal (pop calls) `(line-1 "cons" ,server-buffer)))
+          (should-not calls))
+
+        (ert-info ("Variant `all' inserts in all session buffers")
+          (erc--route-insertion "all" 'all)
+          (should (equal (pop calls) `(line-1 "all" ,chan-buffer)))
+          (should (equal (pop calls) `(line-1 "all" ,spam-buffer)))
+          (should (equal (pop calls) `(line-1 "all" ,server-buffer)))
+          (should-not calls))
+
+        (ert-info ("Variant `active' routes to active buffer if alive")
+          (should (eq chan-buffer (erc-with-server-buffer erc-active-buffer)))
+          (erc-set-active-buffer spam-buffer)
+          (erc--route-insertion "act" 'active)
+          (should (equal (pop calls) `(line-1 "act" ,spam-buffer)))
+          (should (eq (erc-active-buffer) spam-buffer))
+          (should-not calls))
+
+        (ert-info ("Variant `active' falls back to current buffer")
+          (should (eq spam-buffer (erc-active-buffer)))
+          (kill-buffer "#spam")
+          (erc--route-insertion "nact" 'active)
+          (should (equal (pop calls) `(line-1 "nact" ,server-buffer)))
+          (should (eq (erc-with-server-buffer erc-active-buffer)
+                      server-buffer))
+          (should-not calls))
+
+        (ert-info ("Dead single buffer defaults to live server-buffer")
+          (should-not (get-buffer "#spam"))
+          (erc--route-insertion "dead" 'spam-buffer)
+          (should (equal (pop calls) `(line-1 "dead" ,server-buffer)))
+          (should-not calls))))
+
+    (should-not (buffer-live-p spam-buffer))
+    (kill-buffer chan-buffer)))
 
 (defvar erc-tests--ipv6-examples
   '("1:2:3:4:5:6:7:8"

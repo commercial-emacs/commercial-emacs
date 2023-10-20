@@ -219,7 +219,9 @@ This becomes the message's `erc-ts' text property."
   (erc-compat--current-lisp-time))
 
 (cl-defmethod erc-stamp--current-time :around ()
-  (or erc-stamp--current-time (cl-call-next-method)))
+  (or erc-stamp--current-time
+      (and erc--msg-props (gethash 'erc-ts erc--msg-props))
+      (cl-call-next-method)))
 
 (defvar erc-stamp--skip nil
   "Non-nil means inhibit `erc-add-timestamp' completely.")
@@ -490,8 +492,11 @@ and `erc-stamp--margin-left-p', before activating the mode."
     (put-text-property erc-insert-marker (1- erc-input-marker)
                        'display `((margin left-margin) ,prompt))))
 
-(cl-defmethod erc-insert-timestamp-left (string)
+(defun erc-insert-timestamp-left (string)
   "Insert timestamps at the beginning of the line."
+  (erc--insert-timestamp-left string))
+
+(cl-defmethod erc--insert-timestamp-left (string)
   (goto-char (point-min))
   (let* ((ignore-p (and erc-timestamp-only-if-changed-flag
 			(string-equal string erc-timestamp-last-inserted)))
@@ -502,13 +507,12 @@ and `erc-stamp--margin-left-p', before activating the mode."
     (erc-put-text-property 0 len 'invisible erc-stamp--invisible-property s)
     (insert s)))
 
-(cl-defmethod erc-insert-timestamp-left
+(cl-defmethod erc--insert-timestamp-left
   (string &context (erc-stamp--display-margin-mode (eql t)))
   (unless (and erc-timestamp-only-if-changed-flag
                (string-equal string erc-timestamp-last-inserted))
     (goto-char (point-min))
-    (insert-before-markers-and-inherit
-     (setq erc-timestamp-last-inserted string))
+    (insert-and-inherit (setq erc-timestamp-last-inserted string))
     (dolist (p erc-stamp--inherited-props)
       (when-let ((v (get-text-property (point) p)))
         (put-text-property (point-min) (point) p v)))
@@ -702,10 +706,12 @@ left-sided stamps and date stamps inserted by this function."
   (unless erc-stamp--date-format-end
     (add-hook 'erc-insert-pre-hook #'erc-stamp--lr-date-on-pre-modify -95 t)
     (add-hook 'erc-send-pre-functions #'erc-stamp--lr-date-on-pre-modify -95 t)
-    (let ((erc--insert-marker (point-min-marker)))
+    (let ((erc--insert-marker (point-min-marker))
+          (end-marker (point-max-marker)))
       (set-marker-insertion-type erc--insert-marker t)
       (erc-stamp--lr-date-on-pre-modify nil)
-      (narrow-to-region erc--insert-marker (point-max))
+      (narrow-to-region erc--insert-marker end-marker)
+      (set-marker end-marker nil)
       (set-marker erc--insert-marker nil)))
   (let* ((ct (or erc-stamp--current-time (erc-stamp--current-time)))
          (ts-right (with-suppressed-warnings
