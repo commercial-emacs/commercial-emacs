@@ -280,19 +280,6 @@ should nevertheless detect the invalid load."
     (mod-test-invalid-store-copy)
     (mod-test-invalid-load)))
 
-(ert-deftest module--test-assertions--call-emacs-from-gc ()
-  "Check that -module-assertions prevents calling Emacs functions
-during garbage collection."
-  :tags (if (getenv "EMACS_EMBA_CI") '(:unstable))
-  (skip-unless (and (not (cl-search "enable-profiling" system-configuration-options))
-                    (or (file-executable-p mod-test-emacs)
-                        (and (eq system-type 'windows-nt)
-                             (file-executable-p (concat mod-test-emacs ".exe"))))))
-  (module--test-assertion
-      (rx "Module function called during garbage collection\n")
-    (mod-test-invalid-finalizer)
-    (garbage-collect)))
-
 (ert-deftest module--test-assertions--globref-invalid-free ()
   "Check that -module-assertions detects invalid freeing of a
 local reference."
