@@ -56,6 +56,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 */
 
 #include "alloc.h"
+#include "semaphore.h"
 #include "mem_node.h"
 
 #ifdef HAVE_GCC_TLS
@@ -112,6 +113,7 @@ INTERVAL (*static_interval_allocator) (void);
 
 /* Exposed to lisp.h so that maybe_garbage_collect() can inline.  */
 
+sem_t sem_nhalted;
 EMACS_INT bytes_since_gc;
 EMACS_INT bytes_between_gc;
 Lisp_Object Vmemory_full;

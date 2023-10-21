@@ -58,7 +58,7 @@
                                (current-buffer) "tree-sitter" "dump-libpath")))
                     (cl-loop repeat 10
                              while (process-live-p proc)
-                             do (sleep-for 0 100)
+                             do (sleep-for 0.1)
                              finally (when (process-live-p proc) (kill-process proc)))
                     (car (split-string (buffer-substring-no-properties
                                         (point-min) (point-max)))))))))))
