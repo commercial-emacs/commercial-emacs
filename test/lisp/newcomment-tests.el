@@ -36,4 +36,21 @@
               (uncomment-region (point-min) (point-max))
               (buffer-string))))))
 
+(ert-deftest local-comment-continue-in-comment-indent-new-line ()
+  (with-temp-buffer
+    (setq-local comment-start "/* ")
+    (setq-local comment-end "*/")
+    (insert "foo")
+    (newline)
+    (insert "bar")
+    (forward-line -1)
+    (end-of-line)
+    (comment-region (point-min) (point-max))
+    (should (equal (thing-at-point 'line) "/* foo\n"))
+    (comment-indent-new-line)
+    (should (equal (thing-at-point 'line) " * \n"))
+    (setq-local comment-continue "   ")
+    (comment-indent-new-line)
+    (should (equal (thing-at-point 'line) "   \n"))))
+
 ;;; newcomment-tests.el ends here
