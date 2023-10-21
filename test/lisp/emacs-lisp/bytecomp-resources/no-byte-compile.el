@@ -1,1 +1,1 @@
-;; -*- no-byte-compile: t; lexical-binding: t; -*-
+;; -*- no-byte-compile: t; -*-

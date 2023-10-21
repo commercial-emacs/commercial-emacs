@@ -770,6 +770,14 @@ This can help avoid some awkward skip conditions.  For example
 '(skip-unless (not noninteractive))' can be changed to the easier
 to read '(skip-when noninteractive)'.
 
+** Checkdoc
+
+---
+*** New checkdock warning if not using lexical-binding.
+Checkdoc now warns if the first line of an Emacs Lisp file does not
+end with a "-*- lexical-binding: t -*-" cookie.  Customize the user
+option 'checkdoc-lexical-binding-flag' to nil to disable this warning.
+
 ** URL
 
 +++
