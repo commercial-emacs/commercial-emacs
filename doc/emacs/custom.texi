@@ -1507,7 +1507,19 @@ mode or subdirectory, and for variable and value, and adds the
 entry defining the directory-local variable.  @kbd{M-x
 delete-dir-local-variable} deletes an entry.  @kbd{M-x
 copy-file-locals-to-dir-locals} copies the file-local variables in the
-current file into @file{.dir-locals.el}.
+current file into @file{.dir-locals.el}, or @file{.dir-locals-2.el} if
+that file is also present.
+
+Since both @file{.dir-locals.el} and @file{.dir-locals-2.el} file
+might exist in the same directory, there may be some clash about which
+file you want to modify when executing the above three commands.  To
+solve that, all three of them take a prefix argument, to indicate
+which file you want to modify.  When both files exist, a prefix
+argument means to prefer to modify @file{.dir-locals.el} instead of
+@file{.dir-locals-2.el}.  When one of the files doesn't exist, and
+you're adding a variable or copying the file-local variables, a prefix
+argument means to modify (i.e., create) the file that doesn't yet
+exist.
 
 @findex dir-locals-set-class-variables
 @findex dir-locals-set-directory-class
