@@ -5733,10 +5733,9 @@ make_lispy_event (struct input_event *event)
 		/* Monnier (4156359) classified as a drag the
 		   sequence: 1. press, 2. drag out and back that
 		   induces scrolling, 3. release.  This seems flimsy
-		   since a click would result if scrolling wasn't
-		   induced to render Q_SAME_POS false, and more
-		   importantly instigated Bug#66655 which was very
-		   clearly a click.
+		   since step 2 requires both scrolling to occur (to
+		   get Q_SAME_POS false) and a very precise mousing
+		   hand (to keep Q_SAME_COORD true).  Bug#66655
 		*/
 		bool q_monnier_drag = ! q_same_pos && q_same_win;
 		if (! q_same_coord || q_monnier_drag)
