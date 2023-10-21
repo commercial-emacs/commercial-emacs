@@ -4947,10 +4947,6 @@ static Lisp_Object button_down_location;
    the down mouse event.  */
 static Lisp_Object frame_relative_event_pos;
 
-/* The line-number display width, in columns, at the time of most
-   recent down mouse event.  */
-static int down_mouse_line_number_width;
-
 /* Information about the most recent up-going button event:  Which
    button, what location, and what time.  */
 
@@ -5711,8 +5707,6 @@ make_lispy_event (struct input_event *event)
 	    *start_pos_ptr = Fcopy_alist (position);
 	    frame_relative_event_pos = Fcons (event->x, event->y);
 	    ignore_mouse_drag_p = false;
-	    /* Squirrel away the line-number width, if any.  */
-	    save_line_number_display_width (event);
 	  }
 
 	/* Now we're releasing a button - check the coordinates to
@@ -5758,18 +5752,12 @@ make_lispy_event (struct input_event *event)
 			  it's probably OK to ignore it as well.  */
 		       && (EQ (Fcar (Fcdr (start_pos)),
 			       Fcar (Fcdr (position))) /* Same buffer pos */
-			   /* Redisplay hscrolled text between down- and
-                              up-events due to display-line-numbers-mode.  */
-			   || line_number_mode_hscroll (start_pos, position)
 			   || !EQ (Fcar (start_pos),
 				   Fcar (position))))) /* Different window */
-
 		  {
 		    /* Mouse has moved enough.  */
 		    button_down_time = 0;
 		    click_or_drag_modifier = drag_modifier;
-		    /* Reset the value for future clicks.  */
-		    down_mouse_line_number_width = -1;
 		  }
 		else if (((!EQ (Fcar (start_pos), Fcar (position)))
 			  || (!EQ (Fcar (Fcdr (start_pos)),
