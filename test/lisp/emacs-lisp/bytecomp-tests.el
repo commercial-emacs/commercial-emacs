@@ -1456,26 +1456,29 @@ byte-compiled.  Run with dynamic binding."
 literals (Bug#20852)."
   (should (boundp 'lread--unescaped-character-literals))
   (bytecomp-tests--with-temp-file source
-      (write-region (concat ";;; -*-lexical-binding:t-*-\n"
-                            "(list ?) ?( ?; ?\" ?[ ?])")
-                    nil source)
-      (bytecomp-tests--with-temp-file destination
-        (let* ((byte-compile-dest-file-function (lambda (_) destination))
-               (err (should-error (byte-compile-file source))))
-          (should (equal (cdr err)
-                         `(,(concat "unescaped character literals "
-                                    "`?\"', `?(', `?)', `?;', `?[', `?]' "
-                                    "detected, "
-                                    "`?\\\"', `?\\(', `?\\)', `?\\;', `?\\[', "
-                                    "`?\\]' expected!")))))))
-    ;; But don't warn in subsequent compilations (Bug#36068).
-    (bytecomp-tests--with-temp-file source
-      (write-region (concat ";;; -*-lexical-binding:t-*-\n"
-                            "(list 1 2 3)")
-                    nil source)
-      (bytecomp-tests--with-temp-file destination
-        (let ((byte-compile-dest-file-function (lambda (_) destination)))
-          (should (byte-compile-file source))))))
+    (write-region (concat ";;; -*-lexical-binding:t-*-\n"
+                          "(list ?) ?( ?; ?\" ?[ ?])")
+                  nil source)
+    (bytecomp-tests--with-temp-file destination
+      (let ((byte-compile-dest-file-function (lambda (_) destination)))
+        (byte-compile-file source)
+        (with-current-buffer byte-compile-log-buffer
+          (should (re-search-forward
+                   (regexp-quote
+                    (concat "unescaped character literals "
+                            "`?\"', `?(', `?)', `?;', `?[', `?]' "
+                            "detected, "
+                            "`?\\\"', `?\\(', `?\\)', `?\\;', `?\\[', "
+                            "`?\\]' expected!"))
+                   nil t))))))
+  ;; But don't warn in subsequent compilations (Bug#36068).
+  (bytecomp-tests--with-temp-file source
+    (write-region (concat ";;; -*-lexical-binding:t-*-\n"
+                          "(list 1 2 3)")
+                  nil source)
+    (bytecomp-tests--with-temp-file destination
+      (let ((byte-compile-dest-file-function (lambda (_) destination)))
+        (should (byte-compile-file source))))))
 
 (ert-deftest bytecomp-tests-function-put ()
   "Check `function-put' operates during compilation."
@@ -1789,7 +1792,8 @@ mountpoint (Bug#44631)."
              (byte-compile-error-on-warn t))
         (should-not (file-remote-p input-file))
         (should-not (file-remote-p output-file))
-        (write-region "" nil input-file nil nil nil 'excl)
+        (write-region ";;; -*- lexical-binding:t -*-\n" nil input-file
+                      nil nil nil 'excl)
         (write-region "" nil output-file nil nil nil 'excl)
         (unwind-protect
             (progn

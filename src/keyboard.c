@@ -5299,7 +5299,6 @@ make_scroll_bar_position (struct input_event *ev, Lisp_Object type)
 }
 
 #if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
-
 /* Return whether or not the coordinates X and Y are inside the
    box of the menu-bar window of frame F.  */
 
@@ -5318,8 +5317,7 @@ coords_in_menu_bar_window (struct frame *f, int x, int y)
 	  && y <= WINDOW_BOTTOM_EDGE_Y (window)
 	  && x <= WINDOW_RIGHT_EDGE_X (window));
 }
-
-#endif
+#endif /* defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR */
 
 /* Given a struct input_event, build the lisp event which represents
    it.  If EVENT is 0, build a mouse movement event from the mouse
@@ -5690,10 +5688,9 @@ make_lispy_event (struct input_event *event)
 	last_mouse_x = XFIXNUM (event->x);
 	last_mouse_y = XFIXNUM (event->y);
 
-	/* If this is a button press, squirrel away the location, so
-           we can decide later whether it was a click or a drag.  */
 	if (event->modifiers & down_modifier)
 	  {
+	    /* For presses, record pos for deciding click or drag.  */
 	    if (is_double)
 	      {
 		double_click_count++;
@@ -5708,71 +5705,53 @@ make_lispy_event (struct input_event *event)
 	    frame_relative_event_pos = Fcons (event->x, event->y);
 	    ignore_mouse_drag_p = false;
 	  }
-
-	/* Now we're releasing a button - check the coordinates to
-           see if this was a click or a drag.  */
 	else if (event->modifiers & up_modifier)
 	  {
-	    /* If we did not see a down before this up, ignore the up.
-	       Probably this happened because the down event chose a
-	       menu item.  It would be an annoyance to treat the
-	       release of the button that chose the menu item as a
-	       separate event.  */
-
-	    if (!CONSP (start_pos))
-	      return Qnil;
-
 	    unsigned click_or_drag_modifier = click_modifier;
 
-	    if (ignore_mouse_drag_p)
-	      ignore_mouse_drag_p = false;
+	    /* For releases, decide click or drag.  */
+	    if (! CONSP (start_pos))
+	      {
+		/* Ignore the up if we hadn't seen a down before it, as
+		   for menu button releases.  */
+		return Qnil;
+	      }
+	    else if (ignore_mouse_drag_p)
+	      {
+		ignore_mouse_drag_p = false;
+	      }
 	    else
 	      {
-		intmax_t xdiff = double_click_fuzz, ydiff = double_click_fuzz;
-
-		xdiff = XFIXNUM (event->x)
+		intmax_t xdiff = XFIXNUM (event->x)
 		  - XFIXNUM (XCAR (frame_relative_event_pos));
-		ydiff = XFIXNUM (event->y)
+		intmax_t ydiff = XFIXNUM (event->y)
 		  - XFIXNUM (XCDR (frame_relative_event_pos));
+		bool q_same_coord = eabs (xdiff) < double_click_fuzz
+		  && eabs (ydiff) < double_click_fuzz;
+		bool q_same_win = EQ (Fcar (start_pos), Fcar (position));
+		bool q_same_pos = EQ (Fcar (Fcdr (start_pos)), Fcar (Fcdr (position)));
 
-		if (! (0 < double_click_fuzz
-		       && - double_click_fuzz < xdiff
-		       && xdiff < double_click_fuzz
-		       && - double_click_fuzz < ydiff
-		       && ydiff < double_click_fuzz
-		       /* Maybe the mouse has moved a lot, caused scrolling, and
-			  eventually ended up at the same screen position (but
-			  not buffer position) in which case it is a drag, not
-			  a click.  */
-		       /* FIXME: OTOH if the buffer position has changed
-			  because of a timer or process filter rather than
-			  because of mouse movement, it should be considered as
-			  a click.  But mouse-drag-region completely ignores
-			  this case and it hasn't caused any real problem, so
-			  it's probably OK to ignore it as well.  */
-		       && (EQ (Fcar (Fcdr (start_pos)),
-			       Fcar (Fcdr (position))) /* Same buffer pos */
-			   || !EQ (Fcar (start_pos),
-				   Fcar (position))))) /* Different window */
+		/* This heuristic fails when a timer or process filter
+		   changes buffer pos (then it's a click), although
+		   mouse-drag-region completely ignores this case so
+		   it's probably de minimus..  */
+		bool q_prolly_drag = ! q_same_pos && q_same_win;
+
+		if (! q_same_coord || q_prolly_drag)
 		  {
-		    /* Mouse has moved enough.  */
-		    button_down_time = 0;
 		    click_or_drag_modifier = drag_modifier;
+		    button_down_time = 0;
 		  }
-		else if (((!EQ (Fcar (start_pos), Fcar (position)))
-			  || (!EQ (Fcar (Fcdr (start_pos)),
-				   Fcar (Fcdr (position)))))
+		else if ((! q_same_pos || ! q_same_win)
 			 /* Was the down event in a window body? */
 			 && FIXNUMP (Fcar (Fcdr (start_pos)))
 			 && WINDOW_LIVE_P (Fcar (start_pos))
-			 && !NILP (Ffboundp (Qwindow_edges)))
-		  /* If the window (etc.) at the mouse position has
-		     changed between the down event and the up event,
-		     we assume there's been a redisplay between the
-		     two events, and we pretend the mouse is still in
-		     the old window to prevent a spurious drag event
-		     being generated.  */
+			 && ! NILP (Ffboundp (Qwindow_edges)))
 		  {
+		    /* If either win or pos changed between
+		       down and up events, assume redisplay occurred
+		       and pretend mouse remained in old window
+		       to prevent a spurious drag event.  */
 		    Lisp_Object edges
 		      = call4 (Qwindow_edges, Fcar (start_pos), Qt, Qnil, Qt);
 		    int new_x = XFIXNUM (Fcar (frame_relative_event_pos));
@@ -5798,12 +5777,13 @@ make_lispy_event (struct input_event *event)
 
 	    /* Don't check is_double; treat this as multiple if the
 	       down-event was multiple.  */
-	    event->modifiers
-	      = ((event->modifiers & ~up_modifier)
-		 | click_or_drag_modifier
-		 | (double_click_count < 2 ? 0
-		    : double_click_count == 2 ? double_modifier
-		    : triple_modifier));
+	    event->modifiers = (event->modifiers & ~up_modifier)
+	      | click_or_drag_modifier
+	      | (double_click_count < 2
+		 ? 0
+		 : double_click_count == 2
+		 ? double_modifier
+		 : triple_modifier);
 	  }
 	else
 	  /* Every mouse event should either have the down_modifier or
