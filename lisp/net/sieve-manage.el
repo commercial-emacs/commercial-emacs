@@ -511,7 +511,7 @@ If NAME is nil, return the full server list of capabilities."
     (while (not pos)
       (setq pos (search-forward-regexp pattern nil t))
       (goto-char (point-min))
-      (sleep-for 0.05))
+      (sleep-for 0 50))
     pos))
 
 (defun sieve-manage-drop-next-answer ()

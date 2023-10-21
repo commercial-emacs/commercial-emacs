@@ -577,18 +577,7 @@ The possible settings for `align-region-separate' are:
                     "="
                     (group (zero-or-more (syntax whitespace)))))
      (group . (1 2))
-     (modes . '(conf-toml-mode toml-ts-mode lua-mode lua-ts-mode)))
-
-    (double-dash-comment
-     (regexp . ,(rx (group (zero-or-more (syntax whitespace)))
-                    "--"
-                    (zero-or-more nonl)))
-     (modes  . '(lua-mode lua-ts-mode))
-     (column . comment-column)
-     (valid  . ,(lambda ()
-                  (save-excursion
-                    (goto-char (match-beginning 1))
-                    (not (bolp)))))))
+     (modes . '(conf-toml-mode toml-ts-mode))))
   "A list describing all of the available alignment rules.
 The format is:
 
