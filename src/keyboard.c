@@ -5688,13 +5688,14 @@ make_lispy_event (struct input_event *event)
 	last_mouse_x = XFIXNUM (event->x);
 	last_mouse_y = XFIXNUM (event->y);
 
+	/* On mouse-down, record start_pos for deciding click or drag
+	   upon mouse-up.  */
 	if (event->modifiers & down_modifier)
 	  {
-	    /* For presses, record pos for deciding click or drag.  */
 	    if (is_double)
 	      {
-		double_click_count++;
-		event->modifiers |= ((double_click_count > 2)
+		++double_click_count;
+		event->modifiers |= (double_click_count > 2
 				     ? triple_modifier
 				     : double_modifier);
 	      }
@@ -5708,8 +5709,6 @@ make_lispy_event (struct input_event *event)
 	else if (event->modifiers & up_modifier)
 	  {
 	    unsigned click_or_drag_modifier = click_modifier;
-
-	    /* For releases, decide click or drag.  */
 	    if (! CONSP (start_pos))
 	      {
 		/* Ignore the up if we hadn't seen a down before it, as
@@ -5730,14 +5729,20 @@ make_lispy_event (struct input_event *event)
 		  && eabs (ydiff) < double_click_fuzz;
 		bool q_same_win = EQ (Fcar (start_pos), Fcar (position));
 		bool q_same_pos = EQ (Fcar (Fcdr (start_pos)), Fcar (Fcdr (position)));
-
-		/* This heuristic fails when a timer or process filter
-		   changes buffer pos (then it's a click), although
-		   mouse-drag-region completely ignores this case so
-		   it's probably de minimus..  */
-		bool q_prolly_drag = ! q_same_pos && q_same_win;
-
-		if (! q_same_coord || q_prolly_drag)
+#if 0
+		/* Monnier (4156359) classified as a drag the
+		   sequence: 1. press, 2. drag out and back that
+		   induces scrolling, 3. release.  This seems flimsy
+		   since a click would result if scrolling wasn't
+		   induced to render Q_SAME_POS false, and more
+		   importantly instigated Bug#66655 which was very
+		   clearly a click.
+		*/
+		bool q_monnier_drag = ! q_same_pos && q_same_win;
+		if (! q_same_coord || q_monnier_drag)
+#else
+		if (! q_same_coord)
+#endif
 		  {
 		    click_or_drag_modifier = drag_modifier;
 		    button_down_time = 0;
@@ -5748,9 +5753,8 @@ make_lispy_event (struct input_event *event)
 			 && WINDOW_LIVE_P (Fcar (start_pos))
 			 && ! NILP (Ffboundp (Qwindow_edges)))
 		  {
-		    /* If either win or pos changed between
-		       down and up events, assume redisplay occurred
-		       and pretend mouse remained in old window
+		    /* If either win or pos changed between down and
+		       up events, pretend mouse remained in old window
 		       to prevent a spurious drag event.  */
 		    Lisp_Object edges
 		      = call4 (Qwindow_edges, Fcar (start_pos), Qt, Qnil, Qt);
