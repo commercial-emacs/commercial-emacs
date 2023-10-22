@@ -3908,7 +3908,6 @@ mark_automatic_object (Lisp_Object obj)
 
 extern void with_flushed_stack (void (*func) (void *arg), void *arg);
 extern bool garbage_collect (void);
-extern bool maybe_garbage_collect_eagerly (EMACS_INT factor);
 extern Lisp_Object zero_vector;
 extern EMACS_INT bytes_since_gc;
 extern EMACS_INT bytes_between_gc;
