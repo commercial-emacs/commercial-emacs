@@ -3976,22 +3976,24 @@ defined in the file @file{lisp/term/x-win.el}.  Use @kbd{M-x apropos
 @cindex secondary selection
 
   In window systems, such as X, data can be transferred between
-different applications by means of @dfn{selections}.  X defines an
-arbitrary number of @dfn{selection types}, each of which can store its
-own data; however, only three are commonly used: the @dfn{clipboard},
-@dfn{primary selection}, and @dfn{secondary selection}.  Other window
-systems support only the clipboard.  @xref{Cut and Paste,, Cut and
-Paste, emacs, The GNU Emacs Manual}, for Emacs commands that make use
-of these selections.  This section documents the low-level functions
-for reading and setting window-system selections.
+different applications by means of @dfn{selections}.  Each window
+system defines an arbitrary number of @dfn{selection types}, all
+storing their own data; however, only three are commonly used: the
+@dfn{clipboard}, @dfn{primary selection}, and @dfn{secondary
+selection}.  @xref{Cut and Paste,, Cut and Paste, emacs, The GNU Emacs
+Manual}, for Emacs commands that make use of these selections.  This
+section documents the low-level functions for reading and setting
+window-system selections; @xref{Accessing Selections} for
+documentation concerning selection types and data formats under
+particular window systems.
 
 @deffn Command gui-set-selection type data
 This function sets a window-system selection.  It takes two arguments:
 a selection type @var{type}, and the value to assign to it, @var{data}.
 
 @var{type} should be a symbol; it is usually one of @code{PRIMARY},
-@code{SECONDARY} or @code{CLIPBOARD}.  These are symbols with
-upper-case names, in accord with X Window System conventions.  If
+@code{SECONDARY} or @code{CLIPBOARD}.  These are generally symbols
+with upper-case names, in accord with X Window System conventions.  If
 @var{type} is @code{nil}, that stands for @code{PRIMARY}.
 
 If @var{data} is @code{nil}, it means to clear out the selection.
@@ -4019,15 +4021,8 @@ programs.  It takes two optional arguments, @var{type} and
 
 The @var{data-type} argument specifies the form of data conversion to
 use, to convert the raw data obtained from another program into Lisp
-data.  Meaningful values include @code{TEXT}, @code{STRING},
-@code{UTF8_STRING}, @code{TARGETS}, @code{LENGTH}, @code{DELETE},
-@code{FILE_NAME}, @code{CHARACTER_POSITION}, @code{NAME},
-@code{LINE_NUMBER}, @code{COLUMN_NUMBER}, @code{OWNER_OS},
-@code{HOST_NAME}, @code{USER}, @code{CLASS}, @code{ATOM}, and
-@code{INTEGER}.  (These are symbols with upper-case names in accord
-with X conventions.)  The default for @var{data-type} is
-@code{STRING}.  Window systems other than X usually support only a
-small subset of these types, in addition to @code{STRING}.
+data.  @xref{X Selections} for an enumeration of data types valid
+under X, and @xref{Other Selections} for those elsewhere.
 @end defun
 
 @defopt selection-coding-system
@@ -4036,13 +4031,6 @@ writing selections or the clipboard.  @xref{Coding
 Systems}.  The default is @code{compound-text-with-extensions}, which
 converts to the text representation that X11 normally uses.
 @end defopt
-
-@cindex clipboard support (for MS-Windows)
-When Emacs runs on MS-Windows, it does not implement X selections in
-general, but it does support the clipboard.  @code{gui-get-selection}
-and @code{gui-set-selection} on MS-Windows support the text data type
-only; if the clipboard holds other types of data, Emacs treats the
-clipboard as empty.  The supported data type is @code{STRING}.
 
 For backward compatibility, there are obsolete aliases
 @code{x-get-selection} and @code{x-set-selection}, which were the
