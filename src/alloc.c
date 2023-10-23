@@ -112,8 +112,8 @@ INTERVAL (*static_interval_allocator) (void);
 
 /* Exposed to lisp.h so that maybe_garbage_collect() can inline.  */
 
-#ifdef GCC_HAVE_TLS
-sem_t sem_nhalted;
+#ifdef HAVE_GCC_TLS
+sem_t sem_nhalted, sem_gc_begin, sem_gc_end;
 #endif
 EMACS_INT bytes_since_gc;
 EMACS_INT bytes_between_gc;

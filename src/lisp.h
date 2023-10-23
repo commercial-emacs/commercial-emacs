@@ -3914,7 +3914,7 @@ extern Lisp_Object zero_vector;
 extern EMACS_INT bytes_since_gc;
 extern EMACS_INT bytes_between_gc;
 #ifdef HAVE_GCC_TLS
-extern sem_t sem_nhalted;
+extern sem_t sem_nhalted, sem_gc_begin, sem_gc_end;
 #endif
 extern Lisp_Object list1 (Lisp_Object);
 extern Lisp_Object list2 (Lisp_Object, Lisp_Object);
