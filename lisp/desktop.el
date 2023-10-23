@@ -843,8 +843,6 @@ is nil, ask the user where to save the desktop."
 ;; ----------------------------------------------------------------------------
 (defun desktop-buffer-info (buffer)
   "Return information describing BUFFER.
-This function is not pure, as BUFFER is made current with
-`set-buffer'.
 
 Returns a list of all the necessary information to recreate the
 buffer, which is (in order):
@@ -860,49 +858,49 @@ buffer, which is (in order):
     auxiliary information given by `desktop-save-buffer';
     local variables;
     auxiliary information given by `desktop-var-serdes-funs'."
-  (set-buffer buffer)
-  `(
-    ;; base name of the buffer; replaces the buffer name if managed by uniquify
-    ,(and (fboundp 'uniquify-buffer-base-name) (uniquify-buffer-base-name))
-    ;; basic information
-    ,(desktop-file-name (buffer-file-name) desktop-dirname)
-    ,(buffer-name)
-    ,major-mode
-    ;; minor modes
-    ,(seq-filter
-      (lambda (minor-mode)
-        ;; Just two sanity checks.
-        (and (boundp minor-mode)
-             (symbol-value minor-mode)
-             (let ((special
-                    (assq minor-mode desktop-minor-mode-table)))
-               (or (not special)
-                   (cadr special)))))
-      local-minor-modes)
-    ;; point and mark, and read-only status
-    ,(point)
-    ,(list (mark t) mark-active)
-    ,buffer-read-only
-    ;; auxiliary information
-    ,(when (functionp desktop-save-buffer)
-       (funcall desktop-save-buffer desktop-dirname))
-    ;; local variables
-    ,(let ((loclist (buffer-local-variables))
-           (ll nil))
-       (dolist (local desktop-locals-to-save)
-         (let ((here (assq local loclist)))
-           (cond (here
-                  (push here ll))
-                 ((member local loclist)
-                  (push local ll)))))
-       ll)
-   ,@(when (>= desktop-io-file-version 208)
-       (list
-        (mapcar (lambda (record)
-                  (let ((var (car record)))
-                    (list var
-                          (funcall (cadr record) (symbol-value var)))))
-                desktop-var-serdes-funs)))))
+  (with-current-buffer buffer
+    `(
+      ;; base name of the buffer; replaces the buffer name if managed by uniquify
+      ,(and (fboundp 'uniquify-buffer-base-name) (uniquify-buffer-base-name))
+      ;; basic information
+      ,(desktop-file-name (buffer-file-name) desktop-dirname)
+      ,(buffer-name)
+      ,major-mode
+      ;; minor modes
+      ,(seq-filter
+        (lambda (minor-mode)
+          ;; Just two sanity checks.
+          (and (boundp minor-mode)
+               (symbol-value minor-mode)
+               (let ((special
+                      (assq minor-mode desktop-minor-mode-table)))
+                 (or (not special)
+                     (cadr special)))))
+        local-minor-modes)
+      ;; point and mark, and read-only status
+      ,(point)
+      ,(list (mark t) mark-active)
+      ,buffer-read-only
+      ;; auxiliary information
+      ,(when (functionp desktop-save-buffer)
+         (funcall desktop-save-buffer desktop-dirname))
+      ;; local variables
+      ,(let ((loclist (buffer-local-variables))
+             (ll nil))
+         (dolist (local desktop-locals-to-save)
+           (let ((here (assq local loclist)))
+             (cond (here
+                    (push here ll))
+                   ((member local loclist)
+                    (push local ll)))))
+         ll)
+      ,@(when (>= desktop-io-file-version 208)
+          (list
+           (mapcar (lambda (record)
+                     (let ((var (car record)))
+                       (list var
+                             (funcall (cadr record) (symbol-value var)))))
+                   desktop-var-serdes-funs))))))
 
 ;; ----------------------------------------------------------------------------
 (defun desktop--v2s (value)
@@ -1029,6 +1027,12 @@ a given buffer should not be saved.  It takes the same arguments as
 `desktop-save-buffer-p' and should return nil if buffer should not
 have its state saved in the desktop file.")
 
+(defun desktop-save-file-name-p (filename)
+  "Return t if FILENAME should have its state saved."
+  (and filename
+       (or (not (stringp desktop-files-not-to-save))
+	   (not (string-match-p desktop-files-not-to-save filename)))))
+
 (defun desktop-save-buffer-p (filename bufname mode &rest rest)
   "Return t if buffer should have its state saved in the desktop file.
 FILENAME is the visited file name, BUFNAME is the buffer name, and
@@ -1041,9 +1045,7 @@ MODE is the major mode.
 	     (not (stringp desktop-buffers-not-to-save))
 	     (not (string-match-p desktop-buffers-not-to-save bufname)))
 	 (not (memq mode desktop-modes-not-to-save))
-	 (or (and filename
-		  (or no-regexp-to-check
-		      (not (string-match-p desktop-files-not-to-save filename))))
+	 (or (desktop-save-file-name-p filename)
 	     (and (memq mode '(dired-mode vc-dir-mode))
 		  (or no-regexp-to-check
 		      (not (setq dired-skip
@@ -1204,24 +1206,26 @@ no questions asked."
 	     " kill-ring))\n"))
 
 	  (insert "\n;; Buffer section -- buffers listed in same order as in buffer list:\n")
-	  (dolist (l (mapcar #'desktop-buffer-info (buffer-list)))
-	    (let ((base (pop l)))
-	      (when (apply #'desktop-save-buffer-p l)
-		(insert "("
-			(if (or (not (integerp eager))
-				(if (zerop eager)
-				    nil
-				  (setq eager (1- eager))))
-			    "desktop-create-buffer"
-			  "desktop-append-buffer-args")
-			" "
-			(format "%d" desktop-io-file-version))
-		;; If there's a non-empty base name, we save it instead of the buffer name
-		(when (and base (not (string= base "")))
-		  (setcar (nthcdr 1 l) base))
-		(dolist (e l)
-		  (insert "\n  " (desktop-value-to-string e)))
-		(insert ")\n\n"))))
+	  (dolist (buffer (buffer-list))
+            (when (desktop-save-file-name-p (buffer-file-name buffer))
+	      (let* ((l (desktop-buffer-info buffer))
+		     (base (pop l)))
+	        (when (apply #'desktop-save-buffer-p l)
+		  (insert "("
+			  (if (or (not (integerp eager))
+				  (if (zerop eager)
+				      nil
+				    (setq eager (1- eager))))
+			      "desktop-create-buffer"
+			    "desktop-append-buffer-args")
+			  " "
+			  (format "%d" desktop-io-file-version))
+		  ;; If there's a non-empty base name, we save it instead of the buffer name
+		  (when (and base (not (string= base "")))
+		    (setcar (nthcdr 1 l) base))
+		  (dolist (e l)
+		    (insert "\n  " (desktop-value-to-string e)))
+		  (insert ")\n\n")))))
 
 	  (setq default-directory desktop-dirname)
 	  ;; When auto-saving, avoid writing if nothing has changed since the last write.
