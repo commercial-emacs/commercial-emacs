@@ -806,7 +806,7 @@ since it could result in memory overflow and make Emacs crash."
                       :value ?│)
                (character :tag "Use | to indicate fill column"
                       :value ?|)
-               (const :tag "If possible, use U+2502 to indicate fill column, otherwise use |"
+               (const :tag "Do not indicate fill column"
                       :value nil)
                character)
               "27.1"
