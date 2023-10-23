@@ -713,6 +713,17 @@ This argument specifies the prettifying algorithm to use.
 
 ** Emacs Lisp mode
 
+*** Automatic Elisp dialect declaration insertion.
+When visiting a new Elisp file, Emacs will now automatically insert a
+';;; -*- lexical-binding: t -*-' line to declare the modern Elisp
+lexical-binding dialect, and set the 'lexical-binding' variable
+in the buffer to 't'.
+
+This mechanism is controlled by the new 'elisp-auto-dialect-declaration'
+user option.  It will only insert a declaration into an empty buffer:
+if the buffer already had text added by means of 'auto-insert-mode'
+then it will not do anything.
+
 ---
 *** ',@' now has 'prefix' syntax.
 Previously, the '@' character, which normally has 'symbol' syntax,

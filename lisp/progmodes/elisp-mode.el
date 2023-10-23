@@ -361,7 +361,40 @@ be used instead.
   (add-hook 'flymake-diagnostic-functions #'elisp-flymake-checkdoc nil t)
   (add-hook 'flymake-diagnostic-functions
               #'elisp-flymake-byte-compile nil t)
-  (add-hook 'context-menu-functions #'elisp-context-menu 10 t))
+  (add-hook 'context-menu-functions #'elisp-context-menu 10 t)
+  ;; Add this hook sufficient late to give other hooks (like `auto-insert')
+  ;; the opportunity to insert something with higher priority.
+  (add-hook 'find-file-hook #'elisp--insert-auto-dialect-declaration 50 t))
+
+(defcustom elisp-auto-dialect-declaration 'lexical
+  "Dialect declaration automatically inserted in new Elisp buffers.
+The declaration is \";;; -*- lexical-binding: t -*-\".
+It is only inserted when an empty non-existing file is visited.
+Possible values are:
+  `lexical'  declare use of the modern lexical binding dialect.
+  `nil'      do not automatically insert any declaration.
+
+If `auto-insert-mode' is used to put something in the buffer instead,
+then no declaration is inserted."
+  :type '(choice (const :tag "Lexical binding (modern)" lexical)
+                 (const :tag "No automatic declaration" nil))
+  :group 'lisp
+  :version "30.1")
+
+(defun elisp--insert-auto-dialect-declaration ()
+  "Insert the `elisp-auto-dialect-declaration' selection in a new empty buffer.
+Otherwise, do nothing."
+  (when (and (eq elisp-auto-dialect-declaration 'lexical)
+             (not buffer-read-only)
+             (zerop (buffer-size))
+             ;; Don't modify a buffer corresponding to an existing empty file.
+             (not (and buffer-file-name (file-exists-p buffer-file-name))))
+    (let ((was-modified (buffer-modified-p)))
+      (insert ";;; -*- lexical-binding: t -*-\n")
+      (setq-local lexical-binding t)
+      ;; Mark the buffer unmodified (unless it was modified before)
+      ;; so that the user isn't bothered when killing it or quitting Emacs.
+      (set-buffer-modified-p was-modified))))
 
 ;; Font-locking support.
 
