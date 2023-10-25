@@ -860,8 +860,8 @@ If THREAD is the main thread, just the error message is shown.  */)
   else
 #endif
     {
-      /* What to do if thread is already signaled?  */
-      /* What if error_symbol is Qnil?  */
+      /* What to do if thread is already signaled?
+	 What if error_symbol is Qnil?  */
       tstate->error_symbol = error_symbol;
       tstate->error_data = data;
 
@@ -983,6 +983,16 @@ bool
 main_thread_p (const void *ptr)
 {
   return ptr == &main_state.s;
+}
+
+size_t
+n_running_threads (void)
+{
+  size_t n = 0;
+  for (struct thread_state *thr = all_threads;
+       thr != NULL;
+       thr = thr->next_thread, ++n);
+  return n;
 }
 
 void

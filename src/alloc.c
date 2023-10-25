@@ -59,6 +59,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "mem_node.h"
 
 #ifdef HAVE_GCC_TLS
+#include <semaphore.h>
 # define mem_root (current_thread->m_mem_root)
 # define interval_blocks (current_thread->m_interval_blocks)
 # define interval_block_index (current_thread->m_interval_block_index)
@@ -113,7 +114,7 @@ INTERVAL (*static_interval_allocator) (void);
 /* Exposed to lisp.h so that maybe_garbage_collect() can inline.  */
 
 #ifdef HAVE_GCC_TLS
-sem_t sem_nhalted, sem_gc_begin, sem_gc_end;
+sem_t sem_main, sem_not_main, sem_gc_begin, sem_gc_end;
 #endif
 EMACS_INT bytes_since_gc;
 EMACS_INT bytes_between_gc;
@@ -4599,7 +4600,52 @@ garbage_collect (void)
   eassert (weak_hash_tables == NULL);
 
   if (gc_inhibited)
-    return false;
+    goto exit;
+
+#ifdef HAVE_GCC_TLS
+  bool q_gc = ! NILP (Vmemory_full)
+    || bytes_since_gc >= bytes_between_gc;
+
+  if (main_thread_p (current_thread))
+    {
+      int not_main;
+
+      if (sem_getvalue (&sem_not_main, &not_main) != 0)
+	goto exit;
+
+      if (q_gc)
+	sem_post (&sem_main);
+
+      if (q_gc || not_main)
+	{
+	  sigset_t set;
+	  sigemptyset (&set);
+	  sigaddset (&set, SIGINT); /* eventually add others.  */
+	  pthread_sigmask (SIG_BLOCK, &set, NULL);
+	}
+
+      if (not_main < n_running_threads () - 1)
+	goto exit;
+    }
+  else
+    {
+      int main;
+
+      if (sem_getvalue (&sem_main, &main) != 0)
+	goto exit;
+
+      if (q_gc || main)
+	{
+	  if (sem_post (&sem_not_main) != 0)
+	    goto exit;
+	  else if (sem_wait (&sem_gc_begin) != 0)
+	    {
+	      sem_wait (&sem_not_main);
+	      goto exit;
+	    }
+	}
+    }
+#endif /* HAVE_GCC_TLS */
 
   block_input ();
 
@@ -4711,7 +4757,15 @@ garbage_collect (void)
       unbind_to (gc_count, Qnil);
     }
 
+#ifdef HAVE_GCC_TLS
+  if (main_thread_p (current_thread))
+    sem_init (&sem_main, 0, 0);
+  sem_post (&sem_gc_begin);
+#endif
   return finalizer_run;
+
+ exit:
+  return false;
 }
 
 static void

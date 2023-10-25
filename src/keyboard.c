@@ -5693,12 +5693,9 @@ make_lispy_event (struct input_event *event)
 	if (event->modifiers & down_modifier)
 	  {
 	    if (is_double)
-	      {
-		++double_click_count;
-		event->modifiers |= (double_click_count > 2
-				     ? triple_modifier
-				     : double_modifier);
-	      }
+	      event->modifiers |= (++double_click_count > 2
+				   ? triple_modifier
+				   : double_modifier);
 	    else
 	      double_click_count = 1;
 	    button_down_time = event->timestamp;

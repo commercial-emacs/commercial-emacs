@@ -55,9 +55,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <count-leading-zeros.h>
 #include <intprops.h>
 #include <verify.h>
-#ifdef HAVE_GCC_TLS
-#include <semaphore.h>
-#endif
 INLINE_HEADER_BEGIN
 
 /* Define a TYPE constant ID as an externally visible name.  Use like this:
@@ -3913,9 +3910,6 @@ extern bool garbage_collect (void);
 extern Lisp_Object zero_vector;
 extern EMACS_INT bytes_since_gc;
 extern EMACS_INT bytes_between_gc;
-#ifdef HAVE_GCC_TLS
-extern sem_t sem_nhalted, sem_gc_begin, sem_gc_end;
-#endif
 extern Lisp_Object list1 (Lisp_Object);
 extern Lisp_Object list2 (Lisp_Object, Lisp_Object);
 extern Lisp_Object list3 (Lisp_Object, Lisp_Object, Lisp_Object);
@@ -5209,22 +5203,16 @@ struct for_each_tail_internal
        (list_var) = XCDR (list_var))
 
 /* Avoid a garbage_collect() stack push with inlined probe.  */
-
 INLINE void
 maybe_garbage_collect (void)
 {
 #ifdef HAVE_GCC_TLS
-  int sval;  /* Negation of the number of sem_waiting threads.  */
-  if (sem_getvalue (&sem_nhalted, &sval) != 0) /* failed with errno */
-    sval = 0;
-#endif
+  garbage_collect ();
+#else /* ! HAVE_GCC_TLS */
   if (! NILP (Vmemory_full)
-      || bytes_since_gc >= bytes_between_gc
-#ifdef HAVE_GCC_TLS
-      || sval
-#endif
-      )
+      || bytes_since_gc >= bytes_between_gc)
     garbage_collect ();
+#endif /* HAVE_GCC_TLS */
 }
 
 /* Simplified version of 'define-error' that works with pure

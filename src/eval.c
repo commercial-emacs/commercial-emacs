@@ -1702,19 +1702,16 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
       if (h->type != CONDITION_CASE)
 	continue;
       clause = find_handler_clause (h->tag_or_ch, conditions);
-      if (!NILP (clause))
+      if (! NILP (clause))
 	break;
     }
 
   bool debugger_called = false;
-  if (/* Don't run the debugger for a memory-full error.
-	 (There is no room in memory to do that!)  */
-      !NILP (error_symbol)
-      && (!NILP (Vdebug_on_signal)
+  if (! NILP (error_symbol) /* Not memory full.  */
+      && (! NILP (Vdebug_on_signal)
 	  /* If no handler is present now, try to run the debugger.  */
 	  || NILP (clause)
-	  /* A `debug' symbol in the handler list disables the normal
-	     suppression of the debugger.  */
+	  /* A 'debug symbol disables its suppression.  */
 	  || (CONSP (clause) && !NILP (Fmemq (Qdebug, clause)))
 	  /* Special handler that means "print a message and run debugger
 	     if requested".  */
@@ -1732,11 +1729,11 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
      with debugging.  Make sure to use `debug-early' unconditionally
      to not interfere with ERT or other packages that install custom
      debuggers.  */
-  if (!debugger_called && !NILP (error_symbol)
+  if (! debugger_called && ! NILP (error_symbol)
       && (NILP (clause) || EQ (h->tag_or_ch, Qerror))
       && noninteractive && backtrace_on_error_noninteractive
       && NILP (Vinhibit_debugger)
-      && !NILP (Ffboundp (Qdebug_early)))
+      && ! NILP (Ffboundp (Qdebug_early)))
     {
       max_ensure_room (&max_lisp_eval_depth, lisp_eval_depth, 100);
       specpdl_ref count = SPECPDL_INDEX ();
@@ -1745,7 +1742,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
       unbind_to (count, Qnil);
     }
 
-  if (!NILP (clause))
+  if (! NILP (clause))
     {
       Lisp_Object unwind_data
 	= (NILP (error_symbol) ? data : Fcons (error_symbol, data));
@@ -1753,7 +1750,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
     }
   else if (handlerlist != handlerlist_sentinel)
     {
-      /* FIXME: This will come right back here if there's no `top-level'
+      /* FIXME: This will come right back here if there's no top-level
 	 catcher.  A better solution would be to abort here, and instead
 	 add a catch-all condition handler so we never come here.  */
       Fthrow (Qtop_level, Qt);
