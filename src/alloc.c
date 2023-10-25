@@ -59,7 +59,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "mem_node.h"
 
 #ifdef HAVE_GCC_TLS
-#include <semaphore.h>
 # define mem_root (current_thread->m_mem_root)
 # define interval_blocks (current_thread->m_interval_blocks)
 # define interval_block_index (current_thread->m_interval_block_index)
@@ -114,6 +113,7 @@ INTERVAL (*static_interval_allocator) (void);
 /* Exposed to lisp.h so that maybe_garbage_collect() can inline.  */
 
 #ifdef HAVE_GCC_TLS
+#include <semaphore.h>
 sem_t sem_main, sem_not_main, sem_gc_begin, sem_gc_end;
 #endif
 EMACS_INT bytes_since_gc;
