@@ -4592,10 +4592,11 @@ q_garbage_collect (void)
     || bytes_since_gc >= bytes_between_gc;
 }
 
-#if 0
-#define SEM_WAIT(sem) sem_wait (sem)
-#else
-#define SEM_WAIT(sem)						\
+#ifdef HAVE_GCC_TLS
+# if 0
+# define SEM_WAIT(sem) sem_wait (sem)
+# else
+# define SEM_WAIT(sem)						\
   for (;;) {							\
     int val;							\
     if (sem_getvalue (sem, &val) == 0 && val) {			\
@@ -4604,7 +4605,9 @@ q_garbage_collect (void)
     }								\
     wait_reading_process_output (0, 5e7, 0, false, NULL, 0);	\
   }
-#endif
+# endif /* 0 */
+#endif /* HAVE_GCC_TLS */
+
 void
 maybe_garbage_collect (void)
 {
