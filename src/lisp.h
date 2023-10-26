@@ -3357,8 +3357,6 @@ struct handler
 #endif
 };
 
-extern Lisp_Object Vmemory_full;
-
 /* True if ought to quit now.  */
 
 #define QUITP (!NILP (Vquit_flag) && NILP (Vinhibit_quit))
@@ -3906,10 +3904,12 @@ mark_automatic_object (Lisp_Object obj)
 }
 
 extern void with_flushed_stack (void (*func) (void *arg), void *arg);
+extern void maybe_garbage_collect (void);
 extern bool garbage_collect (void);
 extern Lisp_Object zero_vector;
-extern EMACS_INT bytes_since_gc;
-extern EMACS_INT bytes_between_gc;
+extern Lisp_Object Vmemory_full;
+extern PER_THREAD EMACS_INT bytes_since_gc;
+
 extern Lisp_Object list1 (Lisp_Object);
 extern Lisp_Object list2 (Lisp_Object, Lisp_Object);
 extern Lisp_Object list3 (Lisp_Object, Lisp_Object, Lisp_Object);
@@ -5201,19 +5201,6 @@ struct for_each_tail_internal
   for ((list_var) = (head_var);						\
        (CONSP (list_var) && ((value_var) = XCDR (XCAR (list_var)), true)); \
        (list_var) = XCDR (list_var))
-
-/* Avoid a garbage_collect() stack push with inlined probe.  */
-INLINE void
-maybe_garbage_collect (void)
-{
-#ifdef HAVE_GCC_TLS
-  garbage_collect ();
-#else /* ! HAVE_GCC_TLS */
-  if (! NILP (Vmemory_full)
-      || bytes_since_gc >= bytes_between_gc)
-    garbage_collect ();
-#endif /* HAVE_GCC_TLS */
-}
 
 /* Simplified version of 'define-error' that works with pure
    objects.  */

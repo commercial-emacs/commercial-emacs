@@ -110,15 +110,13 @@ struct Lisp_String *(*static_string_allocator) (void);
 struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t len, bool q_clear);
 INTERVAL (*static_interval_allocator) (void);
 
-/* Exposed to lisp.h so that maybe_garbage_collect() can inline.  */
-
 #ifdef HAVE_GCC_TLS
 #include <semaphore.h>
-sem_t sem_main, sem_not_main, sem_gc_begin, sem_gc_end;
+sem_t sem_main_halted, sem_nonmain_halted, sem_nonmain_next;
 #endif
-EMACS_INT bytes_since_gc;
-EMACS_INT bytes_between_gc;
 Lisp_Object Vmemory_full;
+PER_THREAD EMACS_INT bytes_since_gc;
+static EMACS_INT bytes_between_gc;
 static bool gc_inhibited;
 
 /* Last recorded live and free-list counts.  */
@@ -4587,6 +4585,101 @@ mark_stack_push (Lisp_Object *value)
   return mark_stack_push_n (value, 1);
 }
 
+static inline bool
+q_garbage_collect (void)
+{
+  return ! NILP (Vmemory_full)
+    || bytes_since_gc >= bytes_between_gc;
+}
+
+#if 0
+#define SEM_WAIT(sem) sem_wait (sem)
+#else
+#define SEM_WAIT(sem)						\
+  for (;;) {							\
+    int val;							\
+    if (sem_getvalue (sem, &val) == 0 && val) {			\
+      sem_init (sem, 0, --val);					\
+      break;							\
+    }								\
+    wait_reading_process_output (0, 5e7, 0, false, NULL, 0);	\
+  }
+#endif
+void
+maybe_garbage_collect (void)
+{
+#ifndef HAVE_GCC_TLS
+  if (q_garbage_collect ())
+    garbage_collect ();
+#else /* HAVE_GCC_TLS */
+  if (main_thread_p (current_thread))
+    {
+      int main_halted, nonmain_halted;
+
+      if (sem_getvalue (&sem_main_halted, &main_halted) != 0
+	  || sem_getvalue (&sem_nonmain_halted, &nonmain_halted) != 0)
+	return;
+
+      if (q_garbage_collect ())
+	{
+	  static sigset_t restore_set;
+	  if (! main_halted)
+	    {
+	      sigset_t blocked;
+	      sigemptyset (&blocked);
+//	      sigaddset (&blocked, SIGINT); /* eventually add others.  */
+	      pthread_sigmask (SIG_BLOCK, &blocked, &restore_set);
+	      sem_post (&sem_main_halted);
+	    }
+	  if (nonmain_halted == n_running_threads () - 1)
+	    {
+	      SEM_WAIT (&sem_main_halted);
+	      garbage_collect ();
+	      if (nonmain_halted)
+		{
+		  sem_post (&sem_nonmain_next);
+		  SEM_WAIT (&sem_main_halted);
+		}
+	      pthread_sigmask (SIG_BLOCK, &restore_set, 0);
+	    }
+	  // else wait til next time
+	}
+    }
+  else
+    {
+      int main_halted, nonmain_halted;
+
+      if (sem_getvalue (&sem_main_halted, &main_halted) != 0)
+	return;
+
+      if (main_halted)
+	{
+	  // gc began, halt myself
+	  if (sem_post (&sem_nonmain_halted) != 0)
+	    return;
+
+	  // wait until main gc's
+	  SEM_WAIT (&sem_nonmain_next);
+
+	  garbage_collect ();
+
+	  // one step closer to main's release
+	  SEM_WAIT (&sem_nonmain_halted);
+
+	  if (sem_getvalue (&sem_nonmain_halted, &nonmain_halted) != 0)
+	    sem_post (&sem_main_halted); /* abort abort abort */
+
+	  if (nonmain_halted == 0)
+	    sem_post (&sem_main_halted); /* home free */
+	  else if (sem_post (&sem_nonmain_next) != 0)
+	    sem_post (&sem_main_halted); /* abort abort abort */
+	  else
+	    sem_post (&sem_nonmain_next); /* trigger next nonmain */
+	}
+    }
+#endif /* !HAVE_GCC_TLS */
+}
+
 /* Subroutine of Fgarbage_collect that does most of the work.  */
 
 bool
@@ -4597,55 +4690,10 @@ garbage_collect (void)
   specpdl_ref count = SPECPDL_INDEX ();
   struct timespec start;
 
-  eassert (weak_hash_tables == NULL);
-
   if (gc_inhibited)
-    goto exit;
+    return false;
 
-#ifdef HAVE_GCC_TLS
-  bool q_gc = ! NILP (Vmemory_full)
-    || bytes_since_gc >= bytes_between_gc;
-
-  if (main_thread_p (current_thread))
-    {
-      int not_main;
-
-      if (sem_getvalue (&sem_not_main, &not_main) != 0)
-	goto exit;
-
-      if (q_gc)
-	sem_post (&sem_main);
-
-      if (q_gc || not_main)
-	{
-	  sigset_t set;
-	  sigemptyset (&set);
-	  sigaddset (&set, SIGINT); /* eventually add others.  */
-	  pthread_sigmask (SIG_BLOCK, &set, NULL);
-	}
-
-      if (not_main < n_running_threads () - 1)
-	goto exit;
-    }
-  else
-    {
-      int main;
-
-      if (sem_getvalue (&sem_main, &main) != 0)
-	goto exit;
-
-      if (q_gc || main)
-	{
-	  if (sem_post (&sem_not_main) != 0)
-	    goto exit;
-	  else if (sem_wait (&sem_gc_begin) != 0)
-	    {
-	      sem_wait (&sem_not_main);
-	      goto exit;
-	    }
-	}
-    }
-#endif /* HAVE_GCC_TLS */
+  eassert (weak_hash_tables == NULL);
 
   block_input ();
 
@@ -4757,15 +4805,7 @@ garbage_collect (void)
       unbind_to (gc_count, Qnil);
     }
 
-#ifdef HAVE_GCC_TLS
-  if (main_thread_p (current_thread))
-    sem_init (&sem_main, 0, 0);
-  sem_post (&sem_gc_begin);
-#endif
   return finalizer_run;
-
- exit:
-  return false;
 }
 
 static void
