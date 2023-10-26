@@ -5550,45 +5550,40 @@ sweep_buffers (struct thread_state *thr)
 static void
 gc_sweep (void)
 {
-  mgc_flip_space ();
+  struct thread_state *thr = current_thread;
 #ifdef HAVE_GCC_TLS
-  for (struct thread_state *thr = all_threads;
-       thr != NULL;
-       thr = thr->next_thread)
-#else
-  struct thread_state *thr = main_thread;
+  if (main_thread_p (thr))
 #endif
-    {
-      sweep_strings (thr);
-      sweep_void (thr,
-		  (void **) &THREAD_FIELD (thr, m_cons_free_list),
-		  THREAD_FIELD (thr, m_cons_block_index),
-		  (void **) &THREAD_FIELD (thr, m_cons_blocks),
-		  Lisp_Cons,
-		  BLOCK_NCONS,
-		  offsetof (struct cons_block, conses),
-		  offsetof (struct Lisp_Cons, u.s.u.chain),
-		  offsetof (struct cons_block, next),
-		  sizeof (struct Lisp_Cons),
-		  &gcstat.total_conses,
-		  &gcstat.total_free_conses);
-      sweep_void (thr,
-		  (void **) &THREAD_FIELD (thr, m_float_free_list),
-		  THREAD_FIELD (thr, m_float_block_index),
-		  (void **) &THREAD_FIELD (thr, m_float_blocks),
-		  Lisp_Float,
-		  BLOCK_NFLOATS,
-		  offsetof (struct float_block, floats),
-		  offsetof (struct Lisp_Float, u.chain),
-		  offsetof (struct float_block, next),
-		  sizeof (struct Lisp_Float),
-		  &gcstat.total_floats,
-		  &gcstat.total_free_floats);
-      sweep_intervals (thr);
-      sweep_symbols (thr);
-      sweep_buffers (thr);
-      sweep_vectors (thr);
-    }
+    mgc_flip_space ();
+  sweep_strings (thr);
+  sweep_void (thr,
+	      (void **) &THREAD_FIELD (thr, m_cons_free_list),
+	      THREAD_FIELD (thr, m_cons_block_index),
+	      (void **) &THREAD_FIELD (thr, m_cons_blocks),
+	      Lisp_Cons,
+	      BLOCK_NCONS,
+	      offsetof (struct cons_block, conses),
+	      offsetof (struct Lisp_Cons, u.s.u.chain),
+	      offsetof (struct cons_block, next),
+	      sizeof (struct Lisp_Cons),
+	      &gcstat.total_conses,
+	      &gcstat.total_free_conses);
+  sweep_void (thr,
+	      (void **) &THREAD_FIELD (thr, m_float_free_list),
+	      THREAD_FIELD (thr, m_float_block_index),
+	      (void **) &THREAD_FIELD (thr, m_float_blocks),
+	      Lisp_Float,
+	      BLOCK_NFLOATS,
+	      offsetof (struct float_block, floats),
+	      offsetof (struct Lisp_Float, u.chain),
+	      offsetof (struct float_block, next),
+	      sizeof (struct Lisp_Float),
+	      &gcstat.total_floats,
+	      &gcstat.total_free_floats);
+  sweep_intervals (thr);
+  sweep_symbols (thr);
+  sweep_buffers (thr);
+  sweep_vectors (thr);
   pdumper_clear_marks ();
 }
 
