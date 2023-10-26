@@ -2238,16 +2238,12 @@ readevalloop (Lisp_Object readcharfun,
       if (! HASH_TABLE_P (read_objects_map)
 	  || XHASH_TABLE (read_objects_map)->count)
 	read_objects_map
-	  = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
-			     DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
-			     Weak_None, false);
+	  = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
       if (! HASH_TABLE_P (read_objects_completed)
 	  || XHASH_TABLE (read_objects_completed)->count)
 	read_objects_completed
-	  = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
-			     DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
-			     Weak_None, false);
-      if (! NILP (Vloadup_pure_table) && c == '(')
+	  = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
+      if (!NILP (Vloadup_pure_table) && c == '(')
 	val = read0 (readcharfun, false);
       else
 	{
@@ -2478,13 +2474,11 @@ read_internal_start (Lisp_Object stream, Lisp_Object start,
   if (! HASH_TABLE_P (read_objects_map)
       || XHASH_TABLE (read_objects_map)->count)
     read_objects_map
-      = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE, DEFAULT_REHASH_SIZE,
-			 DEFAULT_REHASH_THRESHOLD, Weak_None, false);
+      = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
   if (! HASH_TABLE_P (read_objects_completed)
       || XHASH_TABLE (read_objects_completed)->count)
     read_objects_completed
-      = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE, DEFAULT_REHASH_SIZE,
-			 DEFAULT_REHASH_THRESHOLD, Weak_None, false);
+      = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
 
   if (STRINGP (stream)
       || ((CONSP (stream) && STRINGP (XCAR (stream)))))
@@ -3092,7 +3086,7 @@ read_string_literal (Lisp_Object readcharfun)
 static Lisp_Object
 hash_table_from_plist (Lisp_Object plist)
 {
-  Lisp_Object params[12];
+  Lisp_Object params[4 * 2];
   Lisp_Object *par = params;
 
   /* This is repetitive but fast and simple.  */
@@ -3108,8 +3102,6 @@ hash_table_from_plist (Lisp_Object plist)
 
   ADDPARAM (test);
   ADDPARAM (weakness);
-  ADDPARAM (rehash_size);
-  ADDPARAM (rehash_threshold);
   ADDPARAM (purecopy);
 
   Lisp_Object data = plist_get (plist, Qdata);
@@ -5603,8 +5595,6 @@ loads the most recently modified readable file.  */);
   DEFSYM (Qsize, "size");
   DEFSYM (Qpurecopy, "purecopy");
   DEFSYM (Qweakness, "weakness");
-  DEFSYM (Qrehash_size, "rehash-size");
-  DEFSYM (Qrehash_threshold, "rehash-threshold");
 
   DEFSYM (Qchar_from_name, "char-from-name");
 
