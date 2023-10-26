@@ -3816,7 +3816,7 @@ make_pure_vector (ptrdiff_t len)
 static struct Lisp_Hash_Table *
 purecopy_hash_table (struct Lisp_Hash_Table *table)
 {
-  eassert (NILP (table->weak));
+  eassert (table->weakness == Weak_None);
   eassert (table->purecopy);
 
   struct Lisp_Hash_Table *pure = pure_alloc (sizeof *pure, 0);
@@ -3890,7 +3890,7 @@ purecopy (Lisp_Object obj)
       /* Do not purify hash tables which haven't been defined with
          :purecopy as non-nil or are weak - they aren't guaranteed to
          not change.  */
-      if (! NILP (table->weak) || !table->purecopy)
+      if (table->weakness != Weak_None || !table->purecopy)
         {
           /* Instead, add the hash table to the list of pinned objects,
              so that it will be marked during GC.  */
@@ -4907,16 +4907,38 @@ process_mark_stack (ptrdiff_t base_sp)
 		      struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
 		      ptrdiff_t size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
 		      set_vector_marked (ptr);
+		      mark_stack_push_values (ptr->contents, size);
+		      mark_stack_push_value (h->test.name);
+		      mark_stack_push_value (h->test.user_hash_function);
+		      mark_stack_push_value (h->test.user_cmp_function);
+		      if (h->weakness == Weak_None)
+			mark_stack_push_value (h->key_and_value);
+		      else
+			{
+			  /* For weak tables, mark only the vector and not its
+			     contents --- that's what makes it weak.  */
+			  eassert (h->next_weak == NULL);
+			  h->next_weak = weak_hash_tables;
+			  weak_hash_tables = h;
+			  set_vector_marked (XVECTOR (h->key_and_value));
+			}
+		      break;
+		    }
+		  case PVEC_HASH_TABLE:
+		    {
+		      struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
+		      ptrdiff_t size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
+		      set_vector_marked (ptr);
 		      mark_stack_push_n (ptr->contents, size);
 		      mark_stack_push (&h->test.name);
 		      mark_stack_push (&h->test.user_hash_function);
 		      mark_stack_push (&h->test.user_cmp_function);
-		      if (NILP (h->weak))
-			mark_stack_push (&h->key_and_value);
+		      if (h->weakness == Weak_None)
+			mark_stack_push_value (h->key_and_value);
 		      else
 			{
-			  /* A weak table marks only the vector, not
-			     its contents.  */
+			  /* For weak tables, mark only the vector and not its
+			    contents --- that's what makes it weak.  */
 			  eassert (h->next_weak == NULL);
 			  h->next_weak = weak_hash_tables;
 			  weak_hash_tables = h;
