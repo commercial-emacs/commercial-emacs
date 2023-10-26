@@ -4603,7 +4603,7 @@ q_garbage_collect (void)
       sem_init (sem, 0, --val);					\
       break;							\
     }								\
-    wait_reading_process_output (0, 5e7, 0, false, NULL, 0);	\
+    Fthread_yield ();						\
   }
 # endif /* 0 */
 #endif /* HAVE_GCC_TLS */
@@ -4680,7 +4680,7 @@ maybe_garbage_collect (void)
 	    sem_post (&sem_nonmain_next); /* trigger next nonmain */
 	}
     }
-#endif /* !HAVE_GCC_TLS */
+#endif /* ! HAVE_GCC_TLS */
 }
 
 /* Subroutine of Fgarbage_collect that does most of the work.  */
