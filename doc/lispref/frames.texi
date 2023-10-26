@@ -4036,11 +4036,12 @@ is used to encode selection data, and takes effect on MS-DOS,
 MS-Windows and X@.
 
 Under MS-DOS and MS-Windows, it is the coding system by which all
-clipboard text will be encoded and decoded, whereas on X it merely
-supplies the EOL format of the selection text sent in response to a
-request for text encoded by a matching coding system; which is to say
-that if its value is @code{utf-8-dos}, it will influence requests for
-@code{UTF8_STRING} data, but not those for @code{STRING}.
+non-ASCII clipboard text will be encoded and decoded; if set under X,
+it provides the coding system calls to @code{gui-get-selection} will
+decode selection data for a subset of text data types by, and also
+forces replies to selection requests for the polymorphic @code{TEXT}
+data type to be encoded by the @code{compound-text-with-extensions}
+coding system rather than Unicode.
 
 Its default value is the system code page under MS-Windows 95, 98 or
 Me, @code{utf-16le-dos} under NT/W2K/XP, @code{iso-latin-1-dos} on
