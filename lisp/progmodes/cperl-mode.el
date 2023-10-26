@@ -6652,7 +6652,7 @@ side-effect of memorizing only.  Examples in `cperl-style-examples'."
 (defun cperl-info-on-current-command ()
   (declare (obsolete cperl-perldoc "30.1"))
   (interactive)
-  (cperl-info-on-command (cperl-word-at-point)))
+  (cperl-perldoc (cperl-word-at-point)))
 
 (defun cperl-imenu-info-imenu-search ()
   (declare (obsolete nil "30.1"))
@@ -6679,12 +6679,14 @@ side-effect of memorizing only.  Examples in `cperl-style-examples'."
 	 (index-item (save-restriction
 		       (save-window-excursion
 			 (set-buffer (cperl-info-buffer nil))
-			 (setq imenu-create-index-function
-			       'imenu-default-create-index-function
-			       imenu-prev-index-position-function
-			       #'cperl-imenu-info-imenu-search
-			       imenu-extract-index-name-function
-			       #'cperl-imenu-info-imenu-name)
+                         (with-suppressed-warnings ((obsolete cperl-imenu-info-imenu-search)
+                                                    (obsolete cperl-imenu-info-imenu-name))
+			   (setq imenu-create-index-function
+			         'imenu-default-create-index-function
+			         imenu-prev-index-position-function
+			         #'cperl-imenu-info-imenu-search
+			         imenu-extract-index-name-function
+			         #'cperl-imenu-info-imenu-name))
 			 (imenu-choose-buffer-index)))))
     (and index-item
 	 (progn
