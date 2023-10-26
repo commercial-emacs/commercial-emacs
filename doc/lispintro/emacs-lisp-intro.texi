@@ -3602,24 +3602,59 @@ and the two are not intended to refer to the same value.  The
 @cindex @samp{variable, local}, defined
 The @code{let} special form prevents confusion.  @code{let} creates a
 name for a @dfn{local variable} that overshadows any use of the same
-name outside the @code{let} expression.  This is like understanding
-that whenever your host refers to ``the house'', he means his house, not
-yours.  (Symbols used in argument lists work the same way.
+name outside the @code{let} expression (in computer science jargon, we
+call this ``binding'' the variable).  This is like understanding that
+in your host's home, whenever he refers to ``the house'', he means his
+house, not yours.  (Symbols used in argument lists work the same way.
 @xref{defun, , The @code{defun} Macro}.)
 
-Local variables created by a @code{let} expression retain their value
-@emph{only} within the @code{let} expression itself (and within
-expressions called within the @code{let} expression); the local
-variables have no effect outside the @code{let} expression.
+@cindex lexical binding
+@cindex binding, lexical
+@cindex dynamic binding
+@cindex binding, dynamic
+Before we begin discussing @code{let} in detail, we must first mention
+an important note.  For historical reasons, Emacs Lisp uses a form of
+variable binding called ``dynamic binding''.  However, this manual
+will discuss the preferred form of binding, called ``lexical binding''
+(if you have programmed in other languages before, you're likely
+already familiar with how lexical binding behaves).  In order to use
+lexical binding, you should add something like this to the first line
+of your Emacs Lisp file:
 
-Another way to think about @code{let} is that it is like a @code{setq}
-that is temporary and local.  The values set by @code{let} are
-automatically undone when the @code{let} is finished.  The setting
-only affects expressions that are inside the bounds of the @code{let}
-expression.  In computer science jargon, we would say the binding of
-a symbol is visible only in functions called in the @code{let} form;
-in Emacs Lisp, the default scoping is dynamic, not lexical.  (The
-non-default lexical binding is not discussed in this manual.)
+@example
+;;; -*- lexical-binding: t -*-
+@end example
+
+For more information about this, @pxref{Selecting Lisp Dialect, , ,
+elisp, The Emacs Lisp Reference Manual}.
+
+With that out of the way, we can get back to discussing @code{let}.
+Another way to think about @code{let} is that it defines a place in
+your code where the variables you named have their own local meaning.
+Outside of the @code{let} body, they have another meaning (or they may
+not be defined at all).
+
+This means that inside the @code{let} body, calling @code{setq}
+for a variable named by the @code{let} expression will set the value
+of the @emph{local} variable of that name.  This also means that
+outside of the @code{let} body, calling @code{setq} for a variable
+named by the @code{let} expression will @emph{not} affect that local
+variable.
+
+For example, if you call a function inside of a @code{let}
+body, that function's body would be unable to ``see'' (or modify) the
+value of a local variable from the @code{let} expression:
+
+@example
+(setq x 1)
+
+(defun getx ()
+  x)
+
+(let ((x 2))
+  (get-x))
+     @result{} 1
+@end example
 
 @code{let} can create more than one variable at once.  Also,
 @code{let} gives each variable it creates an initial value, either a
