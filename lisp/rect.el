@@ -646,15 +646,22 @@ with a prefix argument, prompt for START-AT and FORMAT."
   "<remap> <next-line>"               #'rectangle-next-line
   "<remap> <previous-line>"           #'rectangle-previous-line)
 
+(defvar rectangle-mark-mode-lighter nil
+  "Lighter displayed for `rectangle-mark-mode'.")
+
 ;;;###autoload
 (define-minor-mode rectangle-mark-mode
   "Toggle the region as rectangular.
 
 Activates the region if it's inactive and Transient Mark mode is
 on.  Only lasts until the region is next deactivated."
-  :lighter nil
+  :lighter rectangle-mark-mode-lighter
   (rectangle--reset-crutches)
   (when rectangle-mark-mode
+    ;; Make us more visible when Transient Mark mode is off and there
+    ;; is no rectangle (bug#XXXXX).
+    (setq rectangle-mark-mode-lighter
+          (and (not transient-mark-mode) " Rect"))
     (advice-add 'region-beginning :around #'rectangle--region-beginning)
     (advice-add 'region-end :around #'rectangle--region-end)
     (add-hook 'deactivate-mark-hook
@@ -727,29 +734,29 @@ on.  Only lasts until the region is next deactivated."
 
 (defun rectangle-right-char (&optional n)
   "Like `right-char' but steps into wide chars and moves past EOL."
-  (interactive "p") (rectangle--*-char #'right-char n #'left-char))
+  (interactive "^p") (rectangle--*-char #'right-char n #'left-char))
 (defun rectangle-left-char (&optional n)
   "Like `left-char' but steps into wide chars and moves past EOL."
-  (interactive "p") (rectangle--*-char #'left-char n #'right-char))
+  (interactive "^p") (rectangle--*-char #'left-char n #'right-char))
 
 (defun rectangle-forward-char (&optional n)
   "Like `forward-char' but steps into wide chars and moves past EOL."
-  (interactive "p") (rectangle--*-char #'forward-char n #'backward-char))
+  (interactive "^p") (rectangle--*-char #'forward-char n #'backward-char))
 (defun rectangle-backward-char (&optional n)
   "Like `backward-char' but steps into wide chars and moves past EOL."
-  (interactive "p") (rectangle--*-char #'backward-char n #'forward-char))
+  (interactive "^p") (rectangle--*-char #'backward-char n #'forward-char))
 
 (defun rectangle-next-line (&optional n)
   "Like `next-line' but steps into wide chars and moves past EOL.
 Ignores `line-move-visual'."
-  (interactive "p")
+  (interactive "^p")
   (let ((col (rectangle--point-col (point))))
     (forward-line n)
     (rectangle--col-pos col 'point)))
 (defun rectangle-previous-line (&optional n)
   "Like `previous-line' but steps into wide chars and moves past EOL.
 Ignores `line-move-visual'."
-  (interactive "p")
+  (interactive "^p")
   (let ((col (rectangle--point-col (point))))
     (forward-line (- n))
     (rectangle--col-pos col 'point)))
