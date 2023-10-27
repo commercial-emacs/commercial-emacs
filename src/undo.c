@@ -281,57 +281,35 @@ but another undo command will undo to the previous boundary.  */)
   return Qnil;
 }
 
-/* At garbage collection time, make an undo list shorter at the end,
-   returning the truncated list.  How this is done depends on the
-   variables undo-limit, undo-strong-limit and undo-outer-limit.
-   In some cases this works by calling undo-outer-limit-function.  */
+/* At gc, make undo list shorter at the end (what?).  RMS's truncation
+   method depends on variables `undo-limit', `undo-strong-limit', and
+   `undo-outer-limit', and in some cases `undo-outer-limit-function'
+   (wtf).  */
 
 void
 truncate_undo_list (struct buffer *b)
 {
-  Lisp_Object list;
-  Lisp_Object prev, next, last_boundary;
   intmax_t size_so_far = 0;
+  Lisp_Object prev = Qnil, list = BVAR (b, undo_list), next = list;
 
-  /* Make sure that calling undo-outer-limit-function
-     won't cause another GC.  */
+  /* prevent undo-outer-limit-function recursing into gc.  */
   specpdl_ref count = inhibit_garbage_collection ();
 
-  /* Make the buffer current to get its local values of variables such
-     as undo_limit.  Also so that Vundo_outer_limit_function can
-     tell which buffer to operate on.  */
   record_unwind_current_buffer ();
   set_buffer_internal (b);
 
-  list = BVAR (b, undo_list);
-
-  prev = Qnil;
-  next = list;
-  last_boundary = Qnil;
-
-  /* If the first element is an undo boundary, skip past it.  */
   if (CONSP (next) && NILP (XCAR (next)))
     {
-      /* Add in the space occupied by this element and its chain link.  */
+      /* Skip past initial undo boundary, if any.  */
       size_so_far += sizeof (struct Lisp_Cons);
-
-      /* Advance to next element.  */
       prev = next;
       next = XCDR (next);
     }
 
-  /* Always preserve at least the most recent undo record
-     unless it is really horribly big.
-
-     Skip, skip, skip the undo, skip, skip, skip the undo,
-     Skip, skip, skip the undo, skip to the undo bound'ry.  */
-
+  /* Iterate until first undo boundary */
   while (CONSP (next) && ! NILP (XCAR (next)))
     {
-      Lisp_Object elt;
-      elt = XCAR (next);
-
-      /* Add in the space occupied by this element and its chain link.  */
+      Lisp_Object elt = XCAR (next);
       size_so_far += sizeof (struct Lisp_Cons);
       if (CONSP (elt))
 	{
@@ -340,57 +318,42 @@ truncate_undo_list (struct buffer *b)
 	    size_so_far += (sizeof (struct Lisp_String) - 1
 			    + SCHARS (XCAR (elt)));
 	}
-
-      /* Advance to next element.  */
       prev = next;
       next = XCDR (next);
     }
 
-  /* If by the first boundary we have already passed undo_outer_limit,
-     we're heading for memory full, so offer to clear out the list.  */
-  intmax_t undo_outer_limit;
-  if ((INTEGERP (Vundo_outer_limit)
-       && (integer_to_intmax (Vundo_outer_limit, &undo_outer_limit)
-	   ? undo_outer_limit < size_so_far
-	   : NILP (Fnatnump (Vundo_outer_limit))))
-      && !NILP (Vundo_outer_limit_function))
+  /* We're at the first undo boundary.  Apply the special function
+     (typically `undo-outer-limit-truncate') if applicable.  */
+  if (! NILP (Vundo_outer_limit_function) && INTEGERP (Vundo_outer_limit))
     {
-      Lisp_Object tem;
-
-      /* Normally the function this calls is undo-outer-limit-truncate.  */
-      tem = call1 (Vundo_outer_limit_function, make_int (size_so_far));
-      if (! NILP (tem))
-	{
-	  /* The function is responsible for making
-	     any desired changes in buffer-undo-list.  */
-	  unbind_to (count, Qnil);
-	  return;
-	}
+      intmax_t undo_outer_limit;
+      if ((integer_to_intmax (Vundo_outer_limit, &undo_outer_limit)
+	   ? size_so_far > undo_outer_limit
+	   : NILP (Fnatnump (Vundo_outer_limit)))
+	  && ! NILP (call1 (Vundo_outer_limit_function, make_int (size_so_far))))
+	goto out;
     }
 
-  if (CONSP (next))
-    last_boundary = prev;
-
-  /* Keep additional undo data, if it fits in the limits.  */
-  while (CONSP (next))
+  for (Lisp_Object last_boundary = prev; CONSP (next); )
     {
-      Lisp_Object elt;
-      elt = XCAR (next);
-
-      /* When we get to a boundary, decide whether to truncate
-	 either before or after it.  The lower threshold, undo_limit,
-	 tells us to truncate after it.  If its size pushes past
-	 the higher threshold undo_strong_limit, we truncate before it.  */
-      if (NILP (elt))
+      Lisp_Object elt = XCAR (next);
+      if (NILP (elt)) /* undo boundary */
 	{
 	  if (size_so_far > undo_strong_limit)
-	    break;
-	  last_boundary = prev;
-	  if (size_so_far > undo_limit)
-	    break;
+	    {
+	      /* Silly RMS safety measure.  */
+	      XSETCDR (last_boundary, Qnil);
+	      break;
+	    }
+	  else if (size_so_far > undo_limit)
+	    {
+	      XSETCDR (prev, Qnil);
+	      break;
+	    }
+	  else
+	    last_boundary = prev;
 	}
 
-      /* Add in the space occupied by this element and its chain link.  */
       size_so_far += sizeof (struct Lisp_Cons);
       if (CONSP (elt))
 	{
@@ -399,22 +362,11 @@ truncate_undo_list (struct buffer *b)
 	    size_so_far += (sizeof (struct Lisp_String) - 1
 			    + SCHARS (XCAR (elt)));
 	}
-
-      /* Advance to next element.  */
       prev = next;
       next = XCDR (next);
     }
 
-  /* If we scanned the whole list, it is short enough; don't change it.  */
-  if (NILP (next))
-    ;
-  /* Truncate at the boundary where we decided to truncate.  */
-  else if (!NILP (last_boundary))
-    XSETCDR (last_boundary, Qnil);
-  /* There's nothing we decided to keep, so clear it out.  */
-  else
-    bset_undo_list (b, Qnil);
-
+ out:
   unbind_to (count, Qnil);
 }
 

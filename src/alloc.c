@@ -120,7 +120,7 @@ static EMACS_INT bytes_between_gc;
 static bool gc_inhibited;
 
 /* Last recorded live and free-list counts.  */
-static struct
+PER_THREAD_STATIC struct
 {
   size_t total_conses, total_free_conses;
   size_t total_symbols, total_free_symbols;
@@ -3992,18 +3992,17 @@ total_bytes_of_live_objects (void)
 }
 
 #ifdef HAVE_WINDOW_SYSTEM
-
 /* Remove unmarked font-spec and font-entity objects from ENTRY, which is
    (DRIVER-TYPE NUM-FRAMES FONT-CACHE-DATA ...), and return changed entry.  */
 
 static Lisp_Object
 compact_font_cache_entry (Lisp_Object entry)
 {
-  Lisp_Object tail, *prev = &entry;
-
-  for (tail = entry; CONSP (tail); tail = XCDR (tail))
+  for (Lisp_Object tail = entry, *prev = &entry;
+       CONSP (tail);
+       tail = XCDR (tail))
     {
-      bool drop = 0;
+      bool drop = false;
       Lisp_Object obj = XCAR (tail);
 
       /* Consider OBJ if it is (font-spec . [font-entity font-entity ...]).  */
@@ -4047,7 +4046,7 @@ compact_font_cache_entry (Lisp_Object entry)
 	    {
 	      /* No marked fonts were found, so this entire font
 		 entity can be dropped.  */
-	      drop = 1;
+	      drop = true;
 	    }
 	}
       if (drop)
@@ -4058,36 +4057,19 @@ compact_font_cache_entry (Lisp_Object entry)
   return entry;
 }
 
-/* Compact font caches on all terminals and mark
-   everything which is still here after compaction.  */
-
 static void
-compact_font_caches (void)
+mark_font_caches (void)
 {
-  struct terminal *t;
-
-  for (t = terminal_list; t != NULL; t = t->next_terminal)
+  for (struct terminal *t = terminal_list; t != NULL; t = t->next_terminal)
     {
       Lisp_Object cache = TERMINAL_FONT_CACHE (t);
-      /* Inhibit compacting the caches if the user so wishes.  Some of
-	 the users don't mind a larger memory footprint, but do mind
-	 slower redisplay.  */
-      if (!inhibit_compacting_font_caches
-	  && CONSP (cache))
-	{
-	  Lisp_Object entry;
-
-	  for (entry = XCDR (cache); CONSP (entry); entry = XCDR (entry))
-	    XSETCAR (entry, compact_font_cache_entry (XCAR (entry)));
-	}
+      if (! inhibit_compacting_font_caches && CONSP (cache))
+	/* compact before marking */
+	for (Lisp_Object entry = XCDR (cache); CONSP (entry); entry = XCDR (entry))
+	  XSETCAR (entry, compact_font_cache_entry (XCAR (entry)));
       mark_object (&cache);
     }
 }
-
-#else /* not HAVE_WINDOW_SYSTEM */
-
-#define compact_font_caches() (void)(0)
-
 #endif /* HAVE_WINDOW_SYSTEM */
 
 /* Remove (MARKER . DATA) entries with unmarked MARKER
@@ -4689,34 +4671,29 @@ bool
 garbage_collect (void)
 {
   static struct timespec gc_elapsed = { 0, 0 };
-  Lisp_Object tail, buffer;
   specpdl_ref count = SPECPDL_INDEX ();
-  struct timespec start;
 
   if (gc_inhibited)
     return false;
 
-  eassert (weak_hash_tables == NULL);
-
   block_input ();
 
-  eassert (mark_stack_empty_p ());
-
-  /* Show up in profiler.  */
+  /* show up in profiler.  */
   record_in_backtrace (QAutomatic_GC, 0, 0);
 
-  /* Do this early in case user quits.  */
+  const size_t tot_before = (profiler_memory_running
+			     ? total_bytes_of_live_objects ()
+			     : (size_t) -1);
+
+  const struct timespec start = current_timespec ();
+
+  /* Discretionary trimming before marking.  */
+  Lisp_Object tail, buffer;
   FOR_EACH_LIVE_BUFFER (tail, buffer)
     compact_buffer (XBUFFER (buffer));
+  compact_regexp_cache ();
 
-  size_t tot_before = (profiler_memory_running
-		       ? total_bytes_of_live_objects ()
-		       : (size_t) -1);
-
-  start = current_timespec ();
-
-  shrink_regexp_cache ();
-
+  eassert (weak_hash_tables == NULL && mark_stack_empty_p ());
   mark_most_objects ();
   mark_pinned_objects ();
   mark_pinned_symbols ();
@@ -4724,35 +4701,27 @@ garbage_collect (void)
   mark_terminals ();
   mark_kboards ();
   mark_threads ();
-
 #ifdef HAVE_PGTK
   mark_pgtkterm ();
 #endif
-
 #ifdef USE_GTK
   xg_mark_data ();
 #endif
-
 #ifdef HAVE_HAIKU
   mark_haiku_display ();
 #endif
-
 #ifdef HAVE_WINDOW_SYSTEM
   mark_fringe_data ();
 #endif
-
 #ifdef HAVE_X_WINDOWS
   mark_xterm ();
   mark_xselect ();
 #endif
+#ifdef HAVE_WINDOW_SYSTEM
+  mark_font_caches ();
+#endif
 
-  /* Everything is now marked, except for font caches, undo lists, and
-     finalizers.  The first two admit compaction before marking.
-     All finalizers, even unmarked ones, need to run after sweep,
-     so survive the unmarked ones in doomed_finalizers.  */
-
-  compact_font_caches ();
-
+  /* Mark the undo lists after compacting away unmarked markers.  */
   FOR_EACH_LIVE_BUFFER (tail, buffer)
     {
       struct buffer *b = XBUFFER (buffer);
@@ -4761,14 +4730,14 @@ garbage_collect (void)
       mark_object (&BVAR (b, undo_list));
     }
 
+  /* Persist any unmarked finalizers since they still need to run
+     after sweep.  */
   queue_doomed_finalizers (&doomed_finalizers, &finalizers);
   mark_finalizer_list (&doomed_finalizers);
 
-  /* Must happen after all other marking and before gc_sweep.  */
+  /* Must happen after all other marking.  */
   mark_and_sweep_weak_table_contents ();
-  eassert (weak_hash_tables == NULL);
-
-  eassert (mark_stack_empty_p ());
+  eassert (weak_hash_tables == NULL && mark_stack_empty_p ());
 
   gc_sweep ();
 
@@ -4796,7 +4765,7 @@ garbage_collect (void)
   /* Collect profiling data.  */
   if (tot_before != (size_t) -1)
     {
-      size_t tot_after = total_bytes_of_live_objects ();
+      const size_t tot_after = total_bytes_of_live_objects ();
       if (tot_after < tot_before)
 	malloc_probe (min (tot_before - tot_after, SIZE_MAX));
     }

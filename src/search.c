@@ -130,17 +130,13 @@ compile_pattern_1 (struct regexp_cache *cp, Lisp_Object pattern,
   cp->regexp = Fcopy_sequence (pattern);
 }
 
-/* Shrink each compiled regexp buffer in the cache
-   to the size actually used right now.
-   This is called from garbage collection.  */
+/* During gc, shrink compiled patterns to the size actually used.  */
 
 void
-shrink_regexp_cache (void)
+compact_regexp_cache (void)
 {
-  struct regexp_cache *cp;
-
-  for (cp = searchbuf_head; cp != 0; cp = cp->next)
-    if (!cp->busy)
+  for (struct regexp_cache *cp = searchbuf_head; cp != NULL; cp = cp->next)
+    if (! cp->busy)
       {
         cp->buf.allocated = cp->buf.used;
         cp->buf.buffer = xrealloc (cp->buf.buffer, cp->buf.used);

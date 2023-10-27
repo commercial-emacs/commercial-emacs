@@ -1690,30 +1690,24 @@ compact_buffer (struct buffer *buffer)
 {
   BUFFER_CHECK_INDIRECTION (buffer);
 
-  /* Skip dead buffers, indirect buffers and buffers
-     which aren't changed since last compaction.  */
   if (BUFFER_LIVE_P (buffer)
-      && (buffer->base_buffer == NULL)
-      && (BUF_COMPACT (buffer) != BUF_MODIFF (buffer)))
+      /* not indirect */
+      && buffer->base_buffer == NULL
+      /* changed since last compaction */
+      && BUF_COMPACT (buffer) != BUF_MODIFF (buffer))
     {
-      /* If a buffer's undo list is Qt, that means that undo is
-	 turned off in that buffer.  Calling truncate_undo_list on
-	 Qt tends to return NULL, which effectively turns undo back on.
-	 So don't call truncate_undo_list if undo_list is Qt.  */
-      if (!EQ (BVAR(buffer, undo_list), Qt))
+      if (! EQ (BVAR(buffer, undo_list), Qt)) /* undo not disabled.  */
 	truncate_undo_list (buffer);
 
-      /* Shrink buffer gaps.  */
-      if (!buffer->text->inhibit_shrinking)
+      if (! buffer->text->inhibit_shrinking)
 	{
-	  /* If a buffer's gap size is more than 10% of the buffer
-	     size, or larger than GAP_BYTES_DFL bytes, then shrink it
-	     accordingly.  Keep a minimum size of GAP_BYTES_MIN bytes.  */
-	  ptrdiff_t size = clip_to_bounds (GAP_BYTES_MIN,
-					   BUF_Z_BYTE (buffer) / 10,
-					   GAP_BYTES_DFL);
-	  if (BUF_GAP_SIZE (buffer) > size)
-	    make_gap_1 (buffer, -(BUF_GAP_SIZE (buffer) - size));
+	  /* Shrink if gap exceeds either 10% of buffer size or
+	     GAP_BYTES_DFL bytes.  */
+	  const ptrdiff_t thresh = clip_to_bounds (GAP_BYTES_MIN,
+						   BUF_Z_BYTE (buffer) / 10,
+						   GAP_BYTES_DFL);
+	  if (BUF_GAP_SIZE (buffer) > thresh)
+	    make_gap_1 (buffer, -(BUF_GAP_SIZE (buffer) - thresh));
 	}
       BUF_COMPACT (buffer) = BUF_MODIFF (buffer);
     }

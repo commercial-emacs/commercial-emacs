@@ -4378,7 +4378,7 @@ extern void init_fileio (void);
 extern void syms_of_fileio (void);
 
 /* Defined in search.c.  */
-extern void shrink_regexp_cache (void);
+extern void compact_regexp_cache (void);
 extern void update_search_regs (ptrdiff_t oldstart,
                                 ptrdiff_t oldend, ptrdiff_t newend);
 extern void record_unwind_save_match_data (void);
