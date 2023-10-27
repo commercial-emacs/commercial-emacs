@@ -281,10 +281,9 @@ but another undo command will undo to the previous boundary.  */)
   return Qnil;
 }
 
-/* At gc, make undo list shorter at the end (what?).  RMS's truncation
-   method depends on variables `undo-limit', `undo-strong-limit', and
-   `undo-outer-limit', and in some cases `undo-outer-limit-function'
-   (wtf).  */
+/* During gc, trim undo lists to within `undo-limit' bytes.
+   An auxiliary `undo-outer-limit-function' accommodates
+   a custom trimming algo.  */
 
 void
 truncate_undo_list (struct buffer *b)
