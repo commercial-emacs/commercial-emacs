@@ -4635,18 +4635,16 @@ maybe_garbage_collect (void)
       int main_halted, nonmain_halted;
 
       if (sem_getvalue (&sem_main_halted, &main_halted) != 0)
-	return;
+	return; /* til next time */
 
       if (main_halted)
 	{
 	  // gc began, halt myself
 	  if (sem_post (&sem_nonmain_halted) != 0)
-	    return;
+	    return; /* til next time */
 
 	  // wait until main gc's
 	  SEM_WAIT (&sem_nonmain_next);
-
-	  garbage_collect ();
 
 	  // one step closer to main's release
 	  SEM_WAIT (&sem_nonmain_halted);
@@ -4678,7 +4676,7 @@ garbage_collect (void)
 
   block_input ();
 
-  /* show up in profiler.  */
+  /* Show up in profiler.  */
   record_in_backtrace (QAutomatic_GC, 0, 0);
 
   const size_t tot_before = (profiler_memory_running
@@ -4738,6 +4736,8 @@ garbage_collect (void)
   /* Must happen after all other marking.  */
   mark_and_sweep_weak_table_contents ();
   eassert (weak_hash_tables == NULL && mark_stack_empty_p ());
+
+  mgc_flip_space ();
 
   gc_sweep ();
 
@@ -5519,40 +5519,44 @@ sweep_buffers (struct thread_state *thr)
 static void
 gc_sweep (void)
 {
-  struct thread_state *thr = current_thread;
 #ifdef HAVE_GCC_TLS
-  if (main_thread_p (thr))
+  for (struct thread_state *thr = all_threads;
+       thr != NULL;
+       thr = thr->next_thread)
+#else
+  struct thread_state *thr = current_thread;
 #endif
-    mgc_flip_space ();
-  sweep_strings (thr);
-  sweep_void (thr,
-	      (void **) &THREAD_FIELD (thr, m_cons_free_list),
-	      THREAD_FIELD (thr, m_cons_block_index),
-	      (void **) &THREAD_FIELD (thr, m_cons_blocks),
-	      Lisp_Cons,
-	      BLOCK_NCONS,
-	      offsetof (struct cons_block, conses),
-	      offsetof (struct Lisp_Cons, u.s.u.chain),
-	      offsetof (struct cons_block, next),
-	      sizeof (struct Lisp_Cons),
-	      &gcstat.total_conses,
-	      &gcstat.total_free_conses);
-  sweep_void (thr,
-	      (void **) &THREAD_FIELD (thr, m_float_free_list),
-	      THREAD_FIELD (thr, m_float_block_index),
-	      (void **) &THREAD_FIELD (thr, m_float_blocks),
-	      Lisp_Float,
-	      BLOCK_NFLOATS,
-	      offsetof (struct float_block, floats),
-	      offsetof (struct Lisp_Float, u.chain),
-	      offsetof (struct float_block, next),
-	      sizeof (struct Lisp_Float),
-	      &gcstat.total_floats,
-	      &gcstat.total_free_floats);
-  sweep_intervals (thr);
-  sweep_symbols (thr);
-  sweep_buffers (thr);
-  sweep_vectors (thr);
+  {
+    sweep_strings (thr);
+    sweep_void (thr,
+		(void **) &THREAD_FIELD (thr, m_cons_free_list),
+		THREAD_FIELD (thr, m_cons_block_index),
+		(void **) &THREAD_FIELD (thr, m_cons_blocks),
+		Lisp_Cons,
+		BLOCK_NCONS,
+		offsetof (struct cons_block, conses),
+		offsetof (struct Lisp_Cons, u.s.u.chain),
+		offsetof (struct cons_block, next),
+		sizeof (struct Lisp_Cons),
+		&gcstat.total_conses,
+		&gcstat.total_free_conses);
+    sweep_void (thr,
+		(void **) &THREAD_FIELD (thr, m_float_free_list),
+		THREAD_FIELD (thr, m_float_block_index),
+		(void **) &THREAD_FIELD (thr, m_float_blocks),
+		Lisp_Float,
+		BLOCK_NFLOATS,
+		offsetof (struct float_block, floats),
+		offsetof (struct Lisp_Float, u.chain),
+		offsetof (struct float_block, next),
+		sizeof (struct Lisp_Float),
+		&gcstat.total_floats,
+		&gcstat.total_free_floats);
+    sweep_intervals (thr);
+    sweep_symbols (thr);
+    sweep_buffers (thr);
+    sweep_vectors (thr);
+  }
   pdumper_clear_marks ();
 }
 
