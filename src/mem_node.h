@@ -43,9 +43,7 @@ struct mem_node *mem_find (struct thread_state *thr, void *start);
 void mem_delete_root (struct mem_node **root);
 struct mem_node *mem_insert (void *, void *, enum mem_type, struct mem_node **root);
 void mem_delete (struct mem_node *node, struct mem_node **root);
-#ifdef ENABLE_CHECKING
-struct mem_node *mem_find_which_thread (void *start, struct thread_state **which);
-#endif
+struct mem_node *mem_find_which_thread (const void *start, struct thread_state **which);
 
 #ifdef HAVE_GCC_TLS
 # define THREAD_FIELD(thr, field) (thr->field)

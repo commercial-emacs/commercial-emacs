@@ -1152,12 +1152,12 @@ sweep_strings (struct thread_state *thr)
        b != NULL; b = next)
     {
       struct Lisp_String *restore_free_list = THREAD_FIELD (thr, m_string_free_list);
-      int i, nfree = 0;
+      int nfree = 0;
 
       ASAN_UNPOISON_STRING_BLOCK (b);
       next = b->next; /* B might not exist later, so store NEXT now.  */
 
-      for (i = 0; i < BLOCK_NSTRINGS; ++i)
+      for (int i = 0; i < BLOCK_NSTRINGS; ++i)
 	{
 	  struct Lisp_String *s = b->strings + i;
 	  ASAN_UNPOISON_STRING (s);
@@ -1199,7 +1199,7 @@ sweep_strings (struct thread_state *thr)
 	    }
 	  else /* s->u.s.data == NULL */
 	    {
-	      /* S inexplicably not already on free list.  */
+	      /* Put just allocated S onto free list.  */
 	      s->u.next = THREAD_FIELD (thr, m_string_free_list);
 	      THREAD_FIELD (thr, m_string_free_list) = s;
 	      ++nfree;
@@ -2236,8 +2236,10 @@ sweep_vectors (struct thread_state *thr)
 	  /* If RUN_VECTOR never wavered from its initial
 	     assignment, then nothing in the block was marked.
 	     Harvest it back to OS.  */
+	  struct mem_node *node = mem_find (thr, block->data);
+	  eassert (node != mem_nil);
+	  mem_delete (node, &THREAD_FIELD (thr, m_mem_root));
 	  *bprev = block->next;
-	  mem_delete (mem_find (thr, block->data), &THREAD_FIELD (thr, m_mem_root));
 	  xfree (block);
 	}
       else
@@ -3239,6 +3241,7 @@ mark_maybe_pointer (void *const *p)
   struct mem_node *m;
   enum Space_Type xpntr_type;
   void *xpntr, *p_sym;
+  struct thread_state *thr = NULL;
 
   /* Research Bug#41321.  If we didn't special-case Lisp_Symbol
      to subtract off lispsym in make_lisp_ptr(), this hack wouldn't
@@ -3294,7 +3297,7 @@ mark_maybe_pointer (void *const *p)
       INT_SUBTRACT_WRAPV ((uintptr_t) *p, (uintptr_t) xpntr, &offset);
       INT_ADD_WRAPV ((uintptr_t) forwarded, offset, (uintptr_t *) p);
     }
-  else if ((m = mem_find (current_thread, *p)) != mem_nil)
+  else if ((m = mem_find_which_thread (*p, &thr)) != mem_nil)
     {
       switch (m->type)
 	{
@@ -3302,7 +3305,7 @@ mark_maybe_pointer (void *const *p)
 	  break;
 	case MEM_TYPE_CONS:
 	  {
-	    struct Lisp_Cons *h = live_cons_holding (current_thread, m, *p);
+	    struct Lisp_Cons *h = live_cons_holding (thr, m, *p);
 	    if (h)
 	      {
 		mark_automatic_object (make_lisp_ptr (h, Lisp_Cons));
@@ -3312,7 +3315,7 @@ mark_maybe_pointer (void *const *p)
 	  break;
 	case MEM_TYPE_STRING:
 	  {
-	    struct Lisp_String *h = live_string_holding (current_thread, m, *p);
+	    struct Lisp_String *h = live_string_holding (thr, m, *p);
 	    if (h)
 	      {
 		mark_automatic_object (make_lisp_ptr (h, Lisp_String));
@@ -3322,7 +3325,7 @@ mark_maybe_pointer (void *const *p)
 	  break;
 	case MEM_TYPE_SYMBOL:
 	  {
-	    struct Lisp_Symbol *h = live_symbol_holding (current_thread, m, *p);
+	    struct Lisp_Symbol *h = live_symbol_holding (thr, m, *p);
 	    if (h)
 	      {
 		mark_automatic_object (make_lisp_ptr (h, Lisp_Symbol));
@@ -3332,7 +3335,7 @@ mark_maybe_pointer (void *const *p)
 	  break;
 	case MEM_TYPE_FLOAT:
 	  {
-	    struct Lisp_Float *h = live_float_holding (current_thread, m, *p);
+	    struct Lisp_Float *h = live_float_holding (thr, m, *p);
 	    if (h)
 	      {
 		mark_automatic_object (make_lisp_ptr (h, Lisp_Float));
@@ -3342,7 +3345,7 @@ mark_maybe_pointer (void *const *p)
 	  break;
 	case MEM_TYPE_VECTORLIKE:
 	  {
-	    struct Lisp_Vector *h = live_large_vector_holding (current_thread, m, *p);
+	    struct Lisp_Vector *h = live_large_vector_holding (thr, m, *p);
 	    if (h)
 	      {
 		mark_automatic_object (make_lisp_ptr (h, Lisp_Vectorlike));
@@ -3352,7 +3355,7 @@ mark_maybe_pointer (void *const *p)
 	  break;
 	case MEM_TYPE_VBLOCK:
 	  {
-	    struct Lisp_Vector *h = live_small_vector_holding (current_thread, m, *p);
+	    struct Lisp_Vector *h = live_small_vector_holding (thr, m, *p);
 	    if (h)
 	      {
 		mark_automatic_object (make_lisp_ptr (h, Lisp_Vectorlike));
@@ -3362,11 +3365,13 @@ mark_maybe_pointer (void *const *p)
 	  break;
 	default:
 	  emacs_abort ();
+	  break;
 	}
     }
-  else if ((m = mem_find (current_thread, p_sym)) != mem_nil && m->type == MEM_TYPE_SYMBOL)
+  else if ((m = mem_find_which_thread (p_sym, &thr)) != mem_nil
+	   && m->type == MEM_TYPE_SYMBOL)
     {
-      struct Lisp_Symbol *h = live_symbol_holding (current_thread, m, p_sym);
+      struct Lisp_Symbol *h = live_symbol_holding (thr, m, p_sym);
       if (h)
 	{
 	  mark_automatic_object (make_lisp_ptr (h, Lisp_Symbol));
@@ -4651,8 +4656,7 @@ maybe_garbage_collect (void)
 
 	  if (sem_getvalue (&sem_nonmain_halted, &nonmain_halted) != 0)
 	    sem_post (&sem_main_halted); /* abort abort abort */
-
-	  if (nonmain_halted == 0)
+	  else if (nonmain_halted == 0)
 	    sem_post (&sem_main_halted); /* home free */
 	  else if (sem_post (&sem_nonmain_next) != 0)
 	    sem_post (&sem_main_halted); /* abort abort abort */

@@ -985,8 +985,8 @@ insert_from_string (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
   update_compositions (opoint, PT, CHECK_BORDER);
 }
 
-/* Like `insert_from_string' except that all markers pointing
-   at the place where the insertion happens are adjusted to point after it.  */
+/* Like insert_from_string except all markers at the insertion point
+   are adjusted to point after it.  */
 
 void
 insert_from_string_before_markers (Lisp_Object string,

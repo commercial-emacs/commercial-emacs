@@ -44,13 +44,8 @@ mem_find (struct thread_state *thr, void *start)
   return p;
 }
 
-#ifdef ENABLE_CHECKING
-
-/* Please don't move this definition outside ENABLE_CHECKING as
-   someone might inadvertently call it in a production emacs.  */
-
 struct mem_node *
-mem_find_which_thread (void *start, struct thread_state **which)
+mem_find_which_thread (const void *start, struct thread_state **which)
 {
   struct mem_node *p = mem_nil;
   for (struct thread_state *thr = all_threads;
@@ -74,7 +69,6 @@ mem_find_which_thread (void *start, struct thread_state **which)
     }
   return p;
 }
-#endif
 
 /* Destroy tree at ROOT.  */
 
