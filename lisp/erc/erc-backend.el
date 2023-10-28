@@ -293,6 +293,9 @@ escapes removed.")
 (defvar erc-server-ping-timer-alist nil
   "Mapping of server buffers to their specific ping timer.")
 
+(defvar-local erc-server-opened nil
+  "I get two \"open\" events in erc-process-sentinel")
+
 (defvar-local erc-server-connected nil
   "Non-nil if the current buffer belongs to an active IRC connection.
 To determine whether an underlying transport is connected, use the
@@ -1098,9 +1101,11 @@ Change value of property `erc-prompt' from t to `hidden'."
         (erc-log (format
                   "SENTINEL: proc: %S    status: %S  event: %S (quitting: %S)"
                   cproc (process-status cproc) event erc-server-quitting))
-        (if (string-match "^open" event)
+        (if (string-match-p "^open" event)
             ;; newly opened connection (no wait)
-            (erc--register-connection)
+            (unless erc-server-opened
+              (setq erc-server-opened t)
+              (erc--register-connection))
           ;; assume event is 'failed
           (erc-with-all-buffers-of-server cproc nil
             (setq erc-server-connected nil))
