@@ -49,7 +49,6 @@
 (declare-function widget-get-sibling "wid-edit" (widget))
 (declare-function widget-move "wid-edit" (arg &optional suppress-echo))
 (declare-function widget-type "wid-edit" (widget))
-(declare-function cl--defsubst-expand "cl-macs")
 
 (cl-defstruct erc-input
   string insertp sendp refoldp)

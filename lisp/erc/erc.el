@@ -17,6 +17,9 @@
 ;; Keywords: IRC, chat, client, Internet
 ;; URL: https://www.gnu.org/software/emacs/erc.html
 
+;; This is a GNU ELPA :core package.  Avoid functionality that is not
+;; compatible with the version of Emacs recorded above.
+
 ;; This file is NOT part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
@@ -1274,7 +1277,6 @@ which the local user typed."
   "Abbrev table used while in ERC mode.")
 (define-abbrev-table 'erc-mode-abbrev-table ())
 
-(declare-function erc-toggle-interpret-controls "erc-goodies")
 (defvar erc-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\C-m" #'erc-send-current-line)
@@ -7922,11 +7924,8 @@ shortened server name instead."
     (cond (lag (format "lag:%.0f" lag))
           (t ""))))
 
-;; erc-goodies is required at end of this file.
-
-;; FIXME when 29.1 is cut and `format-spec' is added to ELPA Compat,
-;; remove the function invocations from the spec form below.
-(declare-function erc-controls-strip "erc-goodies")
+;; TODO when ERC drops Emacs 28, replace the expressions in the format
+;; spec below with functions.
 (defun erc-update-mode-line-buffer (buffer)
   "Update the mode line in a single ERC buffer BUFFER."
   (with-current-buffer buffer
