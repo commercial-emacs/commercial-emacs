@@ -2342,7 +2342,7 @@ text has only capital letters and has at least one multiletter word,
 convert NEWTEXT to all caps.  Otherwise if all words are capitalized
 in the replaced text, capitalize each word in NEWTEXT.  Note that
 what exactly is a word is determined by the syntax tables in effect
-in the current buffer.
+in the current buffer, and the variable `case-symbols-as-words'.
 
 If optional third arg LITERAL is non-nil, insert NEWTEXT literally.
 Otherwise treat `\\' as special:
@@ -2456,7 +2456,8 @@ since only regular expressions have distinguished subexpressions.  */)
 	      /* Cannot be all caps if any original char is lower case */
 
 	      some_lowercase = 1;
-	      if (SYNTAX (prevc) != Sword)
+	      if (SYNTAX (prevc) != Sword
+		  && !(case_symbols_as_words && SYNTAX (prevc) == Ssymbol))
 		some_nonuppercase_initial = 1;
 	      else
 		some_multiletter_word = 1;
@@ -2464,7 +2465,8 @@ since only regular expressions have distinguished subexpressions.  */)
 	  else if (uppercasep (c))
 	    {
 	      some_uppercase = 1;
-	      if (SYNTAX (prevc) != Sword)
+	      if (SYNTAX (prevc) != Sword
+		  && !(case_symbols_as_words && SYNTAX (prevc) == Ssymbol))
 		;
 	      else
 		some_multiletter_word = 1;
@@ -2473,7 +2475,8 @@ since only regular expressions have distinguished subexpressions.  */)
 	    {
 	      /* If the initial is a caseless word constituent,
 		 treat that like a lowercase initial.  */
-	      if (SYNTAX (prevc) != Sword)
+	      if (SYNTAX (prevc) != Sword
+		  && !(case_symbols_as_words && SYNTAX (prevc) == Ssymbol))
 		some_nonuppercase_initial = 1;
 	    }
 
