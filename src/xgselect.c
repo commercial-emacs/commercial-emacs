@@ -48,7 +48,7 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   struct timespec tmo;
   struct timespec *tmop = timeout;
 
-  GMainContext *context;
+  GMainContext *context = g_main_context_default ();
   bool have_wfds = wfds != NULL;
   GPollFD buf[128];
   GPollFD *gfds = buf;
@@ -57,27 +57,32 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   bool context_acquired = false;
   int tmo_in_millisec;
 #ifdef USE_GTK
-  bool gtk_pending_event;
+  if (
+# ifndef HAVE_PGTK
+  x_gtk_use_native_input &&
+# endif
+  g_main_context_pending (context))
+    {
+      /* Under GTK native input or PGTK, a keypress results in two
+	 events, the second of which does not express in ALL_RFDS
+	 but instead via g_main_context_pending. (Bug#52761) */
+      if (rfds) FD_ZERO (rfds);
+      if (wfds) FD_ZERO (wfds);
+      if (efds) FD_ZERO (efds);
+      return 1;
+    }
 #endif
-
-  context = g_main_context_default ();
   if (main_thread_p (current_thread))
     context_acquired = g_main_context_acquire (context);
 
-  /* Under GTK native input or PGTK, a keypress results in two
-     events, the second of which does not express in ALL_RFDS
-     but instead via g_main_context_pending. (Bug#52761) */
-#ifdef USE_GTK
-  gtk_pending_event = g_main_context_pending (context);
-# ifndef HAVE_PGTK
-  gtk_pending_event = gtk_pending_event && x_gtk_use_native_input;
-# endif
-#endif
-
-  if (rfds) all_rfds = *rfds;
-  else FD_ZERO (&all_rfds);
-  if (wfds) all_wfds = *wfds;
-  else FD_ZERO (&all_wfds);
+  if (rfds)
+    all_rfds = *rfds;
+  else
+    FD_ZERO (&all_rfds);
+  if (wfds)
+    all_wfds = *wfds;
+  else
+    FD_ZERO (&all_wfds);
 
   ngfds = ! context_acquired ? -1 : g_main_context_query (context,
 							  G_PRIORITY_LOW,
@@ -122,83 +127,71 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
     }
 
   fds_lim = max_fds + 1;
-#ifdef USE_GTK
-  if (gtk_pending_event)
+  bool ready_gfds = false;
+  retval = nfds = thread_select (pselect, fds_lim,
+				 &all_rfds, have_wfds ? &all_wfds : NULL, efds,
+				 tmop, sigmask);
+  if (nfds == 0)
     {
       if (rfds) FD_ZERO (rfds);
       if (wfds) FD_ZERO (wfds);
       if (efds) FD_ZERO (efds);
-      nfds = retval = 1;
     }
-  else
-#endif
-  {
-    bool ready_gfds = false;
-    retval = nfds = thread_select (pselect, fds_lim,
-				   &all_rfds, have_wfds ? &all_wfds : NULL, efds,
-				   tmop, sigmask);
-    if (nfds == 0)
-      {
-	if (rfds) FD_ZERO (rfds);
-	if (wfds) FD_ZERO (wfds);
-	if (efds) FD_ZERO (efds);
-      }
-    else if (nfds > 0)
-      {
-	retval = 0;
-	for (int i = 0; i < fds_lim; ++i)
-	  {
-	    if (FD_ISSET (i, &all_rfds))
-	      {
-		if (rfds && FD_ISSET (i, rfds)) ++retval;
-		else ready_gfds = true;
-	      }
-	    else if (rfds)
-	      FD_CLR (i, rfds);
+  else if (nfds > 0)
+    {
+      retval = 0;
+      for (int i = 0; i < fds_lim; ++i)
+	{
+	  if (FD_ISSET (i, &all_rfds))
+	    {
+	      if (rfds && FD_ISSET (i, rfds)) ++retval;
+	      else ready_gfds = true;
+	    }
+	  else if (rfds)
+	    FD_CLR (i, rfds);
 
-	    if (have_wfds && FD_ISSET (i, &all_wfds))
-	      {
-		if (wfds && FD_ISSET (i, wfds)) ++retval;
-		else ready_gfds = true;
-	      }
-	    else if (wfds)
-	      FD_CLR (i, wfds);
+	  if (have_wfds && FD_ISSET (i, &all_wfds))
+	    {
+	      if (wfds && FD_ISSET (i, wfds)) ++retval;
+	      else ready_gfds = true;
+	    }
+	  else if (wfds)
+	    FD_CLR (i, wfds);
 
-	    if (efds && FD_ISSET (i, efds))
-	      ++retval;
-	  }
-      }
+	  if (efds && FD_ISSET (i, efds))
+	    ++retval;
+	}
+    }
 
-    if (retval == 0
-	&& (ready_gfds || (tmop == &tmo && nfds == 0)))
-      {
-	/* Emulate pselect by returning error if accommodating glib's
-	   descriptors prevented caller's descriptors from polling
-	   ready.  */
-	retval = -1;
-	errno = EINTR;
-      }
+  if (retval == 0
+      && (ready_gfds || (tmop == &tmo && nfds == 0)))
+    {
+      /* Emulate pselect by returning error if accommodating glib's
+	 descriptors prevented caller's descriptors from polling
+	 ready.  */
+      retval = -1;
+      errno = EINTR;
+    }
 
-    if (context_acquired
+  if (context_acquired
 #ifdef USE_GTK
-	&& retval == 0 /* in which case gtk_main_iteration may not get
-			  called.  */
+      && retval == 0 /* in which case gtk_main_iteration may not get
+			called.  */
 #endif
-	)
-      {
-	/* need to dispatch */
-	int pselect_errno = errno;
-	/* Czekalski: Callbacks containing block/unblock within
-	   g_main_context_dispatch() trigger event loop recursion
-	   unless we apply this encompassing block/unblock pair
-	   (Bug#15801).  */
-	block_input ();
-	while (g_main_context_pending (context))
-	  g_main_context_dispatch (context);
-	unblock_input ();
-	errno = pselect_errno;
-      }
-  }
+      )
+    {
+      /* need to dispatch */
+      int pselect_errno = errno;
+      /* Czekalski: Callbacks containing block/unblock within
+	 g_main_context_dispatch() trigger event loop recursion
+	 unless we apply this encompassing block/unblock pair
+	 (Bug#15801).  */
+      block_input ();
+      while (g_main_context_pending (context))
+	g_main_context_dispatch (context);
+      unblock_input ();
+      errno = pselect_errno;
+    }
   if (context_acquired)
     g_main_context_release (context);
   return retval;
