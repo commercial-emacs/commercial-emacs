@@ -849,7 +849,6 @@ usage: (define-charset-internal ...)  */)
   /* Charset attr vector.  */
   Lisp_Object attrs;
   Lisp_Object val;
-  Lisp_Object hash_code;
   struct Lisp_Hash_Table *hash_table = XHASH_TABLE (Vcharset_hash_table);
   int i, j;
   struct charset charset;
@@ -1107,6 +1106,7 @@ usage: (define-charset-internal ...)  */)
   CHECK_LIST (args[charset_arg_plist]);
   ASET (attrs, charset_plist, args[charset_arg_plist]);
 
+  hash_hash_t hash_code;
   charset.hash_index = hash_lookup (hash_table, args[charset_arg_name],
 				    &hash_code);
   if (charset.hash_index >= 0)
