@@ -571,6 +571,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
             (include-untracked (project--value-in-dir
                                 'project-vc-include-untracked
                                 dir))
+            (submodules (project--git-submodules))
             files)
        (setq args (append args '("-c" "--exclude-standard")
                           (when include-untracked '("-o"))))
@@ -601,15 +602,16 @@ See `project-vc-extra-root-markers' for the marker value format.")
                                         i)))
                                    extra-ignores)))))
        (setq files
-             (mapcar
-              (lambda (file) (concat (file-name-as-directory dir) file))
+             (seq-keep
+              (lambda (file)
+                (unless (member file submodules)
+                  (concat (file-name-as-directory dir) file)))
               (split-string
                (apply #'vc-git--run-command-string nil "ls-files" args)
                "\0" t)))
        (when (project--vc-merge-submodules-p default-directory)
          ;; Unfortunately, 'ls-files --recurse-submodules' conflicts with '-o'.
-         (let* ((submodules (project--git-submodules))
-                (sub-files
+         (let* ((sub-files
                  (mapcar
                   (lambda (module)
                     (when (file-directory-p module)
@@ -1275,7 +1277,7 @@ If you exit the `query-replace', you can later continue the
   (fileloop-initialize-replace
    from to
    (cl-delete-if-not (lambda (file)
-                       "Filter out git submodules, gpg keyfiles, etc."
+                       "Filter out gpg keyfiles, etc."
                        (and (file-regular-p file)
                             (not (find-file-name-handler file 'insert-file-contents))))
                  (project-files (project-most-recent-project)))
