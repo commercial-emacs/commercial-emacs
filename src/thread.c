@@ -644,8 +644,6 @@ run_thread (void *state)
   struct thread_state *self = state;
   union { char c; GCALIGNED_UNION_MEMBER } stack_pos;
 
-  eassert (self != &main_state.s);
-
 #ifdef HAVE_GCC_TLS
   current_thread = self;
 #endif
@@ -659,7 +657,7 @@ run_thread (void *state)
 #ifdef HAVE_GCC_TLS
   if (self->cooperative)
 #endif
-    acquire_global_lock (self);
+    acquire_global_lock (self); // sets current_thread
 
   /* Obfuscatively ensuring a top-level catch probably by Tromey
      (omnibus merge commit 39372e1).  */

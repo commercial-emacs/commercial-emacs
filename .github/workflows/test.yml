@@ -25,6 +25,8 @@ jobs:
         include:
           - os: ubuntu-latest
             gearing: alt-x
+          - os: ubuntu-latest
+            gearing: multithread
     steps:
     - run: |
         git config --global core.autocrlf false

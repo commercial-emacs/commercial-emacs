@@ -57,6 +57,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "alloc.h"
 #include "mem_node.h"
+#include "syssignal.h"
 
 #ifdef HAVE_GCC_TLS
 # define mem_root (current_thread->m_mem_root)
@@ -112,7 +113,7 @@ INTERVAL (*static_interval_allocator) (void);
 
 #ifdef HAVE_GCC_TLS
 #include <semaphore.h>
-sem_t sem_main_halted, sem_nonmain_halted, sem_nonmain_next;
+sem_t sem_main_halted, sem_main_resumed, sem_nonmain_halted, sem_nonmain_resumed;
 #endif
 Lisp_Object Vmemory_full;
 PER_THREAD EMACS_INT bytes_since_gc;
@@ -3435,7 +3436,7 @@ mark_memory (void const *start, void const *end)
 
   eassert (((uintptr_t) start) % GC_POINTER_ALIGNMENT == 0);
 
-  /* Ours is not a "precise" gc, in which all object references
+  /* Ours is not a precise gc, in which all object references
      are unambiguous and markable.  Here, for example,
 
        Lisp_Object obj = build_string ("test");
@@ -3444,7 +3445,7 @@ mark_memory (void const *start, void const *end)
        fprintf (stderr, "test '%s'\n", ptr->u.s.data);
 
      the compiler is liable to optimize away OBJ, so our
-     "conservative" gc must recognize that PTR references Lisp
+     conservative gc must recognize that PTR references Lisp
      data.  */
 
   for (pp = start; (void const *) pp < end; pp += GC_POINTER_ALIGNMENT)
@@ -4612,14 +4613,12 @@ maybe_garbage_collect (void)
 
       if (q_garbage_collect ())
 	{
-	  static sigset_t restore_set;
+	  static sigset_t oldset;
 	  if (! main_halted)
 	    {
-	      sigset_t blocked;
-	      sigemptyset (&blocked);
-//	      sigaddset (&blocked, SIGINT); /* eventually add others.  */
-	      pthread_sigmask (SIG_BLOCK, &blocked, &restore_set);
+	      block_child_signal (&oldset); // also blocks SIGINT
 	      sem_post (&sem_main_halted);
+	      sem_init (&sem_nonmain_resumed, 0, 0);
 	    }
 	  if (nonmain_halted == n_running_threads () - 1)
 	    {
@@ -4627,10 +4626,10 @@ maybe_garbage_collect (void)
 	      garbage_collect ();
 	      if (nonmain_halted)
 		{
-		  sem_post (&sem_nonmain_next);
-		  SEM_WAIT (&sem_main_halted);
+		  sem_init (&sem_nonmain_resumed, 0, nonmain_halted);
+		  SEM_WAIT (&sem_main_resumed);
 		}
-	      pthread_sigmask (SIG_BLOCK, &restore_set, 0);
+	      restore_signal_mask (&oldset);
 	    }
 	  // else wait til next time
 	}
@@ -4649,19 +4648,15 @@ maybe_garbage_collect (void)
 	    return; /* til next time */
 
 	  // wait until main gc's
-	  SEM_WAIT (&sem_nonmain_next);
+	  SEM_WAIT (&sem_nonmain_resumed);
 
 	  // one step closer to main's release
 	  SEM_WAIT (&sem_nonmain_halted);
 
 	  if (sem_getvalue (&sem_nonmain_halted, &nonmain_halted) != 0)
-	    sem_post (&sem_main_halted); /* abort abort abort */
+	    sem_post (&sem_main_resumed); /* abort abort abort */
 	  else if (nonmain_halted == 0)
-	    sem_post (&sem_main_halted); /* home free */
-	  else if (sem_post (&sem_nonmain_next) != 0)
-	    sem_post (&sem_main_halted); /* abort abort abort */
-	  else
-	    sem_post (&sem_nonmain_next); /* trigger next nonmain */
+	    sem_post (&sem_main_resumed); /* home free */
 	}
     }
 #endif /* ! HAVE_GCC_TLS */
@@ -5589,11 +5584,11 @@ update_allocations_for_thread_death (struct thread_state *thr)
   } while (0);
 #else
 #define CHECKSUM_BEFORE(type, next, what)	\
-    do {					\
-      void (len_thr);				\
-      void (len_main);				\
-      void (len_sum);				\
-    } while (0);
+  do {						\
+    (void) len_thr;				\
+    (void) len_main;				\
+    (void) len_sum;				\
+  } while (0);
 #define CHECKSUM_AFTER(type, next, what)
 #endif /* ENABLE_CHECKING */
 
