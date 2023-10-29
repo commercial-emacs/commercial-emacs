@@ -5394,8 +5394,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	      && (timeout.tv_sec > 0 || timeout.tv_nsec > 0))
 	    {
 	      if (! timespec_valid_p (got_output_end_time)
-		  ||
-		  timespec_cmp (got_output_end_time, current_timespec ()) <= 0)
+		  || timespec_cmp (got_output_end_time, current_timespec ()) <= 0)
 		break;
 	    }
 

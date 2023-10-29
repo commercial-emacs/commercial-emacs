@@ -50,30 +50,28 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 
   GMainContext *context;
   bool have_wfds = wfds != NULL;
-  GPollFD gfds_buf[128];
-  GPollFD *gfds = gfds_buf;
-  int gfds_size = ARRAYELTS (gfds_buf);
-  int n_gfds, retval = 0, our_fds = 0, max_fds = fds_lim - 1;
+  GPollFD buf[128];
+  GPollFD *gfds = buf;
+  const int nbuf = ARRAYELTS (buf);
+  int nfds, ngfds, retval, max_fds = fds_lim - 1;
   bool context_acquired = false;
-  int i, nfds, tmo_in_millisec, must_free = 0;
-  bool need_to_dispatch;
+  int tmo_in_millisec;
 #ifdef USE_GTK
-  bool already_has_events;
+  bool gtk_pending_event;
 #endif
 
   context = g_main_context_default ();
   if (main_thread_p (current_thread))
     context_acquired = g_main_context_acquire (context);
-  /* FIXME: If we couldn't acquire the context, we just silently proceed
-     because this function handles more than just glib file descriptors.
-     Note that, as implemented, this failure is completely silent: there is
-     no feedback to the caller.  */
 
+  /* Under GTK native input or PGTK, a keypress results in two
+     events, the second of which does not express in ALL_RFDS
+     but instead via g_main_context_pending. (Bug#52761) */
 #ifdef USE_GTK
-  already_has_events = g_main_context_pending (context);
-#ifndef HAVE_PGTK
-  already_has_events = already_has_events && x_gtk_use_native_input;
-#endif
+  gtk_pending_event = g_main_context_pending (context);
+# ifndef HAVE_PGTK
+  gtk_pending_event = gtk_pending_event && x_gtk_use_native_input;
+# endif
 #endif
 
   if (rfds) all_rfds = *rfds;
@@ -81,24 +79,21 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   if (wfds) all_wfds = *wfds;
   else FD_ZERO (&all_wfds);
 
-  n_gfds = (context_acquired
-	    ? g_main_context_query (context, G_PRIORITY_LOW, &tmo_in_millisec,
-				    gfds, gfds_size)
-	    : -1);
+  ngfds = ! context_acquired ? -1 : g_main_context_query (context,
+							  G_PRIORITY_LOW,
+							  &tmo_in_millisec,
+							  gfds, nbuf);
 
-  if (gfds_size < n_gfds)
+  if (ngfds > nbuf)
     {
-      /* Avoid using SAFE_NALLOCA, as that implicitly refers to the
-	 current thread.  Using xnmalloc avoids thread-switching
-	 problems here.  */
-      gfds = xnmalloc (n_gfds, sizeof *gfds);
-      must_free = 1;
-      gfds_size = n_gfds;
-      n_gfds = g_main_context_query (context, G_PRIORITY_LOW, &tmo_in_millisec,
-				     gfds, gfds_size);
+      /* xnmalloc is thread-safe, SAFE_NALLOCA is not.  */
+      gfds = xnmalloc (ngfds, sizeof *gfds);
+      ngfds = g_main_context_query (context, G_PRIORITY_LOW, &tmo_in_millisec,
+				    gfds, ngfds);
     }
 
-  for (i = 0; i < n_gfds; ++i)
+  /* See point (2) in header comment.  */
+  for (int i = 0; i < ngfds; ++i)
     {
       if (gfds[i].events & G_IO_IN)
         {
@@ -113,112 +108,99 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
         }
     }
 
-  if (must_free)
+  if (gfds != buf)
     xfree (gfds);
 
-  if (n_gfds >= 0 && tmo_in_millisec >= 0)
+  if (ngfds >= 0 && tmo_in_millisec >= 0)
     {
       tmo = make_timespec (tmo_in_millisec / 1000,
 			   1000 * 1000 * (tmo_in_millisec % 1000));
-      if (!timeout || timespec_cmp (tmo, *timeout) < 0)
+      if (! timeout
+	  /* See point (1) in header comment.  */
+	  || timespec_cmp (tmo, *timeout) < 0)
 	tmop = &tmo;
     }
 
-#ifndef USE_GTK
   fds_lim = max_fds + 1;
-  nfds = thread_select (pselect, fds_lim,
-			&all_rfds, have_wfds ? &all_wfds : NULL, efds,
-			tmop, sigmask);
-#else
-  if (already_has_events)
+#ifdef USE_GTK
+  if (gtk_pending_event)
     {
-      /* Under GTK native input or PGTK, a keypress results in two
-	 events, the second of which is not sent via the display
-	 connection.  So while this latter event pends, the socket
-	 read buffer is also empty.  Dispatch immediately without
-	 calling thread_select().  (Bug#52761) */
-      nfds = 1;
-      FD_ZERO (&all_rfds);
-      if (have_wfds)
-	FD_ZERO (&all_wfds);
-      if (efds)
-	FD_ZERO (efds);
-      our_fds++;
+      if (rfds) FD_ZERO (rfds);
+      if (wfds) FD_ZERO (wfds);
+      if (efds) FD_ZERO (efds);
+      nfds = retval = 1;
     }
   else
-    {
-      fds_lim = max_fds + 1;
-      nfds = thread_select (pselect, fds_lim,
-			    &all_rfds, have_wfds ? &all_wfds : NULL, efds,
-			    tmop, sigmask);
-    }
 #endif
+  {
+    bool ready_gfds = false;
+    retval = nfds = thread_select (pselect, fds_lim,
+				   &all_rfds, have_wfds ? &all_wfds : NULL, efds,
+				   tmop, sigmask);
+    if (nfds == 0)
+      {
+	if (rfds) FD_ZERO (rfds);
+	if (wfds) FD_ZERO (wfds);
+	if (efds) FD_ZERO (efds);
+      }
+    else if (nfds > 0)
+      {
+	retval = 0;
+	for (int i = 0; i < fds_lim; ++i)
+	  {
+	    if (FD_ISSET (i, &all_rfds))
+	      {
+		if (rfds && FD_ISSET (i, rfds)) ++retval;
+		else ready_gfds = true;
+	      }
+	    else if (rfds)
+	      FD_CLR (i, rfds);
 
-  if (nfds < 0)
-    retval = nfds;
-  else if (nfds == 0)
-    {
-      if (rfds)
-	FD_ZERO (rfds);
-      if (wfds)
-	FD_ZERO (wfds);
-    }
-  else if (nfds > 0)
-    {
-      for (i = 0; i < fds_lim; ++i)
-        {
-          if (FD_ISSET (i, &all_rfds))
-            {
-              if (rfds && FD_ISSET (i, rfds)) ++retval;
-              else ++our_fds;
-            }
-          else if (rfds)
-            FD_CLR (i, rfds);
+	    if (have_wfds && FD_ISSET (i, &all_wfds))
+	      {
+		if (wfds && FD_ISSET (i, wfds)) ++retval;
+		else ready_gfds = true;
+	      }
+	    else if (wfds)
+	      FD_CLR (i, wfds);
 
-          if (have_wfds && FD_ISSET (i, &all_wfds))
-            {
-              if (wfds && FD_ISSET (i, wfds)) ++retval;
-              else ++our_fds;
-            }
-          else if (wfds)
-            FD_CLR (i, wfds);
+	    if (efds && FD_ISSET (i, efds))
+	      ++retval;
+	  }
+      }
 
-          if (efds && FD_ISSET (i, efds))
-            ++retval;
-        }
-    }
+    if (retval == 0
+	&& (ready_gfds || (tmop == &tmo && nfds == 0)))
+      {
+	/* Emulate pselect by returning error if accommodating glib's
+	   descriptors prevented caller's descriptors from polling
+	   ready.  */
+	retval = -1;
+	errno = EINTR;
+      }
 
-  /* If Gtk+ is in use eventually gtk_main_iteration will be called,
-     unless retval is zero.  */
+    if (context_acquired
 #ifdef USE_GTK
-  need_to_dispatch = retval == 0;
-#else
-  need_to_dispatch = true;
+	&& retval == 0 /* in which case gtk_main_iteration may not get
+			  called.  */
 #endif
-  if (need_to_dispatch && context_acquired)
-    {
-      int pselect_errno = errno;
-      /* Czekalski: Callbacks within g_main_context_dispatch()
-	 containing block/unblock result in event loop recursion,
-	 unless we apply this encompassing block/unblock pair
-	 (Bug#15801).  */
-      block_input ();
-      while (g_main_context_pending (context))
-        g_main_context_dispatch (context);
-      unblock_input ();
-      errno = pselect_errno;
-    }
-
+	)
+      {
+	/* need to dispatch */
+	int pselect_errno = errno;
+	/* Czekalski: Callbacks containing block/unblock within
+	   g_main_context_dispatch() trigger event loop recursion
+	   unless we apply this encompassing block/unblock pair
+	   (Bug#15801).  */
+	block_input ();
+	while (g_main_context_pending (context))
+	  g_main_context_dispatch (context);
+	unblock_input ();
+	errno = pselect_errno;
+      }
+  }
   if (context_acquired)
     g_main_context_release (context);
-
-  /* To not have to recalculate timeout, return like this.  */
-  if ((our_fds > 0 || (nfds == 0 && tmop == &tmo)) && (retval == 0))
-    {
-      retval = -1;
-      errno = EINTR;
-    }
-
   return retval;
 }
 #endif /* HAVE_GLIB */
