@@ -163,16 +163,6 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
 	}
     }
 
-  if (retval == 0
-      && (ready_gfds || (tmop == &tmo && nfds == 0)))
-    {
-      /* Emulate pselect by returning error if accommodating glib's
-	 descriptors prevented caller's descriptors from polling
-	 ready.  */
-      retval = -1;
-      errno = EINTR;
-    }
-
   if (context_acquired
 #ifdef USE_GTK
       && retval == 0 /* in which case gtk_main_iteration may not get
@@ -192,6 +182,17 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
       unblock_input ();
       errno = pselect_errno;
     }
+
+  if (retval == 0
+      && (ready_gfds || (tmop == &tmo && nfds == 0)))
+    {
+      /* Emulate pselect by returning error if accommodating glib's
+	 descriptors prevented caller's descriptors from polling
+	 ready.  */
+      retval = -1;
+      errno = EINTR;
+    }
+
   if (context_acquired)
     g_main_context_release (context);
   return retval;
