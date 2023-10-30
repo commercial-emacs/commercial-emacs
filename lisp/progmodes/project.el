@@ -571,6 +571,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
             (include-untracked (project--value-in-dir
                                 'project-vc-include-untracked
                                 dir))
+            (submodules (project--git-submodules))
             files)
        (setq args (append args '("-c" "--exclude-standard")
                           (when include-untracked '("-o"))))
