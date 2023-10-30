@@ -89,10 +89,8 @@ Integer values are handled in the `range' slot.")
 
 (defun comp--cl-class-hierarchy (x)
   "Given a class name `x' return its hierarchy."
-  `(,@(cl--class-allparents (cl--struct-get-class x))
-    ;; FIXME: AFAICT, `comp--all-classes' will also find those struct types
-    ;; which use :type and can thus be either `vector' or `cons' (the latter
-    ;; isn't `atom').
+  `(,@(mapcar #'cl--struct-class-name (cl--struct-all-parents
+                                       (cl--struct-get-class x)))
     atom
     t))
 
@@ -272,31 +270,44 @@ Return them as multiple value."
                            (symbol-name y)))))
 
 (defun comp-supertypes (type)
-  "Return the ordered list of supertypes of TYPE."
-  ;; FIXME: We should probably keep the results in
-  ;; `comp-cstr-ctxt-typeof-types' (or maybe even precompute them
-  ;; and maybe turn `comp-cstr-ctxt-typeof-types' into a hash-table).
-  ;; Or maybe we shouldn't keep structs and defclasses in it,
-  ;; and just use `cl--class-allparents' when needed (and refuse to
-  ;; compute their direct subtypes since we can't know them).
+  "Return a list of pairs (supertype . hierarchy-level) for TYPE."
   (cl-loop
-   named loop
-   with above
-   for lane in (comp-cstr-ctxt-typeof-types comp-ctxt)
-   do (let ((x (memq type lane)))
-        (cond
-         ((null x) nil)
-         ((eq x lane) (cl-return-from loop x)) ;A base type: easy case.
-         (t (setq above
-                  (if above (comp--intersection x above) x)))))
-   finally return above))
+   named outer
+   with found = nil
+   for l in (comp-cstr-ctxt-typeof-types comp-ctxt)
+   do (cl-loop
+       for x in l
+       for i from (length l) downto 0
+       when (eq type x)
+         do (setf found t)
+       when found
+         collect `(,x . ,i) into res
+       finally (when found
+                 (cl-return-from outer res)))))
+
+(defun comp-common-supertype-2 (type1 type2)
+  "Return the first common supertype of TYPE1 TYPE2."
+  (when-let ((types (cl-intersection
+                     (comp-supertypes type1)
+                     (comp-supertypes type2)
+                     :key #'car)))
+    (car (cl-reduce (lambda (x y)
+                      (if (> (cdr x) (cdr y)) x y))
+                    types))))
+
+(defun comp-common-supertype (&rest types)
+  "Return the first common supertype of TYPES."
+  (or (gethash types (comp-cstr-ctxt-common-supertype-mem comp-ctxt))
+      (puthash types
+               (cl-reduce #'comp-common-supertype-2 types)
+               (comp-cstr-ctxt-common-supertype-mem comp-ctxt))))
 
 (defsubst comp-subtype-p (type1 type2)
   "Return t if TYPE1 is a subtype of TYPE2 or nil otherwise."
   (let ((types (cons type1 type2)))
     (or (gethash types (comp-cstr-ctxt-subtype-p-mem comp-ctxt))
         (puthash types
-                 (memq type2 (comp-supertypes type1))
+                 (eq (comp-common-supertype-2 type1 type2) type2)
                  (comp-cstr-ctxt-subtype-p-mem comp-ctxt)))))
 
 (defun comp-union-typesets (&rest typesets)
@@ -304,18 +315,16 @@ Return them as multiple value."
   (or (gethash typesets (comp-cstr-ctxt-union-typesets-mem comp-ctxt))
       (puthash typesets
                (cl-loop
-                ;; List of (TYPE . SUPERTYPES)", ordered from
-                ;; "most general" to "least general"
-                with typess = (sort (mapcar #'comp-supertypes
-                                            (apply #'append typesets))
-                                    (lambda (l1 l2)
-                                      (<= (length l1) (length l2))))
+                with types = (apply #'append typesets)
                 with res = '()
-                for types in typess
-                ;; Don't keep this type if it's a subtype of one of
-                ;; the other types.
-                unless (comp--intersection types res)
-                do (push (car types) res)
+                for lane in (comp-cstr-ctxt-typeof-types comp-ctxt)
+                do (cl-loop
+                    with last = nil
+                    for x in lane
+                    when (memq x types)
+                      do (setf last x)
+                    finally (when last
+                              (push last res)))
                 finally return (comp-normalize-typeset res))
                (comp-cstr-ctxt-union-typesets-mem comp-ctxt))))
 
@@ -809,7 +818,7 @@ Non memoized version of `comp-cstr-intersection-no-mem'."
                            (comp-subtype-p neg-type pos-type))
                    do (cl-loop
                        with found
-                       for type in (comp-supertypes neg-type)
+                       for (type . _) in (comp-supertypes neg-type)
                        when found
                          collect type into res
                        when (eq type pos-type)
