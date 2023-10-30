@@ -461,22 +461,26 @@ code, the former having already summited that peak."
   "Would only fail under TEST_INTERACTIVE=yes, and not every time.
 The failure manifests only by being unable to exit the interactive emacs."
   (skip-unless (featurep 'threads))
-  ;; there's a bug here
+  ;; 1. only happens under make check, not make test/src/thread-tests
+  ;; 2. doesn't appear related to gc
+  ;; 3. is hanging on g_main_context_acquire in xg_select?
+  ;; 4. still happens on make -j1 check (not emacsen fighting)
   (skip-when (and (cl-search "enable-multithreading" system-configuration-options)
                   (getenv "GITHUB_ACTIONS")))
   (let* ((cv (make-condition-variable (make-mutex) "CV"))
-       condition
-       (notify (lambda ()
-                 (sleep-for 1) ;; let wait() start spinning first
+         condition
+         (notify (lambda ()
+                   (sleep-for 1) ;; let wait() start spinning first
+                   (with-mutex (condition-mutex cv)
+                     (setq condition t)
+                     (condition-notify cv))))
+         (wait (lambda ()
                  (with-mutex (condition-mutex cv)
-                   (setq condition t)
-                   (condition-notify cv))))
-       (wait (lambda () (with-mutex (condition-mutex cv)
-                          (while (not condition)
-                            (condition-wait cv)))))
-       (herring (make-thread (apply-partially #'sleep-for 1000) "unrelated")))
-    ;; herring is a non-main thread that, if the bug is still present,
-    ;; could assume the glib context lock when the main thread executes wait()
+                   (while (not condition)
+                     (condition-wait cv)))))
+         (herring (make-thread (apply-partially #'sleep-for 1000) "unrelated")))
+    ;; HERRING is a nonmain thread that, if the bug is still present,
+    ;; could assume the glib context lock when the main thread calls wait()
     (make-thread notify "notify")
     (funcall wait)
     (thread-signal herring 'quit nil))

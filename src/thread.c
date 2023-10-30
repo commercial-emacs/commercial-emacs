@@ -826,43 +826,29 @@ thread_signal_callback (void *arg)
 }
 
 DEFUN ("thread-signal", Fthread_signal, Sthread_signal, 3, 3, 0,
-       doc: /* Signal an error in a thread.
-This acts like `signal', but arranges for the signal to be raised
-in THREAD.  If THREAD is the current thread, acts just like `signal'.
-This will interrupt a blocked call to `mutex-lock', `condition-wait',
-or `thread-join' in the target thread.
-If THREAD is the main thread, just the error message is shown.  */)
+       doc: /* Ad hoc semantics for signalling a non-current thread.
+If THREAD is the main thread, queue an input event.  Otherwise, merely
+set THREAD's error data, and wake up waiters of THREAD.  */)
   (Lisp_Object thread, Lisp_Object error_symbol, Lisp_Object data)
 {
-  struct thread_state *tstate;
-
   CHECK_THREAD (thread);
-  tstate = XTHREAD (thread);
+  struct thread_state *tstate = XTHREAD (thread);
 
   if (tstate == current_thread)
     Fsignal (error_symbol, data);
-
-#ifdef THREADS_ENABLED
-  if (main_thread_p (tstate))
+  else if (main_thread_p (tstate))
     {
-      /* Construct an event.  */
       struct input_event event;
       EVENT_INIT (event);
       event.kind = THREAD_EVENT;
       event.frame_or_window = Qnil;
       event.arg = list3 (Fcurrent_thread (), error_symbol, data);
-
-      /* Store it into the input event queue.  */
       kbd_buffer_store_event (&event);
     }
   else
-#endif
     {
-      /* What to do if thread is already signaled?
-	 What if error_symbol is Qnil?  */
       tstate->error_symbol = error_symbol;
       tstate->error_data = data;
-
       if (tstate->wait_condvar)
 	with_flushed_stack (thread_signal_callback, tstate);
     }

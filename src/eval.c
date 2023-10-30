@@ -1634,7 +1634,7 @@ See also the function `condition-case'.  */
        attributes: noreturn)
   (Lisp_Object error_symbol, Lisp_Object data)
 {
-  /* If they call us with nonsensical arguments, produce "peculiar error".  */
+  /* If nonsensical arguments, throw "peculiar error".  */
   if (NILP (error_symbol) && NILP (data))
     error_symbol = Qerror;
   signal_or_quit (error_symbol, data, false);
@@ -1669,23 +1669,18 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
   /* This hook is used by edebug.  */
   if (! NILP (Vsignal_hook_function)
       && ! NILP (error_symbol)
-      /* Don't try to call a lisp function if we've already overflowed
-         the specpdl stack.  */
+      /* specpdl not overflowed */
       && specpdl_ptr < specpdl_end)
     {
-      /* Edebug takes care of restoring these variables when it exits.  */
+      /* Edebug restores these variables when it exits.  */
       max_ensure_room (&max_lisp_eval_depth, lisp_eval_depth, 20);
-
       call2 (Vsignal_hook_function, error_symbol, data);
     }
 
   conditions = Fget (real_error_symbol, Qerror_conditions);
 
-  /* Remember from where signal was called.  Skip over the frame for
-     `signal' itself.  If a frame for `error' follows, skip that,
-     too.  Don't do this when ERROR_SYMBOL is nil, because that
-     is a memory-full error.  */
-  if (! NILP (error_symbol))
+  /* Skip frames for `signal' itself and 'error.  */
+  if (! NILP (error_symbol)) /* Not memory full */
     {
       union specbinding *pdl = backtrace_next (backtrace_top ());
       if (backtrace_p (pdl) && EQ (backtrace_function (pdl), Qerror))
@@ -1695,13 +1690,9 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
   for (h = handlerlist; h; h = h->next)
     {
       if (h->type == CATCHER_ALL)
-        {
-          clause = Qt;
-          break;
-        }
-      if (h->type != CONDITION_CASE)
-	continue;
-      clause = find_handler_clause (h->tag_or_ch, conditions);
+	clause = Qt;
+      else if (h->type == CONDITION_CASE)
+	clause = find_handler_clause (h->tag_or_ch, conditions);
       if (! NILP (clause))
 	break;
     }
@@ -1750,9 +1741,8 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
     }
   else if (handlerlist != handlerlist_sentinel)
     {
-      /* FIXME: This will come right back here if there's no top-level
-	 catcher.  A better solution would be to abort here, and instead
-	 add a catch-all condition handler so we never come here.  */
+      /* FIXME: If no top-level catcher, we'll infloop back here.
+	 Should institute catch-all handler and never get here.  */
       Fthrow (Qtop_level, Qt);
     }
 
