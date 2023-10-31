@@ -4581,19 +4581,22 @@ q_garbage_collect (void)
 }
 
 #ifdef HAVE_GCC_TLS
-# if 0
-# define SEM_WAIT(sem) sem_wait (sem)
-# else
-# define SEM_WAIT(sem)						\
-  for (;;) {							\
-    int val;							\
-    if (sem_getvalue (sem, &val) == 0 && val) {			\
-      sem_init (sem, 0, --val);					\
-      break;							\
-    }								\
-    Fthread_yield ();						\
-  }
-# endif /* 0 */
+static inline int
+sem_wait_ (sem_t *sem)
+{
+  if (current_thread->cooperative)
+    {
+      /* GIL requires manual yield.  */
+      for (;;) {
+	int val;
+	if (sem_getvalue (sem, &val) == 0 && val)
+	  return sem_init (sem, 0, --val);
+	Fthread_yield ();
+      }
+    }
+  else
+    return sem_wait (sem);
+}
 #endif /* HAVE_GCC_TLS */
 
 void
@@ -4605,53 +4608,56 @@ maybe_garbage_collect (void)
 #else /* HAVE_GCC_TLS */
   if (main_thread_p (current_thread))
     {
-      int main_halted, nonmain_halted;
-
-      if (sem_getvalue (&sem_main_halted, &main_halted) != 0
-	  || sem_getvalue (&sem_nonmain_halted, &nonmain_halted) != 0)
-	return;
-
       if (q_garbage_collect ())
 	{
 	  static sigset_t oldset;
+	  int main_halted, nonmain_halted;
+
+	  if (sem_getvalue (&sem_main_halted, &main_halted) != 0
+	      || sem_getvalue (&sem_nonmain_halted, &nonmain_halted) != 0)
+	    return;
+
 	  if (! main_halted)
 	    {
 	      block_child_signal (&oldset); // also blocks SIGINT
 	      sem_post (&sem_main_halted);
 	      sem_init (&sem_nonmain_resumed, 0, 0);
 	    }
-	  if (nonmain_halted == n_running_threads () - 1)
+
+	  if (nonmain_halted == n_running_threads () - 1) // -1 for main
 	    {
-	      SEM_WAIT (&sem_main_halted);
+	      sem_wait_ (&sem_main_halted);
 	      garbage_collect ();
 	      if (nonmain_halted)
 		{
 		  sem_init (&sem_nonmain_resumed, 0, nonmain_halted);
-		  SEM_WAIT (&sem_main_resumed);
+		  sem_wait_ (&sem_main_resumed);
 		}
 	      restore_signal_mask (&oldset);
 	    }
 	  // else wait til next time
 	}
     }
-  else
+  else /* nonmain thread */
     {
-      int main_halted, nonmain_halted;
+      int main_halted;
 
       if (sem_getvalue (&sem_main_halted, &main_halted) != 0)
 	return; /* til next time */
 
       if (main_halted)
 	{
+	  int nonmain_halted;
+
 	  // gc began, halt myself
 	  if (sem_post (&sem_nonmain_halted) != 0)
 	    return; /* til next time */
 
 	  // wait until main gc's
-	  SEM_WAIT (&sem_nonmain_resumed);
+	  sem_wait_ (&sem_nonmain_resumed);
 
 	  // one step closer to main's release
-	  SEM_WAIT (&sem_nonmain_halted);
+	  sem_wait_ (&sem_nonmain_halted);
 
 	  if (sem_getvalue (&sem_nonmain_halted, &nonmain_halted) != 0)
 	    sem_post (&sem_main_resumed); /* abort abort abort */

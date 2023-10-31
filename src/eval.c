@@ -3327,11 +3327,10 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       XSETSYMBOL (symbol, xsymbol);
     }
 
-#ifdef HAVE_GCC_TLS
-  if (! current_thread->cooperative)
+#if defined HAVE_GCC_TLS
+  if (! current_thread->cooperative && ! NILP (symbol))
     {
-      symbol = Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray);
-      if (NILP (symbol))
+      if (NILP (Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray)))
 	{
 	  symbol = Fintern (SYMBOL_NAME (symbol), current_thread->obarray);
 	  XSYMBOL (symbol)->u.s.redirect = xsymbol->u.s.redirect;

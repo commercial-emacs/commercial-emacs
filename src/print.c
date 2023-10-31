@@ -2165,7 +2165,6 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
      for the benefit of stack_overflow().  */
   current_thread->stack_top = buf;
 
-
  print_obj:
   maybe_quit ();
 
@@ -2260,7 +2259,6 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	print_string (obj, printcharfun);
       else
 	{
-	  ptrdiff_t i, i_byte;
 	  ptrdiff_t size_byte;
 	  /* True means we must ensure that the next character we output
 	     cannot be taken as part of a hex character escape.	 */
@@ -2276,7 +2274,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  printchar ('\"', printcharfun);
 	  size_byte = SBYTES (obj);
 
-	  for (i = 0, i_byte = 0; i_byte < size_byte;)
+	  for (ptrdiff_t i = 0, i_byte = 0; i_byte < size_byte;)
 	    {
 	      /* Here, we must convert each multi-byte form to the
 		 corresponding character code before handing it to
