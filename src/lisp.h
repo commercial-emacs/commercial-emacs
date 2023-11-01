@@ -4148,7 +4148,7 @@ extern void init_eval (void);
 extern void syms_of_eval (void);
 extern void prog_ignore (Lisp_Object);
 extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
-extern void get_backtrace (Lisp_Object array);
+extern void get_backtrace (Lisp_Object *array, ptrdiff_t size);
 Lisp_Object backtrace_top_function (void);
 extern bool locally_unbound_blv_let_bounded (struct Lisp_Symbol *symbol);
 void do_debug_on_call (Lisp_Object code, specpdl_ref count);
@@ -4709,6 +4709,7 @@ void syms_of_dbusbind (void);
 extern bool profiler_memory_running;
 extern void malloc_probe (size_t);
 extern void syms_of_profiler (void);
+extern void mark_profiler (void);
 
 /* Defined in tree-sitter.c.  */
 extern void tree_sitter_record_change (ptrdiff_t start_char,

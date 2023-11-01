@@ -4684,6 +4684,7 @@ garbage_collect (void)
   mark_terminals ();
   mark_kboards ();
   mark_threads ();
+  mark_profiler ();
 #ifdef HAVE_PGTK
   mark_pgtkterm ();
 #endif
