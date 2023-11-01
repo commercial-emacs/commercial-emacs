@@ -833,18 +833,11 @@ This function does not return anything but instead fills the
 (define-obsolete-function-alias 'cconv-analyse-form #'cconv-analyze-form "25.1")
 
 (defun cconv-fv (form lexvars dynvars)
-  "Return the free variables used in FORM.
-FORM is usually a function #\\='(lambda ...), but may be any valid
-form.  LEXVARS is a list of symbols, each of which is lexically
-bound in FORM's context.  DYNVARS is a list of symbols, each of
-which is dynamically bound in FORM's context.
-Returns a cons (LEXV . DYNV), the car and cdr being lists of the
-lexically and dynamically bound symbols actually used by FORM."
+  "Extract lexical and dynamic variables actually used by FORM.
+Return a cons of the form (LEXV . DYNV) where LEXV and DYNV
+are subsets of LEXVARS and DYNVARS, respectively."
   (let* ((fun
-          ;; Wrap FORM into a function because the analysis code we
-          ;; have only computes freevars for functions.
-          ;; In practice FORM is always already of the form
-          ;; #'(lambda ...), so optimize for this case.
+          ;; Create a "simple" lambda from FORM if not already so.
           (if (and (eq 'function (car-safe form))
                    (eq 'lambda (car-safe (cadr form)))
                    ;; To get correct results, FUN needs to be a "simple lambda"
@@ -855,26 +848,22 @@ lexically and dynamically bound symbols actually used by FORM."
             `#'(lambda () ,form)))
          (analysis-env (mapcar (lambda (v) (list v nil nil nil nil)) lexvars))
          (cconv--dynbound-variables dynvars)
-         (byte-compile-lexical-variables nil)
-         (cconv--dynbindings nil)
-         (cconv-freevars-alist '())
-	 (cconv-var-classification '()))
-    (let* ((body (cddr (cadr fun))))
-      ;; Analyze form - fill these variables with new information.
-      (cconv-analyze-form fun analysis-env)
-      (setq cconv-freevars-alist (nreverse cconv-freevars-alist))
-      (unless (equal (if (eq :documentation (car-safe (car body)))
-                            (cdr body) body)
-                     (caar cconv-freevars-alist))
-        (message "BOOH!\n%S\n%S"
-                 body (caar cconv-freevars-alist)))
-      (cl-assert (equal (if (eq :documentation (car-safe (car body)))
-                            (cdr body) body)
-                        (caar cconv-freevars-alist)))
-      (let ((fvs (nreverse (cdar cconv-freevars-alist)))
-            (dyns (delq nil (mapcar (lambda (var) (car (memq var dynvars)))
-                                    (delete-dups cconv--dynbindings)))))
-        (cons fvs dyns)))))
+         (body* (cddr (cadr fun)))
+         (body (if (eq :documentation (car-safe (car body*)))
+                   (cdr body*)
+                 body*))
+         byte-compile-lexical-variables
+         cconv--dynbindings
+         cconv-freevars-alist
+         cconv-var-classification
+         (cconv-freevars-alist (progn (cconv-analyze-form fun analysis-env)
+                                      (nreverse cconv-freevars-alist))))
+    (cl-destructuring-bind (cconv-body . cconv-fv)
+        (cl-first cconv-freevars-alist)
+      (cl-assert (equal body cconv-body) t)
+      (cons (nreverse cconv-fv)
+            (seq-keep (lambda (var) (car (memq var dynvars)))
+                      (delete-dups cconv--dynbindings))))))
 
 (defun cconv-make-interpreted-closure (fun env)
   "Make a closure for the interpreter.
