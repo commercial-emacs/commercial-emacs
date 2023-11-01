@@ -42,14 +42,14 @@
                       ',expected-type-spec))))
 
   (defconst comp-cstr-typespec-tests-alist
-    '(;; 1
+    `(;; 1
       (symbol . symbol)
       ;; 2
       ((or string array) . array)
       ;; 3
       ((or symbol number) . (or number symbol))
       ;; 4
-      ((or cons atom) . t) ;; SBCL return T
+      ((or cons atom) . (or atom cons)) ;; SBCL return T
       ;; 5
       ((or integer number) . number)
       ;; 6
