@@ -307,8 +307,11 @@ $(filter-out $(COMPILE_FIRST:.el=.elc), $(shell for el in `echo "${SUBDIRS_REL} 
     done | xargs $(XARGS_LIMIT) echo))
 endef
 
+.PHONY: compile-compiler
+compile-compiler: $(BYTE_COMPILER_EL:.el=.elc) | autoloads
+
 .PHONY: compile
-compile: compile-clean $(BYTE_COMPILER_EL:.el=.elc) $(COMPILE_FIRST:.el=.elc) | autoloads
+compile: compile-clean compile-compiler $(COMPILE_FIRST:.el=.elc)
 	$(MAKE) $(compile-rest)
 
 .PHONY: compile-clean
@@ -404,7 +407,7 @@ compile-after-backup: backup-compiled-files compile-always
 # There is no reason to use this rule unless you only have a single
 # core and CPU time is an issue.
 .PHONY: compile-one-process
-compile-one-process: $(BYTE_COMPILER_EL:.el=.elc)
+compile-one-process: compile-compiler
 	$(emacs) $(BYTE_COMPILE_FLAGS) \
 	    --eval "(batch-byte-recompile-directory 0)" $(lisp)
 

@@ -881,7 +881,7 @@ ifeq ($(DO_CODESIGN),yes)
 endif
 
 ifeq ($(DUMPING),pdumper)
-$(bootstrap_pdmp): bootstrap-emacs$(EXEEXT) $(lispsource)/loaddefs.el
+$(bootstrap_pdmp): bootstrap-emacs$(EXEEXT)
 	rm -f $@
 	$(RUN_TEMACS) --batch $(BUILD_DETAILS) $(DUMPING_OVERWRITE) -l loadup --temacs=pbootstrap \
 		--bin-dest $(BIN_DESTDIR) --eln-dest $(ELN_DESTDIR)
