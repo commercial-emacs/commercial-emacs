@@ -1430,13 +1430,6 @@ Return t if the file exists and loads successfully.  */)
 	      bool report_newer;
 	      SSET (efound, SBYTES (efound) - 1, 0); /* .elc to .el */
               report_newer = (0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s2, 0)
-			      /* the "compile-first" make targets
-				 have their timestamps shunted to epoch.
-				 Bug#58224.  */
-			      && 0 != timespec_cmp (get_stat_mtime (&s1),
-						    (struct timespec) {
-						      (time_t) 0, 0
-						    })
 			      && 0 > timespec_cmp (get_stat_mtime (&s1),
 						   get_stat_mtime (&s2)));
 	      SSET (efound, SBYTES (efound) - 1, 'c'); /* back to .elc from .el */

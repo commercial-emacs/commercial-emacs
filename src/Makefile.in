@@ -106,16 +106,6 @@ LD_SWITCH_SYSTEM_TEMACS=@LD_SWITCH_SYSTEM_TEMACS@
 ## Flags to pass to ld only for temacs.
 TEMACS_LDFLAGS = $(LD_SWITCH_SYSTEM) $(LD_SWITCH_SYSTEM_TEMACS)
 
-## If needed, the names of the paxctl and setfattr programs.
-## On grsecurity/PaX systems, unexec will fail due to a gap between
-## the bss section and the heap.  Older versions need paxctl to work
-## around this, newer ones setfattr.  See Bug#11398 and Bug#16343.
-PAXCTL = @PAXCTL@
-SETFATTR = @SETFATTR@
-## Commands to set PaX flags on dumped and not-dumped instances of Emacs.
-PAXCTL_dumped = @PAXCTL_dumped@
-PAXCTL_notdumped = @PAXCTL_notdumped@
-
 ## Some systems define this to request special libraries.
 LIBS_SYSTEM=@LIBS_SYSTEM@
 
@@ -630,15 +620,7 @@ emacs$(EXEEXT): temacs$(EXEEXT) \
 ifeq ($(SYSTEM_TYPE),cygwin)
 	find ${top_builddir} -name '*.eln' | rebase -v -O -T -
 endif
-ifeq ($(DUMPING),unexec)
-	LC_ALL=C $(RUN_TEMACS) -batch $(BUILD_DETAILS) $(DUMPING_OVERWRITE) -l loadup --temacs=dump
-  ifneq ($(PAXCTL_dumped),)
-	      $(PAXCTL_dumped) emacs$(EXEEXT)
-  endif
-	cp -f $@ bootstrap-emacs$(EXEEXT)
-else
 	rm -f $@ && cp -f temacs$(EXEEXT) $@
-endif
 
 ## On Haiku, also produce a binary named Emacs with the appropriate
 ## icon set.
@@ -728,11 +710,6 @@ endif
 endif
 	$(AM_V_at)mv $@.tmp $@
 	$(MKDIR_P) $(etc)
-ifeq ($(DUMPING),unexec)
-  ifneq ($(PAXCTL_notdumped),)
-	$(PAXCTL_notdumped) $@
-  endif
-endif
 
 ## The following oldxmenu-related rules are only (possibly) used if
 ## HAVE_X11 && !USE_GTK, but there is no harm in always defining them.
@@ -831,26 +808,10 @@ TAGS: ${ETAGS} $(ctagsfiles1) $(ctagsfiles2)
 tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS $(lib)/TAGS
 .PHONY: tags
 
-
 ### Bootstrapping.
 
-## Bootstrapping right is difficult because of the circular dependencies.
-## Furthermore, we have to deal with the fact that many compilation targets
-## such as loaddefs.el or *.elc can typically be produced by any old
-## Emacs executable, so we would like to avoid rebuilding them whenever
-## we build a new Emacs executable.
-##
-## (In other words, changing a single file src/foo.c would force
-## dumping a new bootstrap-emacs, then re-byte-compiling all preloaded
-## elisp files, and only then dump the actual src/emacs, which is not
-## wrong, but is overkill in 99.99% of the cases.)
-##
-## To solve the circularity, we use 2 different Emacs executables,
-## "emacs" is the main target and "bootstrap-emacs" is the one used
-## to build the *.elc and loaddefs.el files.
-## To solve the freshness issue, in the past we tried various clever tricks,
-## but now that we require GNU make, we can simply specify
-## bootstrap-emacs$(EXEEXT) as an order-only prerequisite.
+## Two executables: "emacs" is the main target and "bootstrap-emacs"
+## is used to build *-loaddefs.el files.
 
 %.elc: %.el | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
 	@$(MAKE) $(AM_V_NO_PD) -C ../lisp EMACS="$(bootstrap_exe)"\
@@ -906,7 +867,7 @@ endif
 $(lispsource)/loaddefs.el: | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
 	$(MAKE) -C ../lisp autoloads EMACS="$(bootstrap_exe)"
 
-$(lispsource)/emacs-lisp/cldefs.el: $(pdmp)
+$(lispsource)/emacs-lisp/cldefs.el: | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
 	$(MAKE) -C ../lisp cldefs EMACS="$(bootstrap_exe)"
 
 ## Dump an Emacs executable named bootstrap-emacs containing the
@@ -914,32 +875,16 @@ $(lispsource)/emacs-lisp/cldefs.el: $(pdmp)
 
 bootstrap-emacs$(EXEEXT): temacs$(EXEEXT)
 	$(MAKE) -C ../lisp update-subdirs
-ifeq ($(DUMPING),unexec)
-	$(RUN_TEMACS) --batch $(BUILD_DETAILS) $(DUMPING_OVERWRITE) -l loadup --temacs=bootstrap
-  ifneq ($(PAXCTL_dumped),)
-	$(PAXCTL_dumped) emacs$(EXEEXT)
-  endif
-	mv -f emacs$(EXEEXT) bootstrap-emacs$(EXEEXT)
-	@: Compile some files earlier to speed up further compilation.
-	$(MAKE) -C ../lisp compile-first EMACS="$(bootstrap_exe)"
-else
-	@: In the pdumper case, make compile-first after the dump
 	cp -f temacs$(EXEEXT) bootstrap-emacs$(EXEEXT)
 ifeq ($(DO_CODESIGN),yes)
 	codesign -s - -f bootstrap-emacs$(EXEEXT)
 endif
-endif
 
 ifeq ($(DUMPING),pdumper)
-$(bootstrap_pdmp): bootstrap-emacs$(EXEEXT)
+$(bootstrap_pdmp): bootstrap-emacs$(EXEEXT) $(lispsource)/loaddefs.el
 	rm -f $@
 	$(RUN_TEMACS) --batch $(BUILD_DETAILS) $(DUMPING_OVERWRITE) -l loadup --temacs=pbootstrap \
 		--bin-dest $(BIN_DESTDIR) --eln-dest $(ELN_DESTDIR)
-	@: Compile some files earlier to speed up further compilation.
-	@: First, byte compile these files, ....
-	ANCIENT=yes $(MAKE) -C ../lisp compile-first EMACS="$(bootstrap_exe)"
-	@: .... then use their .elcs in native compiling these and other files.
-	$(MAKE) -C ../lisp compile-first EMACS="$(bootstrap_exe)"
 endif
 
 ### Flymake support (for C only)

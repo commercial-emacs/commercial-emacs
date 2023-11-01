@@ -119,7 +119,7 @@ The GNU allocators don't work|\
 ^git config |\
 ^'\.git/|\
 ^\^\(\(|\
-^ANCIENT=yes make|\
+^make|\
 ^touch -t|\
 ^'build-aux/git-hooks|\
 ^GNUmakefile:[0-9]*: There seems to be no |\
