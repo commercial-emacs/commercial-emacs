@@ -191,7 +191,7 @@
       ;; 74
       ((and boolean (or number marker)) . nil)
       ;; 75
-      ((and atom (or number marker)) . (or number number-or-marker))
+      ((and atom (or number marker)) . (or marker number))
       ;; 76
       ((and symbol (or number marker)) . nil)
       ;; 77
