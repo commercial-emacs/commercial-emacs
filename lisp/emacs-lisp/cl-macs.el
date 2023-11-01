@@ -3085,11 +3085,7 @@ To see the documentation for a defined struct type, use
 				  descs)))
 	      (t
 	       (error "Structure option %s unrecognized" opt)))))
-    (unless (or include-name type
-                ;; Don't create a bogus parent to `cl-structure-object'
-                ;; while compiling the (cl-defstruct cl-structure-object ..)
-                ;; in `cl-preloaded.el'.
-                (eq name cl--struct-default-parent))
+    (unless (or include-name type)
       (setq include-name cl--struct-default-parent))
     (when include-name (setq include (cl--struct-get-class include-name)))
     (if print-func
@@ -3326,7 +3322,7 @@ To see the documentation for a defined struct type, use
 ;;; Add cl-struct support to pcase
 
 ;;In use by comp.el
-(defun cl--struct-all-parents (class) ;FIXME: Merge with `cl--class-allparents'
+(defun cl--struct-all-parents (class)
   (when (cl--struct-class-p class)
     (let ((res ())
           (classes (list class)))
