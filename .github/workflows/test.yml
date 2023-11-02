@@ -27,6 +27,8 @@ jobs:
             gearing: alt-x
           - os: ubuntu-latest
             gearing: multithread
+          - os: ubuntu-latest
+            gearing: native-comp
     steps:
     - run: |
         git config --global core.autocrlf false
@@ -93,6 +95,12 @@ jobs:
         ./autogen.sh
         ./configure $([ `uname` = 'Linux' ] && echo WERROR_CFLAGS=\'-Werror\') --prefix=$HOME/.local --enable-multithreading
         make -j4 check
+    - name: make-native-comp
+      if: matrix.gearing == 'native-comp'
+      run: |
+        ./autogen.sh
+        ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-native-compilation
+        make -j4
     - name: make-linux
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'Linux')
       run: |
