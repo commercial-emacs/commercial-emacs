@@ -609,11 +609,6 @@ ${lispintdir}/characters.elc: ${charscript:.el=.elc} ${emoji-zwj:.el=.elc}
 
 SYSTEM_TYPE = @SYSTEM_TYPE@
 
-## The dumped Emacs is as functional and more efficient than
-## bootstrap-emacs, so we replace the latter with the former.
-## Strictly speaking, emacs does not depend directly on all of $lisp,
-## since not all pieces are used on all platforms.  But DOC depends
-## on all of $lisp, and emacs depends on DOC, so it is ok to use $lisp here.
 emacs$(EXEEXT): temacs$(EXEEXT) \
                 lisp.mk $(etc)/DOC $(lisp) \
                 $(lispsource)/international/charprop.el ${charsets}
@@ -808,14 +803,9 @@ TAGS: ${ETAGS} $(ctagsfiles1) $(ctagsfiles2)
 tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS $(lib)/TAGS
 .PHONY: tags
 
-### Bootstrapping.
-
-## Two executables: "emacs" is the main target and "bootstrap-emacs"
-## is used to build *-loaddefs.el files.
-
+# elc targets in ../src/Makefile made without benefit of emacs$(EXEEXT).
 %.elc: %.el | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
-	@$(MAKE) $(AM_V_NO_PD) -C ../lisp EMACS="$(bootstrap_exe)"\
-		THEFILE=$< $<c
+	@$(bootstrap_exe) -batch --no-site-file --no-site-lisp -f batch-byte-compile $<
 
 ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
 ## The following rules are used only when building a source tarball
@@ -836,8 +826,7 @@ elnlisp := \
 elnlisp := $(addprefix ${lispsource}/,${elnlisp}) $(lisp:.elc=.eln)
 
 %.eln: %.el | emacs$(EXEEXT) $(pdmp)
-	@$(MAKE) $(AM_V_NO_PD) -C ../lisp EMACS="../src/emacs$(EXEEXT)"\
-		THEFILE=$< $<n
+	@$(MAKE) $(AM_V_NO_PD) -C ../lisp EMACS="../src/emacs$(EXEEXT)" $<
 
 ## FIXME: this is fragile!  We lie to Make about the files produced by
 ## this rule, and we rely on the absence of the native-lisp directory
@@ -867,8 +856,8 @@ endif
 $(lispsource)/loaddefs.el: | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
 	$(MAKE) -C ../lisp autoloads EMACS="$(bootstrap_exe)"
 
-$(lispsource)/emacs-lisp/cldefs.el: | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
-	$(MAKE) -C ../lisp cldefs EMACS="$(bootstrap_exe)"
+$(lispsource)/emacs-lisp/cldefs.el: | emacs$(EXEEXT)
+	$(MAKE) -C ../lisp cldefs
 
 ## Dump an Emacs executable named bootstrap-emacs containing the
 ## files from loadup.el in source form.
