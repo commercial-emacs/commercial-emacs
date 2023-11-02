@@ -117,7 +117,7 @@ all: compile $(lisp)/cus-load.el $(lisp)/finder-inf.el generate-ja-dic \
 	org-manuals autoloads
 
 PHONY_EXTRAS =
-.PHONY: all custom-depss finder-data autoloads update-subdirs $(PHONY_EXTRAS) \
+.PHONY: all custom-deps finder-data autoloads update-subdirs $(PHONY_EXTRAS) \
 	generate-ja-dic org-manuals
 
 # custom-deps and finder-data both used to scan _all_ the *.el files.
