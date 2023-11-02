@@ -296,7 +296,7 @@ $(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
 endif
 
 define compile-rest
-$(filter-out $(COMPILE_FIRST:.el=.elc), $(shell for el in `echo "${SUBDIRS_REL} " | \
+$(filter-out $(BYTE_COMPILER_EL:.el=.elc) $(COMPILE_FIRST:.el=.elc),$(shell for el in `echo "${SUBDIRS_REL} " | \
             sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.el |g'`; \
     do \
       test -f $$el || continue; \
@@ -310,9 +310,9 @@ endef
 .PHONY: compile-compiler
 compile-compiler: $(BYTE_COMPILER_EL:.el=.elc) | autoloads
 
+.SECONDEXPANSION:
 .PHONY: compile
-compile: compile-clean compile-compiler $(COMPILE_FIRST:.el=.elc)
-	$(MAKE) $(compile-rest)
+compile: compile-clean compile-compiler $(COMPILE_FIRST:.el=.elc) $$(compile-rest)
 
 .PHONY: compile-clean
 # Erase left-over .elc files that do not have a corresponding .el file.
