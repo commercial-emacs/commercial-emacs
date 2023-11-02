@@ -1894,246 +1894,162 @@ buffer.  The new output will be at the end of the buffer, and
 point is not changed.
 
 Returns the compilation buffer created."
-  (or mode (setq mode 'compilation-mode))
-  (let* ((name-of-mode
-	  (if (eq mode t)
-	      "compilation"
-	    (replace-regexp-in-string "-mode\\'" "" (symbol-name mode))))
-	 (thisdir default-directory)
-	 (thisenv compilation-environment)
-         (buffer-path (and (local-variable-p 'exec-path) exec-path))
-         (buffer-env (and (local-variable-p 'process-environment)
-                          process-environment))
-	 outwin outbuf)
-    (with-current-buffer
-	(setq outbuf
-	      (get-buffer-create
-               (compilation-buffer-name name-of-mode mode name-function)))
-      (let ((comp-proc (get-buffer-process (current-buffer))))
-      (if comp-proc
-          (if (or (not (eq (process-status comp-proc) 'run))
-                  (eq (process-query-on-exit-flag comp-proc) nil)
-                  (yes-or-no-p
-                   (format "A %s process is running; kill it? "
-                           name-of-mode)))
-              (condition-case ()
-                  (progn
-                    (interrupt-process comp-proc)
-                    (sit-for 1)
-                    (delete-process comp-proc))
-                (error nil))
-            (error "Cannot have two processes in `%s' at once"
-                   (buffer-name)))))
-      ;; first transfer directory from where M-x compile was called
-      (setq default-directory thisdir)
-      ;; Make compilation buffer read-only.  The filter can still write it.
-      ;; Clear out the compilation buffer.
-      (let ((inhibit-read-only t)
-	    (default-directory thisdir))
-	;; Then evaluate a cd command if any, but don't perform it yet, else
-	;; start-command would do it again through the shell: (cd "..") AND
-	;; sh -c "cd ..; make"
-	(cd (cond
-             ((not (string-match "\\`\\s *cd\\(?:\\s +\\(\\S +?\\|'[^']*'\\|\"\\(?:[^\"`$\\]\\|\\\\.\\)*\"\\)\\)?\\s *[;&\n]"
-                                 command))
-              default-directory)
-             ((not (match-end 1)) "~")
-             ((eq (aref command (match-beginning 1)) ?\')
-              (substring command (1+ (match-beginning 1))
-                         (1- (match-end 1))))
-             ((eq (aref command (match-beginning 1)) ?\")
-              (replace-regexp-in-string
-               "\\\\\\(.\\)" "\\1"
-               (substring command (1+ (match-beginning 1))
-                          (1- (match-end 1)))))
-             ;; Try globbing as well (bug#15417).
-             (t (let* ((substituted-dir
-                        (substitute-env-vars (match-string 1 command)))
-                       ;; FIXME: This also tries to expand `*' that were
-                       ;; introduced by the envvar expansion!
-                       (expanded-dir
-                        (file-expand-wildcards substituted-dir)))
-                  (if (= (length expanded-dir) 1)
-                      (car expanded-dir)
-                    substituted-dir)))))
-        (if continue
-            (progn
-              ;; Save the point so we can restore it.
-              (setq continue (point))
-              (goto-char (point-max)))
-	  (erase-buffer))
-	;; Select the desired mode.
-	(if (not (eq mode t))
-            (progn
+  (let* ((mode (or mode 'compilation-mode))
+         (name-of-mode (if (eq mode t)
+	                   "compilation"
+	                 (replace-regexp-in-string
+                          "-mode\\'" "" (symbol-name mode))))
+         (default-directory default-directory)
+         (buffer-path (when (local-variable-p 'exec-path) exec-path))
+         (buffer-env (when (local-variable-p 'process-environment)
+                       process-environment))
+         (cd-regex (concat "\\`\\s *cd\\(?:\\s +\\(\\S +?\\|'[^']*'\\|"
+                           "\"\\(?:[^\"`$\\]\\|\\\\.\\)*\"\\)\\)?\\s *[;&\n]"))
+         (outbuf
+          (let ((buf (get-buffer-create (compilation-buffer-name
+                                         name-of-mode mode name-function))))
+            (prog1 buf
+              (with-current-buffer buf
+                ;; set buffer-locals and kill extant process
+                (setq-local compilation-directory default-directory
+                            compilation-environment compilation-environment))))))
+    (when-let ((comp-proc (get-buffer-process outbuf))
+               (ok (or (not (eq (process-status comp-proc) 'run))
+                       (not (process-query-on-exit-flag comp-proc))
+                       (yes-or-no-p (format "A %s process is running; kill it? "
+                                            name-of-mode))
+                       (user-error "Aborted"))))
+      (ignore-errors (interrupt-process comp-proc)
+                     (sit-for 1) ; give sighandlers all of 1s
+                     (delete-process comp-proc)))
+
+    (setq next-error-last-buffer outbuf) ; For C-x `
+    (with-current-buffer outbuf
+      (with-silent-modifications
+        (save-excursion
+          (let* ((inhibit-read-only t)
+                 (smatch (string-match cd-regex command))
+                 (process-environment
+	          (append compilation-environment
+                          (and (derived-mode-p 'comint-mode)
+                               (comint-term-environment))
+	                  (list (format "INSIDE_EMACS=%s,compile" emacs-version))
+                          ;; defeat things like "git grep"
+                          (list "PAGER=")
+	                  (copy-sequence buffer-env))))
+	    (cd (cond ((not smatch) default-directory)
+                      ((not (match-end 1)) "~")
+                      ((eq (aref command (match-beginning 1)) ?\')
+                       (substring command (1+ (match-beginning 1))
+                                  (1- (match-end 1))))
+                      ((eq (aref command (match-beginning 1)) ?\")
+                       (replace-regexp-in-string
+                        "\\\\\\(.\\)" "\\1"
+                        (substring command (1+ (match-beginning 1))
+                                   (1- (match-end 1)))))
+                      ;; Try globbing as well (bug#15417).
+                      (t (let* ((substituted-dir
+                                 (substitute-env-vars (match-string 1 command)))
+                                ;; FIXME: This expands `*` introduced by
+                                ;; the envvar expansion!
+                                (expanded-dir
+                                 (file-expand-wildcards substituted-dir)))
+                           (if (= (length expanded-dir) 1)
+                               (car expanded-dir)
+                             substituted-dir)))))
+            (unless continue
+              (erase-buffer))
+            (goto-char (point-max))
+	    (if (eq mode t)
+                (progn
+	          (setq buffer-read-only nil)
+	          (with-no-warnings (comint-mode))
+	          (compilation-shell-minor-mode))
               (buffer-disable-undo)
               (funcall mode))
-	  (setq buffer-read-only nil)
-	  (with-no-warnings (comint-mode))
-	  (compilation-shell-minor-mode))
-        ;; Remember the original dir, so we can use it when we recompile.
-        ;; default-directory' can't be used reliably for that because it may be
-        ;; affected by the special handling of "cd ...;".
-        ;; NB: must be done after (funcall mode) as that resets local variables
-        (setq-local compilation-directory thisdir)
-        (setq-local compilation-environment thisenv)
-        (if buffer-path
-            (setq-local exec-path buffer-path)
-          (kill-local-variable 'exec-path))
-        (if buffer-env
-            (setq-local process-environment buffer-env)
-          (kill-local-variable 'process-environment))
-	(if highlight-regexp
-            (setq-local compilation-highlight-regexp highlight-regexp))
-        (if (or compilation-auto-jump-to-first-error
-		(eq compilation-scroll-output 'first-error))
-            (setq-local compilation-auto-jump-to-next t))
-        (when (zerop (buffer-size))
-	  ;; Output a mode setter, for saving and later reloading this buffer.
-	  (compilation-insert-annotation
-           "-*- mode: " name-of-mode
-           "; default-directory: "
-           (prin1-to-string (abbreviate-file-name default-directory))
-	   " -*-\n"))
-        (compilation-insert-annotation
-         (format "%s started at %s\n\n"
-                 mode-name
-		 (substring (current-time-string) 0 19))
-	 command "\n")
-        (setq compilation--start-time (float-time))
-	(setq thisdir default-directory))
-      (set-buffer-modified-p nil))
-    ;; Pop up the compilation buffer.
-    ;; https://lists.gnu.org/r/emacs-devel/2007-11/msg01638.html
-    (setq outwin (display-buffer outbuf '(nil (allow-no-window . t))))
-    (with-current-buffer outbuf
-      (let ((process-environment
-	     (append
-	      compilation-environment
-              (and (derived-mode-p 'comint-mode)
-                   (comint-term-environment))
-	      (list (format "INSIDE_EMACS=%s,compile" emacs-version))
-              ;; Some external programs (like "git grep") use a pager;
-              ;; defeat that.
-              (list "PAGER=")
-	      (copy-sequence process-environment))))
-        (setq-local compilation-arguments
-                    (list command mode name-function highlight-regexp))
-        (setq-local revert-buffer-function 'compilation-revert-buffer)
-	(when (and outwin
-                   (not continue)
-	           ;; Forcing the window-start overrides the usual redisplay
-	           ;; feature of bringing point into view, so setting the
-	           ;; window-start to top of the buffer risks losing the
-	           ;; effect of moving point to EOB below, per
-	           ;; compilation-scroll-output, if the command is long
-	           ;; enough to push point outside of the window.  This
-	           ;; could happen, e.g., in `rgrep'.
-	           (not compilation-scroll-output))
-	  (set-window-start outwin (point-min)))
-
-	;; Position point as the user will see it.
-	(let ((desired-visible-point
-	       (cond
-                (continue continue)
-	        ;; Put it at the end if `compilation-scroll-output' is set.
-                (compilation-scroll-output (point-max))
-		;; Normally put it at the top.
-                (t (point-min)))))
+            (if buffer-path
+                (setq-local exec-path buffer-path)
+              (kill-local-variable 'exec-path))
+	    (when highlight-regexp
+              (setq-local compilation-highlight-regexp highlight-regexp))
+            (when (or compilation-auto-jump-to-first-error
+		      (eq compilation-scroll-output 'first-error))
+              (setq-local compilation-auto-jump-to-next t))
+            (when (zerop (buffer-size))
+	      ;; Output a mode setter, for saving and later reloading this buffer.
+	      (compilation-insert-annotation
+               "-*- mode: " name-of-mode
+               "; default-directory: "
+               (prin1-to-string (abbreviate-file-name default-directory))
+	       " -*-\n"))
+            (compilation-insert-annotation
+             (format "%s started at %s\n\n"
+                     mode-name
+		     (substring (current-time-string) 0 19))
+	     command "\n")
+            (setq compilation--start-time (float-time))
+            (setq-local compilation-arguments
+                        (list command mode name-function highlight-regexp)
+                        revert-buffer-function
+                        #'compilation-revert-buffer)
+            (when compilation-process-setup-function
+	      (funcall compilation-process-setup-function))))
+	;; Move point after `save-excursion'
+	(let* ((outwin (display-buffer outbuf '(nil (allow-no-window . t))))
+               (desired-visible-point
+	        (cond (continue (point))
+                      (compilation-scroll-output (point-max))
+                      (t (when outwin
+                           (set-window-start outwin (point-min)))
+                         (point-min)))))
 	  (goto-char desired-visible-point)
-	  (when (and outwin (not (eq outwin (selected-window))))
-	    (set-window-point outwin desired-visible-point)))
-
-	;; The setup function is called before compilation-set-window-height
-	;; so it can set the compilation-window-height buffer locally.
-	(if compilation-process-setup-function
-	    (funcall compilation-process-setup-function))
-	(and outwin (compilation-set-window-height outwin))
-	;; Start the compilation.
-	(if (fboundp 'make-process)
-	    (let ((proc
-		   (if (eq mode t)
-                       ;; On remote hosts, the local `shell-file-name'
-                       ;; might be useless.
-                       (with-connection-local-variables
-		        ;; comint uses `start-file-process'.
-		        (get-buffer-process
-			 (with-no-warnings
-			   (comint-exec
-			    outbuf (downcase mode-name)
-			    shell-file-name
-			    nil `(,shell-command-switch ,command)))))
-		     (start-file-process-shell-command (downcase mode-name)
-						       outbuf command))))
-              ;; Make the buffer's mode line show process state.
-              (setq mode-line-process
-                    '((:propertize ":%s" face compilation-mode-line-run)
-                      compilation-mode-line-errors))
-
-              ;; Set the process as killable without query by default.
-              ;; This allows us to start a new compilation without
-              ;; getting prompted.
-              (when compilation-always-kill
-                (set-process-query-on-exit-flag proc nil))
-
-              (set-process-sentinel proc #'compilation-sentinel)
-              (unless (eq mode t)
-                ;; Keep the comint filter, since it's needed for proper
-		;; handling of the prompts.
-		(set-process-filter proc #'compilation-filter))
-	      ;; Use (point-max) here so that output comes in
-	      ;; after the initial text,
-	      ;; regardless of where the user sees point.
-	      (set-marker (process-mark proc) (point-max) outbuf)
-	      (when compilation-disable-input
-		(condition-case nil
-		    (process-send-eof proc)
-		  ;; The process may have exited already.
-		  (error nil)))
-	      (run-hook-with-args 'compilation-start-hook proc)
-              (compilation--update-in-progress-mode-line)
-	      (push proc compilation-in-progress))
-	  ;; No asynchronous processes available.
-	  (message "Executing `%s'..." command)
-	  ;; Fake mode line display as if `start-process' were run.
-	  (setq mode-line-process
-		'((:propertize ":run" face compilation-mode-line-run)
+          (when outwin
+            (compilation-set-window-height outwin)
+            (unless (eq outwin (selected-window))
+              (set-window-point outwin desired-visible-point))))
+        ;; Start the compilation.
+        (let ((proc
+	       (if (eq mode t)
+                   ;; On remote hosts, the local `shell-file-name'
+                   ;; might be useless.
+                   (with-connection-local-variables
+		    ;; comint uses `start-file-process'.
+		    (get-buffer-process
+		     (with-no-warnings
+		       (comint-exec
+		        outbuf (downcase mode-name)
+		        shell-file-name
+		        nil `(,shell-command-switch ,command)))))
+	         (start-file-process-shell-command (downcase mode-name)
+						   outbuf command))))
+          ;; Make the buffer's mode line show process state.
+          (setq mode-line-process
+                '((:propertize ":%s" face compilation-mode-line-run)
                   compilation-mode-line-errors))
-	  (force-mode-line-update)
-	  (sit-for 0)			; Force redisplay
-	  (save-excursion
-	    ;; Insert the output at the end, after the initial text,
-	    ;; regardless of where the user sees point.
-	    (goto-char (point-max))
-	    (let* ((inhibit-read-only t) ; call-process needs to modify outbuf
-		   (compilation-filter-start (point))
-		   (status (call-process shell-file-name nil outbuf nil "-c"
-					 command)))
-	      (run-hooks 'compilation-filter-hook)
-	      (cond ((numberp status)
-		     (compilation-handle-exit
-		      'exit status
-		      (if (zerop status)
-			  "finished\n"
-			(format "exited abnormally with code %d\n" status))))
-		    ((stringp status)
-		     (compilation-handle-exit 'signal status
-					      (concat status "\n")))
-		    (t
-		     (compilation-handle-exit 'bizarre status status)))))
-	  (set-buffer-modified-p nil)
-	  (message "Executing `%s'...done" command)))
-      ;; Now finally cd to where the shell started make/grep/...
-      (setq default-directory thisdir)
-      ;; The following form selected outwin ever since revision 1.183,
-      ;; so possibly messing up point in some other window (bug#1073).
-      ;; Moved into the scope of with-current-buffer, though still with
-      ;; complete disregard for the case when compilation-scroll-output
-      ;; equals 'first-error (martin 2008-10-04).
-      (when compilation-scroll-output
-	(goto-char (point-max))))
 
-    ;; Make it so the next C-x ` will use this buffer.
-    (setq next-error-last-buffer outbuf)))
+          ;; Set the process as killable without query by default.
+          ;; This allows us to start a new compilation without
+          ;; getting prompted.
+          (when compilation-always-kill
+            (set-process-query-on-exit-flag proc nil))
+
+          (set-process-sentinel proc #'compilation-sentinel)
+          (unless (eq mode t)
+            ;; Keep the comint filter, since it's needed for proper
+	    ;; handling of the prompts.
+	    (set-process-filter proc #'compilation-filter))
+	  ;; Use (point-max) here so that output comes in
+	  ;; after the initial text,
+	  ;; regardless of where the user sees point.
+	  (set-marker (process-mark proc) (point-max) outbuf)
+	  (when compilation-disable-input
+	    (ignore-errors (process-send-eof proc)))
+	  (run-hook-with-args 'compilation-start-hook proc)
+          (compilation--update-in-progress-mode-line)
+	  (push proc compilation-in-progress))
+        (when compilation-scroll-output
+          ;; compilation-scroll-output could be 'first-error.  Tough.
+	  (goto-char (point-max)))))))
 
 (defun compilation-set-window-height (window)
   "Set the height of WINDOW according to `compilation-window-height'."
