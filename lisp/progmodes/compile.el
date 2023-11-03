@@ -2050,7 +2050,8 @@ Returns the compilation buffer created."
 	  (push proc compilation-in-progress))
         (when compilation-scroll-output
           ;; compilation-scroll-output could be 'first-error.  Tough.
-	  (goto-char (point-max)))))))
+	  (goto-char (point-max)))))
+    outbuf))
 
 (defun compilation-set-window-height (window)
   "Set the height of WINDOW according to `compilation-window-height'."
