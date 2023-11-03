@@ -1907,12 +1907,13 @@ Returns the compilation buffer created."
                            "\"\\(?:[^\"`$\\]\\|\\\\.\\)*\"\\)\\)?\\s *[;&\n]"))
          (outbuf
           (let ((buf (get-buffer-create (compilation-buffer-name
-                                         name-of-mode mode name-function))))
+                                         name-of-mode mode name-function)))
+                (caller-dir default-directory)
+                (caller-env compilation-environment))
             (prog1 buf
               (with-current-buffer buf
-                ;; set buffer-locals and kill extant process
-                (setq-local compilation-directory default-directory
-                            compilation-environment compilation-environment))))))
+                (setq-local default-directory caller-dir
+                            compilation-environment caller-env))))))
     (when-let ((comp-proc (get-buffer-process outbuf))
                (ok (or (not (eq (process-status comp-proc) 'run))
                        (not (process-query-on-exit-flag comp-proc))
