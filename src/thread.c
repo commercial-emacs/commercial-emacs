@@ -68,6 +68,9 @@ PER_THREAD struct thread_state *current_thread = &main_state.s;
 struct thread_state *const main_thread = &main_state.s;
 
 #ifdef HAVE_GCC_TLS
+/* Under multithreading, the CURRENT_THREAD is now an agnostic
+   thread-local thing, and the PREVAILING_THREAD is what cooperative
+   emacs used to know as CURRENT_THREAD.  */
 struct thread_state *prevailing_thread = &main_state.s;
 #endif
 

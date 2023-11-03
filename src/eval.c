@@ -3344,7 +3344,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
     }
 #endif
 
-  /* First, qualify what kind of binding.  */
+  /* First, push old value onto let-stack.  */
   switch (xsymbol->u.s.redirect)
     {
     case SYMBOL_PLAINVAL:
@@ -3383,10 +3383,10 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       break;
     }
 
-  /* Second, actually set SYMBOL to the new value.  */
+  /* Second, set SYMBOL to the new value.  */
   grow_specpdl ();
   if (xsymbol->u.s.redirect == SYMBOL_PLAINVAL
-      && ! xsymbol->u.s.trapped_write)
+      && xsymbol->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
     SET_SYMBOL_VAL (xsymbol, value);
   else if (xsymbol->u.s.redirect == SYMBOL_FORWARDED
 	   && BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol))
@@ -3826,9 +3826,10 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 	      break;
 	    case SPECPDL_LET:
 	      {
-		/* If variable has a trivial value (no forwarding), we can
-		   just set it.  No need to check for constant symbols here,
-		   since that was already done by specbind.  */
+		/* If variable has a trivial value (no forwarding), we
+		   can just set it.  The symbol cannot be
+		   constant (or otherwise write-trapped) by
+		   construction in specbind().  */
 		Lisp_Object sym = specpdl_symbol (tmp);
 		if (SYMBOLP (sym)
 		    && XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)

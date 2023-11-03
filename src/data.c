@@ -1845,7 +1845,8 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
       return; /* Allow setting keywords to their own value.  */
     }
   else if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE
-	   && sym->u.s.redirect != SYMBOL_PLAINVAL /* o.w. calling Fset anyway */
+	   /* Don't need to notify if PLAINVAL calling Fset anyway.  */
+	   && sym->u.s.redirect != SYMBOL_PLAINVAL
 	   && bindflag != SET_INTERNAL_THREAD_SWITCH)
     {
       notify_variable_watchers (symbol, value, Qset_default, Qnil);
@@ -1911,8 +1912,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 
 DEFUN ("set-default", Fset_default, Sset_default, 2, 2, 0,
        doc: /* Set SYMBOL's default value to VALUE.  SYMBOL and VALUE are evaluated.
-The default value is seen in buffers that do not have their own values
-for this variable.  */)
+The default value obtains in the absence of a buffer-local value.  */)
   (Lisp_Object symbol, Lisp_Object value)
 {
   set_default_internal (symbol, value, SET_INTERNAL_SET);
