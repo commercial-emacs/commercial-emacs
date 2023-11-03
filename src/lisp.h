@@ -416,11 +416,11 @@ enum _GL_ATTRIBUTE_PACKED Lisp_Type
    indicates the true value is stored in an auxiliary C variable.  */
 enum _GL_ATTRIBUTE_PACKED Lisp_Fwd_Type
   {
-    Lisp_Fwd_Int,		/* Fwd to a C `int' variable.  */
-    Lisp_Fwd_Bool,		/* Fwd to a C boolean var.  */
-    Lisp_Fwd_Obj,		/* Fwd to a C Lisp_Object variable.  */
-    Lisp_Fwd_Buffer_Obj,	/* Fwd to a Lisp_Object field of buffers.  */
-    Lisp_Fwd_Kboard_Obj		/* Fwd to a Lisp_Object field of kboards.  */
+    Lisp_Fwd_Int,		/* C int */
+    Lisp_Fwd_Bool,		/* C bool */
+    Lisp_Fwd_Obj,		/* Lisp_Object */
+    Lisp_Fwd_Buffer_Obj,	/* buffer field of type Lisp_Object */
+    Lisp_Fwd_Kboard_Obj		/* kboards field of type Lisp_Object */
   };
 
 /* Ordinarily Lisp_Object and Lisp_Word are the same type, which
@@ -589,11 +589,10 @@ INLINE void
 #define XUNTAG(a, type, ctype) \
   ((ctype *) ((uintptr_t) XLP (a) - (uintptr_t) LISP_WORD_TAG (type)))
 
-/* A forwarding pointer to a value.  It uses a generic pointer to
-   avoid alignment bugs that could occur if it used a pointer to a
-   union of the possible values (struct Lisp_Objfwd, struct
-   Lisp_Intfwd, etc.).  The pointer is packaged inside a struct to
-   help static checking.  */
+/* Eggert in 9287813 claims the more intuitive pointer to a union of
+   `struct Lisp_*fwd` creates alignment issues, and replaces it with a
+   void star, which he then packaged in a struct for the static type
+   checker.  */
 typedef struct { void const *fwdptr; } lispfwd;
 
 /* Interned state of a symbol.  */
@@ -672,7 +671,7 @@ struct Lisp_Symbol
 	 0 : plain var
 	 1 : varalias
 	 2 : localized var
-	 3 : forwarding variable
+	 3 : C variable
       */
       ENUM_BF (symbol_redirect) redirect : 3;
 
@@ -690,7 +689,7 @@ struct Lisp_Symbol
       /* The symbol's name, as a Lisp string.  */
       Lisp_Object name;
 
-      /* Value according to REDIRECT above, or Qunbound if unbound.  */
+      /* Value according to REDIRECT above or Qunbound.  */
       union {
 	Lisp_Object value;
 	struct Lisp_Symbol *alias;
@@ -2489,24 +2488,18 @@ make_uint (uintmax_t n)
 #define INT_TO_INTEGER(expr) \
   (EXPR_SIGNED (expr) ? make_int (expr) : make_uint (expr))
 
-
-/* Forwarding pointer allowed only in symbol's value cell.
-   Means symbol's value actually lives in the
-   specified int variable.  */
 struct Lisp_Intfwd
   {
     enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Int */
     intmax_t *intvar;
   };
 
-/* Boolean forwarding pointer like Lisp_Intfwd.  */
 struct Lisp_Boolfwd
   {
     enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Bool */
     bool *boolvar;
   };
 
-/* Object forwarding pointer like Lisp_Intfwd.  */
 struct Lisp_Objfwd
   {
     enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Obj */
@@ -2523,17 +2516,15 @@ struct Lisp_Buffer_Objfwd
     Lisp_Object predicate;
   };
 
-/* Note slots or "per-buffer" variables form a subset of buffer-local
-   variables, and are administered by Lisp_Buffer_Objfwd.  */
 struct Lisp_Buffer_Local_Value
   {
-    /* True means that merely setting the variable creates a local
-       binding for the current buffer.  */
+    /* Setting the variable creates a buffer-local binding
+       (cf. `defvar-local').  */
     bool_bf local_if_set : 1;
-    /* Presumably equivalent to (defcell!=valcell).  */
-    bool_bf found : 1;
-    /* If non-NULL, override VALCELL with a C var.  */
-    lispfwd fwd;	/* Should never be (Buffer|Kboard)_Objfwd.  */
+    /* Override VALCELL with a C var.  Should never be
+       (Buffer|Kboard)_Objfwd (see buffer.h about Mcgrath buffer
+       local).  */
+    lispfwd fwd;
     /* The buffer for which the loaded binding was found.  */
     Lisp_Object where;
     /* A cons cell of the form (SYMBOL . DEFAULT-VALUE).  */
@@ -2544,7 +2535,7 @@ struct Lisp_Buffer_Local_Value
   };
 
 /* Like Lisp_Objfwd except that value lives in a slot in the
-   current kboard.  */
+   current `struct kboard`.  */
 struct Lisp_Kboard_Objfwd
   {
     enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Kboard_Obj */
@@ -3091,9 +3082,10 @@ enum specbind_tag {
   SPECPDL_MODULE_ENVIRONMENT,   /* A live module environment.  */
 #endif
   SPECPDL_LET,			/* A plain and simple dynamic let-binding.  */
-  /* Tags greater than SPECPDL_LET must be "subkinds" of LET.  */
   SPECPDL_LET_LOCAL,		/* A buffer-local let-binding.  */
-  SPECPDL_LET_DEFAULT		/* A global binding for a localized var.  */
+  SPECPDL_LET_DEFAULT		/* Var has since been buffer-localized
+				   but this stack value reflects the
+				   un-let-bound default.  */
 };
 
 union specbinding
@@ -3136,11 +3128,6 @@ union specbinding
     } unwind_void;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      /* WHERE is the buffer in which SYMBOL is bound.  Note it
-	 applies to only two situations admitting buffer-local
-	 bindings, i.e., SPECPDL_LET_LOCAL (buffer-local bindings) or
-	 SPECPDL_LET_DEFAULT (global bindings for potentially
-	 buffer-local variables).  */
       Lisp_Object symbol, old_value, where;
     } let;
     struct {
@@ -3490,15 +3477,6 @@ INLINE void
 make_symbol_constant (Lisp_Object sym)
 {
   XSYMBOL (sym)->u.s.trapped_write = SYMBOL_NOWRITE;
-}
-
-/* Buffer-local variable access functions.  */
-
-INLINE bool
-blv_found (struct Lisp_Buffer_Local_Value *blv)
-{
-  eassert (blv->found == !EQ (blv->defcell, blv->valcell));
-  return blv->found;
 }
 
 /* Set overlay's property list.  */
@@ -4250,7 +4228,7 @@ extern void prog_ignore (Lisp_Object);
 extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
 extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
-extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
+extern bool blv_shadowed_p (struct Lisp_Symbol *symbol);
 void do_debug_on_call (Lisp_Object code, specpdl_ref count);
 Lisp_Object funcall_general (Lisp_Object fun,
 			     ptrdiff_t numargs, Lisp_Object *args);

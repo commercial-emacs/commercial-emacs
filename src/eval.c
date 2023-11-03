@@ -97,7 +97,6 @@ set_specpdl_old_value (union specbinding *pdl, Lisp_Object val)
 static Lisp_Object *
 specpdl_where_addr (union specbinding *pdl)
 {
-  eassert (pdl->kind > SPECPDL_LET);
   return &pdl->let.where;
 }
 
@@ -3291,23 +3290,16 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
   return object;
 }
 
-/* Return true if SYMBOL currently has a let-binding
-   which was made in the buffer that is now current.  */
+/* Did a buffer-local variable get let-bound?  */
 
 bool
-let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol)
+blv_shadowed_p (struct Lisp_Symbol *symbol)
 {
-  Lisp_Object buf = Fcurrent_buffer ();
   for (union specbinding *p = specpdl_ptr; p > specpdl; )
-    if ((--p)->kind > SPECPDL_LET)
-      {
-	struct Lisp_Symbol *let_bound_symbol = XSYMBOL (specpdl_symbol (p));
-	eassert (let_bound_symbol->u.s.redirect != SYMBOL_VARALIAS);
-	if (symbol == let_bound_symbol
-	    && p->kind != SPECPDL_LET_LOCAL /* bug#62419 */
-	    && EQ (specpdl_where (p), buf))
-	  return true;
-      }
+    if ((--p)->kind == SPECPDL_LET_DEFAULT
+	&& XSYMBOL (specpdl_symbol (p)) == symbol
+	&& EQ (specpdl_where (p), Fcurrent_buffer ()))
+      return true;
   return false;
 }
 
@@ -3344,7 +3336,8 @@ specbind (Lisp_Object argsym, Lisp_Object value)
     }
 #endif
 
-  /* First, push old value onto let-stack.  */
+  /* First, push old value onto let-stack.  Unintuitively, its KIND
+     depends on the REDIRECT of the argument symbol.  */
   switch (xsymbol->u.s.redirect)
     {
     case SYMBOL_PLAINVAL:
@@ -3353,38 +3346,37 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.old_value = SYMBOL_VAL (xsymbol);
       break;
     case SYMBOL_LOCALIZED:
-    case SYMBOL_FORWARDED:
-      specpdl_ptr->let.old_value = find_symbol_value (symbol, NULL);
       specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
+      specpdl_ptr->let.old_value = find_symbol_value (symbol, NULL);
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.where = Fcurrent_buffer ();
-
-      eassert (xsymbol->u.s.redirect != SYMBOL_LOCALIZED
-	       || (EQ (SYMBOL_BLV (xsymbol)->where, Fcurrent_buffer ())));
-
-      if (xsymbol->u.s.redirect == SYMBOL_LOCALIZED)
+      eassert (EQ (SYMBOL_BLV (xsymbol)->where, Fcurrent_buffer ()));
+      if (EQ (SYMBOL_BLV (xsymbol)->defcell, SYMBOL_BLV (xsymbol)->valcell))
+	/* Value still the global one, reset the let.kind.  */
+	specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
+      break;
+    case SYMBOL_FORWARDED:
+      specpdl_ptr->let.kind = SPECPDL_LET;
+      specpdl_ptr->let.old_value = find_symbol_value (symbol, NULL);
+      specpdl_ptr->let.symbol = symbol;
+      specpdl_ptr->let.where = Fcurrent_buffer ();
+      if (BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol)))
 	{
-	  if (! blv_found (SYMBOL_BLV (xsymbol)))
-	    specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
+	  /* Analogous case to SYMBOL_LOCALIZED for a Mcgrath
+	     buffer-local (see buffer.h).  */
+	  specpdl_ptr->let.kind =
+	    NILP (Flocal_variable_p (symbol, Fcurrent_buffer ()))
+	    ? SPECPDL_LET_DEFAULT
+	    : SPECPDL_LET_LOCAL;
 	}
-      else if (BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol)))
-	{
-	  /* If SYMBOL is a slot variable (see buffer.h), change its
-	     global default value, thus keeping consistent with
-	     non-slot, buffer-local behavior.  */
-	  if (NILP (Flocal_variable_p (symbol, Qnil)))
-	    specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
-	}
-      else
-	specpdl_ptr->let.kind = SPECPDL_LET;
       break;
     default:
       emacs_abort ();
       break;
     }
+  grow_specpdl ();
 
   /* Second, set SYMBOL to the new value.  */
-  grow_specpdl ();
   if (xsymbol->u.s.redirect == SYMBOL_PLAINVAL
       && xsymbol->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
     SET_SYMBOL_VAL (xsymbol, value);
@@ -3525,11 +3517,11 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
       break;
 #endif
     case SPECPDL_LET:
-      { /* If variable has a trivial value (no forwarding), and isn't
-	   trapped, we can just set it.  */
+      {
 	Lisp_Object sym = specpdl_symbol (this_binding);
-	if (SYMBOLP (sym) && XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
+	if (XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
 	  {
+	    /* Simple let binding of non-slot variable.  */
 	    if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
 	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_old_value (this_binding));
 	    else
@@ -3538,8 +3530,7 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
 	    break;
 	  }
       }
-      /* Come here only if make_local_foo was used for the first time
-	 on this var within this let.  */
+      /* gets here first time through when redirect isn't PLAINVAL.  */
       FALLTHROUGH;
     case SPECPDL_LET_DEFAULT:
       set_default_internal (specpdl_symbol (this_binding),
@@ -3826,13 +3817,8 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 	      break;
 	    case SPECPDL_LET:
 	      {
-		/* If variable has a trivial value (no forwarding), we
-		   can just set it.  The symbol cannot be
-		   constant (or otherwise write-trapped) by
-		   construction in specbind().  */
 		Lisp_Object sym = specpdl_symbol (tmp);
-		if (SYMBOLP (sym)
-		    && XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
+		if (XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
 		  {
 		    Lisp_Object old_value = specpdl_old_value (tmp);
 		    set_specpdl_old_value (tmp, SYMBOL_VAL (XSYMBOL (sym)));
@@ -3840,8 +3826,7 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		    break;
 		  }
 	      }
-	      /* Come here only if make_local_foo was used for the first
-		 time on this var within this let.  */
+	      /* gets here first time through when redirect isn't PLAINVAL.  */
 	      FALLTHROUGH;
 	    case SPECPDL_LET_DEFAULT:
 	      {

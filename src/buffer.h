@@ -21,8 +21,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    one of the fields over which FOR_EACH_PER_BUFFER_OBJECT_AT iterates,
    (and excludes `undo_list_`).
 
-   Note so-called "slots" or "per-buffer" variables form a subset of
-   buffer-local variables, and are administered by Lisp_Buffer_Objfwd.
+   Some slots, identified by a flipped bit in local_slots, are
+   surfaced to lisp variables via Lisp_Buffer_Objfwd.  Such slots were
+   designated "buffer local" during the Mcgrath era.  Monnier et al
+   later allowed any user Lisp variable to be buffer-localized, but
+   the vestiges Mcgrath's conception persist in the code.
 */
 
 #ifndef EMACS_BUFFER_H
@@ -622,8 +625,8 @@ struct buffer
      an indirect buffer since it counts as its base buffer.  */
   int window_count;
 
-  /* Boolean array indexed by the so-called "slot index" indicating
-     which slots became buffer-local.  */
+  /* Boolean array indicating whether slot (see header) at index was
+     surfaced to lisp.  */
   char local_flags[MAX_PER_BUFFER_VARS];
 
   /* Set to the modtime of the visited file when read or written.
@@ -1437,14 +1440,14 @@ extern bool valid_per_buffer_idx (int);
 /* Return true if IDX corresponds to a buffer-local variable.  */
 
 INLINE bool
-PER_BUFFER_VALUE_P (struct buffer *b, int idx)
+BUFFER_LOCAL_P (struct buffer *b, int idx)
 {
   eassert (valid_per_buffer_idx (idx));
   return b->local_flags[idx];
 }
 
 INLINE void
-SET_PER_BUFFER_VALUE_P (struct buffer *b, int idx, bool val)
+SET_BUFFER_LOCAL_P (struct buffer *b, int idx, bool val)
 {
   eassert (valid_per_buffer_idx (idx));
   b->local_flags[idx] = val;

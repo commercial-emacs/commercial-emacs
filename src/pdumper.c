@@ -2265,7 +2265,6 @@ dump_blv (struct dump_context *ctx,
   struct Lisp_Buffer_Local_Value out;
   dump_object_start (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, blv, local_if_set);
-  DUMP_FIELD_COPY (&out, blv, found);
   if (blv->fwd.fwdptr)
     dump_field_fixup_later (ctx, &out, blv, &blv->fwd.fwdptr);
   dump_field_lv (ctx, &out, blv, &blv->where, WEIGHT_NORMAL);

@@ -1036,7 +1036,7 @@ One argument, a syntax table.  */)
   bset_syntax_table (current_buffer, table);
   /* Indicate that this buffer now has a specified syntax table.  */
   idx = PER_BUFFER_VAR_IDX (syntax_table);
-  SET_PER_BUFFER_VALUE_P (current_buffer, idx, 1);
+  SET_BUFFER_LOCAL_P (current_buffer, idx, 1);
   return table;
 }
 
