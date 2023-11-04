@@ -4920,7 +4920,8 @@ process_mark_stack (ptrdiff_t base_sp)
 			  eassert (h->next_weak == NULL);
 			  h->next_weak = weak_hash_tables;
 			  weak_hash_tables = h;
-			  set_vector_marked (XVECTOR (h->key_and_value));
+			  if (!PURE_P (h->key_and_value))
+			    set_vector_marked (XVECTOR (h->key_and_value));
 			}
 		      break;
 		    }
