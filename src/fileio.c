@@ -5894,7 +5894,7 @@ If BUF is omitted or nil, it defaults to the current buffer.
 See Info node `(elisp)Modification Time' for more details.  */)
   (Lisp_Object buf)
 {
-  struct buffer *b = decode_buffer (buf);
+  struct buffer *b = BUFFERP (buf) ? XBUFFER (buf) : current_buffer;
   struct stat st;
   Lisp_Object handler;
   Lisp_Object filename;

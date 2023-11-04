@@ -110,9 +110,9 @@ set_blv_value (struct Lisp_Buffer_Local_Value *blv, Lisp_Object val)
 }
 
 static void
-set_blv_where (struct Lisp_Buffer_Local_Value *blv, Lisp_Object val)
+set_blv_buffer (struct Lisp_Buffer_Local_Value *blv, Lisp_Object val)
 {
-  blv->where = val;
+  blv->buffer = val;
 }
 
 static void
@@ -759,7 +759,7 @@ symval_update_fwd (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
     }
 }
 
-/* Reassign SYMBOL's singleton blv member to SYMBOL's entry in BUFFER's
+/* Reassign SYMBOL's blv member to SYMBOL's entry in BUFFER's
    LOCAL_VAR_ALIST.  Uncanny resemblance to set_internal().  */
 
 static struct Lisp_Buffer_Local_Value *
@@ -767,14 +767,13 @@ symval_update_blv (Lisp_Object symbol, Lisp_Object buffer)
 {
   struct Lisp_Symbol *xsymbol = XSYMBOL (symbol);
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
-  eassert (xsymbol->u.s.redirect == SYMBOL_LOCALIZED);
 
-  if (! BUFFERP (blv->where)
-      || XBUFFER (buffer) != XBUFFER (blv->where))
+  if (! BUFFERP (blv->buffer)
+      || XBUFFER (buffer) != XBUFFER (blv->buffer))
     {
       Lisp_Object pair =
 	assq_no_quit (symbol, BVAR (XBUFFER (buffer), local_var_alist));
-      set_blv_where (blv, buffer);
+      set_blv_buffer (blv, buffer);
       if (blv->fwd.fwdptr)
 	set_blv_value (blv, symval_resolve (blv->fwd, NULL));
       set_blv_valcell (blv, ! NILP (pair) ? pair : blv->defcell);
@@ -1426,7 +1425,7 @@ symval_restore_default (struct Lisp_Symbol *symbol)
   if (blv->fwd.fwdptr) /* load symbol's default binding. */
     symval_update_fwd (blv->fwd, XCDR (blv->defcell), NULL);
 
-  set_blv_where (blv, Qnil);
+  set_blv_buffer (blv, Qnil);
 }
 
 Lisp_Object
@@ -1553,12 +1552,12 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	Lisp_Object mybuf = ! NILP (buf) ? buf : Fcurrent_buffer();
 
 	/* Uncanny resemblance to symval_update_blv().  */
-	if (! EQ (blv->where, mybuf)
+	if (! EQ (blv->buffer, mybuf)
 	    || EQ (blv->defcell, blv->valcell))
 	  {
 	    Lisp_Object pair =
 	      assq_no_quit (symbol, BVAR (XBUFFER (mybuf), local_var_alist));
-	    set_blv_where (blv, mybuf);
+	    set_blv_buffer (blv, mybuf);
 	    if (NILP (pair))
 	      {
 		pair = blv->defcell;
@@ -1703,7 +1702,7 @@ void
 notify_variable_watchers (Lisp_Object symbol,
                           Lisp_Object newval,
                           Lisp_Object operation,
-                          Lisp_Object where)
+                          Lisp_Object buffer)
 {
   symbol = Findirect_variable (symbol);
 
@@ -1712,11 +1711,11 @@ notify_variable_watchers (Lisp_Object symbol,
   /* Avoid recursion.  */
   set_symbol_trapped_write (symbol, SYMBOL_UNTRAPPED_WRITE);
 
-  if (NILP (where)
+  if (NILP (buffer)
       && ! EQ (operation, Qset_default) && !EQ (operation, Qmakunbound)
       && ! NILP (Flocal_variable_if_set_p (symbol, Fcurrent_buffer ())))
     {
-      XSETBUFFER (where, current_buffer);
+      XSETBUFFER (buffer, current_buffer);
     }
 
   if (EQ (operation, Qset_default))
@@ -1730,11 +1729,11 @@ notify_variable_watchers (Lisp_Object symbol,
       /* Call subr directly to avoid gc.  */
       if (SUBRP (watcher))
         {
-          Lisp_Object args[] = { symbol, newval, operation, where };
+          Lisp_Object args[] = { symbol, newval, operation, buffer};
           funcall_subr (XSUBR (watcher), ARRAYELTS (args), args);
         }
       else
-        CALLN (Ffuncall, watcher, symbol, newval, operation, where);
+        CALLN (Ffuncall, watcher, symbol, newval, operation, buffer);
     }
 
   unbind_to (count, Qnil);
@@ -1928,7 +1927,7 @@ make_blv (struct Lisp_Symbol *sym, bool forwarded,
     blv->fwd = valpp.fwd;
   else
     blv->fwd.fwdptr = NULL;
-  set_blv_where (blv, Qnil);
+  set_blv_buffer (blv, Qnil);
   blv->local_if_set = 0;
   set_blv_defcell (blv, tem);
   set_blv_valcell (blv, tem);
@@ -2106,8 +2105,8 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
 	  CALLN (Fmessage, format, SYMBOL_NAME (variable));
 	}
 
-      if (BUFFERP (SYMBOL_BLV (sym)->where)
-	  && current_buffer == XBUFFER (SYMBOL_BLV (sym)->where))
+      if (BUFFERP (SYMBOL_BLV (sym)->buffer)
+	  && current_buffer == XBUFFER (SYMBOL_BLV (sym)->buffer))
         /* Make sure the current value is permanently recorded, if it's the
            default value.  */
         symval_restore_default (sym);
@@ -2189,7 +2188,7 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
 	 forwarded objects won't work right.  */
       {
 	Lisp_Object buf; XSETBUFFER (buf, current_buffer);
-	if (EQ (buf, SYMBOL_BLV (sym)->where))
+	if (EQ (buf, SYMBOL_BLV (sym)->buffer))
 	  symval_restore_default (sym);
       }
     }
@@ -2208,7 +2207,7 @@ Also see `buffer-local-boundp'.*/)
   (Lisp_Object variable, Lisp_Object buffer)
 {
   Lisp_Object result = Qnil;
-  struct buffer *buf = decode_buffer (buffer);
+  Lisp_Object mybuf = ! NILP (buffer) ? buffer : Fcurrent_buffer ();
   struct Lisp_Symbol *sym;
 
   CHECK_SYMBOL (variable);
@@ -2226,13 +2225,11 @@ Also see `buffer-local-boundp'.*/)
       break;
     case SYMBOL_LOCALIZED:
       {
-	Lisp_Object tmp;
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
-	XSETBUFFER (tmp, buf);
-	if (EQ (blv->where, tmp)) /* The binding is already loaded.  */
+	if (EQ (blv->buffer, mybuf))
 	  result = ! EQ (blv->defcell, blv->valcell) ? Qt : Qnil;
 	else
-	  result = NILP (assq_no_quit (variable, BVAR (buf, local_var_alist)))
+	  result = NILP (assq_no_quit (variable, BVAR (XBUFFER (mybuf), local_var_alist)))
 	    ? Qnil : Qt;
       }
       break;
@@ -2243,7 +2240,7 @@ Also see `buffer-local-boundp'.*/)
 	  {
 	    int offset = XBUFFER_OBJFWD (valpp)->offset;
 	    int idx = PER_BUFFER_IDX (offset);
-	    if (idx == -1 || LOCALIZED_SLOT_P (buf, idx))
+	    if (idx == -1 || LOCALIZED_SLOT_P (XBUFFER (mybuf), idx))
 	      result = Qt;
 	  }
       }
@@ -2346,7 +2343,7 @@ If the current binding is global (the default), the value is nil.  */)
 	result = Fcurrent_buffer ();
       else if (sym->u.s.redirect == SYMBOL_LOCALIZED
 	       && ! EQ (SYMBOL_BLV (sym)->defcell, SYMBOL_BLV (sym)->valcell))
-	result = SYMBOL_BLV (sym)->where;
+	result = SYMBOL_BLV (sym)->buffer;
       break;
     default:
       emacs_abort ();

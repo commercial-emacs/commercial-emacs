@@ -2526,7 +2526,7 @@ struct Lisp_Buffer_Local_Value
        local).  */
     lispfwd fwd;
     /* The buffer for which the loaded binding was found.  */
-    Lisp_Object where;
+    Lisp_Object buffer;
     /* A cons cell of the form (SYMBOL . DEFAULT-VALUE).  */
     Lisp_Object defcell;
     /* A cons cell of the form (SYMBOL . VALUE).
@@ -3126,7 +3126,7 @@ union specbinding
     } unwind_void;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      Lisp_Object symbol, old_value, where;
+      Lisp_Object symbol, old_value, buffer;
     } let;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;

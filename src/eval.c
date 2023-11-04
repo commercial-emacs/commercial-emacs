@@ -95,15 +95,15 @@ set_specpdl_old_value (union specbinding *pdl, Lisp_Object val)
 }
 
 static Lisp_Object *
-specpdl_where_addr (union specbinding *pdl)
+specpdl_buffer_addr (union specbinding *pdl)
 {
-  return &pdl->let.where;
+  return &pdl->let.buffer;
 }
 
 static Lisp_Object
-specpdl_where (union specbinding *pdl)
+specpdl_buffer (union specbinding *pdl)
 {
-  return *specpdl_where_addr (pdl);
+  return *specpdl_buffer_addr (pdl);
 }
 
 static Lisp_Object *
@@ -3307,7 +3307,7 @@ set_default_p (struct Lisp_Symbol *symbol)
   for (union specbinding *p = specpdl_ptr; p > specpdl; )
     if ((--p)->kind == SPECPDL_LET_DEFAULT
 	&& XSYMBOL (specpdl_symbol (p)) == symbol
-	&& EQ (specpdl_where (p), Fcurrent_buffer ()))
+	&& EQ (specpdl_buffer (p), Fcurrent_buffer ()))
       return true;
   return false;
 }
@@ -3358,8 +3358,8 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
-      specpdl_ptr->let.where = Fcurrent_buffer ();
-      eassert (EQ (SYMBOL_BLV (xsymbol)->where, Fcurrent_buffer ()));
+      specpdl_ptr->let.buffer = Fcurrent_buffer ();
+      eassert (EQ (SYMBOL_BLV (xsymbol)->buffer, Fcurrent_buffer ()));
       /* Regular buffer locals -- see set_default_p() for intended
 	 semantics of `let'.  */
       if (NILP (Flocal_variable_p (symbol, Fcurrent_buffer ())))
@@ -3369,7 +3369,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.kind = SPECPDL_LET;
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
-      specpdl_ptr->let.where = Fcurrent_buffer ();
+      specpdl_ptr->let.buffer = Fcurrent_buffer ();
       if (BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol)))
 	{
 	  /* Mcgrath buffer locals -- see set_default_p() for intended
@@ -3550,7 +3550,7 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
     case SPECPDL_LET_LOCAL:
       {
 	Lisp_Object symbol = specpdl_symbol (this_binding);
-	Lisp_Object where = specpdl_where (this_binding);
+	Lisp_Object where = specpdl_buffer (this_binding);
 	Lisp_Object old_value = specpdl_old_value (this_binding);
 	eassert (BUFFERP (where));
 
@@ -3849,7 +3849,7 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 	    case SPECPDL_LET_LOCAL:
 	      {
 		Lisp_Object symbol = specpdl_symbol (tmp);
-		Lisp_Object where = specpdl_where (tmp);
+		Lisp_Object where = specpdl_buffer (tmp);
 		Lisp_Object old_value = specpdl_old_value (tmp);
 		eassert (BUFFERP (where));
 
@@ -4037,7 +4037,7 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 
 	case SPECPDL_LET_DEFAULT:
 	case SPECPDL_LET_LOCAL:
-	  mark_object (specpdl_where_addr (pdl));
+	  mark_object (specpdl_buffer_addr (pdl));
 	  FALLTHROUGH;
 	case SPECPDL_LET:
 	  mark_object (specpdl_symbol_addr (pdl));

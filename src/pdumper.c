@@ -2267,7 +2267,7 @@ dump_blv (struct dump_context *ctx,
   DUMP_FIELD_COPY (&out, blv, local_if_set);
   if (blv->fwd.fwdptr)
     dump_field_fixup_later (ctx, &out, blv, &blv->fwd.fwdptr);
-  dump_field_lv (ctx, &out, blv, &blv->where, WEIGHT_NORMAL);
+  dump_field_lv (ctx, &out, blv, &blv->buffer, WEIGHT_NORMAL);
   dump_field_lv (ctx, &out, blv, &blv->defcell, WEIGHT_STRONG);
   dump_field_lv (ctx, &out, blv, &blv->valcell, WEIGHT_STRONG);
   dump_off offset = dump_object_finish (ctx, &out, sizeof (out));

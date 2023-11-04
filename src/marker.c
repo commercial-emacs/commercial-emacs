@@ -489,7 +489,7 @@ attach_marker (struct Lisp_Marker *m, struct buffer *b,
 static struct buffer *
 live_buffer (Lisp_Object buffer)
 {
-  struct buffer *b = decode_buffer (buffer);
+  struct buffer *b = BUFFERP (buffer) ? XBUFFER (buffer) : current_buffer;
   return BUFFER_LIVE_P (b) ? b : NULL;
 }
 

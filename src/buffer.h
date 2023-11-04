@@ -357,8 +357,8 @@ struct buffer
      point into this buffer or may point nowhere.  */
   Lisp_Object mark_;
 
-  /* Alist of elements (SYMBOL . VALUE-IN-THIS-BUFFER).  For locally
-     unbound symbols, just the symbol appears as the element.  */
+  /* Alist of elements (SYMBOL . BUFFER-LOCAL_VALUE).  The
+     cdr is nil for locally unbound symbols..  */
   Lisp_Object local_var_alist_;
 
   /* Symbol naming major mode (e.g., lisp-mode).  */
@@ -1167,14 +1167,6 @@ extern void mmap_set_vars (bool);
 extern void restore_buffer (Lisp_Object);
 extern void set_buffer_if_live (Lisp_Object);
 extern Lisp_Object build_overlay (bool, bool, Lisp_Object);
-
-/* Return B as a struct buffer pointer, defaulting to the current buffer.  */
-
-INLINE struct buffer *
-decode_buffer (Lisp_Object b)
-{
-  return NILP (b) ? current_buffer : (CHECK_BUFFER (b), XBUFFER (b));
-}
 
 /* Arrange to go back to the original buffer after the next
    call to unbind_to if the original buffer is still alive.  */
