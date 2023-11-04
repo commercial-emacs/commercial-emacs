@@ -3360,8 +3360,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
       specpdl_ptr->let.where = Fcurrent_buffer ();
       eassert (EQ (SYMBOL_BLV (xsymbol)->where, Fcurrent_buffer ()));
-      /* A `set` of a buffer-local variable within a `let' of same
-	 changes its default binding (within the `let').  */
+      /* See set_default_p() for intended semantics of `let'.  */
       if (EQ (SYMBOL_BLV (xsymbol)->defcell, SYMBOL_BLV (xsymbol)->valcell))
 	specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
       break;
@@ -3372,8 +3371,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.where = Fcurrent_buffer ();
       if (BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol)))
 	{
-	  /* `set' within `let' treatment of Mcgrath buffer locals
-	     analogous to regular buffer locals. (Bug#44733) */
+	  /* See set_default_p() for intended semantics of `let'.  */
 	  specpdl_ptr->let.kind =
 	    ! NILP (Flocal_variable_p (symbol, Fcurrent_buffer ()))
 	    ? SPECPDL_LET_LOCAL
