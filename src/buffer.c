@@ -1141,7 +1141,7 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
 
   for (i = 0; i < last_per_buffer_idx; ++i)
     if (permanent_too || buffer_permanent_local_flags[i] == 0)
-      SET_BUFFER_LOCAL_P (b, i, 0);
+      SET_LOCALIZED_SLOT_P (b, i, 0);
 
   /* For each slot that has a default value, copy that into the slot.  */
   FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
@@ -1296,7 +1296,7 @@ static Lisp_Object
 buffer_local_variables_1 (struct buffer *buf, int offset, Lisp_Object sym)
 {
   int idx = PER_BUFFER_IDX (offset);
-  if ((idx == -1 || BUFFER_LOCAL_P (buf, idx))
+  if ((idx == -1 || LOCALIZED_SLOT_P (buf, idx))
       && SYMBOLP (PER_BUFFER_SYMBOL (offset)))
     {
       sym = NILP (sym) ? PER_BUFFER_SYMBOL (offset) : sym;

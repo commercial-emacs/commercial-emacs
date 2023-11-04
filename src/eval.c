@@ -3290,10 +3290,19 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
   return object;
 }
 
-/* Did a buffer-local variable get let-bound?  */
+/* Follow these arbitrary but consistent rules:
+
+   If the buffer *has not* assigned its own buffer local value
+   of SYMBOL, assignment within a `let' of SYMBOL
+   changes its default binding within the `let'.
+
+   If the buffer *has* assigned its own buffer local value of SYMBOL,
+   assignment within a `let' of SYMBOL does not affect its default
+   binding.
+*/
 
 bool
-blv_shadowed_p (struct Lisp_Symbol *symbol)
+set_default_p (struct Lisp_Symbol *symbol)
 {
   for (union specbinding *p = specpdl_ptr; p > specpdl; )
     if ((--p)->kind == SPECPDL_LET_DEFAULT
@@ -3347,27 +3356,28 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       break;
     case SYMBOL_LOCALIZED:
       specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
-      specpdl_ptr->let.old_value = find_symbol_value (symbol, NULL);
       specpdl_ptr->let.symbol = symbol;
+      specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
       specpdl_ptr->let.where = Fcurrent_buffer ();
       eassert (EQ (SYMBOL_BLV (xsymbol)->where, Fcurrent_buffer ()));
+      /* A `set` of a buffer-local variable within a `let' of same
+	 changes its default binding (within the `let').  */
       if (EQ (SYMBOL_BLV (xsymbol)->defcell, SYMBOL_BLV (xsymbol)->valcell))
-	/* Value still the global one, reset the let.kind.  */
 	specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
       break;
     case SYMBOL_FORWARDED:
       specpdl_ptr->let.kind = SPECPDL_LET;
-      specpdl_ptr->let.old_value = find_symbol_value (symbol, NULL);
       specpdl_ptr->let.symbol = symbol;
+      specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
       specpdl_ptr->let.where = Fcurrent_buffer ();
       if (BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol)))
 	{
-	  /* Analogous case to SYMBOL_LOCALIZED for a Mcgrath
-	     buffer-local (see buffer.h).  */
+	  /* `set' within `let' treatment of Mcgrath buffer locals
+	     analogous to regular buffer locals. (Bug#44733) */
 	  specpdl_ptr->let.kind =
-	    NILP (Flocal_variable_p (symbol, Fcurrent_buffer ()))
-	    ? SPECPDL_LET_DEFAULT
-	    : SPECPDL_LET_LOCAL;
+	    ! NILP (Flocal_variable_p (symbol, Fcurrent_buffer ()))
+	    ? SPECPDL_LET_LOCAL
+	    : SPECPDL_LET_DEFAULT;
 	}
       break;
     default:

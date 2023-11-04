@@ -21,11 +21,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    one of the fields over which FOR_EACH_PER_BUFFER_OBJECT_AT iterates,
    (and excludes `undo_list_`).
 
-   Some slots, identified by a flipped bit in local_slots, are
+   Some slots, identified by a flipped bit in `local_slots`, are
    surfaced to lisp variables via Lisp_Buffer_Objfwd.  Such slots were
    designated "buffer local" during the Mcgrath era.  Monnier et al
    later allowed any user Lisp variable to be buffer-localized, but
-   the vestiges Mcgrath's conception persist in the code.
+   the vestiges of Mcgrath's conception, which we'll now call "localized
+   slots", persist in the code (and are confusing as shit).
 */
 
 #ifndef EMACS_BUFFER_H
@@ -1437,17 +1438,18 @@ extern bool valid_per_buffer_idx (int);
        offset <= PER_BUFFER_VAR_OFFSET (cursor_in_non_selected_windows); \
        offset += word_size)
 
-/* Return true if IDX corresponds to a buffer-local variable.  */
+/* Return true if IDX corresponds to a Mcgrath buffer local
+   (Lisp-surfaced slot).  */
 
 INLINE bool
-BUFFER_LOCAL_P (struct buffer *b, int idx)
+LOCALIZED_SLOT_P (struct buffer *b, int idx)
 {
   eassert (valid_per_buffer_idx (idx));
   return b->local_flags[idx];
 }
 
 INLINE void
-SET_BUFFER_LOCAL_P (struct buffer *b, int idx, bool val)
+SET_LOCALIZED_SLOT_P (struct buffer *b, int idx, bool val)
 {
   eassert (valid_per_buffer_idx (idx));
   b->local_flags[idx] = val;

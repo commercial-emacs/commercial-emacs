@@ -273,7 +273,7 @@ Return TABLE.  */)
   bset_category_table (current_buffer, table);
   /* Indicate that this buffer now has a specified category table.  */
   idx = PER_BUFFER_VAR_IDX (category_table);
-  SET_BUFFER_LOCAL_P (current_buffer, idx, 1);
+  SET_LOCALIZED_SLOT_P (current_buffer, idx, 1);
   return table;
 }
 

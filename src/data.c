@@ -705,7 +705,7 @@ symval_update_fwd (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
 	    {
 	      struct buffer *b = XBUFFER (buffer);
 
-	      if (! BUFFER_LOCAL_P (b, idx))
+	      if (! LOCALIZED_SLOT_P (b, idx))
 		set_per_buffer_value (b, offset, newval);
 	    }
 	}
@@ -1505,9 +1505,7 @@ DEFUN ("set", Fset, Sset, 2, 2, 0,
   return newval;
 }
 
-/* Store the value NEWVAL into SYMBOL.  For buffer-local bindings, the
-   current buffer is assumed if BUF is nil.
-*/
+/* The guts of `set'-related functions.  */
 
 void
 set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
@@ -1552,28 +1550,27 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
     case SYMBOL_LOCALIZED:
       {
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
-	if (NILP (buf))
-	  XSETBUFFER (buf, current_buffer);
+	Lisp_Object mybuf = ! NILP (buf) ? buf : Fcurrent_buffer();
 
 	/* Uncanny resemblance to symval_update_blv().  */
-	if (! EQ (blv->where, buf)
+	if (! EQ (blv->where, mybuf)
 	    || EQ (blv->defcell, blv->valcell))
 	  {
 	    Lisp_Object pair =
-	      assq_no_quit (symbol, BVAR (XBUFFER (buf), local_var_alist));
-	    set_blv_where (blv, buf);
+	      assq_no_quit (symbol, BVAR (XBUFFER (mybuf), local_var_alist));
+	    set_blv_where (blv, mybuf);
 	    if (NILP (pair))
 	      {
 		pair = blv->defcell;
 		if (bindflag == SET_INTERNAL_SET
 		    && blv->local_if_set
-		    && ! blv_shadowed_p (xsymbol))
+		    && ! set_default_p (xsymbol))
 		  {
 		    /* Baroque exception dating back to 2000 by RMS.  */
 		    pair = Fcons (symbol, last_assigned_value (symbol));
 		    bset_local_var_alist
-		      (XBUFFER (buf),
-		       Fcons (pair, BVAR (XBUFFER (buf), local_var_alist)));
+		      (XBUFFER (mybuf),
+		       Fcons (pair, BVAR (XBUFFER (mybuf), local_var_alist)));
 		  }
 	      }
 	    set_blv_valcell (blv, pair);
@@ -1584,26 +1581,24 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 
 	if (EQ (newval, Qunbound))
 	  blv->fwd.fwdptr = NULL;
-	else if (blv->fwd.fwdptr)
-	  symval_update_fwd (blv->fwd,
-			     newval,
-			     BUFFERP (buf) ? XBUFFER (buf) : current_buffer);
+	if (blv->fwd.fwdptr)
+	  symval_update_fwd (blv->fwd, newval, XBUFFER (mybuf));
       }
       break;
     case SYMBOL_FORWARDED:
       {
-	struct buffer *b = BUFFERP (buf) ? XBUFFER (buf) : current_buffer;
+	Lisp_Object mybuf = ! NILP (buf) ? buf : Fcurrent_buffer();
 	lispfwd valpp = SYMBOL_FWD (xsymbol);
 	if (BUFFER_OBJFWDP (valpp) && bindflag == SET_INTERNAL_SET)
 	  {
-	    /* added wrinkle of setting local_flags. */
 	    int idx = PER_BUFFER_IDX (XBUFFER_OBJFWD (valpp)->offset);
-	    if (idx > 0 && ! BUFFER_LOCAL_P (b, idx))
+	    if (idx > 0 && ! LOCALIZED_SLOT_P (XBUFFER (mybuf), idx))
 	      {
-		if (blv_shadowed_p (xsymbol))
+		if (set_default_p (xsymbol)) // Bug#44733
 		  set_default_internal (symbol, newval, bindflag);
 		else
-		  SET_BUFFER_LOCAL_P (b, idx, 1);
+		  /* Make a Mcgrath buffer local (see buffer.h). */
+		  SET_LOCALIZED_SLOT_P (XBUFFER (mybuf), idx, 1);
 	      }
 	  }
 
@@ -1614,7 +1609,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	    SET_SYMBOL_VAL (xsymbol, Qunbound);
 	  }
 	else
-	  symval_update_fwd (valpp, newval, b);
+	  symval_update_fwd (valpp, newval, XBUFFER (mybuf));
       }
       break;
     default:
@@ -1880,7 +1875,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 		FOR_EACH_LIVE_BUFFER (tail, buf)
 		  {
 		    struct buffer *b = XBUFFER (buf);
-		    if (! BUFFER_LOCAL_P (b, idx))
+		    if (! LOCALIZED_SLOT_P (b, idx))
 		      set_per_buffer_value (b, offset, value);
 		  }
 	      }
@@ -2090,7 +2085,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
           eassert (idx);
           if (idx > 0)
             /* If idx < 0, it's always buffer local, like `mode-name`.  */
-            SET_BUFFER_LOCAL_P (current_buffer, idx, true);
+            SET_LOCALIZED_SLOT_P (current_buffer, idx, true);
           return variable;
         }
       sym->u.s.redirect = SYMBOL_LOCALIZED;
@@ -2104,7 +2099,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
   tem = assq_no_quit (variable, BVAR (current_buffer, local_var_alist));
   if (NILP (tem))
     {
-      if (blv_shadowed_p (sym))
+      if (set_default_p (sym))
 	{
 	  AUTO_STRING (format,
 		       "Making %s buffer-local while locally let-bound!");
@@ -2160,7 +2155,7 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
 	    int idx = PER_BUFFER_IDX (offset);
 	    if (idx > 0)
 	      {
-		SET_BUFFER_LOCAL_P (current_buffer, idx, 0);
+		SET_LOCALIZED_SLOT_P (current_buffer, idx, 0);
 		set_per_buffer_value (current_buffer, offset,
 				      per_buffer_default (offset));
 	      }
@@ -2248,7 +2243,7 @@ Also see `buffer-local-boundp'.*/)
 	  {
 	    int offset = XBUFFER_OBJFWD (valpp)->offset;
 	    int idx = PER_BUFFER_IDX (offset);
-	    if (idx == -1 || BUFFER_LOCAL_P (buf, idx))
+	    if (idx == -1 || LOCALIZED_SLOT_P (buf, idx))
 	      result = Qt;
 	  }
       }

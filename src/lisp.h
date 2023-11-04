@@ -3082,10 +3082,8 @@ enum specbind_tag {
   SPECPDL_MODULE_ENVIRONMENT,   /* A live module environment.  */
 #endif
   SPECPDL_LET,			/* A plain and simple dynamic let-binding.  */
-  SPECPDL_LET_LOCAL,		/* A buffer-local let-binding.  */
-  SPECPDL_LET_DEFAULT		/* Var has since been buffer-localized
-				   but this stack value reflects the
-				   un-let-bound default.  */
+  SPECPDL_LET_LOCAL,		/* Let-binding of blv when `local-variable-p' true.  */
+  SPECPDL_LET_DEFAULT		/* Let-binding of blv when `local-variable-p' false.  */
 };
 
 union specbinding
@@ -4228,7 +4226,7 @@ extern void prog_ignore (Lisp_Object);
 extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
 extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
-extern bool blv_shadowed_p (struct Lisp_Symbol *symbol);
+extern bool set_default_p (struct Lisp_Symbol *symbol);
 void do_debug_on_call (Lisp_Object code, specpdl_ref count);
 Lisp_Object funcall_general (Lisp_Object fun,
 			     ptrdiff_t numargs, Lisp_Object *args);
