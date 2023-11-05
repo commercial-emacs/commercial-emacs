@@ -85,12 +85,6 @@ XOBJFWD (lispfwd a)
 }
 
 static Lisp_Object
-blv_value (struct Lisp_Buffer_Local_Value *blv)
-{
-  return XCDR (blv->valcell);
-}
-
-static Lisp_Object
 last_assigned_value (Lisp_Object symbol)
 {
   /* translate confusing Blandyism involving "current_alist_element"
@@ -735,7 +729,7 @@ symval_update_fwd (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
     }
 }
 
-/* Is blv a singleton?  Reassign SYMBOL's blv member to SYMBOL's entry
+/* Reassign SYMBOL's singleton blv member to SYMBOL's entry
    in BUFFER's LOCAL_VAR_ALIST.  Uncanny resemblance to
    set_internal().  */
 
@@ -751,11 +745,9 @@ symval_update_blv (Lisp_Object symbol, Lisp_Object buffer)
       Lisp_Object pair =
 	assq_no_quit (symbol, BVAR (XBUFFER (buffer), local_var_alist));
       blv->buffer = buffer;
-      if (blv->fwd.fwdptr)
-	XSETCDR (blv->valcell, symval_resolve (blv->fwd, current_buffer));
       blv->valcell = ! NILP (pair) ? pair : blv->defcell;
       if (blv->fwd.fwdptr)
-	symval_update_fwd (blv->fwd, blv_value (blv), current_buffer);
+	symval_update_fwd (blv->fwd, XCDR (blv->valcell), current_buffer);
     }
   return blv;
 }
@@ -768,7 +760,7 @@ Note that if `lexical-binding' is in effect, this refers to the
 global value outside of any lexical scope.  */)
   (register Lisp_Object symbol)
 {
-  Lisp_Object valpp = Qnil;
+  Lisp_Object val = Qnil;
   struct Lisp_Symbol *sym;
   CHECK_SYMBOL (symbol);
   sym = XSYMBOL (symbol);
@@ -782,25 +774,27 @@ global value outside of any lexical scope.  */)
       goto start;
       break;
     case SYMBOL_PLAINVAL:
-      valpp = SYMBOL_VAL (sym);
+      val = SYMBOL_VAL (sym);
       break;
     case SYMBOL_LOCALIZED:
       if (! SYMBOL_BLV (sym)->fwd.fwdptr)
 	{
-	  valpp = blv_value (symval_update_blv (symbol, Fcurrent_buffer ()));
+	  struct Lisp_Buffer_Local_Value *blv =
+	    symval_update_blv (symbol, Fcurrent_buffer ());
+	  val = XCDR (blv->valcell);
 	  break;
 	}
       FALLTHROUGH;
     case SYMBOL_FORWARDED:
       /* set_internal() un-forwards vars whose value is Qunbound.  */
-      valpp = Qt;
+      val = Qt;
       break;
     default:
       emacs_abort ();
       break;
     }
 
-  return (EQ (valpp, Qunbound) ? Qnil : Qt);
+  return (EQ (val, Qunbound) ? Qnil : Qt);
 }
 
 /* It has been previously suggested to make this function an alias for
@@ -1447,7 +1441,7 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
 					    Lisp_Vectorlike));
 	result = blv->fwd.fwdptr
 	  ? symval_resolve (blv->fwd, current_buffer)
-	  : blv_value (blv);
+	  : XCDR (blv->valcell);
       }
       break;
     case SYMBOL_FORWARDED:
@@ -1906,8 +1900,8 @@ DEFUN ("make-variable-buffer-local", Fmake_variable_buffer_local,
        Smake_variable_buffer_local, 1, 1, "vMake Variable Buffer Local: ",
        doc: /* Make VARIABLE buffer-local whenever it is set.
 This globally affects VARIABLE's behavior across all buffers.  Use
-`make-local-variable' to constrain to a single buffer.  The more
-common and natural `defvar-local' combines this with a variable's
+`make-local-variable' to restrict to a single buffer.  The more
+common and natural `defvar-local' folds this into the variable's
 declaration.  */)
   (register Lisp_Object variable)
 {

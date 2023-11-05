@@ -2522,8 +2522,7 @@ struct Lisp_Buffer_Local_Value
        (cf. `defvar-local').  */
     bool_bf local_if_set : 1;
     /* Override VALCELL with a C var.  Should never be
-       (Buffer|Kboard)_Objfwd (see buffer.h about Mcgrath buffer
-       local).  */
+       (Buffer|Kboard)_Objfwd.  */
     lispfwd fwd;
     /* The buffer for which the loaded binding was found.  */
     Lisp_Object buffer;
