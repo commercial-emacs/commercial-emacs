@@ -21,12 +21,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    one of the fields over which FOR_EACH_PER_BUFFER_OBJECT_AT iterates,
    (and excludes `undo_list_`).
 
-   Some slots, identified by a flipped bit in `local_slots`, are
+   Some slots, identified by a flipped bit in `local_flags`, are
    surfaced to lisp variables via Lisp_Buffer_Objfwd.  Such slots were
    designated "buffer local" during the Mcgrath era.  Monnier et al
    later allowed any user Lisp variable to be buffer-localized, but
    the vestiges of Mcgrath's conception, which we'll now call "localized
-   slots", persist in the code (and are confusing as shit).
+   slots," persist in the code (and are confusing as shit).
 */
 
 #ifndef EMACS_BUFFER_H
