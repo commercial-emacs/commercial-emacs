@@ -1701,6 +1701,67 @@ completion to the buffer.  @xref{Completion}.
   In Text mode and related modes, @kbd{M-@key{TAB}} completes words
 based on the spell-checker's dictionary.  @xref{Spelling}.
 
+@cindex completion preview
+@cindex preview completion
+@cindex suggestion preview
+@cindex Completion Preview mode
+@findex completion-preview-mode
+@vindex completion-preview-mode
+  Completion Preview mode is a minor mode that shows you symbol
+completion suggestions as type.  When you enable Completion Preview
+mode in a buffer (with @kbd{M-x completion-preview-mode}), Emacs
+examines the text around point after certain commands you invoke and
+automatically suggests a possible completion.  Emacs displays this
+suggestion with an inline preview right after point, so you see in
+advance exactly how the text will look if you accept the completion
+suggestion---that's why it's called a preview.
+
+For example, suppose that you have an Emacs Lisp buffer with the
+following code:
+
+@lisp
+(defun doit (foobarbaz)
+  fo@point{}
+@end lisp
+
+If you type another @samp{o}, the preview appears after point,
+suggesting that you complete the text to @samp{foobarbaz}:
+
+@lisp
+(defun doit (foobarbaz)
+  foo@point{}barbaz
+@end lisp
+
+Here, the text @samp{barbaz} after point is the completion preview.
+You can accept the completion suggestion with @kbd{M-@key{TAB}} to
+actually inserts @samp{barbaz} and move point after it:
+
+@lisp
+(defun doit (foobarbaz)
+  foobarbaz@point{}
+@end lisp
+
+If you want to ignore a completion suggestion, just go on editing or
+moving around the buffer.  Completion Preview mode continues to update
+the suggestion as you type according to the text around point.
+
+@vindex completion-preview-exact-match-only
+@vindex completion-preview-commands
+@vindex completion-preview-minimum-symbol-length
+If you set the user option @code{completion-preview-exact-match-only}
+to non-@code{nil}, Completion Preview mode only suggests a completion
+candidate when its the only possible completion for the (partial)
+symbol at point.  The user option @code{completion-preview-commands}
+says which commands should trigger the completion preview, by default
+that is only @code{self-insert-command}, which corresponds to when you
+type regular characters in the buffer.  The user option
+@code{completion-preview-minimum-symbol-length} specifies a minimum
+number of consecutive characters with word or symbol syntax that
+should appear around point for Emacs to suggest a completion.  By
+default, this option is set to 3, so Emacs suggests a completion if
+you type @samp{foo}, but typing just @samp{fo} doesn't trigger
+completion preview.
+
 @node MixedCase Words
 @section MixedCase Words
 @cindex camel case
