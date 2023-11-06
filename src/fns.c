@@ -6153,6 +6153,9 @@ syms_of_fns (void)
   defsubr (&Sremhash);
   defsubr (&Smaphash);
   defsubr (&Sdefine_hash_table_test);
+  defsubr (&Sinternal__hash_table_histogram);
+  defsubr (&Sinternal__hash_table_buckets);
+  defsubr (&Sinternal__hash_table_index_size);
   defsubr (&Sstring_search);
   defsubr (&Sobject_intervals);
   defsubr (&Sline_number_at_pos);
