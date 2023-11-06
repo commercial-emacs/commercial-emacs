@@ -722,8 +722,7 @@ See `icomplete-mode' and `minibuffer-setup-hook'."
              ;; Check if still in the right buffer (bug#61308)
              (or (window-minibuffer-p) completion-in-region--data)
              (icomplete-simple-completing-p)) ;Shouldn't be necessary.
-    (let ((saved-point (point))
-          (completion-lazy-hilit t))
+    (let ((saved-point (point)))
       (save-excursion
         (goto-char (icomplete--field-end))
         ;; Insert the match-status information:
@@ -902,7 +901,7 @@ by `group-function''s second \"transformation\" protocol."
                                 'icomplete-selected-match 'append comp)
      collect (concat prefix
                      (make-string (- max-prefix-len (length prefix)) ? )
-                     (completion-lazy-hilit comp)
+                     comp
                      (make-string (- max-comp-len (length comp)) ? )
                      suffix)
      into lines-aux
@@ -1068,8 +1067,7 @@ matches exist."
                   (if (< prospects-len prospects-max)
                       (push comp prospects)
                     (setq limit t)))
-                (setq prospects
-                      (nreverse (mapcar #'completion-lazy-hilit prospects)))
+                (setq prospects (nreverse prospects))
                 ;; Decorate first of the prospects.
                 (when prospects
                   (let ((first (copy-sequence (pop prospects))))
