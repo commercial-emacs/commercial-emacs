@@ -1940,18 +1940,15 @@ static void
 convert_to_localized (Lisp_Object variable,
 		      union Lisp_Val_Fwd value_or_fwd)
 {
-  struct Lisp_Symbol *sym;
   CHECK_SYMBOL (variable);
-  sym = XSYMBOL (variable);
-
-  const int oredirect = sym->u.s.redirect;
-
+  const int oredirect = XSYMBOL (variable)->u.s.redirect;
   // not a whiff of buffer-local state
   eassert (oredirect != SYMBOL_LOCALIZED
 	   && NILP (Flocal_variable_p (variable, Fcurrent_buffer ())));
-
-  sym->u.s.redirect = SYMBOL_LOCALIZED;
-  SET_SYMBOL_BLV (sym, make_blv (sym, oredirect == SYMBOL_FORWARDED, value_or_fwd));
+  XSYMBOL (variable)->u.s.redirect = SYMBOL_LOCALIZED;
+  SET_SYMBOL_BLV (XSYMBOL (variable),
+		  make_blv (XSYMBOL (variable),
+			    oredirect == SYMBOL_FORWARDED, value_or_fwd));
 }
 
 /* Workaround for Bug#65209 to bootstrap an empty LOCAL_VAR_ALIST in
