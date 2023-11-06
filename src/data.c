@@ -1957,7 +1957,7 @@ Prefer `add-hook' with a non-nil LOCAL argument to make a buffer-local
 hook.  */)
   (Lisp_Object variable)
 {
-  union Lisp_Val_Fwd valpp;
+  union Lisp_Val_Fwd valpp = { .value = NULL };
   struct Lisp_Symbol *sym;
 
   CHECK_SYMBOL (variable);
