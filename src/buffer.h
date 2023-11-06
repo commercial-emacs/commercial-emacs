@@ -23,7 +23,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    A "slot" is a Lisp_Object field in struct buffer, more
    specifically, one of the fields over which
    FOR_EACH_PER_BUFFER_OBJECT_AT iterates, (and excludes
-   `undo_list_`).  Slots are also known as per-buffer variables,
+   `undo_list_`).  Slots are also known as per-buffer variables.
 
    Some slots are surfaced to lisp.  These slots are known as
    forwarded buffer variables (Lisp_Buffer_Objfwd).  The code confuses

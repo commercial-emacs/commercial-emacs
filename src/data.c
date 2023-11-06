@@ -1357,6 +1357,8 @@ blv_restore (struct Lisp_Symbol *symbol)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
   eassert (symbol->u.s.redirect == SYMBOL_LOCALIZED);
+  if (blv->fwd.fwdptr)
+    XSETCDR (blv->valcell, slot_resolve (blv->fwd, NULL));
   blv->valcell = blv->defcell;
   if (blv->fwd.fwdptr)
     slot_update (blv->fwd, XCDR (blv->defcell), NULL);
