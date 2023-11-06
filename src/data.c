@@ -1955,11 +1955,17 @@ hook.  */)
 {
   union Lisp_Val_Fwd valpp = { .value = NULL };
   struct Lisp_Symbol *sym;
+  bool buffer_local_boundp;
 
   CHECK_SYMBOL (variable);
   sym = XSYMBOL (variable);
 
+  if (sym->u.s.trapped_write == SYMBOL_NOWRITE)
+    xsignal1 (Qsetting_constant, variable);
+
  start:
+  buffer_local_boundp =
+    ! NILP (assq_no_quit (variable, BVAR (current_buffer, local_var_alist)));
   switch (sym->u.s.redirect)
     {
     case SYMBOL_VARALIAS:
@@ -1967,50 +1973,49 @@ hook.  */)
       XSETSYMBOL (variable, sym);
       goto start;
       break;
+    case SYMBOL_LOCALIZED:
+      eassert (SYMBOL_BLV (sym) && buffer_local_boundp);
+      break;
     case SYMBOL_PLAINVAL:
+      eassert (! SYMBOL_BLV (sym) && ! buffer_local_boundp);
       valpp.value = SYMBOL_VAL (sym);
+      sym->u.s.redirect = SYMBOL_LOCALIZED;
+      SET_SYMBOL_BLV (sym, make_blv (sym, false, valpp));
       break;
     case SYMBOL_FORWARDED:
+      eassert (! SYMBOL_BLV (sym) && ! buffer_local_boundp);
       valpp.fwd = SYMBOL_FWD (sym);
+      if (BUFFER_OBJFWDP (valpp.fwd))
+	{
+	  int offset = XBUFFER_OBJFWD (valpp.fwd)->offset;
+	  int idx = PER_BUFFER_IDX (offset);
+	  eassert (idx); // must have been surfaced to lisp
+	  if (idx > 0)
+	    SET_LOCALIZED_SLOT_P (current_buffer, idx, true);
+	  // Effed up special case for Lisp_Fwd_Buffer_Obj.
+	  // We don't set u.s.redirect to SYMBOL_LOCALIZED
+	  // nor SET_SYMBOL_BLV.
+	  eassert (! SYMBOL_BLV (sym) && ! buffer_local_boundp);
+	}
+      else
+	{
+	  sym->u.s.redirect = SYMBOL_LOCALIZED;
+	  SET_SYMBOL_BLV (sym, make_blv (sym, true, valpp));
+	}
       break;
     default:
+      emacs_abort ();
       break;
     }
 
-  if (sym->u.s.trapped_write == SYMBOL_NOWRITE)
-    xsignal1 (Qsetting_constant, variable);
-
-  if (sym->u.s.redirect != SYMBOL_LOCALIZED
-      || ! SYMBOL_BLV (sym))
+  if (SYMBOL_BLV (sym) && ! buffer_local_boundp)
     {
-      bool forwarded_p = sym->u.s.redirect == SYMBOL_FORWARDED;
-      if (forwarded_p && BUFFER_OBJFWDP (valpp.fwd))
-        {
-          int offset = XBUFFER_OBJFWD (valpp.fwd)->offset;
-          int idx = PER_BUFFER_IDX (offset);
-          eassert (idx); // must have been surfaced to lisp
-          if (idx > 0)
-	    SET_LOCALIZED_SLOT_P (current_buffer, idx, true);
-          return variable;
-        }
-      sym->u.s.redirect = SYMBOL_LOCALIZED;
-      SET_SYMBOL_BLV (sym, make_blv (sym, forwarded_p, valpp));
-    }
+      eassert (NILP (SYMBOL_BLV (sym)->buffer));
 
-  eassert (sym->u.s.redirect == SYMBOL_LOCALIZED
-	   && SYMBOL_BLV (sym));
-
-
-  if (NILP (assq_no_quit (variable, BVAR (current_buffer, local_var_alist))))
-    {
       /* VARIABLE wasn't heretofore buffer-local...  */
       if (set_default_p (sym))
 	/* ... but a `let' is active.  */
 	(void) "Making buffer-local while locally let-bound!";
-
-      if (BUFFERP (SYMBOL_BLV (sym)->buffer)
-	      && current_buffer == XBUFFER (SYMBOL_BLV (sym)->buffer))
-        blv_restore (sym);
 
       /* Initialize LOCAL_VAR_ALIST with default binding, and eagerly
 	 push the value to DEFVAR-PER-BUFFER C variable.  */
