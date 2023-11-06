@@ -11025,12 +11025,9 @@ XTflash (struct frame *f)
 
   if (FRAME_X_VISUAL_INFO (f)->class == TrueColor)
     {
-      values.function = GXxor;
-      values.foreground = (FRAME_FOREGROUND_PIXEL (f)
-			   ^ FRAME_BACKGROUND_PIXEL (f));
+      values.function = GXinvert;
 
-      gc = XCreateGC (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f),
-		      GCFunction | GCForeground, &values);
+      gc = XCreateGC (FRAME_X_DISPLAY (f), FRAME_X_WINDOW (f), GCFunction, &values);
     }
   else
     gc = FRAME_X_OUTPUT (f)->normal_gc;
