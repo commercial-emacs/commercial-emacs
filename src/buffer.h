@@ -25,10 +25,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    Some slots are surfaced to lisp.  These slots are known as
    forwarded buffer variables.
 
-   Some forwarded buffer variables are treated like buffer-locals, and
-   are identified by their "on" bits in `local_flags`.  These
-   so-called "localized slots" are an boundless source of confusion
-   and special casing.
+   A so-called "localized slot" is a forwarded buffer variable whose
+   bit in `local_flags` is on.  They are treated like buffer local
+   variables.
 */
 
 #ifndef EMACS_BUFFER_H
