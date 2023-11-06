@@ -2301,12 +2301,14 @@ dump_pre_dump_symbol (struct dump_context *ctx, struct Lisp_Symbol *symbol)
 {
   Lisp_Object symbol_lv = make_lisp_ptr (symbol, Lisp_Symbol);
   eassert (!dump_recall_symbol_aux (ctx, symbol_lv));
-  switch (symbol->u.s.redirect)
+  switch (symbol->u.s.type)
     {
     case SYMBOL_LOCALIZED:
       dump_remember_symbol_aux (ctx, symbol_lv,
 				dump_blv (ctx, symbol->u.s.val.blv));
       break;
+    case SYMBOL_KBOARD:
+    case SYMBOL_BUFFER:
     case SYMBOL_FORWARDED:
       dump_remember_symbol_aux (ctx, symbol_lv,
 				dump_fwd (ctx, symbol->u.s.val.fwd));
@@ -2350,13 +2352,13 @@ dump_symbol (struct dump_context *ctx,
   struct Lisp_Symbol out;
   dump_object_start (ctx, &out, sizeof (out));
   eassert (symbol->u.s.gcmarkbit == 0);
-  DUMP_FIELD_COPY (&out, symbol, u.s.redirect);
+  DUMP_FIELD_COPY (&out, symbol, u.s.type);
   DUMP_FIELD_COPY (&out, symbol, u.s.trapped_write);
   DUMP_FIELD_COPY (&out, symbol, u.s.interned);
   DUMP_FIELD_COPY (&out, symbol, u.s.declared_special);
   DUMP_FIELD_COPY (&out, symbol, u.s.pinned);
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.name, WEIGHT_STRONG);
-  switch (symbol->u.s.redirect)
+  switch (symbol->u.s.type)
     {
     case SYMBOL_PLAINVAL:
       dump_field_lv (ctx, &out, symbol, &symbol->u.s.val.value,
@@ -2370,6 +2372,8 @@ dump_symbol (struct dump_context *ctx,
     case SYMBOL_LOCALIZED:
       dump_field_fixup_later (ctx, &out, symbol, &symbol->u.s.val.blv);
       break;
+    case SYMBOL_KBOARD:
+    case SYMBOL_BUFFER:
     case SYMBOL_FORWARDED:
       dump_field_fixup_later (ctx, &out, symbol, &symbol->u.s.val.fwd);
       break;
@@ -2384,7 +2388,7 @@ dump_symbol (struct dump_context *ctx,
   offset = dump_object_finish (ctx, &out, sizeof (out));
   dump_off aux_offset;
 
-  switch (symbol->u.s.redirect)
+  switch (symbol->u.s.type)
     {
     case SYMBOL_LOCALIZED:
       aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
@@ -2395,6 +2399,8 @@ dump_symbol (struct dump_context *ctx,
 	  ? aux_offset
 	  : dump_blv (ctx, symbol->u.s.val.blv)));
       break;
+    case SYMBOL_KBOARD:
+    case SYMBOL_BUFFER:
     case SYMBOL_FORWARDED:
       aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
       dump_remember_fixup_ptr_raw

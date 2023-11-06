@@ -1088,7 +1088,7 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
 	    notify_variable_watchers (var, Qnil, Qmakunbound, buffer);
 
           if (EQ (SYMBOL_BLV (XSYMBOL (var))->buffer, buffer))
-	    blv_restore (XSYMBOL (var));
+	    blv_invalidate (XSYMBOL (var));
 
 	  if (NILP (prop_perm)) // skip it
 	    {
@@ -2160,7 +2160,7 @@ set_buffer_internal (struct buffer *new_buf)
 	  {
 	    Lisp_Object var = XCAR (XCAR (tail));
 	    struct Lisp_Symbol *sym = XSYMBOL (var);
-	    if (sym->u.s.redirect == SYMBOL_LOCALIZED
+	    if (sym->u.s.type == SYMBOL_LOCALIZED
 		&& SYMBOL_BLV (sym)->fwd.fwdptr)
 	      Fsymbol_value (var); /* sets variable by side effect */
 	  }
@@ -4728,7 +4728,7 @@ defvar_per_buffer (struct Lisp_Buffer_Objfwd *bo_fwd, const char *namestring,
   bo_fwd->offset = offset;
   bo_fwd->predicate = predicate;
   sym->u.s.declared_special = true;
-  sym->u.s.redirect = SYMBOL_FORWARDED;
+  sym->u.s.type = SYMBOL_BUFFER;
   SET_SYMBOL_FWD (sym, bo_fwd);
   XSETSYMBOL (PER_BUFFER_SYMBOL (offset), sym);
 

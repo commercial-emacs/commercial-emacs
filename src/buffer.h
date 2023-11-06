@@ -25,13 +25,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    FOR_EACH_PER_BUFFER_OBJECT_AT iterates, (and excludes
    `undo_list_`).  Slots are also known as per-buffer variables.
 
-   Some slots are surfaced to lisp.  These slots are known as
-   forwarded buffer variables (Lisp_Buffer_Objfwd).  The code confuses
-   them with buffer locals (Lisp_Buffer_Local_Value), with which they
-   share many traits.  The confusion exploded when someone decided to
-   CONVERT one type to the other in `make-local-variable', then
-   attempt and fail to draft a consistent semantics for such a
-   chimeric buffer-localized forwarded buffer variable.
+   Some slots are surfaced to lisp via DEFVAR_PER_BUFFER.  These slots
+   are known as forwarded buffer variables (Lisp_Buffer_Objfwd).  The
+   code confuses them with buffer locals (Lisp_Buffer_Local_Value),
+   with which they share many traits.  The confusion exploded when
+   someone decided to CONVERT one type to the other in
+   `make-local-variable', then attempt and fail to draft a consistent
+   semantics for such a chimeric buffer-localized forwarded buffer
+   variable.
 
    Yet another confusingly named category "localized slot" is a
    forwarded buffer variable whose bit in `local_flags` is on.  Their

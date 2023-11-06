@@ -4595,7 +4595,7 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
   if (SREF (SYMBOL_NAME (sym), 0) == ':' && EQ (obarray, initial_obarray))
     {
       make_symbol_constant (sym);
-      XSYMBOL (sym)->u.s.redirect = SYMBOL_PLAINVAL;
+      XSYMBOL (sym)->u.s.type = SYMBOL_PLAINVAL;
       /* Mark keywords as special.  This makes (let ((:key 'foo)) ...)
 	 in lexically bound elisp signal an error, as documented.  */
       XSYMBOL (sym)->u.s.declared_special = true;
@@ -5027,7 +5027,7 @@ defvar_int (struct Lisp_Intfwd const *i_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
   XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  XSYMBOL (sym)->u.s.type = SYMBOL_FORWARDED;
   SET_SYMBOL_FWD (XSYMBOL (sym), i_fwd);
 }
 
@@ -5037,7 +5037,7 @@ defvar_bool (struct Lisp_Boolfwd const *b_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
   XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  XSYMBOL (sym)->u.s.type = SYMBOL_FORWARDED;
   SET_SYMBOL_FWD (XSYMBOL (sym), b_fwd);
   Vbyte_boolean_vars = Fcons (sym, Vbyte_boolean_vars);
 }
@@ -5052,7 +5052,7 @@ defvar_lisp_nopro (struct Lisp_Objfwd const *o_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
   XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  XSYMBOL (sym)->u.s.type = SYMBOL_FORWARDED;
   SET_SYMBOL_FWD (XSYMBOL (sym), o_fwd);
 }
 
@@ -5071,7 +5071,7 @@ defvar_kboard (struct Lisp_Kboard_Objfwd const *ko_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
   XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  XSYMBOL (sym)->u.s.type = SYMBOL_KBOARD;
   SET_SYMBOL_FWD (XSYMBOL (sym), ko_fwd);
 }
 

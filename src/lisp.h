@@ -348,13 +348,13 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_FLOATP(x) TAGGEDP (x, Lisp_Float)
 #define lisp_h_NILP(x) EQ (x, Qnil)
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
-   (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), \
+   (eassert ((sym)->u.s.type == SYMBOL_PLAINVAL), \
     (sym)->u.s.val.value = (v))
 #define lisp_h_SYMBOL_CONSTANT_P(sym) \
    (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_NOWRITE)
 #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (XSYMBOL (sym)->u.s.trapped_write)
 #define lisp_h_SYMBOL_VAL(sym) \
-   (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), (sym)->u.s.val.value)
+   (eassert ((sym)->u.s.type == SYMBOL_PLAINVAL), (sym)->u.s.val.value)
 #define lisp_h_SYMBOLP(x) TAGGEDP (x, Lisp_Symbol)
 #define lisp_h_TAGGEDP(a, tag) \
    (! (((unsigned) (XLI (a) >> (USE_LSB_TAG ? 0 : VALBITS)) \
@@ -416,11 +416,11 @@ enum _GL_ATTRIBUTE_PACKED Lisp_Type
    indicates the true value is stored in an auxiliary C variable.  */
 enum _GL_ATTRIBUTE_PACKED Lisp_Fwd_Type
   {
-    Lisp_Fwd_Int,		/* C int */
-    Lisp_Fwd_Bool,		/* C bool */
-    Lisp_Fwd_Obj,		/* Lisp_Object */
-    Lisp_Fwd_Buffer_Obj,	/* buffer field of type Lisp_Object */
-    Lisp_Fwd_Kboard_Obj		/* kboards field of type Lisp_Object */
+    Lisp_Fwd_Int,		/* DEFVAR_INT */
+    Lisp_Fwd_Bool,		/* DEFVAR_BOOL */
+    Lisp_Fwd_Obj,		/* DEFVAR_LISP */
+    Lisp_Fwd_Buffer_Obj,	/* DEFVAR_PER_BUFFER */
+    Lisp_Fwd_Kboard_Obj		/* DEFVAR_KBOARD */
   };
 
 /* Ordinarily Lisp_Object and Lisp_Word are the same type, which
@@ -604,12 +604,16 @@ enum symbol_interned
   SYMBOL_INTERNED_IN_INITIAL_OBARRAY  /* interned in initial obarray */
 };
 
-enum symbol_redirect
+enum symbol_type
 {
-  SYMBOL_PLAINVAL,   /* plain var, value is in the `value' field */
-  SYMBOL_VARALIAS,   /* var alias, value is really in the `alias' symbol */
-  SYMBOL_LOCALIZED,  /* localized var, value is in the `blv' object */
-  SYMBOL_FORWARDED   /* forwarding var, value is in `forward' */
+  SYMBOL_PLAINVAL,   /* plain old variable */
+  SYMBOL_VARALIAS,   /* symbol alias */
+  SYMBOL_LOCALIZED,  /* buffer local variable */
+
+  /* Fragile: Forwarded subtypes go after SYMBOL_FORWARDED. */
+  SYMBOL_FORWARDED,  /* C variable surfaced to lisp */
+  SYMBOL_BUFFER,     /* Buffer slot surfaced to lisp */
+  SYMBOL_KBOARD      /* Keyboard field surfaced to lisp */
 };
 
 enum symbol_trapped_write
@@ -673,7 +677,7 @@ struct Lisp_Symbol
 	 2 : localized var
 	 3 : C variable
       */
-      ENUM_BF (symbol_redirect) redirect : 3;
+      ENUM_BF (symbol_type) type : 3;
 
       ENUM_BF (symbol_trapped_write) trapped_write : 2;
 
@@ -689,7 +693,7 @@ struct Lisp_Symbol
       /* The symbol's name, as a Lisp string.  */
       Lisp_Object name;
 
-      /* Value according to REDIRECT above or Qunbound.  */
+      /* Value according to TYPE above or Qunbound.  */
       union {
 	Lisp_Object value;
 	struct Lisp_Symbol *alias;
@@ -2011,19 +2015,19 @@ INLINE Lisp_Object
 INLINE struct Lisp_Symbol *
 SYMBOL_ALIAS (struct Lisp_Symbol *sym)
 {
-  eassume (sym->u.s.redirect == SYMBOL_VARALIAS && sym->u.s.val.alias);
+  eassume (sym->u.s.type == SYMBOL_VARALIAS && sym->u.s.val.alias);
   return sym->u.s.val.alias;
 }
 INLINE struct Lisp_Buffer_Local_Value *
 SYMBOL_BLV (struct Lisp_Symbol *sym)
 {
-  eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && sym->u.s.val.blv);
+  eassume (sym->u.s.type == SYMBOL_LOCALIZED && sym->u.s.val.blv);
   return sym->u.s.val.blv;
 }
 INLINE lispfwd
 SYMBOL_FWD (struct Lisp_Symbol *sym)
 {
-  eassume (sym->u.s.redirect == SYMBOL_FORWARDED && sym->u.s.val.fwd.fwdptr);
+  eassume (sym->u.s.type >= SYMBOL_FORWARDED && sym->u.s.val.fwd.fwdptr);
   return sym->u.s.val.fwd;
 }
 
@@ -2036,19 +2040,19 @@ INLINE void
 INLINE void
 SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
 {
-  eassume (sym->u.s.redirect == SYMBOL_VARALIAS && v);
+  eassume (sym->u.s.type == SYMBOL_VARALIAS && v);
   sym->u.s.val.alias = v;
 }
 INLINE void
 SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
 {
-  eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && v);
+  eassume (sym->u.s.type == SYMBOL_LOCALIZED && v);
   sym->u.s.val.blv = v;
 }
 INLINE void
 SET_SYMBOL_FWD (struct Lisp_Symbol *sym, void const *v)
 {
-  eassume (sym->u.s.redirect == SYMBOL_FORWARDED && v);
+  eassume (sym->u.s.type >= SYMBOL_FORWARDED && v);
   sym->u.s.val.fwd.fwdptr = v;
 }
 
@@ -3652,7 +3656,7 @@ extern void set_default_internal (Lisp_Object, Lisp_Object,
                                   enum Set_Internal_Bind bindflag);
 extern Lisp_Object expt_integer (Lisp_Object, Lisp_Object);
 extern void syms_of_data (void);
-extern void blv_restore (struct Lisp_Symbol *);
+extern void blv_invalidate (struct Lisp_Symbol *);
 
 /* Defined in cmds.c */
 extern void syms_of_cmds (void);

@@ -588,13 +588,15 @@ signal a `cyclic-variable-indirection' error.  */)
     {
       if (s == sym)
 	xsignal1 (Qcyclic_variable_indirection, base_variable);
-      if (s->u.s.redirect != SYMBOL_VARALIAS)
+      if (s->u.s.type != SYMBOL_VARALIAS)
 	break;
       s = SYMBOL_ALIAS (s);
     }
 
-  switch (sym->u.s.redirect)
+  switch (sym->u.s.type)
     {
+    case SYMBOL_KBOARD:
+    case SYMBOL_BUFFER:
     case SYMBOL_FORWARDED:
       error ("Cannot make a built-in variable an alias: %s",
 	     SDATA (SYMBOL_NAME (new_alias)));
@@ -606,6 +608,7 @@ signal a `cyclic-variable-indirection' error.  */)
       break;
     default:
       emacs_abort ();
+      break;
     }
 
   /* https://lists.gnu.org/r/emacs-devel/2008-04/msg00834.html
@@ -640,7 +643,7 @@ signal a `cyclic-variable-indirection' error.  */)
 
   sym->u.s.declared_special = true;
   XSYMBOL (base_variable)->u.s.declared_special = true;
-  sym->u.s.redirect = SYMBOL_VARALIAS;
+  sym->u.s.type = SYMBOL_VARALIAS;
   SET_SYMBOL_ALIAS (sym, XSYMBOL (base_variable));
   sym->u.s.trapped_write = XSYMBOL (base_variable)->u.s.trapped_write;
   LOADHIST_ATTACH (new_alias);
@@ -3319,7 +3322,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
   symbol = argsym;
   xsymbol = XSYMBOL (symbol);
 
-  if (xsymbol->u.s.redirect == SYMBOL_VARALIAS)
+  if (xsymbol->u.s.type == SYMBOL_VARALIAS)
     {
       xsymbol = SYMBOL_ALIAS (xsymbol);
       XSETSYMBOL (symbol, xsymbol);
@@ -3331,7 +3334,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       if (NILP (Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray)))
 	{
 	  symbol = Fintern (SYMBOL_NAME (symbol), current_thread->obarray);
-	  XSYMBOL (symbol)->u.s.redirect = xsymbol->u.s.redirect;
+	  XSYMBOL (symbol)->u.s.type = xsymbol->u.s.type;
 	  XSYMBOL (symbol)->u.s.trapped_write = xsymbol->u.s.trapped_write;
 	  XSYMBOL (symbol)->u.s.declared_special = xsymbol->u.s.declared_special;
 	  XSYMBOL (symbol)->u.s.val = xsymbol->u.s.val;
@@ -3344,7 +3347,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 
   /* First, push old value onto let-stack.  Unintuitively, its KIND
      depends on the REDIRECT of the argument symbol.  */
-  switch (xsymbol->u.s.redirect)
+  switch (xsymbol->u.s.type)
     {
     case SYMBOL_PLAINVAL:
       specpdl_ptr->let.kind = SPECPDL_LET;
@@ -3357,27 +3360,26 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       eassert (EQ (SYMBOL_BLV (xsymbol)->buffer, Fcurrent_buffer ()));
-      /* Regular buffer locals -- see
-	 locally_unbound_blv_let_bounded() for intended semantics of
-	 `let'.  */
+      /* See locally_unbound_blv_let_bounded.  */
       if (NILP (Flocal_variable_p (symbol, Fcurrent_buffer ())))
 	specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
       break;
     case SYMBOL_FORWARDED:
+    case SYMBOL_KBOARD:
       specpdl_ptr->let.kind = SPECPDL_LET;
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
-      if (BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol)))
-	{
-	  /* Forwarded buffer variables -- see
-	     locally_unbound_blv_let_bounded() for intended semantics
-	     of `let'.  */
-	  specpdl_ptr->let.kind =
-	    NILP (Flocal_variable_p (symbol, Fcurrent_buffer ()))
-	    ? SPECPDL_LET_DEFAULT
-	    : SPECPDL_LET_LOCAL;
-	}
+      break;
+    case SYMBOL_BUFFER:
+      /* See locally_unbound_blv_let_bounded.  */
+      specpdl_ptr->let.kind =
+	NILP (Flocal_variable_p (symbol, Fcurrent_buffer ()))
+	? SPECPDL_LET_DEFAULT
+	: SPECPDL_LET_LOCAL;
+      specpdl_ptr->let.symbol = symbol;
+      specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
+      specpdl_ptr->let.buffer = Fcurrent_buffer ();
       break;
     default:
       emacs_abort ();
@@ -3386,11 +3388,10 @@ specbind (Lisp_Object argsym, Lisp_Object value)
   grow_specpdl ();
 
   /* Second, set SYMBOL to the new value.  */
-  if (xsymbol->u.s.redirect == SYMBOL_PLAINVAL
+  if (xsymbol->u.s.type == SYMBOL_PLAINVAL
       && xsymbol->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
     SET_SYMBOL_VAL (xsymbol, value);
-  else if (xsymbol->u.s.redirect == SYMBOL_FORWARDED
-	   && BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol))
+  else if (xsymbol->u.s.type == SYMBOL_BUFFER
 	   && specpdl_kind (specpdl_ptr - 1) == SPECPDL_LET_DEFAULT)
     set_default_internal (specpdl_symbol (specpdl_ptr - 1), value, SET_INTERNAL_BIND);
   else
@@ -3528,7 +3529,7 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
     case SPECPDL_LET:
       {
 	Lisp_Object sym = specpdl_symbol (this_binding);
-	if (XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
+	if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
 	  {
 	    /* Simple let binding of non-slot variable.  */
 	    if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
@@ -3827,7 +3828,7 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 	    case SPECPDL_LET:
 	      {
 		Lisp_Object sym = specpdl_symbol (tmp);
-		if (XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
+		if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
 		  {
 		    Lisp_Object old_value = specpdl_old_value (tmp);
 		    set_specpdl_old_value (tmp, SYMBOL_VAL (XSYMBOL (sym)));

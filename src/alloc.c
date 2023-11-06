@@ -2577,7 +2577,7 @@ init_symbol (Lisp_Object val, Lisp_Object name)
   struct Lisp_Symbol *p = XSYMBOL (val);
   set_symbol_name (val, name);
   set_symbol_plist (val, Qnil);
-  p->u.s.redirect = SYMBOL_PLAINVAL;
+  p->u.s.type = SYMBOL_PLAINVAL;
   SET_SYMBOL_VAL (p, Qunbound);
   set_symbol_function (val, Qnil);
   set_symbol_next (val, NULL);
@@ -5027,7 +5027,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      }
 	    mark_stack_push (&ptr->u.s.function);
 	    mark_stack_push (&ptr->u.s.plist);
-	    switch (ptr->u.s.redirect)
+	    switch (ptr->u.s.type)
 	      {
 	      case SYMBOL_PLAINVAL:
 		mark_stack_push (&ptr->u.s.val.value);
@@ -5045,10 +5045,10 @@ process_mark_stack (ptrdiff_t base_sp)
 		}
 		break;
 	      case SYMBOL_FORWARDED:
-		/* If the value is forwarded to a buffer or keyboard field,
-		   these are marked when we see the corresponding object.
-		   And if it's forwarded to a C variable, either it's not
-		   a Lisp_Object var, or it's staticpro'd already.  */
+		/* Either not a Lisp_Object var, or already staticpro'd.  */
+	      case SYMBOL_BUFFER:
+	      case SYMBOL_KBOARD:
+		/* Marked when we see the corresponding object.  */
 		break;
 	      default:
 		emacs_abort ();
@@ -5448,11 +5448,11 @@ sweep_symbols (struct thread_state *thr)
             }
 	  else
             {
-              if (sym->u.s.redirect == SYMBOL_LOCALIZED)
+              if (sym->u.s.type == SYMBOL_LOCALIZED)
 		{
                   xfree (SYMBOL_BLV (sym));
                   /* Avoid re-free (bug#29066).  */
-                  sym->u.s.redirect = SYMBOL_PLAINVAL;
+                  sym->u.s.type = SYMBOL_PLAINVAL;
                 }
               sym->u.s.next = THREAD_FIELD (thr, m_symbol_free_list);
               THREAD_FIELD (thr, m_symbol_free_list) = sym;
