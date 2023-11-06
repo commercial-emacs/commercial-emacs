@@ -1943,24 +1943,19 @@ declaration.  */)
 
 DEFUN ("make-local-variable", Fmake_local_variable, Smake_local_variable,
        1, 1, "vMake Local Variable: ",
-       doc: /* Make VARIABLE have a separate value in the current buffer.
-Other buffers will continue to share a common default value.
-\(The buffer-local value of VARIABLE starts out as the same value
-VARIABLE previously had.  If VARIABLE was void, it remains void.)
-Return VARIABLE.
+       doc: /* Associate VARIABLE to the current buffer.
+A so-called buffer local variable varies independently of any
+identically named variable outside its own buffer.  A buffer local
+variable defaults to its global value.  Return VARIABLE.
 
-If the variable is already arranged to become local when set,
-this function causes a local value to exist for this buffer,
-just as setting the variable would do.
-
-This function returns VARIABLE, and therefore
+The expression
   (set (make-local-variable \\='VARIABLE) VALUE-EXP)
-works.
+idiomatically makes and assigns VARIABLE.
 
 See also `make-variable-buffer-local'.
 
-Do not use `make-local-variable' to make a hook variable buffer-local.
-Instead, use `add-hook' and specify t for the LOCAL argument.  */)
+Prefer `add-hook' with a non-nil LOCAL argument to make a buffer-local
+hook.  */)
   (Lisp_Object variable)
 {
   union Lisp_Val_Fwd valpp;
