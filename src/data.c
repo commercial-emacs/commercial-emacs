@@ -1936,6 +1936,38 @@ declaration.  */)
   return variable;
 }
 
+static void
+convert_to_localized (Lisp_Object variable,
+		      union Lisp_Val_Fwd value_or_fwd)
+{
+  struct Lisp_Symbol *sym;
+  CHECK_SYMBOL (variable);
+  sym = XSYMBOL (variable);
+
+  // not a whiff of buffer-local state
+  eassert (sym->u.s.redirect != SYMBOL_LOCALIZED
+	   && NILP (Flocal_variable_p (variable, Fcurrent_buffer ())));
+
+  bool slot_p = sym->u.s.redirect == SYMBOL_FORWARDED;
+  sym->u.s.redirect = SYMBOL_LOCALIZED;
+  SET_SYMBOL_BLV (sym, make_blv (sym, slot_p, value_or_fwd));
+
+  /* VARIABLE heretofore was not buffer-local...  */
+  if (set_default_p (sym))
+    /* ... but a `let' is active.  */
+    (void) "Making buffer-local while locally let-bound!";
+
+  /* Initialize LOCAL_VAR_ALIST with default binding, and eagerly
+     push the value to DEFVAR-PER-BUFFER C variable.  Suspect.  */
+  bset_local_var_alist
+    (current_buffer,
+     Fcons (Fcons (variable, XCDR (SYMBOL_BLV (sym)->defcell)),
+	    BVAR (current_buffer, local_var_alist)));
+
+  if (slot_p)
+    blv_update (sym, current_buffer);
+}
+
 DEFUN ("make-local-variable", Fmake_local_variable, Smake_local_variable,
        1, 1, "vMake Local Variable: ",
        doc: /* Associate VARIABLE to the current buffer.
@@ -1955,7 +1987,6 @@ hook.  */)
 {
   union Lisp_Val_Fwd valpp = { .value = NULL };
   struct Lisp_Symbol *sym;
-  bool buffer_local_boundp;
 
   CHECK_SYMBOL (variable);
   sym = XSYMBOL (variable);
@@ -1964,8 +1995,6 @@ hook.  */)
     xsignal1 (Qsetting_constant, variable);
 
  start:
-  buffer_local_boundp =
-    ! NILP (assq_no_quit (variable, BVAR (current_buffer, local_var_alist)));
   switch (sym->u.s.redirect)
     {
     case SYMBOL_VARALIAS:
@@ -1973,17 +2002,11 @@ hook.  */)
       XSETSYMBOL (variable, sym);
       goto start;
       break;
-    case SYMBOL_LOCALIZED:
-      eassert (SYMBOL_BLV (sym) && buffer_local_boundp);
-      break;
     case SYMBOL_PLAINVAL:
-      eassert (! SYMBOL_BLV (sym) && ! buffer_local_boundp);
       valpp.value = SYMBOL_VAL (sym);
-      sym->u.s.redirect = SYMBOL_LOCALIZED;
-      SET_SYMBOL_BLV (sym, make_blv (sym, false, valpp));
+      convert_to_localized (variable, valpp);
       break;
     case SYMBOL_FORWARDED:
-      eassert (! SYMBOL_BLV (sym) && ! buffer_local_boundp);
       valpp.fwd = SYMBOL_FWD (sym);
       if (BUFFER_OBJFWDP (valpp.fwd))
 	{
@@ -1995,37 +2018,12 @@ hook.  */)
 	  // Effed up special case for Lisp_Fwd_Buffer_Obj.
 	  // We don't set u.s.redirect to SYMBOL_LOCALIZED
 	  // nor SET_SYMBOL_BLV.
-	  eassert (! SYMBOL_BLV (sym) && ! buffer_local_boundp);
 	}
       else
-	{
-	  sym->u.s.redirect = SYMBOL_LOCALIZED;
-	  SET_SYMBOL_BLV (sym, make_blv (sym, true, valpp));
-	}
+	convert_to_localized (variable, valpp);
       break;
     default:
-      emacs_abort ();
       break;
-    }
-
-  if (SYMBOL_BLV (sym) && ! buffer_local_boundp)
-    {
-      eassert (NILP (SYMBOL_BLV (sym)->buffer));
-
-      /* VARIABLE wasn't heretofore buffer-local...  */
-      if (set_default_p (sym))
-	/* ... but a `let' is active.  */
-	(void) "Making buffer-local while locally let-bound!";
-
-      /* Initialize LOCAL_VAR_ALIST with default binding, and eagerly
-	 push the value to DEFVAR-PER-BUFFER C variable.  */
-      bset_local_var_alist
-	(current_buffer,
-	 Fcons (Fcons (variable, XCDR (SYMBOL_BLV (sym)->defcell)),
-		BVAR (current_buffer, local_var_alist)));
-
-      if (SYMBOL_BLV (sym)->fwd.fwdptr)
-        blv_update (sym, current_buffer);
     }
 
   return variable;
