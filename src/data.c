@@ -2008,10 +2008,9 @@ hook.  */)
 	/* ... but a `let' is active.  */
 	(void) "Making buffer-local while locally let-bound!";
 
-      eassert (! BUFFERP (SYMBOL_BLV (sym)->buffer)
-	       || current_buffer == XBUFFER (SYMBOL_BLV (sym)->buffer));
-
-      blv_restore (sym);
+      if (BUFFERP (SYMBOL_BLV (sym)->buffer)
+	      && current_buffer == XBUFFER (SYMBOL_BLV (sym)->buffer))
+        blv_restore (sym);
 
       /* Initialize LOCAL_VAR_ALIST with default binding, and eagerly
 	 push the value to DEFVAR-PER-BUFFER C variable.  */
