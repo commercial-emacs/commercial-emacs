@@ -1038,16 +1038,13 @@ reset_buffer (register struct buffer *b)
   b->display_error_modiff = 0;
 }
 
-/* Reset buffer B's local variables info.
+/* Reset buffer-locals except permanent-locals.
 
-   If PERMANENT_TOO, reset permanent buffer-local variables.
+   If IGNORE_PERM, also reset permanent-locals.
 */
-
 static void
-reset_buffer_local_variables (struct buffer *b, bool permanent_too)
+reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
 {
-  int offset, i;
-
   /* Reset the major mode to Fundamental, together with all the
      things that depend on the major mode.
      default-major-mode is handled at a higher level.
@@ -1069,87 +1066,77 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
   bset_case_eqv_table (b, XCHAR_TABLE (Vascii_downcase_table)->extras[2]);
   bset_invisibility_spec (b, Qt);
 
-  /* Reset all (or most) per-buffer variables to their defaults.  */
-  if (permanent_too)
+  /* Reset all buffer locals to defaults.  */
+  if (ignore_perm)
     bset_local_var_alist (b, Qnil);
   else
     {
-      Lisp_Object buffer, last = Qnil;
+      Lisp_Object buffer;
       XSETBUFFER (buffer, b);
+      for (Lisp_Object last_kept = Qnil,
+	     tail = BVAR (b, local_var_alist);
+	   CONSP (tail); tail = XCDR (tail))
+	{
+	  Lisp_Object pair = XCAR (tail),
+	    var = XCAR (pair),
+	    prop_perm = Fget (var, Qpermanent_local);
 
-      for (Lisp_Object tmp = BVAR (b, local_var_alist); CONSP (tmp); tmp = XCDR (tmp))
-        {
-          Lisp_Object local_var = XCAR (XCAR (tmp));
-          Lisp_Object prop = Fget (local_var, Qpermanent_local);
-          Lisp_Object sym = local_var;
+	  /* Watchers are run *before* modifying the var.  */
+	  if (XSYMBOL (var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+	    notify_variable_watchers (var, Qnil,
+				      Qmakunbound, buffer);
 
-          /* Watchers are run *before* modifying the var.  */
-          if (XSYMBOL (local_var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
-            notify_variable_watchers (local_var, Qnil,
-                                      Qmakunbound, Fcurrent_buffer ());
+          if (EQ (SYMBOL_BLV (XSYMBOL (var))->buffer, buffer))
+	    blv_restore (XSYMBOL (var));
 
-          eassert (XSYMBOL (sym)->u.s.redirect == SYMBOL_LOCALIZED);
-          /* Need not do anything if some other buffer's binding is
-	     now cached.  */
-          if (EQ (SYMBOL_BLV (XSYMBOL (sym))->buffer, buffer))
+	  if (NILP (prop_perm)) // skip it
 	    {
-	      /* Symbol is set up for this buffer's old local value:
-	         swap it out!  */
-	      symval_restore_default (XSYMBOL (sym));
+	      if (! NILP (last_kept))
+		XSETCDR (last_kept, XCDR (tail));
+	      else
+		bset_local_var_alist (b, XCDR (tail));
 	    }
-
-          if (!NILP (prop))
-            {
-              /* If permanent-local, keep it.  */
-              last = tmp;
-              if (EQ (prop, Qpermanent_local_hook))
-                {
-                  /* This is a partially permanent hook variable.
-                     Preserve only the elements that want to be preserved.  */
-                  Lisp_Object list, newlist;
-                  list = XCDR (XCAR (tmp));
-                  if (!CONSP (list))
-                    newlist = list;
-                  else
-                    for (newlist = Qnil; CONSP (list); list = XCDR (list))
-                      {
-                        Lisp_Object elt = XCAR (list);
-                        /* Preserve element ELT if it's t, or if it is a
-                           function with a `permanent-local-hook'
-                           property. */
-                        if (EQ (elt, Qt)
-                            || (SYMBOLP (elt)
-                                && !NILP (Fget (elt, Qpermanent_local_hook))))
-                          newlist = Fcons (elt, newlist);
-                      }
-                  newlist = Fnreverse (newlist);
-                  if (XSYMBOL (local_var)->u.s.trapped_write
-		      == SYMBOL_TRAPPED_WRITE)
-                    notify_variable_watchers (local_var, newlist,
-                                              Qmakunbound, Fcurrent_buffer ());
-                  XSETCDR (XCAR (tmp), newlist);
-                  continue; /* Don't do variable write trapping twice.  */
-                }
-            }
-          /* Delete this local variable.  */
-          else if (NILP (last))
-            bset_local_var_alist (b, XCDR (tmp));
-          else
-            XSETCDR (last, XCDR (tmp));
-        }
+	  else // keep it
+	    {
+	      last_kept = tail;
+	      if (EQ (prop_perm, Qpermanent_local_hook))
+		{
+		  /* Rewrite PAIR's binds.  A negligibly useful but
+		     baroque scheme insisted upon by RMS of
+		     course.  */
+		  Lisp_Object nbinds = Qnil;
+		  for (Lisp_Object tail = XCDR (pair); CONSP (tail); tail = XCDR (tail))
+		    {
+		      Lisp_Object bind = XCAR (tail);
+		      /* Preserve BIND if it's t, or has
+			 `permanent-local-hook' property. */
+		      if (EQ (bind, Qt)
+			  || (SYMBOLP (bind)
+			      && ! NILP (Fget (bind, Qpermanent_local_hook))))
+			nbinds = Fcons (bind, nbinds);
+		    }
+		  nbinds = Fnreverse (nbinds);
+		  if (XSYMBOL (var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+		    notify_variable_watchers (var, nbinds,
+					      Qmakunbound, buffer);
+		  XSETCDR (pair, nbinds);
+		}
+	    }
+	}
     }
 
-  for (i = 0; i < last_per_buffer_idx; ++i)
-    if (permanent_too || buffer_permanent_local_flags[i] == 0)
+  /* Douse local_flags bit for killed.  */
+  for (int i = 0; i < last_per_buffer_idx; ++i)
+    if (ignore_perm || ! buffer_permanent_local_flags[i])
       SET_LOCALIZED_SLOT_P (b, i, 0);
 
-  /* For each slot that has a default value, copy that into the slot.  */
+  /* Set slot values for killed.  */
+  int offset;
   FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
     {
       int idx = PER_BUFFER_IDX (offset);
-      if ((idx > 0
-	   && (permanent_too
-	       || buffer_permanent_local_flags[idx] == 0)))
+      if (idx > 0
+	  && (ignore_perm || ! buffer_permanent_local_flags[idx]))
 	set_per_buffer_value (b, offset, per_buffer_default (offset));
     }
 }

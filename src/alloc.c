@@ -5039,11 +5039,6 @@ process_mark_stack (ptrdiff_t base_sp)
 	      case SYMBOL_LOCALIZED:
 		{
 		  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (ptr);
-		  /* If the value is set up for a killed buffer
-		     restore its global binding.  */
-		  if (BUFFERP (blv->buffer)
-		      && ! BUFFER_LIVE_P (XBUFFER (blv->buffer)))
-		    symval_restore_default (ptr);
 		  mark_stack_push (&blv->buffer);
 		  mark_stack_push (&blv->valcell);
 		  mark_stack_push (&blv->defcell);

@@ -84,6 +84,50 @@ XOBJFWD (lispfwd a)
   return a.fwdptr;
 }
 
+/* Given the raw contents of a symbol value cell,
+   return the Lisp value of the symbol. */
+
+static Lisp_Object
+slot_resolve (lispfwd valpp, struct buffer *xbuffer)
+{
+  Lisp_Object result = Qnil;
+  switch (XFWDTYPE (valpp))
+    {
+    case Lisp_Fwd_Int:
+      result = make_int (*XFIXNUMFWD (valpp)->intvar);
+      break;
+    case Lisp_Fwd_Bool:
+      result = (*XBOOLFWD (valpp)->boolvar ? Qt : Qnil);
+      break;
+    case Lisp_Fwd_Obj:
+      result = *XOBJFWD (valpp)->objvar;
+      break;
+    case Lisp_Fwd_Buffer_Obj:
+      result = per_buffer_value (xbuffer ? xbuffer : current_buffer,
+				 XBUFFER_OBJFWD (valpp)->offset);
+      break;
+    case Lisp_Fwd_Kboard_Obj:
+      /* We used to simply use current_kboard here, but from Lisp
+	 code, its value is often unexpected.  It seems nicer to
+	 allow constructions like this to work as intuitively expected:
+
+	 (with-selected-frame frame
+	 (define-key local-function-map "\eOP" [f1]))
+
+	 On the other hand, this affects the semantics of
+	 last-command and real-last-command, and people may rely on
+	 that.  I took a quick look at the Lisp codebase, and I
+	 don't think anything will break.  --lorentey  */
+      result = *(Lisp_Object *)(XKBOARD_OBJFWD (valpp)->offset
+				+ (char *)FRAME_KBOARD (SELECTED_FRAME ()));
+      break;
+    default:
+      emacs_abort ();
+      break;
+    }
+  return result;
+}
+
 static Lisp_Object
 last_assigned_value (Lisp_Object symbol)
 {
@@ -93,7 +137,7 @@ last_assigned_value (Lisp_Object symbol)
   struct Lisp_Symbol *sym = XSYMBOL (symbol);
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
   return (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
-    ? symval_resolve (blv->fwd, NULL)
+    ? slot_resolve (blv->fwd, NULL)
     : XCDR (blv->defcell);
 }
 
@@ -634,7 +678,7 @@ wrong_range (Lisp_Object min, Lisp_Object max, Lisp_Object wrong)
 }
 
 static void
-symval_update_fwd (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
+slot_update (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
 {
   switch (XFWDTYPE (valpp))
     {
@@ -729,25 +773,33 @@ symval_update_fwd (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
     }
 }
 
-/* Reassign SYMBOL's singleton blv member to SYMBOL's entry
-   in BUFFER's LOCAL_VAR_ALIST.  Uncanny resemblance to
-   set_internal().  */
+/* If BLV lived in buffer rather than symbol, we wouldn't
+   have to be so careful updating it  Its truth would
+   also become independent of an ever-changing current_buffer.
+
+   Uncanny resemblance to set_internal().  */
 
 static struct Lisp_Buffer_Local_Value *
-symval_update_blv (Lisp_Object symbol, Lisp_Object buffer)
+blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
 {
-  struct Lisp_Symbol *xsymbol = XSYMBOL (symbol);
-  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
-
-  if (! BUFFERP (blv->buffer)
-      || XBUFFER (buffer) != XBUFFER (blv->buffer))
+  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
+  Lisp_Object slot_value;
+  if (blv->fwd.fwdptr)
     {
-      Lisp_Object pair =
-	assq_no_quit (symbol, BVAR (XBUFFER (buffer), local_var_alist));
-      blv->buffer = buffer;
-      blv->valcell = ! NILP (pair) ? pair : blv->defcell;
-      if (blv->fwd.fwdptr)
-	symval_update_fwd (blv->fwd, XCDR (blv->valcell), current_buffer);
+      slot_value = slot_resolve (blv->fwd, current_buffer);
+      XSETCDR (blv->valcell, slot_value);
+    }
+  Lisp_Object pair =
+    assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
+		  BVAR (buffer, local_var_alist));
+  blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
+  blv->valcell = ! NILP (pair) ? pair : blv->defcell;
+  if (blv->fwd.fwdptr)
+    {
+      /* BLV->VALCELL is actually a link in LOCAL_VAR_ALIST, so we
+	 effectively echoed the C value back to itself with
+	 the important side effect of refreshing LOCAL_VAR_ALIST.  */
+      slot_update (blv->fwd, XCDR (blv->valcell), buffer);
     }
   return blv;
 }
@@ -780,7 +832,7 @@ global value outside of any lexical scope.  */)
       if (! SYMBOL_BLV (sym)->fwd.fwdptr)
 	{
 	  struct Lisp_Buffer_Local_Value *blv =
-	    symval_update_blv (symbol, Fcurrent_buffer ());
+	    blv_update (sym, current_buffer);
 	  val = XCDR (blv->valcell);
 	  break;
 	}
@@ -1303,51 +1355,6 @@ If OBJECT is not a symbol, just return it.  */)
   return object;
 }
 
-
-/* Given the raw contents of a symbol value cell,
-   return the Lisp value of the symbol. */
-
-Lisp_Object
-symval_resolve (lispfwd valpp, struct buffer *xbuffer)
-{
-  Lisp_Object result = Qnil;
-  switch (XFWDTYPE (valpp))
-    {
-    case Lisp_Fwd_Int:
-      result = make_int (*XFIXNUMFWD (valpp)->intvar);
-      break;
-    case Lisp_Fwd_Bool:
-      result = (*XBOOLFWD (valpp)->boolvar ? Qt : Qnil);
-      break;
-    case Lisp_Fwd_Obj:
-      result = *XOBJFWD (valpp)->objvar;
-      break;
-    case Lisp_Fwd_Buffer_Obj:
-      result = per_buffer_value (xbuffer ? xbuffer : current_buffer,
-				 XBUFFER_OBJFWD (valpp)->offset);
-      break;
-    case Lisp_Fwd_Kboard_Obj:
-      /* We used to simply use current_kboard here, but from Lisp
-	 code, its value is often unexpected.  It seems nicer to
-	 allow constructions like this to work as intuitively expected:
-
-	 (with-selected-frame frame
-	 (define-key local-function-map "\eOP" [f1]))
-
-	 On the other hand, this affects the semantics of
-	 last-command and real-last-command, and people may rely on
-	 that.  I took a quick look at the Lisp codebase, and I
-	 don't think anything will break.  --lorentey  */
-      result = *(Lisp_Object *)(XKBOARD_OBJFWD (valpp)->offset
-				+ (char *)FRAME_KBOARD (SELECTED_FRAME ()));
-      break;
-    default:
-      emacs_abort ();
-      break;
-    }
-  return result;
-}
-
 /* Used to signal a user-friendly error when symbol WRONG is
    not a member of CHOICE, which should be a list of symbols.  */
 
@@ -1384,16 +1391,16 @@ wrong_choice (Lisp_Object choice, Lisp_Object wrong)
 /* Assuming SYMBOL is buffer-local, restore to its default binding. */
 
 void
-symval_restore_default (struct Lisp_Symbol *symbol)
+blv_restore (struct Lisp_Symbol *symbol)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
   eassert (symbol->u.s.redirect == SYMBOL_LOCALIZED);
 
   if (blv->fwd.fwdptr) /* unload the previously loaded binding. */
-    XSETCDR (blv->valcell, symval_resolve (blv->fwd, NULL));
+    XSETCDR (blv->valcell, slot_resolve (blv->fwd, NULL));
   blv->valcell = blv->defcell;
   if (blv->fwd.fwdptr) /* load symbol's default binding. */
-    symval_update_fwd (blv->fwd, XCDR (blv->defcell), NULL);
+    slot_update (blv->fwd, XCDR (blv->defcell), NULL);
 
   blv->buffer = Qnil;
 }
@@ -1436,16 +1443,14 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
     case SYMBOL_LOCALIZED:
       {
 	struct Lisp_Buffer_Local_Value *blv =
-	  symval_update_blv (symbol,
-			     make_lisp_ptr (xbuffer ? xbuffer : current_buffer,
-					    Lisp_Vectorlike));
+	  blv_update (xsymbol, xbuffer ? xbuffer : current_buffer);
 	result = blv->fwd.fwdptr
-	  ? symval_resolve (blv->fwd, current_buffer)
+	  ? slot_resolve (blv->fwd, current_buffer)
 	  : XCDR (blv->valcell);
       }
       break;
     case SYMBOL_FORWARDED:
-      result = symval_resolve (SYMBOL_FWD (xsymbol), xbuffer);
+      result = slot_resolve (SYMBOL_FWD (xsymbol), xbuffer);
       break;
     default:
       emacs_abort ();
@@ -1521,7 +1526,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
 	Lisp_Object mybuf = ! NILP (buf) ? buf : Fcurrent_buffer();
 
-	/* Uncanny resemblance to symval_update_blv().  */
+	/* Uncanny resemblance to blv_update().  */
 	if (! EQ (blv->buffer, mybuf)
 	    || EQ (blv->defcell, blv->valcell))
 	  {
@@ -1551,7 +1556,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	if (EQ (newval, Qunbound))
 	  blv->fwd.fwdptr = NULL;
 	if (blv->fwd.fwdptr)
-	  symval_update_fwd (blv->fwd, newval, XBUFFER (mybuf));
+	  slot_update (blv->fwd, newval, XBUFFER (mybuf));
       }
       break;
     case SYMBOL_FORWARDED:
@@ -1578,7 +1583,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	    SET_SYMBOL_VAL (xsymbol, Qunbound);
 	  }
 	else
-	  symval_update_fwd (valpp, newval, XBUFFER (mybuf));
+	  slot_update (valpp, newval, XBUFFER (mybuf));
       }
       break;
     default:
@@ -1743,7 +1748,7 @@ default_value (Lisp_Object symbol)
 	    && PER_BUFFER_IDX (XBUFFER_OBJFWD (valpp)->offset))
 	  result = per_buffer_default (XBUFFER_OBJFWD (valpp)->offset);
 	else
-	  result = symval_resolve (valpp, NULL);
+	  result = slot_resolve (valpp, NULL);
 	break;
       }
     default:
@@ -1819,7 +1824,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 	XSETCDR (blv->defcell, value);
 	/* If default binding loaded, set the defvar-per-buffer slot too.  */
 	if (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
-	  symval_update_fwd (blv->fwd, value, NULL);
+	  slot_update (blv->fwd, value, NULL);
       }
       break;
     case SYMBOL_FORWARDED:
@@ -1883,7 +1888,7 @@ make_blv (struct Lisp_Symbol *sym, bool forwarded,
   struct Lisp_Buffer_Local_Value *blv = xmalloc (sizeof *blv);
   Lisp_Object init = Fcons (make_lisp_ptr (sym, Lisp_Symbol),
 			    (forwarded
-			     ? symval_resolve (value_or_fwd.fwd, NULL)
+			     ? slot_resolve (value_or_fwd.fwd, NULL)
 			     : value_or_fwd.value));
 
   eassert (! (forwarded && BUFFER_OBJFWDP (value_or_fwd.fwd)));
@@ -2042,7 +2047,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
 	  && current_buffer == XBUFFER (SYMBOL_BLV (sym)->buffer))
         /* Make sure the current value is permanently recorded, if it's the
            default value.  */
-        symval_restore_default (sym);
+        blv_restore (sym);
 
       bset_local_var_alist
 	(current_buffer,
@@ -2052,7 +2057,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
       /* Eagerly reflect blv into defvar-per-buffer slot.
          Bug#34318. */
       if (SYMBOL_BLV (sym)->fwd.fwdptr)
-        symval_update_blv (variable, Fcurrent_buffer ());
+        blv_update (sym, current_buffer);
     }
 
   return variable;
@@ -2122,7 +2127,7 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
       {
 	Lisp_Object buf; XSETBUFFER (buf, current_buffer);
 	if (EQ (buf, SYMBOL_BLV (sym)->buffer))
-	  symval_restore_default (sym);
+	  blv_restore (sym);
       }
     }
 
