@@ -1374,20 +1374,14 @@ wrong_choice (Lisp_Object choice, Lisp_Object wrong)
   xsignal2 (Qerror, obj, wrong);
 }
 
-/* Assuming SYMBOL is buffer-local, restore to its default binding. */
-
 void
 blv_restore (struct Lisp_Symbol *symbol)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
   eassert (symbol->u.s.redirect == SYMBOL_LOCALIZED);
-
-  if (blv->fwd.fwdptr) /* unload the previously loaded binding. */
-    XSETCDR (blv->valcell, slot_resolve (blv->fwd, NULL));
   blv->valcell = blv->defcell;
-  if (blv->fwd.fwdptr) /* load symbol's default binding. */
+  if (blv->fwd.fwdptr)
     slot_update (blv->fwd, XCDR (blv->defcell), NULL);
-
   blv->buffer = Qnil;
 }
 
@@ -1994,10 +1988,9 @@ hook.  */)
         {
           int offset = XBUFFER_OBJFWD (valpp.fwd)->offset;
           int idx = PER_BUFFER_IDX (offset);
-          eassert (idx);
+          eassert (idx); // must have been surfaced to lisp
           if (idx > 0)
-            /* If idx < 0, it's always buffer local, like `mode-name`.  */
-	  SET_LOCALIZED_SLOT_P (current_buffer, idx, true);
+	    SET_LOCALIZED_SLOT_P (current_buffer, idx, true);
           return variable;
         }
       sym->u.s.redirect = SYMBOL_LOCALIZED;
@@ -2007,24 +2000,26 @@ hook.  */)
   eassert (sym->u.s.redirect == SYMBOL_LOCALIZED
 	   && SYMBOL_BLV (sym));
 
+
   if (NILP (assq_no_quit (variable, BVAR (current_buffer, local_var_alist))))
     {
-      if (set_default_p (sym)) // a `let' is active
-	(void)"Making buffer-local while locally let-bound!";
+      /* VARIABLE wasn't heretofore buffer-local...  */
+      if (set_default_p (sym))
+	/* ... but a `let' is active.  */
+	(void) "Making buffer-local while locally let-bound!";
 
-      if (BUFFERP (SYMBOL_BLV (sym)->buffer)
-	  && current_buffer == XBUFFER (SYMBOL_BLV (sym)->buffer))
-        /* Make sure the current value is permanently recorded, if it's the
-           default value.  */
-	blv_restore (sym);
+      eassert (! BUFFERP (SYMBOL_BLV (sym)->buffer)
+	       || current_buffer == XBUFFER (SYMBOL_BLV (sym)->buffer));
 
+      blv_restore (sym);
+
+      /* Initialize LOCAL_VAR_ALIST with default binding, and eagerly
+	 push the value to DEFVAR-PER-BUFFER C variable.  */
       bset_local_var_alist
 	(current_buffer,
 	 Fcons (Fcons (variable, XCDR (SYMBOL_BLV (sym)->defcell)),
 		BVAR (current_buffer, local_var_alist)));
 
-      /* Eagerly reflect blv into defvar-per-buffer slot.
-         Bug#34318. */
       if (SYMBOL_BLV (sym)->fwd.fwdptr)
         blv_update (sym, current_buffer);
     }
