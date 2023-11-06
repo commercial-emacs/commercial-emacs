@@ -1914,13 +1914,15 @@ declaration.  */)
       SYMBOL_BLV (sym)->local_if_set = 1;
       break;
     case SYMBOL_PLAINVAL:
-      const Lisp_Object value =
-	EQ (SYMBOL_VAL (sym), Qunbound) ? Qnil : SYMBOL_VAL (sym);
-      sym->u.s.redirect = SYMBOL_LOCALIZED;
-      SET_SYMBOL_BLV (sym, make_blv (sym, false, (union Lisp_Val_Fwd) {
-	    .value = value
-	  }));
-      SYMBOL_BLV (sym)->local_if_set = 1;
+      {
+	Lisp_Object value =
+	  EQ (SYMBOL_VAL (sym), Qunbound) ? Qnil : SYMBOL_VAL (sym);
+	sym->u.s.redirect = SYMBOL_LOCALIZED;
+	SET_SYMBOL_BLV (sym, make_blv (sym, false, (union Lisp_Val_Fwd) {
+	      .value = value
+	    }));
+	SYMBOL_BLV (sym)->local_if_set = 1;
+      }
       break;
     case SYMBOL_FORWARDED:
       if (! KBOARD_OBJFWDP (SYMBOL_FWD (sym))
