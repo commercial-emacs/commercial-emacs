@@ -1222,6 +1222,17 @@ or a pair (NEWSTRING . NEWPOINT) of the completed result string together with
 a new position for point."
   (completion--nth-completion 1 string table pred point metadata))
 
+(defun completion-all-completions (string table pred point &optional metadata)
+  "List the possible completions of STRING in completion table TABLE.
+Only the elements of table that satisfy predicate PRED are considered.
+POINT is the position of point within STRING.
+The return value is a list of completions and may contain the base-size
+in the last `cdr'."
+  (setq completion-lazy-hilit-fn nil)
+  ;; FIXME: We need to additionally return the info needed for the
+  ;; second part of completion-base-position.
+  (completion--nth-completion 2 string table pred point metadata))
+
 (defun minibuffer--bitset (modified completions exact)
   (logior (if modified    4 0)
           (if completions 2 0)
@@ -3797,17 +3808,6 @@ When a given style wants to enable support for
 variable to a function of one argument, a fresh string to be
 displayed to the user.  The function is responsible for
 destructively propertizing the string with a `face' property.")
-
-(defun completion-all-completions (string table pred point &optional metadata)
-  "List the possible completions of STRING in completion table TABLE.
-Only the elements of table that satisfy predicate PRED are considered.
-POINT is the position of point within STRING.
-The return value is a list of completions and may contain the base-size
-in the last `cdr'."
-  (setq completion-lazy-hilit-fn nil)
-  ;; FIXME: We need to additionally return the info needed for the
-  ;; second part of completion-base-position.
-  (completion--nth-completion 2 string table pred point metadata))
 
 (defun completion-lazy-hilit (str)
   "Return a copy of completion STR that is `face'-propertized.
