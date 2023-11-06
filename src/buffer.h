@@ -17,16 +17,18 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-/* A slot is a Lisp_Object field in struct buffer, more specifically,
-   one of the fields over which FOR_EACH_PER_BUFFER_OBJECT_AT iterates,
-   (and excludes `undo_list_`).
+/* A "slot" is a Lisp_Object field in struct buffer, more
+   specifically, one of the fields over which
+   FOR_EACH_PER_BUFFER_OBJECT_AT iterates, (and excludes
+   `undo_list_`).  Slots are also known as per-buffer variables.
 
-   Some slots, identified by a flipped bit in `local_flags`, are
-   surfaced to lisp variables via Lisp_Buffer_Objfwd.  Such slots were
-   designated "buffer local" during the Mcgrath era.  Monnier et al
-   later allowed any user Lisp variable to be buffer-localized, but
-   the vestiges of Mcgrath's conception, which we'll now call "localized
-   slots," persist in the code (and are confusing as shit).
+   Some slots are surfaced to lisp.  These slots are known as
+   forwarded buffer variables.
+
+   Some forwarded buffer variables are treated like buffer-locals, and
+   are identified by their "on" bits in `local_flags`.  These
+   so-called "localized slots" are an boundless source of confusion
+   and special casing.
 */
 
 #ifndef EMACS_BUFFER_H
@@ -1429,9 +1431,6 @@ extern bool valid_per_buffer_idx (int);
   for (offset = PER_BUFFER_VAR_OFFSET (name);				 \
        offset <= PER_BUFFER_VAR_OFFSET (cursor_in_non_selected_windows); \
        offset += word_size)
-
-/* Return true if IDX corresponds to a Mcgrath buffer local
-   (Lisp-surfaced slot).  */
 
 INLINE bool
 LOCALIZED_SLOT_P (struct buffer *b, int idx)

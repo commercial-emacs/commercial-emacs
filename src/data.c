@@ -84,9 +84,6 @@ XOBJFWD (lispfwd a)
   return a.fwdptr;
 }
 
-/* Given the raw contents of a symbol value cell,
-   return the Lisp value of the symbol. */
-
 static Lisp_Object
 slot_resolve (lispfwd valpp, struct buffer *xbuffer)
 {
@@ -691,40 +688,32 @@ slot_update (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
 	*XFIXNUMFWD (valpp)->intvar = i;
       }
       break;
-
     case Lisp_Fwd_Bool:
       *XBOOLFWD (valpp)->boolvar = !NILP (newval);
       break;
-
     case Lisp_Fwd_Obj:
       *XOBJFWD (valpp)->objvar = newval;
-
-      /* If this variable is a default for something stored
-	 in the buffer itself, such as default-fill-column,
-	 find the buffers that don't have local values for it
-	 and update them.  */
-      if (XOBJFWD (valpp)->objvar > (Lisp_Object *) &buffer_slot_defaults
+      if ((Lisp_Object *) &buffer_slot_defaults < XOBJFWD (valpp)->objvar
 	  && XOBJFWD (valpp)->objvar < (Lisp_Object *) (&buffer_slot_defaults + 1))
 	{
-	  int offset = ((char *) XOBJFWD (valpp)->objvar
-			- (char *) &buffer_slot_defaults);
+	  /* VALPP is a slot (but I thought those could only be
+	     Lisp_Fwd_Buffer_Obj).  Propagate NEWVAL to all slot
+	     values which aren't localized.  */
+	  int offset = (char *) XOBJFWD (valpp)->objvar -
+	    (char *) &buffer_slot_defaults;
 	  int idx = PER_BUFFER_IDX (offset);
-
-	  Lisp_Object tail, buffer;
-
-	  if (idx <= 0)
-	    break;
-
-	  FOR_EACH_LIVE_BUFFER (tail, buffer)
+	  if (idx > 0)
 	    {
-	      struct buffer *b = XBUFFER (buffer);
-
-	      if (! LOCALIZED_SLOT_P (b, idx))
-		set_per_buffer_value (b, offset, newval);
+	      Lisp_Object tail, buffer;
+	      FOR_EACH_LIVE_BUFFER (tail, buffer)
+		{
+		  struct buffer *b = XBUFFER (buffer);
+		  if (! LOCALIZED_SLOT_P (b, idx))
+		    set_per_buffer_value (b, offset, newval);
+		}
 	    }
 	}
       break;
-
     case Lisp_Fwd_Buffer_Obj:
       {
 	int offset = XBUFFER_OBJFWD (valpp)->offset;
@@ -759,7 +748,6 @@ slot_update (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
 	set_per_buffer_value (buf ? buf : current_buffer, offset, newval);
       }
       break;
-
     case Lisp_Fwd_Kboard_Obj:
       {
 	char *base = (char *) FRAME_KBOARD (SELECTED_FRAME ());
@@ -767,9 +755,9 @@ slot_update (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
 	*(Lisp_Object *) p = newval;
       }
       break;
-
     default:
-      emacs_abort (); /* goto def; */
+      emacs_abort ();
+      break;
     }
 }
 
@@ -779,7 +767,7 @@ slot_update (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
 
    Uncanny resemblance to set_internal().  */
 
-static struct Lisp_Buffer_Local_Value *
+struct Lisp_Buffer_Local_Value *
 blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
@@ -829,23 +817,22 @@ global value outside of any lexical scope.  */)
       val = SYMBOL_VAL (sym);
       break;
     case SYMBOL_LOCALIZED:
-      if (! SYMBOL_BLV (sym)->fwd.fwdptr)
+      if (SYMBOL_BLV (sym)->fwd.fwdptr)
+	val = Qt;
+      else
 	{
 	  struct Lisp_Buffer_Local_Value *blv =
 	    blv_update (sym, current_buffer);
 	  val = XCDR (blv->valcell);
-	  break;
 	}
-      FALLTHROUGH;
+      break;
     case SYMBOL_FORWARDED:
-      /* set_internal() un-forwards vars whose value is Qunbound.  */
       val = Qt;
       break;
     default:
       emacs_abort ();
       break;
     }
-
   return (EQ (val, Qunbound) ? Qnil : Qt);
 }
 
@@ -1571,7 +1558,6 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 		if (set_default_p (xsymbol)) // Bug#44733
 		  set_default_internal (symbol, newval, bindflag);
 		else
-		  /* Make a Mcgrath buffer local (see buffer.h). */
 		  SET_LOCALIZED_SLOT_P (XBUFFER (mybuf), idx, 1);
 	      }
 	  }
@@ -1977,8 +1963,7 @@ Do not use `make-local-variable' to make a hook variable buffer-local.
 Instead, use `add-hook' and specify t for the LOCAL argument.  */)
   (Lisp_Object variable)
 {
-  Lisp_Object tem;
-  union Lisp_Val_Fwd valpp UNINIT;
+  union Lisp_Val_Fwd valpp;
   struct Lisp_Symbol *sym;
 
   CHECK_SYMBOL (variable);
@@ -1995,16 +1980,10 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
     case SYMBOL_PLAINVAL:
       valpp.value = SYMBOL_VAL (sym);
       break;
-    case SYMBOL_LOCALIZED:
-      break;
     case SYMBOL_FORWARDED:
       valpp.fwd = SYMBOL_FWD (sym);
-      if (KBOARD_OBJFWDP (valpp.fwd))
-	error ("Symbol %s may not be buffer-local",
-	       SDATA (SYMBOL_NAME (variable)));
       break;
     default:
-      emacs_abort ();
       break;
     }
 
@@ -2022,7 +2001,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
           eassert (idx);
           if (idx > 0)
             /* If idx < 0, it's always buffer local, like `mode-name`.  */
-            SET_LOCALIZED_SLOT_P (current_buffer, idx, true);
+	  SET_LOCALIZED_SLOT_P (current_buffer, idx, true);
           return variable;
         }
       sym->u.s.redirect = SYMBOL_LOCALIZED;
@@ -2032,22 +2011,16 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
   eassert (sym->u.s.redirect == SYMBOL_LOCALIZED
 	   && SYMBOL_BLV (sym));
 
-  /* Make sure this buffer has its own value of symbol.  */
-  tem = assq_no_quit (variable, BVAR (current_buffer, local_var_alist));
-  if (NILP (tem))
+  if (NILP (assq_no_quit (variable, BVAR (current_buffer, local_var_alist))))
     {
-      if (set_default_p (sym))
-	{
-	  AUTO_STRING (format,
-		       "Making %s buffer-local while locally let-bound!");
-	  CALLN (Fmessage, format, SYMBOL_NAME (variable));
-	}
+      if (set_default_p (sym)) // a `let' is active
+	(void)"Making buffer-local while locally let-bound!";
 
       if (BUFFERP (SYMBOL_BLV (sym)->buffer)
 	  && current_buffer == XBUFFER (SYMBOL_BLV (sym)->buffer))
         /* Make sure the current value is permanently recorded, if it's the
            default value.  */
-        blv_restore (sym);
+	blv_restore (sym);
 
       bset_local_var_alist
 	(current_buffer,
@@ -2069,9 +2042,7 @@ DEFUN ("kill-local-variable", Fkill_local_variable, Skill_local_variable,
 From now on the default value will apply in this buffer.  Return VARIABLE.  */)
   (register Lisp_Object variable)
 {
-  register Lisp_Object tem;
   struct Lisp_Symbol *sym;
-
   CHECK_SYMBOL (variable);
   sym = XSYMBOL (variable);
 
@@ -2100,35 +2071,29 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
       }
       break;
     case SYMBOL_PLAINVAL:
+      break;
     case SYMBOL_LOCALIZED:
+      {
+	/* Update watchers, delete from LOCAL_VAR_ALIST.  */
+	Lisp_Object pair = Fassq (variable, BVAR (current_buffer, local_var_alist));
+	if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+	  notify_variable_watchers (variable, Qnil, Qmakunbound, Fcurrent_buffer ());
+	if (! NILP (pair))
+	  bset_local_var_alist
+	    (current_buffer,
+	     Fdelq (pair, BVAR (current_buffer, local_var_alist)));
+	/* If the symbol is set up with the current buffer's binding
+	   loaded, recompute its value.  We have to do it now, or else
+	   forwarded objects won't work right.  */
+	{
+	  Lisp_Object buf; XSETBUFFER (buf, current_buffer);
+	  if (EQ (buf, SYMBOL_BLV (sym)->buffer))
+	    blv_restore (sym);
+	}
+      }
       break;
     default:
-      emacs_abort ();
       break;
-    }
-
-  if (sym->u.s.redirect == SYMBOL_LOCALIZED)
-    {
-      eassert (SYMBOL_BLV (sym));
-
-      if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
-	notify_variable_watchers (variable, Qnil, Qmakunbound, Fcurrent_buffer ());
-
-      /* Get rid of this buffer's alist element, if any.  */
-      tem = Fassq (variable, BVAR (current_buffer, local_var_alist));
-      if (! NILP (tem))
-	bset_local_var_alist
-	  (current_buffer,
-	   Fdelq (tem, BVAR (current_buffer, local_var_alist)));
-
-      /* If the symbol is set up with the current buffer's binding
-	 loaded, recompute its value.  We have to do it now, or else
-	 forwarded objects won't work right.  */
-      {
-	Lisp_Object buf; XSETBUFFER (buf, current_buffer);
-	if (EQ (buf, SYMBOL_BLV (sym)->buffer))
-	  blv_restore (sym);
-      }
     }
 
   return variable;

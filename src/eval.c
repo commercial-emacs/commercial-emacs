@@ -3372,7 +3372,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       if (BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol)))
 	{
-	  /* Mcgrath buffer locals -- see set_default_p() for intended
+	  /* Localized slots -- see set_default_p() for intended
 	     semantics of `let'.  */
 	  specpdl_ptr->let.kind =
 	    NILP (Flocal_variable_p (symbol, Fcurrent_buffer ()))

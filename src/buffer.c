@@ -1042,6 +1042,7 @@ reset_buffer (register struct buffer *b)
 
    If IGNORE_PERM, also reset permanent-locals.
 */
+
 static void
 reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
 {
@@ -1073,6 +1074,7 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
     {
       Lisp_Object buffer;
       XSETBUFFER (buffer, b);
+
       for (Lisp_Object last_kept = Qnil,
 	     tail = BVAR (b, local_var_alist);
 	   CONSP (tail); tail = XCDR (tail))
@@ -1083,8 +1085,7 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
 
 	  /* Watchers are run *before* modifying the var.  */
 	  if (XSYMBOL (var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
-	    notify_variable_watchers (var, Qnil,
-				      Qmakunbound, buffer);
+	    notify_variable_watchers (var, Qnil, Qmakunbound, buffer);
 
           if (EQ (SYMBOL_BLV (XSYMBOL (var))->buffer, buffer))
 	    blv_restore (XSYMBOL (var));
@@ -1117,8 +1118,7 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
 		    }
 		  nbinds = Fnreverse (nbinds);
 		  if (XSYMBOL (var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
-		    notify_variable_watchers (var, nbinds,
-					      Qmakunbound, buffer);
+		    notify_variable_watchers (var, nbinds, Qmakunbound, buffer);
 		  XSETCDR (pair, nbinds);
 		}
 	    }
@@ -1739,69 +1739,66 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 
   b = XBUFFER (buffer);
 
-  /* Avoid trouble for buffer already dead.  */
   if (!BUFFER_LIVE_P (b))
     return Qnil;
 
   /* Run hooks with the buffer to be killed as the current buffer.  */
-  {
-    specpdl_ref count = SPECPDL_INDEX ();
-    bool modified;
+  specpdl_ref count = SPECPDL_INDEX ();
+  bool modified;
 
-    record_unwind_protect_excursion ();
-    set_buffer_internal (b);
+  record_unwind_protect_excursion ();
+  set_buffer_internal (b);
 
-    /* First run the query functions; if any query is answered no,
-       don't kill the buffer.  */
-    if (!b->inhibit_buffer_hooks)
-      {
-	tem = CALLN (Frun_hook_with_args_until_failure,
-		     Qkill_buffer_query_functions);
-	if (NILP (tem))
-	  return unbind_to (count, Qnil);
-      }
+  /* First run the query functions; if any query is answered no,
+     don't kill the buffer.  */
+  if (!b->inhibit_buffer_hooks)
+    {
+      tem = CALLN (Frun_hook_with_args_until_failure,
+		   Qkill_buffer_query_functions);
+      if (NILP (tem))
+	return unbind_to (count, Qnil);
+    }
 
-    /* Is this a modified buffer that's visiting a file? */
-    modified = !NILP (BVAR (b, filename))
-      && BUF_MODIFF (b) > BUF_SAVE_MODIFF (b);
+  /* Is this a modified buffer that's visiting a file? */
+  modified = !NILP (BVAR (b, filename))
+    && BUF_MODIFF (b) > BUF_SAVE_MODIFF (b);
 
-    /* Query if the buffer is still modified.  */
-    if (INTERACTIVE && modified)
-      {
-	/* Ask whether to kill the buffer, and exit if the user says
-	   "no".  */
-	if (NILP (call1 (Qkill_buffer__possibly_save, buffer)))
-	  return unbind_to (count, Qnil);
-	/* Recheck modified.  */
-	modified = BUF_MODIFF (b) > BUF_SAVE_MODIFF (b);
-      }
+  /* Query if the buffer is still modified.  */
+  if (INTERACTIVE && modified)
+    {
+      /* Ask whether to kill the buffer, and exit if the user says
+	 "no".  */
+      if (NILP (call1 (Qkill_buffer__possibly_save, buffer)))
+	return unbind_to (count, Qnil);
+      /* Recheck modified.  */
+      modified = BUF_MODIFF (b) > BUF_SAVE_MODIFF (b);
+    }
 
-    /* Delete the autosave file, if requested. */
-    if (modified
-	&& kill_buffer_delete_auto_save_files
-	&& delete_auto_save_files
-	&& !NILP (Frecent_auto_save_p ())
-	&& STRINGP (BVAR (b, auto_save_file_name))
-	&& !NILP (Ffile_exists_p (BVAR (b, auto_save_file_name)))
-	/* If `auto-save-visited-mode' is on, then we're auto-saving
-	   to the visited file -- don't delete it.. */
-	&& NILP (Fstring_equal (BVAR (b, auto_save_file_name),
-				BVAR (b, filename))))
-      {
-	tem = do_yes_or_no_p (build_string ("Delete auto-save file? "));
-	if (!NILP (tem))
-	  call0 (intern ("delete-auto-save-file-if-necessary"));
-      }
+  /* Delete the autosave file, if requested. */
+  if (modified
+      && kill_buffer_delete_auto_save_files
+      && delete_auto_save_files
+      && !NILP (Frecent_auto_save_p ())
+      && STRINGP (BVAR (b, auto_save_file_name))
+      && !NILP (Ffile_exists_p (BVAR (b, auto_save_file_name)))
+      /* If `auto-save-visited-mode' is on, then we're auto-saving
+	 to the visited file -- don't delete it.. */
+      && NILP (Fstring_equal (BVAR (b, auto_save_file_name),
+			      BVAR (b, filename))))
+    {
+      tem = do_yes_or_no_p (build_string ("Delete auto-save file? "));
+      if (!NILP (tem))
+	call0 (intern ("delete-auto-save-file-if-necessary"));
+    }
 
-    /* If the hooks have killed the buffer, exit now.  */
-    if (!BUFFER_LIVE_P (b))
-      return unbind_to (count, Qt);
+  /* If the hooks have killed the buffer, exit now.  */
+  if (!BUFFER_LIVE_P (b))
+    return unbind_to (count, Qt);
 
-    /* Then run the hooks.  */
-    if (!b->inhibit_buffer_hooks)
-      run_hook (Qkill_buffer_hook);
-    unbind_to (count, Qnil);
-  }
+  /* Then run the hooks.  */
+  if (!b->inhibit_buffer_hooks)
+    run_hook (Qkill_buffer_hook);
+  unbind_to (count, Qnil);
 
   /* If the hooks have killed the buffer, exit now.  */
   if (!BUFFER_LIVE_P (b))
@@ -2807,11 +2804,7 @@ the normal hook `change-major-mode-hook'.  */)
   (Lisp_Object kill_permanent)
 {
   run_hook (Qchange_major_mode_hook);
-
-  /* Actually eliminate all local bindings of this buffer.  */
-
   reset_buffer_local_variables (current_buffer, !NILP (kill_permanent));
-
   /* Force mode-line redisplay.  Useful here because all major mode
      commands call this function.  */
   bset_update_mode_line (current_buffer);
@@ -3278,7 +3271,6 @@ overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
   if (overlay_heads.bytes || overlay_tails.bytes)
     {
       Lisp_Object tem;
-      ptrdiff_t i;
       unsigned char *p;
       ptrdiff_t total;
 
@@ -3289,7 +3281,7 @@ overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
 				   total - overlay_str_len, -1, 1);
 
       p = overlay_str_buf;
-      for (i = overlay_tails.used; --i >= 0;)
+      for (ptrdiff_t i = overlay_tails.used; --i >= 0;)
 	{
 	  ptrdiff_t nbytes;
 	  tem = overlay_tails.buf[i].string;
@@ -3298,7 +3290,7 @@ overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
 			      STRING_MULTIBYTE (tem), multibyte);
 	  p += nbytes;
 	}
-      for (i = 0; i < overlay_heads.used; ++i)
+      for (ptrdiff_t i = 0; i < overlay_heads.used; ++i)
 	{
 	  ptrdiff_t nbytes;
 	  tem = overlay_heads.buf[i].string;
@@ -3964,14 +3956,13 @@ report_overlay_modification (Lisp_Object start, Lisp_Object end, bool after,
        do subsequent modification of the buffer.  */
     ptrdiff_t size = last_overlay_modification_hooks_used;
     Lisp_Object *copy;
-    ptrdiff_t i;
 
     USE_SAFE_ALLOCA;
     SAFE_ALLOCA_LISP (copy, size);
     memcpy (copy, XVECTOR (last_overlay_modification_hooks)->contents,
 	    size * word_size);
 
-    for (i = 0; i < size;)
+    for (ptrdiff_t i = 0; i < size;)
       {
 	Lisp_Object prop_i, overlay_i;
 	prop_i = copy[i++];
@@ -4001,10 +3992,6 @@ call_overlay_mod_hooks (Lisp_Object list, Lisp_Object overlay, bool after,
       list = XCDR (list);
     }
 }
-
-/***********************************************************************
-			 Allocation with mmap
- ***********************************************************************/
 
 /* Note: WINDOWSNT implements this stuff on w32heap.c.  */
 #if defined USE_MMAP_FOR_BUFFERS && !defined WINDOWSNT
@@ -4159,7 +4146,6 @@ mmap_free_1 (struct mmap_region *r)
     fprintf (stderr, "munmap: %s\n", emacs_strerror (errno));
 }
 
-
 /* Enlarge region R by NPAGES pages.  NPAGES < 0 means shrink R.
    Value is true if successful.  */
 
@@ -4217,7 +4203,6 @@ mmap_enlarge (struct mmap_region *r, int npages)
   return success;
 }
 
-
 /* Allocate a block of storage large enough to hold NBYTES bytes of
    data.  A pointer to the data is returned in *VAR.  VAR is thus the
    address of some variable which will use the data area.
@@ -4264,7 +4249,6 @@ mmap_alloc (void **var, size_t nbytes)
   return *var = p;
 }
 
-
 /* Free a block of relocatable storage whose data is pointed to by
    PTR.  Store 0 in *PTR to show there's no block allocated.  */
 
@@ -4279,7 +4263,6 @@ mmap_free (void **var)
       *var = NULL;
     }
 }
-
 
 /* Given a pointer at address VAR to data allocated with mmap_alloc,
    resize it to size NBYTES.  Change *VAR to reflect the new block,
@@ -4355,7 +4338,6 @@ mmap_realloc (void **var, size_t nbytes)
 
   return result;
 }
-
 
 #endif /* USE_MMAP_FOR_BUFFERS */
 
@@ -4796,8 +4778,6 @@ DEFUN ("overlay-tree", Foverlay_tree, Soverlay_tree, 0, 1, 0,
   return overlay_tree (b->overlays, b->overlays->root);
 }
 #endif
-
-
 
 /* Initialize the buffer routines.  */
 void
