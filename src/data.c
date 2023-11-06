@@ -125,19 +125,6 @@ slot_resolve (lispfwd valpp, struct buffer *xbuffer)
   return result;
 }
 
-static Lisp_Object
-last_assigned_value (Lisp_Object symbol)
-{
-  /* translate confusing Blandyism involving "current_alist_element"
-     and "realvalue" into something only mildly less confusing.  */
-  CHECK_SYMBOL (symbol);
-  struct Lisp_Symbol *sym = XSYMBOL (symbol);
-  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
-  return (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
-    ? slot_resolve (blv->fwd, NULL)
-    : XCDR (blv->defcell);
-}
-
 static AVOID
 wrong_length_argument (Lisp_Object a1, Lisp_Object a2, Lisp_Object a3)
 {
@@ -763,31 +750,22 @@ slot_update (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
 /* If BLV lived in buffer rather than symbol, we wouldn't
    have to be so careful updating it  Its truth would
    also become independent of an ever-changing current_buffer.
-
-   Uncanny resemblance to set_internal().  */
+*/
 
 struct Lisp_Buffer_Local_Value *
 blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
-  Lisp_Object slot_value;
   if (blv->fwd.fwdptr)
-    {
-      slot_value = slot_resolve (blv->fwd, current_buffer);
-      XSETCDR (blv->valcell, slot_value);
-    }
+    XSETCDR (blv->valcell, slot_resolve (blv->fwd, current_buffer));
   Lisp_Object pair =
     assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
 		  BVAR (buffer, local_var_alist));
   blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
+  /* VALCELL same memory as LOCAL_VAR_ALIST.  */
   blv->valcell = ! NILP (pair) ? pair : blv->defcell;
   if (blv->fwd.fwdptr)
-    {
-      /* BLV->VALCELL is actually a link in LOCAL_VAR_ALIST, so we
-	 effectively echoed the C value back to itself with
-	 the important side effect of refreshing LOCAL_VAR_ALIST.  */
-      slot_update (blv->fwd, XCDR (blv->valcell), buffer);
-    }
+    slot_update (blv->fwd, XCDR (blv->valcell), buffer);
   return blv;
 }
 
@@ -1459,6 +1437,28 @@ DEFUN ("set", Fset, Sset, 2, 2, 0,
   return newval;
 }
 
+/* Apparently, a buffer-local variable assumes an entry in
+   LOCAL_BAR_ALIST (Bug#65209).  */
+
+static Lisp_Object
+goose_local_bindings (Lisp_Object variable)
+{
+  CHECK_SYMBOL (variable);
+  Lisp_Object pair = Qnil;
+  if (NILP (assq_no_quit (variable, BVAR (current_buffer, local_var_alist))))
+    {
+      struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (XSYMBOL (variable));
+      pair = Fcons (variable,
+		    (blv->fwd.fwdptr
+		     ? slot_resolve (blv->fwd, current_buffer)
+		     : XCDR (blv->defcell)));
+      bset_local_var_alist
+	(current_buffer,
+	 Fcons (pair, BVAR (current_buffer, local_var_alist)));
+    }
+  return pair;
+}
+
 /* The guts of `set'-related functions.  */
 
 void
@@ -1506,28 +1506,26 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
 	Lisp_Object mybuf = ! NILP (buf) ? buf : Fcurrent_buffer();
 
-	/* Uncanny resemblance to blv_update().  */
 	if (! EQ (blv->buffer, mybuf)
+	    /* DEFCELL eq'ing VALCELL means we just blv_restore'd or
+	       there's really no buffer-local binding.  In either case
+	       we (re)inspect local value bindings.  */
 	    || EQ (blv->defcell, blv->valcell))
 	  {
+	    blv->buffer = mybuf;
+	    if (bindflag == SET_INTERNAL_SET
+		&& blv->local_if_set
+		/* locally_unbound_blv_let_bounded() aka
+		   "assignment sets default binding".  If not,
+		   then okay to set value binding.  */
+		&& ! locally_unbound_blv_let_bounded (xsymbol))
+	      {
+		goose_local_bindings (symbol);
+	      }
 	    Lisp_Object pair =
 	      assq_no_quit (symbol, BVAR (XBUFFER (mybuf), local_var_alist));
-	    blv->buffer = mybuf;
-	    if (NILP (pair))
-	      {
-		pair = blv->defcell;
-		if (bindflag == SET_INTERNAL_SET
-		    && blv->local_if_set
-		    && ! set_default_p (xsymbol))
-		  {
-		    /* Baroque exception dating back to 2000 by RMS.  */
-		    pair = Fcons (symbol, last_assigned_value (symbol));
-		    bset_local_var_alist
-		      (XBUFFER (mybuf),
-		       Fcons (pair, BVAR (XBUFFER (mybuf), local_var_alist)));
-		  }
-	      }
-	    blv->valcell = pair;
+	    /* VALCELL same memory as LOCAL_VAR_ALIST.  */
+	    blv->valcell = ! NILP (pair) ? pair : blv->defcell;
 	  }
 
 	/* Now that valcell is settled, update its cdr.  */
@@ -1548,7 +1546,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	    int idx = PER_BUFFER_IDX (XBUFFER_OBJFWD (valpp)->offset);
 	    if (idx > 0 && ! LOCALIZED_SLOT_P (XBUFFER (mybuf), idx))
 	      {
-		if (set_default_p (xsymbol)) // Bug#44733
+		if (locally_unbound_blv_let_bounded (xsymbol)) // Bug#44733
 		  set_default_internal (symbol, newval, bindflag);
 		else
 		  SET_LOCALIZED_SLOT_P (XBUFFER (mybuf), idx, 1);
@@ -1714,7 +1712,20 @@ default_value (Lisp_Object symbol)
       result = SYMBOL_VAL (sym);
       break;
     case SYMBOL_LOCALIZED:
-      result = last_assigned_value (symbol);
+      {
+	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
+	if (blv->fwd.fwdptr)
+	  {
+	    /* Blandy's utterly arbitrary "realvalue" semantics for the
+	       default binding of buffer-localized forwarded buffer
+	       variables: if locally-bound (local-variable-p), use global
+	       default, else use forwarded-to C variable.  */
+	    if (NILP (Flocal_variable_p (symbol, Fcurrent_buffer ())))
+	      result = slot_resolve (blv->fwd, current_buffer);
+	  }
+	if (NILP (result))
+	  result = XCDR (SYMBOL_BLV (sym)->defcell);
+      }
       break;
     case SYMBOL_FORWARDED:
       {
@@ -1951,21 +1962,6 @@ convert_to_localized (Lisp_Object variable,
 			    oredirect == SYMBOL_FORWARDED, value_or_fwd));
 }
 
-/* Workaround for Bug#65209 to bootstrap an empty LOCAL_VAR_ALIST in
-   the buffer invoking `make-local-variable'.  An empty
-   LOCAL_VAR_ALIST is presumably permissible outside this
-   circumstance.  */
-static void
-goose_buffer_local (Lisp_Object variable)
-{
-  CHECK_SYMBOL (variable);
-  if (NILP (Flocal_variable_p (variable, Fcurrent_buffer ())))
-    bset_local_var_alist
-      (current_buffer,
-       Fcons (Fcons (variable, XCDR (SYMBOL_BLV (XSYMBOL (variable))->defcell)),
-	      BVAR (current_buffer, local_var_alist)));
-}
-
 DEFUN ("make-local-variable", Fmake_local_variable, Smake_local_variable,
        1, 1, "vMake Local Variable: ",
        doc: /* Associate VARIABLE to the current buffer.
@@ -2002,7 +1998,7 @@ hook.  */)
       {
 	union Lisp_Val_Fwd valpp = { .value = SYMBOL_VAL (sym) };
 	convert_to_localized (variable, valpp);
-	goose_buffer_local (variable);
+	goose_local_bindings (variable);
       }
       break;
     case SYMBOL_FORWARDED:
@@ -2025,7 +2021,7 @@ hook.  */)
 	else
 	  {
 	    convert_to_localized (variable, valpp);
-	    goose_buffer_local (variable);
+	    goose_local_bindings (variable);
 	    /* Eagerly push the value to DEFVAR-PER-BUFFER C variable.
 	       Bug#34318*/
 	    blv_update (sym, current_buffer);
@@ -2033,7 +2029,7 @@ hook.  */)
       }
       break;
     case SYMBOL_LOCALIZED:
-      goose_buffer_local (variable);
+      goose_local_bindings (variable);
       break;
     default:
       emacs_abort ();
@@ -2135,7 +2131,7 @@ Also see `buffer-local-boundp'.*/)
     case SYMBOL_LOCALIZED:
       {
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
-	if (EQ (blv->buffer, mybuf))
+	if (EQ (blv->buffer, mybuf)) // can trust defcell to valcell comparison
 	  result = ! EQ (blv->defcell, blv->valcell) ? Qt : Qnil;
 	else
 	  result = NILP (assq_no_quit (variable, BVAR (XBUFFER (mybuf), local_var_alist)))

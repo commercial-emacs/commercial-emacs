@@ -3290,19 +3290,16 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
   return object;
 }
 
-/* Follow these arbitrary but consistent rules:
+/* Return true in the circumstance where SYMBOL was let-bound when the
+   buffer had not yet assigned its own buffer local value for SYMBOL.
 
-   If the buffer *has not* assigned its own buffer local value
-   of SYMBOL, assignment within a `let' of SYMBOL
-   changes its default binding within the `let'.
-
-   If the buffer *has* assigned its own buffer local value of SYMBOL,
-   assignment within a `let' of SYMBOL does not affect its default
-   binding.
+   Monnier arbitrarily decided that assignment within such a `let'
+   closure should change the SYMBOL's default, not value, binding
+   within the `let'.
 */
 
 bool
-set_default_p (struct Lisp_Symbol *symbol)
+locally_unbound_blv_let_bounded (struct Lisp_Symbol *symbol)
 {
   for (union specbinding *p = specpdl_ptr; p > specpdl; )
     if ((--p)->kind == SPECPDL_LET_DEFAULT
@@ -3360,8 +3357,9 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       eassert (EQ (SYMBOL_BLV (xsymbol)->buffer, Fcurrent_buffer ()));
-      /* Regular buffer locals -- see set_default_p() for intended
-	 semantics of `let'.  */
+      /* Regular buffer locals -- see
+	 locally_unbound_blv_let_bounded() for intended semantics of
+	 `let'.  */
       if (NILP (Flocal_variable_p (symbol, Fcurrent_buffer ())))
 	specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
       break;
@@ -3372,8 +3370,9 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       if (BUFFER_OBJFWDP (SYMBOL_FWD (xsymbol)))
 	{
-	  /* Localized slots -- see set_default_p() for intended
-	     semantics of `let'.  */
+	  /* Forwarded buffer variables -- see
+	     locally_unbound_blv_let_bounded() for intended semantics
+	     of `let'.  */
 	  specpdl_ptr->let.kind =
 	    NILP (Flocal_variable_p (symbol, Fcurrent_buffer ()))
 	    ? SPECPDL_LET_DEFAULT

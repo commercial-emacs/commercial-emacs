@@ -4226,7 +4226,7 @@ extern void prog_ignore (Lisp_Object);
 extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
 extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
-extern bool set_default_p (struct Lisp_Symbol *symbol);
+extern bool locally_unbound_blv_let_bounded (struct Lisp_Symbol *symbol);
 void do_debug_on_call (Lisp_Object code, specpdl_ref count);
 Lisp_Object funcall_general (Lisp_Object fun,
 			     ptrdiff_t numargs, Lisp_Object *args);
