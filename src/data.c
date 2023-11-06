@@ -718,7 +718,6 @@ slot_update (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
       {
 	int offset = XBUFFER_OBJFWD (valpp)->offset;
 	Lisp_Object predicate = XBUFFER_OBJFWD (valpp)->predicate;
-
 	if (!NILP (newval) && !NILP (predicate))
 	  {
 	    eassert (SYMBOLP (predicate));
