@@ -1470,8 +1470,10 @@ void
 set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
               enum Set_Internal_Bind bindflag)
 {
+  Lisp_Object mybuf = ! NILP (buf) ? buf : Fcurrent_buffer();
+  struct Lisp_Symbol *xsymbol;
   CHECK_SYMBOL (symbol);
-  struct Lisp_Symbol *xsymbol = XSYMBOL (symbol);
+  xsymbol = XSYMBOL (symbol);
   if (xsymbol->u.s.trapped_write == SYMBOL_NOWRITE)
     {
       if (NILP (Fkeywordp (symbol))
@@ -1496,7 +1498,6 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
     }
 
  start:
-  Lisp_Object mybuf = ! NILP (buf) ? buf : Fcurrent_buffer();
   switch (xsymbol->u.s.type)
     {
     case SYMBOL_VARALIAS:
