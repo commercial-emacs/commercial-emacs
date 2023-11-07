@@ -751,12 +751,12 @@ slot_update (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
    also become independent of an ever-changing current_buffer.
 */
 
-struct Lisp_Buffer_Local_Value *
+struct Retarded_BLV *
 blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
 {
-  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
+  struct Retarded_BLV *blv = RETARDED_BLV (symbol);
   if (blv->fwd.fwdptr)
-    XSETCDR (blv->valcell, slot_resolve (blv->fwd, current_buffer));
+    XSETCDR (blv->valcell, slot_resolve (blv->fwd, buffer));
   Lisp_Object pair =
     assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
 		  BVAR (buffer, local_var_alist));
@@ -793,11 +793,11 @@ global value outside of any lexical scope.  */)
       val = SYMBOL_VAL (sym);
       break;
     case SYMBOL_LOCALIZED:
-      if (SYMBOL_BLV (sym)->fwd.fwdptr)
+      if (RETARDED_BLV (sym)->fwd.fwdptr)
 	val = Qt;
       else
 	{
-	  struct Lisp_Buffer_Local_Value *blv =
+	  struct Retarded_BLV *blv =
 	    blv_update (sym, current_buffer);
 	  val = XCDR (blv->valcell);
 	}
@@ -841,7 +841,7 @@ See also `fmakunbound'.  */)
   if (SYMBOL_CONSTANT_P (symbol))
     xsignal1 (Qsetting_constant, symbol);
   Fset (symbol, Qunbound);
-  /* In lieu of more dangerous, set_symbol_plist (symbol, Qnil); */
+  /* In lieu of more dangerous set_symbol_plist (symbol, Qnil); */
   Fput (symbol, Qvariable_documentation, Qnil);
   return symbol;
 }
@@ -1356,7 +1356,7 @@ wrong_choice (Lisp_Object choice, Lisp_Object wrong)
 void
 blv_invalidate (struct Lisp_Symbol *symbol)
 {
-  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
+  struct Retarded_BLV *blv = RETARDED_BLV (symbol);
   eassert (symbol->u.s.type == SYMBOL_LOCALIZED);
   if (blv->fwd.fwdptr)
     XSETCDR (blv->valcell, slot_resolve (blv->fwd, NULL));
@@ -1403,11 +1403,9 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
       break;
     case SYMBOL_LOCALIZED:
       {
-	struct Lisp_Buffer_Local_Value *blv =
-	  blv_update (xsymbol, xbuffer ? xbuffer : current_buffer);
-	result = blv->fwd.fwdptr
-	  ? slot_resolve (blv->fwd, current_buffer)
-	  : XCDR (blv->valcell);
+	struct buffer *b = xbuffer ? xbuffer : current_buffer;
+	struct Retarded_BLV *blv = blv_update (xsymbol, b);
+	result = XCDR (blv->valcell);
       }
       break;
     case SYMBOL_FORWARDED:
@@ -1452,7 +1450,7 @@ goose_local_bindings (Lisp_Object variable)
   Lisp_Object pair = Qnil;
   if (NILP (assq_no_quit (variable, BVAR (current_buffer, local_var_alist))))
     {
-      struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (XSYMBOL (variable));
+      struct Retarded_BLV *blv = RETARDED_BLV (XSYMBOL (variable));
       pair = Fcons (variable,
 		    (blv->fwd.fwdptr
 		     ? slot_resolve (blv->fwd, current_buffer)
@@ -1510,7 +1508,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
       break;
     case SYMBOL_LOCALIZED:
       {
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
+	struct Retarded_BLV *blv = RETARDED_BLV (xsymbol);
 	if (! EQ (blv->buffer, mybuf)
 	    /* DEFCELL eq'ing VALCELL means we just blv_invalidate'd
 	       -OR- there's really no buffer-local binding.  In either
@@ -1520,8 +1518,8 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	    blv->buffer = mybuf;
 	    if (bindflag == SET_INTERNAL_SET
 		&& blv->local_if_set
-		/* locally_unbound_blv_let_bounded() aka
-		   "assignment sets default binding".  If not,
+		/* locally_unbound_blv_let_bounded means
+		   "assignment sets default binding."  If not,
 		   then okay to set value binding.  */
 		&& ! locally_unbound_blv_let_bounded (xsymbol))
 	      {
@@ -1723,7 +1721,7 @@ default_value (Lisp_Object symbol)
       break;
     case SYMBOL_LOCALIZED:
       {
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
+	struct Retarded_BLV *blv = RETARDED_BLV (sym);
 	if (blv->fwd.fwdptr)
 	  {
 	    /* Blandy's utterly arbitrary "realvalue" semantics for the
@@ -1734,7 +1732,7 @@ default_value (Lisp_Object symbol)
 	      result = slot_resolve (blv->fwd, current_buffer);
 	  }
 	if (NILP (result))
-	  result = XCDR (SYMBOL_BLV (sym)->defcell);
+	  result = XCDR (RETARDED_BLV (sym)->defcell);
       }
       break;
     case SYMBOL_BUFFER:
@@ -1819,7 +1817,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
       break;
     case SYMBOL_LOCALIZED:
       {
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
+	struct Retarded_BLV *blv = RETARDED_BLV (sym);
 	/* Store new value into the DEFAULT-VALUE slot.  */
 	XSETCDR (blv->defcell, value);
 	/* If default binding loaded, set the defvar-per-buffer slot too.  */
@@ -1875,18 +1873,15 @@ union Lisp_Val_Fwd
     lispfwd fwd;
   };
 
-static struct Lisp_Buffer_Local_Value *
+static struct Retarded_BLV *
 make_blv (struct Lisp_Symbol *sym, bool forwarded,
 	  union Lisp_Val_Fwd value_or_fwd)
 {
-  struct Lisp_Buffer_Local_Value *blv = xmalloc (sizeof *blv);
+  struct Retarded_BLV *blv = xmalloc (sizeof *blv);
   Lisp_Object init = Fcons (make_lisp_ptr (sym, Lisp_Symbol),
 			    (forwarded
 			     ? slot_resolve (value_or_fwd.fwd, NULL)
 			     : value_or_fwd.value));
-
-  eassert (! (forwarded && BUFFER_OBJFWDP (value_or_fwd.fwd)));
-  eassert (! (forwarded && KBOARD_OBJFWDP (value_or_fwd.fwd)));
   blv->buffer = Qnil;
   blv->fwd = forwarded ? value_or_fwd.fwd : (lispfwd) { NULL };
   blv->local_if_set = 0;
@@ -1919,28 +1914,31 @@ declaration.  */)
       goto start;
       break;
     case SYMBOL_LOCALIZED:
-      eassert (SYMBOL_BLV (sym));
-      SYMBOL_BLV (sym)->local_if_set = 1;
+      eassert (RETARDED_BLV (sym));
+      RETARDED_BLV (sym)->local_if_set = 1;
+      sym->u.s.buffer_local_only = 1;
       break;
     case SYMBOL_PLAINVAL:
       {
 	Lisp_Object value =
 	  EQ (SYMBOL_VAL (sym), Qunbound) ? Qnil : SYMBOL_VAL (sym);
 	sym->u.s.type = SYMBOL_LOCALIZED;
-	SET_SYMBOL_BLV (sym, make_blv (sym, false, (union Lisp_Val_Fwd) {
+	SET_RETARDED_BLV (sym, make_blv (sym, false, (union Lisp_Val_Fwd) {
 	      .value = value
 	    }));
-	SYMBOL_BLV (sym)->local_if_set = 1;
+	RETARDED_BLV (sym)->local_if_set = 1;
+	sym->u.s.buffer_local_only = 1;
       }
       break;
     case SYMBOL_FORWARDED:
       {
 	const lispfwd fwd = SYMBOL_FWD (sym);
 	sym->u.s.type = SYMBOL_LOCALIZED;
-	SET_SYMBOL_BLV (sym, make_blv (sym, true, (union Lisp_Val_Fwd) {
+	SET_RETARDED_BLV (sym, make_blv (sym, true, (union Lisp_Val_Fwd) {
 	      .fwd = fwd
 	    }));
-	SYMBOL_BLV (sym)->local_if_set = 1;
+	RETARDED_BLV (sym)->local_if_set = 1;
+	sym->u.s.buffer_local_only = 1;
       }
       break;
     default:
@@ -1959,9 +1957,9 @@ convert_to_localized (Lisp_Object variable,
   eassert (otype != SYMBOL_LOCALIZED
 	   && NILP (Flocal_variable_p (variable, Fcurrent_buffer ())));
   XSYMBOL (variable)->u.s.type = SYMBOL_LOCALIZED;
-  SET_SYMBOL_BLV (XSYMBOL (variable),
-		  make_blv (XSYMBOL (variable),
-			    otype == SYMBOL_FORWARDED, value_or_fwd));
+  SET_RETARDED_BLV (XSYMBOL (variable),
+		    make_blv (XSYMBOL (variable),
+			      otype == SYMBOL_FORWARDED, value_or_fwd));
 }
 
 DEFUN ("make-local-variable", Fmake_local_variable, Smake_local_variable,
@@ -2085,7 +2083,7 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
 	   forwarded objects won't work right.  */
 	{
 	  Lisp_Object buf; XSETBUFFER (buf, current_buffer);
-	  if (EQ (buf, SYMBOL_BLV (sym)->buffer))
+	  if (EQ (buf, RETARDED_BLV (sym)->buffer))
 	    blv_invalidate (sym);
 	}
       }
@@ -2126,7 +2124,7 @@ Also see `buffer-local-boundp'.*/)
       break;
     case SYMBOL_LOCALIZED:
       {
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
+	struct Retarded_BLV *blv = RETARDED_BLV (sym);
 	if (EQ (blv->buffer, mybuf)) // can trust defcell to valcell comparison
 	  result = ! EQ (blv->defcell, blv->valcell) ? Qt : Qnil;
 	else
@@ -2179,7 +2177,7 @@ value in BUFFER, or if VARIABLE is automatically buffer-local (see
       result = Qnil;
       break;
     case SYMBOL_LOCALIZED:
-      result = (SYMBOL_BLV (sym)->local_if_set)
+      result = (RETARDED_BLV (sym)->local_if_set)
 	? Qt : Flocal_variable_p (variable, buffer);
       break;
     case SYMBOL_BUFFER:
@@ -2230,8 +2228,8 @@ If the current binding is global (the default), the value is nil.  */)
     case SYMBOL_LOCALIZED:
       if (! NILP (Flocal_variable_p (variable, Qnil)))
 	result = Fcurrent_buffer ();
-      else if (! EQ (SYMBOL_BLV (sym)->defcell, SYMBOL_BLV (sym)->valcell))
-	result = SYMBOL_BLV (sym)->buffer;
+      else if (! EQ (RETARDED_BLV (sym)->defcell, RETARDED_BLV (sym)->valcell))
+	result = RETARDED_BLV (sym)->buffer;
       break;
     default:
       emacs_abort ();

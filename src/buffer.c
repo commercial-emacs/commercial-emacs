@@ -1087,7 +1087,7 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
 	  if (XSYMBOL (var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
 	    notify_variable_watchers (var, Qnil, Qmakunbound, buffer);
 
-          if (EQ (SYMBOL_BLV (XSYMBOL (var))->buffer, buffer))
+          if (EQ (RETARDED_BLV (XSYMBOL (var))->buffer, buffer))
 	    blv_invalidate (XSYMBOL (var));
 
 	  if (NILP (prop_perm)) // skip it
@@ -2161,7 +2161,7 @@ set_buffer_internal (struct buffer *new_buf)
 	    Lisp_Object var = XCAR (XCAR (tail));
 	    struct Lisp_Symbol *sym = XSYMBOL (var);
 	    if (sym->u.s.type == SYMBOL_LOCALIZED
-		&& SYMBOL_BLV (sym)->fwd.fwdptr)
+		&& RETARDED_BLV (sym)->fwd.fwdptr)
 	      Fsymbol_value (var); /* sets variable by side effect */
 	  }
     }

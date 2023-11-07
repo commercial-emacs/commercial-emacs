@@ -2257,12 +2257,12 @@ dump_fwd (struct dump_context *ctx, lispfwd fwd)
 
 static dump_off
 dump_blv (struct dump_context *ctx,
-          const struct Lisp_Buffer_Local_Value *blv)
+          const struct Retarded_BLV *blv)
 {
-#if CHECK_STRUCTS && !defined HASH_Lisp_Buffer_Local_Value_3C363FAC3C
-# error "Lisp_Buffer_Local_Value changed. See CHECK_STRUCTS comment in config.h."
+#if CHECK_STRUCTS && !defined HASH_Retarded_BLV_3C363FAC3C
+# error "Retarded_BLV changed. See CHECK_STRUCTS comment in config.h."
 #endif
-  struct Lisp_Buffer_Local_Value out;
+  struct Retarded_BLV out;
   dump_object_start (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, blv, local_if_set);
   if (blv->fwd.fwdptr)
@@ -2274,7 +2274,7 @@ dump_blv (struct dump_context *ctx,
   if (blv->fwd.fwdptr)
     dump_remember_fixup_ptr_raw
       (ctx,
-       offset + dump_offsetof (struct Lisp_Buffer_Local_Value, fwd),
+       offset + dump_offsetof (struct Retarded_BLV, fwd),
        dump_fwd (ctx, blv->fwd));
   return offset;
 }

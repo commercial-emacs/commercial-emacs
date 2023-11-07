@@ -607,13 +607,13 @@ enum symbol_interned
 enum symbol_type
 {
   SYMBOL_PLAINVAL,   /* plain old variable */
-  SYMBOL_VARALIAS,   /* symbol alias */
+  SYMBOL_VARALIAS,   /* variable alias */
   SYMBOL_LOCALIZED,  /* buffer local variable */
 
   /* Fragile: Forwarded subtypes go after SYMBOL_FORWARDED. */
-  SYMBOL_FORWARDED,  /* C variable surfaced to lisp */
-  SYMBOL_BUFFER,     /* Buffer slot surfaced to lisp */
-  SYMBOL_KBOARD      /* Keyboard field surfaced to lisp */
+  SYMBOL_FORWARDED,  /* defvar_lisp, defvar_bool, defvar_int, ... */
+  SYMBOL_BUFFER,     /* defvar_per_buffer */
+  SYMBOL_KBOARD      /* defvar_kboard */
 };
 
 enum symbol_trapped_write
@@ -671,12 +671,6 @@ struct Lisp_Symbol
     {
       bool_bf gcmarkbit : 1;
 
-      /* Indicates where the value can be found:
-	 0 : plain var
-	 1 : varalias
-	 2 : localized var
-	 3 : C variable
-      */
       ENUM_BF (symbol_type) type : 3;
 
       ENUM_BF (symbol_trapped_write) trapped_write : 2;
@@ -697,7 +691,7 @@ struct Lisp_Symbol
       union {
 	Lisp_Object value;
 	struct Lisp_Symbol *alias;
-	struct Lisp_Buffer_Local_Value *blv;
+	struct Retarded_BLV *blv;
 	lispfwd fwd;
       } val;
 
@@ -709,6 +703,9 @@ struct Lisp_Symbol
 
       /* Next symbol in obarray bucket, if the symbol is interned.  */
       struct Lisp_Symbol *next;
+
+      /* Formerly local_if_set */
+      bool_bf buffer_local_only : 1;
     } s;
     GCALIGNED_UNION_MEMBER
   } u;
@@ -2018,8 +2015,8 @@ SYMBOL_ALIAS (struct Lisp_Symbol *sym)
   eassume (sym->u.s.type == SYMBOL_VARALIAS && sym->u.s.val.alias);
   return sym->u.s.val.alias;
 }
-INLINE struct Lisp_Buffer_Local_Value *
-SYMBOL_BLV (struct Lisp_Symbol *sym)
+INLINE struct Retarded_BLV *
+RETARDED_BLV (struct Lisp_Symbol *sym)
 {
   eassume (sym->u.s.type == SYMBOL_LOCALIZED && sym->u.s.val.blv);
   return sym->u.s.val.blv;
@@ -2044,7 +2041,7 @@ SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
   sym->u.s.val.alias = v;
 }
 INLINE void
-SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
+SET_RETARDED_BLV (struct Lisp_Symbol *sym, struct Retarded_BLV *v)
 {
   eassume (sym->u.s.type == SYMBOL_LOCALIZED && v);
   sym->u.s.val.blv = v;
@@ -2520,13 +2517,13 @@ struct Lisp_Buffer_Objfwd
     Lisp_Object predicate;
   };
 
-struct Lisp_Buffer_Local_Value
+/* Modelling blv as per-symbol instead of per-buffer was a mistake.  */
+struct Retarded_BLV
   {
     /* Setting the variable creates a buffer-local binding
        (cf. `defvar-local').  */
     bool_bf local_if_set : 1;
-    /* Override VALCELL with a C var.  Should never be
-       (Buffer|Kboard)_Objfwd.  */
+    /* a DEFVAR_LISP.  */
     lispfwd fwd;
     /* The buffer for which the loaded binding was found.  */
     Lisp_Object buffer;
@@ -3642,7 +3639,7 @@ extern uintmax_t cons_to_unsigned (Lisp_Object, uintmax_t);
 
 extern AVOID args_out_of_range (Lisp_Object, Lisp_Object);
 extern AVOID circular_list (Lisp_Object);
-extern struct Lisp_Buffer_Local_Value *blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer);
+extern struct Retarded_BLV *blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer);
 
 enum Set_Internal_Bind {
   SET_INTERNAL_SET,
