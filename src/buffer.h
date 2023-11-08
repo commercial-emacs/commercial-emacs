@@ -24,13 +24,20 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    Mcgrath slots are also known as per-buffer variables.
 
    Some slots are surfaced to lisp via DEFVAR_PER_BUFFER.  These slots
-   are known as forwarded buffer variables (updates to their values
-   get "forwarded" to an underlying C variable).  The code conflates
-   them with buffer locals, with which they share many traits.  The
-   confusion went nuclear when someone decided to CONVERT one type to
-   the other in `make-local-variable', producing a chimeric new
-   subclass known as the "localized slot," a buffer-localized
-   forwarded buffer variable.
+   are known as forwarded slots.  Updates to their values in lisp get
+   "forwarded" to the underlying `struct buffer` field.  The
+   "forwarded" distinction is a general one applying to other types
+   via DEFVAR_INT, DEFVAR_BOOL, DEFVAR_LISP (general Lisp objects),
+   DEFVAR_KBOARD (struct kboard fields), etc.
+
+   Complexity ensued when someone contrived in `make-local-variable' a
+   *conversion* semantics from forwarded variables to buffer local
+   variables, yielding a chimeric subclass we'll call the localized
+   forwarded variable.
+
+   The confusion went nuclear when someone subjected localized
+   forwarded slots and kboard fields to a separate code path from
+   other localized forwarded variables.
 
    [1] more specifically, one of the fields over whicha
    FOR_EACH_PER_BUFFER_OBJECT_AT iterates, (and excludes

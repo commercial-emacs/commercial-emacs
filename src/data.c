@@ -775,6 +775,28 @@ blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
   return blv;
 }
 
+static Lisp_Object
+buffer_local_value (struct Lisp_Symbol *symbol, struct buffer *buffer)
+{
+  Lisp_Object val;
+  if (symbol->u.s.c_variable.fwdptr)
+    val = fwd_get (symbol->u.s.c_variable, buffer);
+  else
+    {
+      Lisp_Object pair = assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
+				       BVAR (buffer, local_var_alist));
+      val = ! NILP (pair)
+	? XCDR (pair)
+	: symbol->u.s.buffer_local_default;
+      if (EQ (val, Qunbound))
+	val = default_value (make_lisp_ptr (symbol, Lisp_Symbol));
+      struct Lisp_Buffer_Local_Value *blv =
+	blv_update (symbol, buffer); // side effect up the wazoo
+      eassert (EQ (XCDR (blv->valcell), val));
+    }
+  return val;
+}
+
 /* Extract and set components of symbols.  */
 
 DEFUN ("boundp", Fboundp, Sboundp, 1, 1, 0,
@@ -800,24 +822,7 @@ global value outside of any lexical scope.  */)
       val = SYMBOL_VAL (sym);
       break;
     case SYMBOL_LOCALIZED:
-      {
-	if (sym->u.s.c_variable.fwdptr)
-	  val = Qt;
-	else
-	  {
-	    Lisp_Object pair = assq_no_quit
-	      (symbol, BVAR (current_buffer, local_var_alist));
-	    val = ! NILP (pair)
-	      ? XCDR (pair)
-	      : sym->u.s.buffer_local_default;
-	    if (EQ (val, Qunbound)
-		&& ! NILP (Fdefault_boundp (symbol)))
-	      val = Fdefault_value (symbol);
-	    struct Lisp_Buffer_Local_Value *blv =
-	      blv_update (sym, current_buffer); // side effect up the wazoo
-	    eassert (EQ (XCDR (blv->valcell), val));
-	  }
-      }
+      val = buffer_local_value (sym, current_buffer);
       break;
     case SYMBOL_FORWARDED:
     case SYMBOL_BUFFER:
@@ -1424,7 +1429,7 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
 #ifdef ENABLE_CHECKING
 	Lisp_Object what = xsymbol->u.s.c_variable.fwdptr
 	  ? fwd_get (xsymbol->u.s.c_variable, b)
-	  : CDR_SAFE (assq_no_quit (symbol, BVAR (b, local_var_alist)));
+	  : buffer_local_value (xsymbol, current_buffer);
 #endif
 	struct Lisp_Buffer_Local_Value *blv = blv_update (xsymbol, b);
 #ifdef ENABLE_CHECKING
