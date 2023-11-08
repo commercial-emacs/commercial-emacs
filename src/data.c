@@ -2134,10 +2134,12 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
 
 DEFUN ("local-variable-p", Flocal_variable_p, Slocal_variable_p,
        1, 2, 0,
-       doc: /* Non-nil if VARIABLE has a local binding in buffer BUFFER.
-BUFFER defaults to the current buffer.
+       doc: /* Return non-nil if BUFFER asserts its own buffer-local
+binding for VARIABLE.  BUFFER defaults to the current buffer.
 
-Also see `buffer-local-boundp'.*/)
+Users will generally prefer this to `buffer-local-boundp', which
+unlike `local-variable-p', also returns true if BUFFER falls back to
+VARIABLE's default binding.  */)
   (Lisp_Object variable, Lisp_Object buffer)
 {
   Lisp_Object result = Qnil;
@@ -2203,20 +2205,14 @@ value in BUFFER, or if VARIABLE is automatically buffer-local (see
       XSETSYMBOL (variable, sym);
       goto start;
       break;
-    case SYMBOL_KBOARD:
-    case SYMBOL_FORWARDED:
-    case SYMBOL_PLAINVAL:
-      result = Qnil;
-      break;
     case SYMBOL_LOCALIZED:
-      result = (SYMBOL_BLV (sym)->local_if_set)
+      result = SYMBOL_BLV (sym)->local_if_set
 	? Qt : Flocal_variable_p (variable, buffer);
       break;
     case SYMBOL_BUFFER:
       result = Qt;
       break;
     default:
-      emacs_abort ();
       break;
     }
   return result;
@@ -2269,7 +2265,6 @@ If the current binding is global (the default), the value is nil.  */)
     }
   return result;
 }
-
 
 /* Find the function at the end of a chain of symbol function indirections.  */
 

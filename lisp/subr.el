@@ -204,7 +204,14 @@ buffer-local wherever it is set."
 
 (defun buffer-local-boundp (symbol buffer)
   "Return non-nil if SYMBOL is bound in BUFFER.
-Also see `local-variable-p'."
+This function was a mistake, and is equivalent to the less
+opaque
+
+(with-current-buffer BUFFER (boundp SYMBOL))
+
+Most users will want `local-variable-p' which determines whether
+BUFFER asserts its own bespoke local binding for SYMBOL
+(as opposed to abiding by SYMBOL's default binding)."
   (declare (side-effect-free t))
   (condition-case nil
       (buffer-local-value symbol buffer)
