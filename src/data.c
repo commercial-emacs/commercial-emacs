@@ -1426,27 +1426,11 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
     case SYMBOL_LOCALIZED:
       {
 	struct buffer *b = xbuffer ? xbuffer : current_buffer;
-#ifdef ENABLE_CHECKING
-	Lisp_Object what = xsymbol->u.s.c_variable.fwdptr
-	  ? fwd_get (xsymbol->u.s.c_variable, b)
-	  : buffer_local_value (xsymbol, current_buffer);
-#endif
-	struct Lisp_Buffer_Local_Value *blv = blv_update (xsymbol, b);
-#ifdef ENABLE_CHECKING
-	if (blv->fwd.fwdptr)
-	  eassert (xsymbol->u.s.c_variable.fwdptr
-		   // everyone points to same per-buffer variable.
-		   && (*(const ptrdiff_t *)
-			 ((ptrdiff_t) xsymbol->u.s.c_variable.fwdptr
-			  + sizeof (enum Lisp_Fwd_Type))
-			 == *(const ptrdiff_t *)
-			 ((ptrdiff_t) blv->fwd.fwdptr
-			 + sizeof (enum Lisp_Fwd_Type))));
-#endif
-	result = XCDR (blv->valcell);
-#ifdef ENABLE_CHECKING
-	eassert (true || EQ (result, what));
-#endif
+	struct Lisp_Buffer_Local_Value *blv;
+	result = buffer_local_value (xsymbol, b);
+	// to avoid cheating, call blv_update after buffer_local_value
+	blv = blv_update (xsymbol, b); /* side effect up the wazoo */
+	eassert (EQ (XCDR (blv->valcell), result));
       }
       break;
     case SYMBOL_FORWARDED:
