@@ -471,7 +471,7 @@ struct dump_flags
   bool_bf assert_already_seen : 1;
   /* Punt on unstable hash tables: defer them to ctx->deferred_hash_tables.  */
   bool_bf defer_hash_tables : 1;
- /* Punt on symbols: defer them to ctx->deferred_symbols.  */
+  /* Punt on symbols: defer them to ctx->deferred_symbols.  */
   bool_bf defer_symbols : 1;
   /* Punt on cold objects: defer them to ctx->cold_queue.  */
   bool_bf defer_cold_objects : 1;

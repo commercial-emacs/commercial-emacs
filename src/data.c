@@ -104,19 +104,8 @@ slot_resolve (lispfwd valpp, struct buffer *xbuffer)
 				 XBUFFER_OBJFWD (valpp)->offset);
       break;
     case Lisp_Fwd_Kboard_Obj:
-      /* We used to simply use current_kboard here, but from Lisp
-	 code, its value is often unexpected.  It seems nicer to
-	 allow constructions like this to work as intuitively expected:
-
-	 (with-selected-frame frame
-	 (define-key local-function-map "\eOP" [f1]))
-
-	 On the other hand, this affects the semantics of
-	 last-command and real-last-command, and people may rely on
-	 that.  I took a quick look at the Lisp codebase, and I
-	 don't think anything will break.  --lorentey  */
-      result = *(Lisp_Object *)(XKBOARD_OBJFWD (valpp)->offset
-				+ (char *)FRAME_KBOARD (SELECTED_FRAME ()));
+      result = *(Lisp_Object *) ((char *) FRAME_KBOARD (SELECTED_FRAME ())
+				 + XKBOARD_OBJFWD (valpp)->offset);
       break;
     default:
       emacs_abort ();
