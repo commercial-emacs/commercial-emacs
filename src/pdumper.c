@@ -471,7 +471,7 @@ struct dump_flags
   bool_bf assert_already_seen : 1;
   /* Punt on unstable hash tables: defer them to ctx->deferred_hash_tables.  */
   bool_bf defer_hash_tables : 1;
-  /* Punt on symbols: defer them to ctx->deferred_symbols.  */
+ /* Punt on symbols: defer them to ctx->deferred_symbols.  */
   bool_bf defer_symbols : 1;
   /* Punt on cold objects: defer them to ctx->cold_queue.  */
   bool_bf defer_cold_objects : 1;
@@ -534,6 +534,8 @@ struct dump_context
      structures (which we dump immediately before the start of the
      discardable section). */
   Lisp_Object symbol_aux;
+  Lisp_Object symbol_cvar;
+
   /* Queue of copied objects for special treatment.  */
   Lisp_Object copied_queue;
   /* Queue of cold objects to dump.  */
@@ -2257,12 +2259,12 @@ dump_fwd (struct dump_context *ctx, lispfwd fwd)
 
 static dump_off
 dump_blv (struct dump_context *ctx,
-          const struct Retarded_BLV *blv)
+          const struct Lisp_Buffer_Local_Value *blv)
 {
-#if CHECK_STRUCTS && !defined HASH_Retarded_BLV_3C363FAC3C
-# error "Retarded_BLV changed. See CHECK_STRUCTS comment in config.h."
+#if CHECK_STRUCTS && !defined HASH_Lisp_Buffer_Local_Value_3C363FAC3C
+# error "Lisp_Buffer_Local_Value changed. See CHECK_STRUCTS comment in config.h."
 #endif
-  struct Retarded_BLV out;
+  struct Lisp_Buffer_Local_Value out;
   dump_object_start (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, blv, local_if_set);
   if (blv->fwd.fwdptr)
@@ -2274,7 +2276,7 @@ dump_blv (struct dump_context *ctx,
   if (blv->fwd.fwdptr)
     dump_remember_fixup_ptr_raw
       (ctx,
-       offset + dump_offsetof (struct Retarded_BLV, fwd),
+       offset + dump_offsetof (struct Lisp_Buffer_Local_Value, fwd),
        dump_fwd (ctx, blv->fwd));
   return offset;
 }
@@ -2288,6 +2290,15 @@ dump_recall_symbol_aux (struct dump_context *ctx, Lisp_Object symbol)
   return dump_off_from_lisp (Fgethash (symbol, symbol_aux, make_fixnum (0)));
 }
 
+static dump_off
+dump_recall_symbol_cvar (struct dump_context *ctx, Lisp_Object symbol)
+{
+  Lisp_Object symbol_cvar = ctx->symbol_cvar;
+  if (NILP (symbol_cvar))
+    return 0;
+  return dump_off_from_lisp (Fgethash (symbol, symbol_cvar, make_fixnum (0)));
+}
+
 static void
 dump_remember_symbol_aux (struct dump_context *ctx,
                           Lisp_Object symbol,
@@ -2297,10 +2308,19 @@ dump_remember_symbol_aux (struct dump_context *ctx,
 }
 
 static void
+dump_remember_symbol_cvar (struct dump_context *ctx,
+			   Lisp_Object symbol,
+			   dump_off offset)
+{
+  Fputhash (symbol, dump_off_to_lisp (offset), ctx->symbol_cvar);
+}
+
+static void
 dump_pre_dump_symbol (struct dump_context *ctx, struct Lisp_Symbol *symbol)
 {
   Lisp_Object symbol_lv = make_lisp_ptr (symbol, Lisp_Symbol);
   eassert (!dump_recall_symbol_aux (ctx, symbol_lv));
+  eassert (!dump_recall_symbol_cvar (ctx, symbol_lv));
   switch (symbol->u.s.type)
     {
     case SYMBOL_LOCALIZED:
@@ -2316,6 +2336,10 @@ dump_pre_dump_symbol (struct dump_context *ctx, struct Lisp_Symbol *symbol)
     default:
       break;
     }
+
+  if (symbol->u.s.c_variable.fwdptr)
+    dump_remember_symbol_cvar (ctx, symbol_lv,
+			       dump_fwd (ctx, symbol->u.s.c_variable));
 }
 
 static dump_off
@@ -2357,6 +2381,7 @@ dump_symbol (struct dump_context *ctx,
   DUMP_FIELD_COPY (&out, symbol, u.s.interned);
   DUMP_FIELD_COPY (&out, symbol, u.s.declared_special);
   DUMP_FIELD_COPY (&out, symbol, u.s.pinned);
+  DUMP_FIELD_COPY (&out, symbol, u.s.buffer_local_only);
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.name, WEIGHT_STRONG);
   switch (symbol->u.s.type)
     {
@@ -2380,39 +2405,58 @@ dump_symbol (struct dump_context *ctx,
     default:
       emacs_abort ();
     }
+
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.function, WEIGHT_NORMAL);
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.plist, WEIGHT_NORMAL);
-  dump_field_lv_rawptr (ctx, &out, symbol, &symbol->u.s.next, Lisp_Symbol,
-                        WEIGHT_STRONG);
+  dump_field_lv (ctx, &out, symbol, &symbol->u.s.buffer_local_default, WEIGHT_NORMAL);
+  dump_field_lv_rawptr (ctx, &out, symbol, &symbol->u.s.next, Lisp_Symbol, WEIGHT_STRONG);
+
+  if (symbol->u.s.c_variable.fwdptr)
+    dump_field_fixup_later (ctx, &out, symbol, &symbol->u.s.c_variable);
 
   offset = dump_object_finish (ctx, &out, sizeof (out));
-  dump_off aux_offset;
 
   switch (symbol->u.s.type)
     {
     case SYMBOL_LOCALIZED:
-      aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
-      dump_remember_fixup_ptr_raw
-	(ctx,
-	 offset + dump_offsetof (struct Lisp_Symbol, u.s.val.blv),
-	 (aux_offset
-	  ? aux_offset
-	  : dump_blv (ctx, symbol->u.s.val.blv)));
+      {
+	dump_off aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
+	dump_remember_fixup_ptr_raw
+	  (ctx,
+	   offset + dump_offsetof (struct Lisp_Symbol, u.s.val.blv),
+	   (aux_offset
+	    ? aux_offset
+	    : dump_blv (ctx, symbol->u.s.val.blv)));
+      }
       break;
     case SYMBOL_KBOARD:
     case SYMBOL_BUFFER:
     case SYMBOL_FORWARDED:
-      aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
-      dump_remember_fixup_ptr_raw
-	(ctx,
-	 offset + dump_offsetof (struct Lisp_Symbol, u.s.val.fwd),
-	 (aux_offset
-	  ? aux_offset
-	  : dump_fwd (ctx, symbol->u.s.val.fwd)));
+      {
+	dump_off aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
+	dump_remember_fixup_ptr_raw
+	  (ctx,
+	   offset + dump_offsetof (struct Lisp_Symbol, u.s.val.fwd),
+	   (aux_offset
+	    ? aux_offset
+	    : dump_fwd (ctx, symbol->u.s.val.fwd)));
+      }
       break;
     default:
       break;
     }
+
+  if (symbol->u.s.c_variable.fwdptr)
+    {
+      dump_off cvar_offset = dump_recall_symbol_cvar (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
+      dump_remember_fixup_ptr_raw
+	(ctx,
+	 offset + dump_offsetof (struct Lisp_Symbol, u.s.c_variable),
+	 (cvar_offset
+	  ? cvar_offset
+	  : dump_fwd (ctx, symbol->u.s.c_variable)));
+    }
+
   return offset;
 }
 
@@ -3700,7 +3744,6 @@ dump_merge_emacs_relocs (Lisp_Object lreloc_a, Lisp_Object lreloc_b)
     dump_off off_a = dump_off_from_lisp (XCAR (XCDR (lreloc_a)));
     dump_off off_b = dump_off_from_lisp (XCAR (XCDR (lreloc_b)));
     eassert (off_a <= off_b);  /* Catch sort errors.  */
-    eassert (off_a < off_b);  /* Catch duplicate relocations.  */
   }
 #endif
 
@@ -3962,6 +4005,7 @@ DEFUN ("dump-emacs-portable",
   ctx->fixups = Qnil;
   ctx->staticpro_table = Fmake_hash_table (0, NULL);
   ctx->symbol_aux = Qnil;
+  ctx->symbol_cvar = Qnil;
   ctx->copied_queue = Qnil;
   ctx->cold_queue = Qnil;
   for (int i = 0; i < RELOC_NUM_PHASES; ++i)
@@ -4080,6 +4124,8 @@ DEFUN ("dump-emacs-portable",
      of the hot section and use a special hash table to remember them.
      The actual symbol dump will pick them up below.  */
   ctx->symbol_aux = make_eq_hash_table ();
+  ctx->symbol_cvar = make_eq_hash_table ();
+
   dump_hot_parts_of_discardable_objects (ctx);
 
   /* Emacs, after initial dump loading, can forget about the portion

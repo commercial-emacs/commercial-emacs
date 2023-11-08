@@ -663,6 +663,10 @@ struct interval
 } GCALIGNED_STRUCT;
 verify (GCALIGNED (struct interval));
 
+
+/* Additional fields require corresponding dump_field_* in
+   pdumper.c.  */
+
 struct Lisp_Symbol
 {
   union
@@ -691,7 +695,7 @@ struct Lisp_Symbol
       union {
 	Lisp_Object value;
 	struct Lisp_Symbol *alias;
-	struct Retarded_BLV *blv;
+	struct Lisp_Buffer_Local_Value *blv;
 	lispfwd fwd;
       } val;
 
@@ -704,8 +708,16 @@ struct Lisp_Symbol
       /* Next symbol in obarray bucket, if the symbol is interned.  */
       struct Lisp_Symbol *next;
 
-      /* Formerly local_if_set */
+      /* Irrevocably made `make-buffer-local-variable' */
       bool_bf buffer_local_only : 1;
+
+      /* Independently varying buffer local default.  Qunbound if not
+	 applicable.  */
+      Lisp_Object buffer_local_default;
+
+      /* Once a C variable, then always a C variable regardless of
+	 convert_to_localize.  */
+      lispfwd c_variable;
     } s;
     GCALIGNED_UNION_MEMBER
   } u;
@@ -2015,8 +2027,8 @@ SYMBOL_ALIAS (struct Lisp_Symbol *sym)
   eassume (sym->u.s.type == SYMBOL_VARALIAS && sym->u.s.val.alias);
   return sym->u.s.val.alias;
 }
-INLINE struct Retarded_BLV *
-RETARDED_BLV (struct Lisp_Symbol *sym)
+INLINE struct Lisp_Buffer_Local_Value *
+SYMBOL_BLV (struct Lisp_Symbol *sym)
 {
   eassume (sym->u.s.type == SYMBOL_LOCALIZED && sym->u.s.val.blv);
   return sym->u.s.val.blv;
@@ -2041,7 +2053,7 @@ SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
   sym->u.s.val.alias = v;
 }
 INLINE void
-SET_RETARDED_BLV (struct Lisp_Symbol *sym, struct Retarded_BLV *v)
+SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
 {
   eassume (sym->u.s.type == SYMBOL_LOCALIZED && v);
   sym->u.s.val.blv = v;
@@ -2518,7 +2530,7 @@ struct Lisp_Buffer_Objfwd
   };
 
 /* Modelling blv as per-symbol instead of per-buffer was a mistake.  */
-struct Retarded_BLV
+struct Lisp_Buffer_Local_Value
   {
     /* Setting the variable creates a buffer-local binding
        (cf. `defvar-local').  */
@@ -3639,7 +3651,7 @@ extern uintmax_t cons_to_unsigned (Lisp_Object, uintmax_t);
 
 extern AVOID args_out_of_range (Lisp_Object, Lisp_Object);
 extern AVOID circular_list (Lisp_Object);
-extern struct Retarded_BLV *blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer);
+extern struct Lisp_Buffer_Local_Value *blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer);
 
 enum Set_Internal_Bind {
   SET_INTERNAL_SET,

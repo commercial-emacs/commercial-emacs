@@ -27,7 +27,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    Some slots are surfaced to lisp via DEFVAR_PER_BUFFER.  These slots
    are known as forwarded buffer variables (Lisp_Buffer_Objfwd).  The
-   code confuses them with buffer locals (Retarded_BLV),
+   code confuses them with buffer locals (Lisp_Buffer_Local_Value),
    with which they share many traits.  The confusion exploded when
    someone decided to CONVERT one type to the other in
    `make-local-variable', then attempt and fail to draft a consistent

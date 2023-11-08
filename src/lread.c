@@ -5029,6 +5029,7 @@ defvar_int (struct Lisp_Intfwd const *i_fwd, char const *namestring)
   XSYMBOL (sym)->u.s.declared_special = true;
   XSYMBOL (sym)->u.s.type = SYMBOL_FORWARDED;
   SET_SYMBOL_FWD (XSYMBOL (sym), i_fwd);
+  XSYMBOL (sym)->u.s.c_variable.fwdptr = i_fwd;
 }
 
 /* Similar but define a variable whose value is t if 1, nil if 0.  */
@@ -5039,6 +5040,7 @@ defvar_bool (struct Lisp_Boolfwd const *b_fwd, char const *namestring)
   XSYMBOL (sym)->u.s.declared_special = true;
   XSYMBOL (sym)->u.s.type = SYMBOL_FORWARDED;
   SET_SYMBOL_FWD (XSYMBOL (sym), b_fwd);
+  XSYMBOL (sym)->u.s.c_variable.fwdptr = b_fwd;
   Vbyte_boolean_vars = Fcons (sym, Vbyte_boolean_vars);
 }
 
@@ -5054,6 +5056,7 @@ defvar_lisp_nopro (struct Lisp_Objfwd const *o_fwd, char const *namestring)
   XSYMBOL (sym)->u.s.declared_special = true;
   XSYMBOL (sym)->u.s.type = SYMBOL_FORWARDED;
   SET_SYMBOL_FWD (XSYMBOL (sym), o_fwd);
+  XSYMBOL (sym)->u.s.c_variable.fwdptr = o_fwd;
 }
 
 void
@@ -5073,6 +5076,7 @@ defvar_kboard (struct Lisp_Kboard_Objfwd const *ko_fwd, char const *namestring)
   XSYMBOL (sym)->u.s.declared_special = true;
   XSYMBOL (sym)->u.s.type = SYMBOL_KBOARD;
   SET_SYMBOL_FWD (XSYMBOL (sym), ko_fwd);
+  XSYMBOL (sym)->u.s.c_variable.fwdptr = ko_fwd;
 }
 
 /* Check that the elements of lpath exist.  */

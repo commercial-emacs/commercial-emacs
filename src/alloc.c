@@ -2586,6 +2586,9 @@ init_symbol (Lisp_Object val, Lisp_Object name)
   p->u.s.trapped_write = SYMBOL_UNTRAPPED_WRITE;
   p->u.s.declared_special = false;
   p->u.s.pinned = false;
+  p->u.s.buffer_local_only = false;
+  p->u.s.buffer_local_default = Qunbound;
+  p->u.s.c_variable = (lispfwd) { NULL };
 }
 
 DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
@@ -5038,7 +5041,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		break;
 	      case SYMBOL_LOCALIZED:
 		{
-		  struct Retarded_BLV *blv = RETARDED_BLV (ptr);
+		  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (ptr);
 		  mark_stack_push (&blv->buffer);
 		  mark_stack_push (&blv->valcell);
 		  mark_stack_push (&blv->defcell);
@@ -5450,7 +5453,7 @@ sweep_symbols (struct thread_state *thr)
             {
               if (sym->u.s.type == SYMBOL_LOCALIZED)
 		{
-                  xfree (RETARDED_BLV (sym));
+                  xfree (SYMBOL_BLV (sym));
                   /* Avoid re-free (bug#29066).  */
                   sym->u.s.type = SYMBOL_PLAINVAL;
                 }
