@@ -1473,8 +1473,9 @@ static Lisp_Object
 goose_local_bindings (Lisp_Object variable)
 {
   CHECK_SYMBOL (variable);
-  Lisp_Object pair = Qnil;
-  if (NILP (assq_no_quit (variable, BVAR (current_buffer, local_var_alist))))
+  Lisp_Object pair =
+    assq_no_quit (variable, BVAR (current_buffer, local_var_alist));
+  if (NILP (pair))
     {
       struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (XSYMBOL (variable));
       pair = Fcons (variable,
