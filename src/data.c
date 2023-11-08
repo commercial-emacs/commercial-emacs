@@ -1552,7 +1552,6 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	    || EQ (blv->defcell, blv->valcell))
 	  {
 	    blv->buffer = mybuf;
-	    /* Fulfill contract of `make-variable-buffer-local'.  */
 	    eassert (blv->local_if_set == xsymbol->u.s.buffer_local_only);
 	    if (blv->local_if_set
 		&& bindflag == SET_INTERNAL_SET
@@ -1561,6 +1560,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 		   then okay to set value binding.  */
 		&& ! locally_unbound_blv_let_bounded (xsymbol))
 	      {
+		/* Fulfill contract of `make-variable-buffer-local'.  */
 		pair = locally_bind_new_blv (symbol);
 	      }
 	    else
@@ -2157,14 +2157,10 @@ VARIABLE's default binding.  */)
       XSETSYMBOL (variable, sym);
       goto start;
       break;
-    case SYMBOL_PLAINVAL:
-      break;
     case SYMBOL_LOCALIZED:
-      {
-	result = NILP (assq_no_quit
-		       (variable, BVAR (XBUFFER (mybuf), local_var_alist)))
-	  ? Qnil : Qt;
-      }
+      result = ! NILP (assq_no_quit (variable, BVAR (XBUFFER (mybuf),
+						     local_var_alist)))
+	? Qt : Qnil;
       break;
     case SYMBOL_BUFFER:
       {
