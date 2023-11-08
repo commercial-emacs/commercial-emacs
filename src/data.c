@@ -1439,7 +1439,9 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
 			 + sizeof (enum Lisp_Fwd_Type))));
 #endif
 	result = XCDR (blv->valcell);
+#ifdef ENABLE_CHECKING
 	eassert (true || EQ (result, what));
+#endif
       }
       break;
     case SYMBOL_FORWARDED:
