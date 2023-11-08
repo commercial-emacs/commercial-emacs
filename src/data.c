@@ -84,8 +84,116 @@ XOBJFWD (lispfwd a)
   return a.fwdptr;
 }
 
+/* Used to signal a user-friendly error if WRONG is not a number or
+   integer/floating-point number outsize of inclusive MIN..MAX range.  */
+
+static void
+wrong_range (Lisp_Object min, Lisp_Object max, Lisp_Object wrong)
+{
+  AUTO_STRING (value_should_be_from, "Value should be from ");
+  AUTO_STRING (to, " to ");
+  xsignal2 (Qerror,
+	    CALLN (Fconcat, value_should_be_from, Fnumber_to_string (min),
+		   to, Fnumber_to_string (max)),
+	    wrong);
+}
+
+/* Update C variable at VALPP with NEWVAL.  BUF applies to forwarded
+   buffer variables (i.e., defvar_per_buffer).
+*/
+
+static void
+fwd_set (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
+{
+  switch (XFWDTYPE (valpp))
+    {
+    case Lisp_Fwd_Int:
+      {
+	intmax_t i;
+	CHECK_INTEGER (newval);
+	if (! integer_to_intmax (newval, &i))
+	  xsignal1 (Qoverflow_error, newval);
+	*XFIXNUMFWD (valpp)->intvar = i;
+      }
+      break;
+    case Lisp_Fwd_Bool:
+      *XBOOLFWD (valpp)->boolvar = !NILP (newval);
+      break;
+    case Lisp_Fwd_Obj:
+      *XOBJFWD (valpp)->objvar = newval;
+      if ((Lisp_Object *) &buffer_slot_defaults < XOBJFWD (valpp)->objvar
+	  && XOBJFWD (valpp)->objvar < (Lisp_Object *) (&buffer_slot_defaults + 1))
+	{
+	  /* VALPP is a defvar-lisp slot (but not a
+	     defvar-per-buffer)?  Propagate NEWVAL to all buffers
+	     whose same slot isn't localized.  */
+	  int offset = (char *) XOBJFWD (valpp)->objvar -
+	    (char *) &buffer_slot_defaults;
+	  int idx = PER_BUFFER_IDX (offset);
+	  if (idx > 0)
+	    {
+	      Lisp_Object tail, buffer;
+	      FOR_EACH_LIVE_BUFFER (tail, buffer)
+		{
+		  struct buffer *b = XBUFFER (buffer);
+		  if (! LOCALIZED_SLOT_P (b, idx))
+		    set_per_buffer_value (b, offset, newval);
+		}
+	    }
+	}
+      break;
+    case Lisp_Fwd_Buffer_Obj:
+      {
+	int offset = XBUFFER_OBJFWD (valpp)->offset;
+	Lisp_Object predicate = XBUFFER_OBJFWD (valpp)->predicate;
+	if (!NILP (newval) && !NILP (predicate))
+	  {
+	    eassert (SYMBOLP (predicate));
+	    Lisp_Object choiceprop = Fget (predicate, Qchoice);
+	    if (!NILP (choiceprop))
+	      {
+		if (NILP (Fmemq (newval, choiceprop)))
+		  wrong_choice (choiceprop, newval);
+	      }
+	    else
+	      {
+		Lisp_Object rangeprop = Fget (predicate, Qrange);
+		if (CONSP (rangeprop))
+		  {
+		    Lisp_Object min = XCAR (rangeprop), max = XCDR (rangeprop);
+		    if (! NUMBERP (newval)
+			|| NILP (CALLN (Fleq, min, newval, max)))
+		      wrong_range (min, max, newval);
+		  }
+		else if (FUNCTIONP (predicate))
+		  {
+		    if (NILP (call1 (predicate, newval)))
+		      wrong_type_argument (predicate, newval);
+		  }
+	      }
+	  }
+	set_per_buffer_value (buf ? buf : current_buffer, offset, newval);
+      }
+      break;
+    case Lisp_Fwd_Kboard_Obj:
+      {
+	char *base = (char *) FRAME_KBOARD (SELECTED_FRAME ());
+	char *p = base + XKBOARD_OBJFWD (valpp)->offset;
+	*(Lisp_Object *) p = newval;
+      }
+      break;
+    default:
+      emacs_abort ();
+      break;
+    }
+}
+
+/* Return underlying C variable at VALPP as Lisp_Object.  BUF applies
+   to forwarded buffer variables (i.e., defvar_per_buffer).
+*/
+
 static Lisp_Object
-slot_resolve (lispfwd valpp, struct buffer *xbuffer)
+fwd_get (lispfwd valpp, struct buffer *buf)
 {
   Lisp_Object result = Qnil;
   switch (XFWDTYPE (valpp))
@@ -100,7 +208,7 @@ slot_resolve (lispfwd valpp, struct buffer *xbuffer)
       result = *XOBJFWD (valpp)->objvar;
       break;
     case Lisp_Fwd_Buffer_Obj:
-      result = per_buffer_value (xbuffer ? xbuffer : current_buffer,
+      result = per_buffer_value (buf ? buf : current_buffer,
 				 XBUFFER_OBJFWD (valpp)->offset);
       break;
     case Lisp_Fwd_Kboard_Obj:
@@ -636,105 +744,6 @@ DEFUN ("setcdr", Fsetcdr, Ssetcdr, 2, 2, 0,
   return newcdr;
 }
 
-/* Used to signal a user-friendly error if WRONG is not a number or
-   integer/floating-point number outsize of inclusive MIN..MAX range.  */
-
-static void
-wrong_range (Lisp_Object min, Lisp_Object max, Lisp_Object wrong)
-{
-  AUTO_STRING (value_should_be_from, "Value should be from ");
-  AUTO_STRING (to, " to ");
-  xsignal2 (Qerror,
-	    CALLN (Fconcat, value_should_be_from, Fnumber_to_string (min),
-		   to, Fnumber_to_string (max)),
-	    wrong);
-}
-
-static void
-slot_update (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
-{
-  switch (XFWDTYPE (valpp))
-    {
-    case Lisp_Fwd_Int:
-      {
-	intmax_t i;
-	CHECK_INTEGER (newval);
-	if (! integer_to_intmax (newval, &i))
-	  xsignal1 (Qoverflow_error, newval);
-	*XFIXNUMFWD (valpp)->intvar = i;
-      }
-      break;
-    case Lisp_Fwd_Bool:
-      *XBOOLFWD (valpp)->boolvar = !NILP (newval);
-      break;
-    case Lisp_Fwd_Obj:
-      *XOBJFWD (valpp)->objvar = newval;
-      if ((Lisp_Object *) &buffer_slot_defaults < XOBJFWD (valpp)->objvar
-	  && XOBJFWD (valpp)->objvar < (Lisp_Object *) (&buffer_slot_defaults + 1))
-	{
-	  /* VALPP is a slot.  Propagate NEWVAL to all buffers
-	     whose same slot isn't localized.  */
-	  int offset = (char *) XOBJFWD (valpp)->objvar -
-	    (char *) &buffer_slot_defaults;
-	  int idx = PER_BUFFER_IDX (offset);
-	  if (idx > 0)
-	    {
-	      Lisp_Object tail, buffer;
-	      FOR_EACH_LIVE_BUFFER (tail, buffer)
-		{
-		  struct buffer *b = XBUFFER (buffer);
-		  if (! LOCALIZED_SLOT_P (b, idx))
-		    set_per_buffer_value (b, offset, newval);
-		}
-	    }
-	}
-      break;
-    case Lisp_Fwd_Buffer_Obj:
-      {
-	int offset = XBUFFER_OBJFWD (valpp)->offset;
-	Lisp_Object predicate = XBUFFER_OBJFWD (valpp)->predicate;
-	if (!NILP (newval) && !NILP (predicate))
-	  {
-	    eassert (SYMBOLP (predicate));
-	    Lisp_Object choiceprop = Fget (predicate, Qchoice);
-	    if (!NILP (choiceprop))
-	      {
-		if (NILP (Fmemq (newval, choiceprop)))
-		  wrong_choice (choiceprop, newval);
-	      }
-	    else
-	      {
-		Lisp_Object rangeprop = Fget (predicate, Qrange);
-		if (CONSP (rangeprop))
-		  {
-		    Lisp_Object min = XCAR (rangeprop), max = XCDR (rangeprop);
-		    if (! NUMBERP (newval)
-			|| NILP (CALLN (Fleq, min, newval, max)))
-		      wrong_range (min, max, newval);
-		  }
-		else if (FUNCTIONP (predicate))
-		  {
-		    if (NILP (call1 (predicate, newval)))
-		      wrong_type_argument (predicate, newval);
-		  }
-	      }
-	  }
-	set_per_buffer_value (buf ? buf : current_buffer, offset, newval);
-      }
-      break;
-    case Lisp_Fwd_Kboard_Obj:
-      {
-	char *base = (char *) FRAME_KBOARD (SELECTED_FRAME ());
-	char *p = base + XKBOARD_OBJFWD (valpp)->offset;
-	*(Lisp_Object *) p = newval;
-      }
-      break;
-    default:
-      emacs_abort ();
-      break;
-    }
-}
-
 /* If BLV lived in buffer rather than symbol, we wouldn't
    have to be so careful updating it  Its truth would
    also become independent of an ever-changing current_buffer.
@@ -747,7 +756,7 @@ blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
   Lisp_Object echo = Qunbound;
   if (blv->fwd.fwdptr)
     {
-      echo = slot_resolve (blv->fwd, buffer);
+      echo = fwd_get (blv->fwd, buffer);
       XSETCDR (blv->valcell, echo);
     }
   Lisp_Object pair =
@@ -762,7 +771,7 @@ blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
   /* VALCELL same memory as LOCAL_VAR_ALIST.  */
   blv->valcell = ! NILP (pair) ? pair : blv->defcell;
   if (blv->fwd.fwdptr) // if PAIR is echo, no-op
-    slot_update (blv->fwd, XCDR (blv->valcell), buffer);
+    fwd_set (blv->fwd, XCDR (blv->valcell), buffer);
   return blv;
 }
 
@@ -1357,10 +1366,10 @@ blv_invalidate (struct Lisp_Symbol *symbol)
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
   eassert (symbol->u.s.type == SYMBOL_LOCALIZED);
   if (blv->fwd.fwdptr)
-    XSETCDR (blv->valcell, slot_resolve (blv->fwd, NULL));
+    XSETCDR (blv->valcell, fwd_get (blv->fwd, NULL));
   blv->valcell = blv->defcell;
   if (blv->fwd.fwdptr)
-    slot_update (blv->fwd, XCDR (blv->defcell), NULL);
+    fwd_set (blv->fwd, XCDR (blv->defcell), NULL);
   blv->buffer = Qnil;
 }
 
@@ -1404,7 +1413,7 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
 	struct buffer *b = xbuffer ? xbuffer : current_buffer;
 #ifdef ENABLE_CHECKING
 	Lisp_Object what = xsymbol->u.s.c_variable.fwdptr
-	  ? slot_resolve (xsymbol->u.s.c_variable, b)
+	  ? fwd_get (xsymbol->u.s.c_variable, b)
 	  : CDR_SAFE (assq_no_quit (symbol, BVAR (b, local_var_alist)));
 #endif
 	struct Lisp_Buffer_Local_Value *blv = blv_update (xsymbol, b);
@@ -1428,7 +1437,7 @@ find_symbol_value (Lisp_Object argsym, struct buffer *xbuffer)
     case SYMBOL_FORWARDED:
     case SYMBOL_BUFFER:
     case SYMBOL_KBOARD:
-      result = slot_resolve (SYMBOL_FWD (xsymbol), xbuffer);
+      result = fwd_get (SYMBOL_FWD (xsymbol), xbuffer);
       break;
     default:
       emacs_abort ();
@@ -1470,7 +1479,7 @@ goose_local_bindings (Lisp_Object variable)
       struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (XSYMBOL (variable));
       pair = Fcons (variable,
 		    (blv->fwd.fwdptr
-		     ? slot_resolve (blv->fwd, current_buffer)
+		     ? fwd_get (blv->fwd, current_buffer)
 		     : XCDR (blv->defcell)));
       bset_local_var_alist
 	(current_buffer,
@@ -1554,7 +1563,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	if (EQ (newval, Qunbound))
 	  blv->fwd.fwdptr = NULL;
 	if (blv->fwd.fwdptr)
-	  slot_update (blv->fwd, newval, XBUFFER (mybuf));
+	  fwd_set (blv->fwd, newval, XBUFFER (mybuf));
       }
       break;
     case SYMBOL_BUFFER:
@@ -1585,7 +1594,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
 	    SET_SYMBOL_VAL (xsymbol, Qunbound);
 	  }
 	else
-	  slot_update (valpp, newval, XBUFFER (mybuf));
+	  fwd_set (valpp, newval, XBUFFER (mybuf));
       }
       break;
     default:
@@ -1746,7 +1755,7 @@ default_value (Lisp_Object symbol)
 	       variables: if locally-bound (local-variable-p), use global
 	       default, else use forwarded-to C variable.  */
 	    if (NILP (Flocal_variable_p (symbol, Fcurrent_buffer ())))
-	      result = slot_resolve (blv->fwd, current_buffer);
+	      result = fwd_get (blv->fwd, current_buffer);
 	  }
 	if (NILP (result))
 	  result = XCDR (SYMBOL_BLV (sym)->defcell);
@@ -1763,7 +1772,7 @@ default_value (Lisp_Object symbol)
     case SYMBOL_FORWARDED:
       {
 	lispfwd valpp = SYMBOL_FWD (sym);
-	result = slot_resolve (valpp, NULL);
+	result = fwd_get (valpp, NULL);
 	break;
       }
     default:
@@ -1838,7 +1847,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 	XSETCDR (blv->defcell, value);
 	/* Reflect new value to slot if default binding active.  */
 	if (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
-	  slot_update (blv->fwd, value, NULL);
+	  fwd_set (blv->fwd, value, NULL);
       }
       break;
     case SYMBOL_BUFFER:
@@ -1896,7 +1905,7 @@ make_blv (struct Lisp_Symbol *sym, bool forwarded,
   struct Lisp_Buffer_Local_Value *blv = xmalloc (sizeof *blv);
   Lisp_Object init = Fcons (make_lisp_ptr (sym, Lisp_Symbol),
 			    (forwarded
-			     ? slot_resolve (value_or_fwd.fwd, NULL)
+			     ? fwd_get (value_or_fwd.fwd, NULL)
 			     : value_or_fwd.value));
   blv->buffer = Qnil;
   blv->fwd = forwarded ? value_or_fwd.fwd : (lispfwd) { NULL };
