@@ -3294,11 +3294,12 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
 }
 
 /* Return true in the circumstance where SYMBOL was let-bound when the
-   buffer had not yet assigned its own buffer local value for SYMBOL.
+   buffer had not yet assigned its own bespoke buffer local value for
+   SYMBOL.
 
-   Monnier arbitrarily decided that assignment within such a `let'
-   closure should change the SYMBOL's default, not value, binding
-   within the `let'.
+   In hewing to Blandy's buffer local semantics, Monnier decided that
+   assignment within such a `let' closure should change the SYMBOL's
+   default, not value, binding.
 */
 
 bool

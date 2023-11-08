@@ -17,28 +17,24 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-/* The combined powers of Blandy, Mcgrath, and Monnier made an
+/* Blandy, Mcgrath, and Monnier conspired successfully to make an
    ungodly mess of the semantics of buffer variables.
 
-   A "slot" is a Lisp_Object field in struct buffer, more
-   specifically, one of the fields over which
-   FOR_EACH_PER_BUFFER_OBJECT_AT iterates, (and excludes
-   `undo_list_`).  Slots are also known as per-buffer variables.
+   A Mcgrath "slot" is a Lisp_Object field in `struct buffer` [1].
+   Mcgrath slots are also known as per-buffer variables.
 
    Some slots are surfaced to lisp via DEFVAR_PER_BUFFER.  These slots
-   are known as forwarded buffer variables (Lisp_Buffer_Objfwd).  The
-   code confuses them with buffer locals (Lisp_Buffer_Local_Value),
-   with which they share many traits.  The confusion exploded when
-   someone decided to CONVERT one type to the other in
-   `make-local-variable', then attempt and fail to draft a consistent
-   semantics for such a chimeric buffer-localized forwarded buffer
-   variable.
+   are known as forwarded buffer variables (updates to their values
+   get "forwarded" to an underlying C variable).  The code conflates
+   them with buffer locals, with which they share many traits.  The
+   confusion went nuclear when someone decided to CONVERT one type to
+   the other in `make-local-variable', producing a chimeric new
+   subclass known as the "localized slot," a buffer-localized
+   forwarded buffer variable.
 
-   Yet another confusingly named category "localized slot" is a
-   forwarded buffer variable whose bit in `local_flags` is on.  Their
-   semantics differ little from general forwarded buffer variables.
-   Amazingly, they're primarily used to manage let-stack unwinding
-   (see locally_unbound_blv_let_bounded).
+   [1] more specifically, one of the fields over whicha
+   FOR_EACH_PER_BUFFER_OBJECT_AT iterates, (and excludes
+   `undo_list_`).
 */
 
 #ifndef EMACS_BUFFER_H
