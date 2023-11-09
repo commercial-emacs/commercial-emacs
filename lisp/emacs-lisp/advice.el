@@ -2041,7 +2041,7 @@ in that CLASS."
 		 function class name)))
     (error "ad-remove-advice: `%s' is not advised" function)))
 
-(declare-function comp-subr-trampoline-install "comp")
+(declare-function comp-subr-trampoline-install "comp-run")
 
 ;;;###autoload
 (defun ad-add-advice (function advice class position)
