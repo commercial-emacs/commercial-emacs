@@ -1278,7 +1278,7 @@ command_loop (void)
 	      Lisp_Object symval;
 	      if ((!NILP (Fwindow_system (Qnil))
 		   || ((symval =
-			find_symbol_value (Qxterm_select_active_regions, NULL),
+			find_symbol_value (XSYMBOL (Qxterm_select_active_regions), NULL),
 			(!EQ (symval, Qunbound) && !NILP (symval)))
 		         && !NILP (Fterminal_parameter (Qnil,
 						        Qxterm__set_selection))))
@@ -1636,7 +1636,7 @@ safe_run_hooks_error (Lisp_Object error, ptrdiff_t nargs, Lisp_Object *args)
     {
       bool found = false;
       Lisp_Object newval = Qnil;
-      Lisp_Object val = find_symbol_value (hook, NULL);
+      Lisp_Object val = find_symbol_value (XSYMBOL (hook), NULL);
       FOR_EACH_TAIL (val)
 	if (EQ (fun, XCAR (val)))
 	  found = true;

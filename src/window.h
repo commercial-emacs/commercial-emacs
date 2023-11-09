@@ -606,7 +606,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
    buffer.  */
 #define WINDOW_BUFFER_LOCAL_VALUE(V, W)			\
   (BUFFERP ((W)->contents)				\
-   ? find_symbol_value (V, XBUFFER ((W)->contents))	\
+   ? find_symbol_value (XSYMBOL (V), XBUFFER ((W)->contents))	\
    : Qnil)
 
 /* Return the canonical column width of the frame of window W.  */

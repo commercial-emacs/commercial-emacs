@@ -1549,7 +1549,7 @@ current_minor_maps (Lisp_Object **modeptr, Lisp_Object **mapptr)
 	  alist = XCAR (emulation_alists);
 	  emulation_alists = XCDR (emulation_alists);
 	  if (SYMBOLP (alist))
-	    alist = find_symbol_value (alist, NULL);
+	    alist = find_symbol_value (XSYMBOL (alist), NULL);
 	  list_number = -1;
 	}
       else
@@ -1558,7 +1558,7 @@ current_minor_maps (Lisp_Object **modeptr, Lisp_Object **mapptr)
       for ( ; CONSP (alist); alist = XCDR (alist))
 	if ((assoc = XCAR (alist), CONSP (assoc))
 	    && (var = XCAR (assoc), SYMBOLP (var))
-	    && (val = find_symbol_value (var, NULL), !EQ (val, Qunbound))
+	    && (val = find_symbol_value (XSYMBOL (var), NULL), ! EQ (val, Qunbound))
 	    && !NILP (val))
 	  {
 	    Lisp_Object temp;

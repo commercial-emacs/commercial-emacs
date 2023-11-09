@@ -288,13 +288,13 @@ create_terminal (enum output_method type, struct redisplay_interface *rif)
      already defined, use them in preference to the defaults.  This is
      needed when Emacs runs in daemon mode.  */
   keyboard_coding =
-    find_symbol_value (intern ("default-keyboard-coding-system"), NULL);
+    find_symbol_value (XSYMBOL (intern ("default-keyboard-coding-system")), NULL);
   if (NILP (keyboard_coding)
       || EQ (keyboard_coding, Qunbound)
       || NILP (Fcoding_system_p (keyboard_coding)))
     keyboard_coding = Qno_conversion;
   terminal_coding =
-    find_symbol_value (intern ("default-terminal-coding-system"), NULL);
+    find_symbol_value (XSYMBOL (intern ("default-terminal-coding-system")), NULL);
   if (NILP (terminal_coding)
       || EQ (terminal_coding, Qunbound)
       || NILP (Fcoding_system_p (terminal_coding)))

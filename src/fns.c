@@ -3216,7 +3216,7 @@ by a mouse, or by some window-system gesture, or via a menu.  */)
   if (!NILP (last_input_event)
       && (CONSP (last_nonmenu_event)
 	  || (NILP (last_nonmenu_event) && CONSP (last_input_event))
-	  || (val = find_symbol_value (Qfrom__tty_menu_p, NULL),
+	  || (val = find_symbol_value (XSYMBOL (Qfrom__tty_menu_p), NULL),
 	      (! NILP (val) && ! EQ (val, Qunbound))))
       && use_dialog_box)
     {

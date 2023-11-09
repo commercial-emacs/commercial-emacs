@@ -1234,7 +1234,7 @@ is the default binding of the variable.  */)
 {
   Lisp_Object result;
   CHECK_BUFFER (buffer);
-  result = find_symbol_value (variable, XBUFFER (buffer));
+  result = find_symbol_value (XSYMBOL (variable), XBUFFER (buffer));
   return EQ (result, Qunbound)
     ? (xsignal1 (Qvoid_variable, variable), Qnil)
     : result;
@@ -1263,7 +1263,7 @@ buffer_lisp_local_variables (struct buffer *buf, bool clone)
 	 so store them into the alist so the alist is up to date.
 	 If inquiring about some other buffer, this swaps out any values
 	 for that buffer, making the alist up to date automatically.  */
-      val = find_symbol_value (XCAR (elt), NULL);
+      val = find_symbol_value (XSYMBOL (XCAR (elt)), NULL);
       /* Use the current buffer value only if buf is the current buffer.  */
       if (buf != current_buffer)
 	val = XCDR (elt);
@@ -2073,7 +2073,7 @@ the current buffer's major mode.  */)
     error ("Attempt to set major mode for a dead buffer");
 
   if (strcmp (SSDATA (BVAR (XBUFFER (buffer), name)), "*scratch*") == 0)
-    function = find_symbol_value (intern ("initial-major-mode"), NULL);
+    function = find_symbol_value (XSYMBOL (intern ("initial-major-mode")), NULL);
   else
     {
       function = BVAR (&buffer_slot_defaults, major_mode);

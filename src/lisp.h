@@ -718,6 +718,9 @@ struct Lisp_Symbol
       /* Once a C variable, then always a C variable regardless of
 	 convert_to_localize.  */
       lispfwd c_variable;
+
+      /* See find_symbol_value() for buffer switching logic.  */
+      struct buffer *buffer_local_buffer;
     } s;
     GCALIGNED_UNION_MEMBER
   } u;
@@ -3627,7 +3630,7 @@ extern AVOID wrong_choice (Lisp_Object, Lisp_Object);
 extern void notify_variable_watchers (Lisp_Object, Lisp_Object,
 				      Lisp_Object, Lisp_Object);
 extern Lisp_Object indirect_function (Lisp_Object);
-extern Lisp_Object find_symbol_value (Lisp_Object, struct buffer *);
+extern Lisp_Object find_symbol_value (struct Lisp_Symbol *, struct buffer *);
 enum Arith_Comparison {
   ARITH_EQUAL,
   ARITH_NOTEQUAL,

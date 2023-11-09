@@ -514,7 +514,7 @@ the same file name is found in the `doc-directory'.  */)
   /* Preloaded defcustoms using custom-initialize-delay are added to
      this list, but kept unbound.  See https://debbugs.gnu.org/11565  */
   Lisp_Object delayed_init =
-    find_symbol_value (intern ("custom-delayed-init-variables"), NULL);
+    find_symbol_value (XSYMBOL (intern ("custom-delayed-init-variables")), NULL);
 
   if (!CONSP (delayed_init)) delayed_init = Qnil;
 

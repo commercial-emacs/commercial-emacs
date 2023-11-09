@@ -3788,7 +3788,7 @@ run_window_change_functions_1 (Lisp_Object symbol, Lisp_Object buffer,
   else if (!NILP (Fassoc (symbol, BVAR (XBUFFER (buffer), local_var_alist),
 			  Qnil)))
     /* Don't run global value buffer-locally.  */
-    funs = find_symbol_value (symbol, NULL);
+    funs = find_symbol_value (XSYMBOL (symbol), NULL);
 
   while (CONSP (funs))
     {
@@ -5480,7 +5480,7 @@ null_header_line_format (Lisp_Object fmt)
 	  unbind_to (count, Qnil);
 	}
       else if (SYMBOLP (car))
-	val = find_symbol_value (car, NULL);
+	val = find_symbol_value (XSYMBOL (car), NULL);
     }
   return EQ (val, Qunbound) || NILP (val);
 }
@@ -7556,7 +7556,7 @@ save_window_save (Lisp_Object window, struct Lisp_Vector *vector, ptrdiff_t i)
       if (BUFFERP (w->contents))
 	{
 	  bool window_point_insertion_type
-	    = ! NILP (find_symbol_value (Qwindow_point_insertion_type,
+	    = ! NILP (find_symbol_value (XSYMBOL (Qwindow_point_insertion_type),
 					 XBUFFER (w->contents)));
 
 	  /* Save w's value of point in the window configuration.  If w

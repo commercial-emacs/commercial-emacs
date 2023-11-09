@@ -2589,6 +2589,7 @@ init_symbol (Lisp_Object val, Lisp_Object name)
   p->u.s.buffer_local_only = false;
   p->u.s.buffer_local_default = Qunbound;
   p->u.s.c_variable = (lispfwd) { NULL };
+  p->u.s.buffer_local_buffer = NULL;
 }
 
 DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
@@ -5852,7 +5853,7 @@ static bool
 symbol_uses_obj (Lisp_Object symbol, Lisp_Object obj)
 {
   struct Lisp_Symbol *sym = XSYMBOL (symbol);
-  Lisp_Object val = find_symbol_value (symbol, NULL);
+  Lisp_Object val = find_symbol_value (sym, NULL);
   return (EQ (val, obj)
 	  || EQ (sym->u.s.function, obj)
 	  || (! NILP (sym->u.s.function)

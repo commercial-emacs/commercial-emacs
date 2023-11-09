@@ -2174,7 +2174,7 @@ readevalloop (Lisp_Object readcharfun,
   /* If lexical binding is active (either because it was specified in
      the file's header, or via a buffer-local variable), create an empty
      lexical environment, otherwise, turn off lexical binding.  */
-  lex_bound = find_symbol_value (Qlexical_binding, NULL);
+  lex_bound = find_symbol_value (XSYMBOL (Qlexical_binding), NULL);
   specbind (Qinternal_interpreter_environment,
 	    (NILP (lex_bound) || EQ (lex_bound, Qunbound)
 	     ? Qnil : list1 (Qt)));

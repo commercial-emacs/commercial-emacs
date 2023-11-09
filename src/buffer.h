@@ -35,10 +35,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    variables, yielding a chimeric subclass we'll call the localized
    forwarded variable.
 
-   The confusion went nuclear when someone subjected localized
-   forwarded slots and kboard fields to a separate code path from
-   other localized forwarded variables.
-
    [1] more specifically, one of the fields over whicha
    FOR_EACH_PER_BUFFER_OBJECT_AT iterates, (and excludes
    `undo_list_`).

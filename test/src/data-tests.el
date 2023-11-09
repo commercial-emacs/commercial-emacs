@@ -751,19 +751,21 @@ comparing the subr with a much slower Lisp implementation."
     (should-error (lsh (1- most-negative-fixnum) -1))))
 
 (ert-deftest data-tests-make-local-forwarded-var () ;bug#34318
-  ;; Boy, this bug is tricky to trigger.  You need to:
-  ;; - call make-local-variable on a forwarded var (i.e. one that
-  ;;   has a corresponding C var linked via DEFVAR_(LISP|INT|BOOL))
-  ;; - cause the C code to modify this variable from the C side of the
-  ;;   forwarding, but this needs to happen before the var is accessed
-  ;;   from the Lisp side and before we switch to another buffer.
-  ;; The trigger in bug#34318 doesn't exist any more because the C code has
-  ;; changed.  Instead I found the trigger below.
   (with-temp-buffer
     (setq last-coding-system-used 'bug34318)
+    ;; localize a forwarded var, one that forwards a lisp-space value
+    ;; to a C variable.
     (make-local-variable 'last-coding-system-used)
-    ;; This should set last-coding-system-used to `no-conversion'.
+    (should (local-variable-p 'last-coding-system-used))
+    (should (equal (list last-coding-system-used
+                         (default-value 'last-coding-system-used))
+                   '(bug34318 bug34318)))
+    ;; modify in C-space the underlying C variable.  This
+    ;; should assign to the C variable `no-conversion`.
     (decode-coding-string "hello" nil)
+    ;; If buffer changed, write from lisp to C.
+    ;; If buffer unchanged, write from C to lisp.
+    ;; Our buffer didn't change, so lisp should reflect C.
     (should (equal (list last-coding-system-used
                          (default-value 'last-coding-system-used))
                    '(no-conversion bug34318)))))

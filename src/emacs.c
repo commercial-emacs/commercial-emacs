@@ -2886,7 +2886,7 @@ killed.  */
     sd_notify(0, "STOPPING=1");
 #endif /* HAVE_LIBSYSTEMD */
 
-  if (! NILP (find_symbol_value (Qkill_emacs_hook, NULL)))
+  if (! NILP (find_symbol_value (XSYMBOL (Qkill_emacs_hook), NULL)))
     {
       if (noninteractive)
 	safe_run_hooks (Qkill_emacs_hook);

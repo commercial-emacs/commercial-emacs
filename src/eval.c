@@ -616,11 +616,11 @@ signal a `cyclic-variable-indirection' error.  */)
      so that old-code that affects n_a before the aliasing is setup
      still works.  */
   if (NILP (Fboundp (base_variable)))
-    set_internal (base_variable, find_symbol_value (new_alias, NULL),
-                  Qnil, SET_INTERNAL_BIND);
+    set_internal (base_variable, find_symbol_value (XSYMBOL (new_alias), NULL),
+		  Qnil, SET_INTERNAL_BIND);
   else if (!NILP (Fboundp (new_alias))
-           && !EQ (find_symbol_value (new_alias, NULL),
-                   find_symbol_value (base_variable, NULL)))
+           && !EQ (find_symbol_value (XSYMBOL (new_alias), NULL),
+                   find_symbol_value (XSYMBOL (base_variable), NULL)))
     call2 (intern ("display-warning"),
            list3 (Qdefvaralias, intern ("losing-value"), new_alias),
            CALLN (Fformat_message,
@@ -2700,7 +2700,8 @@ run_hook_with_args (ptrdiff_t nargs, Lisp_Object *args,
     return Qnil;
 
   sym = args[0];
-  val = find_symbol_value (sym, NULL);
+  CHECK_SYMBOL (sym);
+  val = find_symbol_value (XSYMBOL (sym), NULL);
 
   if (EQ (val, Qunbound) || NILP (val))
     return ret;
@@ -3358,7 +3359,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
     case SYMBOL_LOCALIZED:
       specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
       specpdl_ptr->let.symbol = symbol;
-      specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
+      specpdl_ptr->let.old_value = find_symbol_value (xsymbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       eassert (EQ (SYMBOL_BLV (xsymbol)->buffer, Fcurrent_buffer ()));
       /* See locally_unbound_blv_let_bounded.  */
@@ -3369,7 +3370,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
     case SYMBOL_KBOARD:
       specpdl_ptr->let.kind = SPECPDL_LET;
       specpdl_ptr->let.symbol = symbol;
-      specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
+      specpdl_ptr->let.old_value = find_symbol_value (xsymbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       break;
     case SYMBOL_BUFFER:
@@ -3379,7 +3380,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 	? SPECPDL_LET_DEFAULT
 	: SPECPDL_LET_LOCAL;
       specpdl_ptr->let.symbol = symbol;
-      specpdl_ptr->let.old_value = find_symbol_value (symbol, current_buffer);
+      specpdl_ptr->let.old_value = find_symbol_value (xsymbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       break;
     default:
@@ -3859,7 +3860,7 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		if (!NILP (Flocal_variable_p (symbol, where)))
 		  {
 		    set_specpdl_old_value
-		      (tmp, find_symbol_value (symbol, XBUFFER (where)));
+		      (tmp, find_symbol_value (XSYMBOL (symbol), XBUFFER (where)));
 		    set_internal (symbol, old_value, where,
 				  SET_INTERNAL_THREAD_SWITCH);
 		  }
