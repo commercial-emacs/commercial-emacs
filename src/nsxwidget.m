@@ -244,7 +244,7 @@ completionHandler:(void (^)(NSArray<NSURL *> *URLs))completionHandler
 - (void) keyDown:(NSEvent *)event
 {
   Lisp_Object var = Fintern (build_string ("isearch-mode"), Qnil);
-  Lisp_Object val = find_symbol_value (var, NULL);
+  Lisp_Object val = find_symbol_value (XSYMBOL (var), NULL);
   if (!EQ (val, Qunbound) && !EQ (val, Qnil))
     {
       [self.window makeFirstResponder:self.xw->xv->emacswindow];

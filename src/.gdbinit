@@ -107,7 +107,7 @@ define pv
   set $tmp = "$arg0"
   set $output_debug = print_output_debug_flag
   set print_output_debug_flag = 0
-  call safe_debug_print (find_symbol_value (intern ($tmp), 0))
+  call safe_debug_print (find_symbol_value (XSYMBOL (intern ($tmp)), 0))
   set print_output_debug_flag = $output_debug
 end
 document pv
