@@ -856,7 +856,7 @@ endif
 $(lispsource)/loaddefs.el: | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
 	$(MAKE) -C ../lisp autoloads EMACS="$(bootstrap_exe)"
 
-$(lispsource)/emacs-lisp/cldefs.el: | emacs$(EXEEXT)
+$(lispsource)/emacs-lisp/cldefs.el: | $(pdmp)
 	$(MAKE) -C ../lisp cldefs
 
 ## Dump an Emacs executable named bootstrap-emacs containing the
