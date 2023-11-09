@@ -1117,10 +1117,17 @@ VERY-WIDE is a list of other articles to reply to."
             (erase-buffer)
             (insert very-wide-headers))
           (goto-char (point-max)))
-        (let ((parent-buffer (current-buffer)))
-          (gnus-msg-preserve-variables parent-buffer
-            (mml-quote-region (point) (point-max))
-            (message-reply nil wide)))
+        (let* ((parent-buffer (current-buffer))
+               (inherit (lambda ()
+                          (gnus-msg-inherit-variables
+                           parent-buffer (current-buffer)))))
+          (unwind-protect
+              (progn
+                (add-hook 'message-mode-hook inherit)
+                (gnus-msg-preserve-variables parent-buffer
+                  (mml-quote-region (point) (point-max))
+                  (message-reply nil wide)))
+            (remove-hook 'message-mode-hook inherit)))
 	(when yank
 	  (gnus-inews-yank-articles yank))
 	(gnus-summary-handle-replysign)))))
