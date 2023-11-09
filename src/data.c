@@ -1364,23 +1364,8 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
       break;
     case SYMBOL_LOCALIZED:
       {
-	Lisp_Object pair = assq_no_quit (symbol, BVAR (b, local_var_alist));
-	if (xsymbol->u.s.c_variable.fwdptr && CONSP (pair))
-	  {
-	    /* Forwarding to and from the C variable occurs
-	       just-in-time.  */
-	    if (xsymbol->u.s.buffer_local_buffer == b)
-	      // No switch, update lisp from C.
-	      XSETCDR (pair, fwd_get (xsymbol->u.s.c_variable, b));
-	    else
-	      // Switch, update C from lisp.
-	      fwd_set (xsymbol->u.s.c_variable, XCDR (pair), b);
-	  }
-	xsymbol->u.s.buffer_local_buffer = b;
-	result = CONSP (pair) ? XCDR (pair) : xsymbol->u.s.buffer_local_default;
-	if (EQ (result, Qunbound))
-	  result = default_value (symbol);
-	eassert (EQ (result, XCDR (blv_update (xsymbol, b)->valcell)));
+	struct Lisp_Buffer_Local_Value *blv = blv_update (xsymbol, b);
+	result = XCDR (blv->valcell);
       }
       break;
     case SYMBOL_FORWARDED:
