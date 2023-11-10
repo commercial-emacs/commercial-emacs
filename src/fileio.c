@@ -4695,7 +4695,7 @@ by calling `format-decode', which see.  */)
     make_gap (total - GAP_SIZE + 1);
 
   if (beg_offset != 0 || (!NILP (replace)
-			  && !BASE_EQ (replace, Qunbound)))
+			  && !EQ (replace, Qunbound)))
     {
       if (lseek (fd, beg_offset, SEEK_SET) < 0)
 	report_file_error ("Setting file position", orig_filename);
