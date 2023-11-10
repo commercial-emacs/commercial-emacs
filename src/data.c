@@ -1447,6 +1447,10 @@ locally_bind_new_blv (Lisp_Object variable)
       if (NILP (pair))
 	{
 	  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (XSYMBOL (variable));
+
+	  if (EQ (blv->buffer, Fcurrent_buffer ()))
+	    blv_invalidate (XSYMBOL (variable));
+
 	  pair = Fcons (variable,
 			blv->fwd.fwdptr
 			? fwd_get (blv->fwd, current_buffer)
