@@ -155,31 +155,28 @@ their markers accordingly.  The following properties have meaning
 as of ERC 5.6:
 
  - `erc-msg': a symbol, guaranteed present; values include:
-
-   - `msg', signifying a `PRIVMSG' or an incoming `NOTICE'
-   - `self', a fallback used by `erc-display-msg' for callers
-     that don't specify an `erc-msg'
-   - `unknown', a similar fallback for `erc-display-message'
-   - a catalog key, such as `s401' or `finished'
-   - an `erc-display-message' TYPE parameter, like `notice'
+   `msg', signifying a `PRIVMSG' or an incoming `NOTICE';
+   `unknown', a fallback for `erc-display-message'; a catalog
+    key, such as `s401' or `finished'; an `erc-display-message'
+    TYPE parameter, like `notice'
 
  - `erc-cmd': a message's associated IRC command, as read by
    `erc--get-eq-comparable-cmd'; currently either a symbol, like
    `PRIVMSG', or a number, like 5, which represents the numeric
-   \"005\"; absent on \"local\" messages, such as simple warnings
-   and help text, and on outgoing messages unless echoed back by
-   the server (assuming future support)
+    \"005\"; absent on \"local\" messages, such as simple warnings
+    and help text, and on outgoing messages unless echoed back by
+    the server (assuming future support)
 
  - `erc-ctcp': a CTCP command, like `ACTION'
 
  - `erc-ts': a timestamp, possibly provided by the server; as of
-   5.6, a ticks/hertz pair on Emacs 29 and above, and a \"list\"
-   type otherwise; managed by the `stamp' module
+    5.6, a ticks/hertz pair on Emacs 29 and above, and a \"list\"
+    type otherwise; managed by the `stamp' module
 
  - `erc-ephemeral': a symbol prefixed by or matching a module
-   name; indicates to other modules and members of modification
-   hooks that the current message should not affect stateful
-   operations, such as recording a channel's most recent speaker
+    name; indicates to other modules and members of modification
+    hooks that the current message should not affect stateful
+    operations, such as recording a channel's most recent speaker
 
 This is an internal API, and the selection of related helper
 utilities is fluid and provisional.  As of ERC 5.6, see the
@@ -2949,13 +2946,17 @@ If ARG is non-nil, show the *erc-protocol* buffer."
 
 (defun erc-send-action (tgt str &optional force)
   "Send CTCP ACTION information described by STR to TGT."
+  (erc--send-action tgt str force))
+
+(cl-defmethod erc--send-action (tgt str &optional force)
   (erc-send-ctcp-message tgt (format "ACTION %s" str) force)
   ;; Allow hooks that act on inserted PRIVMSG and NOTICES to process us.
   (let ((erc--msg-prop-overrides `((erc-msg . msg)
                                    (erc-ctcp . ACTION)
                                    ,@erc--msg-prop-overrides))
         (nick (erc-current-nick)))
-    (setq nick (propertize nick 'erc-speaker nick))
+    (setq nick (propertize nick 'erc-speaker nick
+                           'font-lock-face 'erc-my-nick-face))
     (erc-display-message nil '(t action input) (current-buffer)
                          'ACTION ?n nick ?a str ?u "" ?h "")))
 
@@ -3654,6 +3655,12 @@ present."
   "Non-nil when a user types a \"/slash\" command.
 Remains bound until `erc-cmd-SLASH' returns.")
 
+(defvar erc--current-line-input-split nil
+  "Current `erc--input-split' instance when processing user input.
+This is for special cases in which a \"slash\" command needs
+details about the input it's handling or needs to detect whether
+it's been dispatched by `erc-send-current-line'.")
+
 (defvar-local erc-send-input-line-function #'erc-send-input-line
   "Function for sending lines lacking a leading \"slash\" command.
 When prompt input starts with a \"slash\" command, like \"/MSG\",
@@ -3728,7 +3735,7 @@ this function from interpreting the line as a command."
       (let ((r (erc-default-target)))
         (if r
             (funcall erc-send-input-line-function r line force)
-          (erc-display-message nil 'error (current-buffer) 'no-target)
+          (erc-display-message nil '(notice error) (current-buffer) 'no-target)
           nil)))))
 
 (defconst erc--shell-parse-regexp
@@ -3790,9 +3797,7 @@ need this when pasting multiple lines of text."
   (if (string-match "^\\s-*$" line)
       nil
     (string-match "^ ?\\(.*\\)" line)
-    (let ((msg (match-string 1 line)))
-      (erc-display-msg msg)
-      (erc-process-input-line msg nil t))))
+    (erc--send-message (match-string 1 line) nil)))
 (put 'erc-cmd-SAY 'do-not-parse-args t)
 
 (defun erc-cmd-SET (line)
@@ -4492,11 +4497,35 @@ the matching is case-sensitive."
   "Send LINE to the current channel or user and display it.
 
 See also `erc-message' and `erc-display-line'."
+  (erc--send-message line force))
+
+(cl-defgeneric erc--send-message (line force)
   (erc-message "PRIVMSG" (concat (erc-default-target) " " line) force)
   (erc-display-line
    (concat (erc-format-my-nick) line)
    (current-buffer))
   ;; FIXME - treat multiline, run hooks, or remove me?
+  t)
+
+;; When running inside insert and send hooks, take more care in
+;; dealing with the prompt.
+(cl-defmethod erc--send-message
+  (input-line force &context (erc--current-line-input-split erc--input-split))
+  "Process non-command INPUT-LINE almost as if it's normal chat input.
+Expect INPUT-LINE to differ from the `string' slot of the calling
+context's `erc--current-line-input-split' object because the
+latter is likely a slash command invocation whose handler
+generated INPUT-LINE.  Before inserting INPUT-LINE, split it and
+run `erc-send-modify-hook' and `erc-send-post-hook' on each
+actual outgoing line.  Forgo input validation because this isn't
+interactive input, and skip `erc-send-completed-hook' because it
+will run just before the outer `erc-send-current-line' call
+returns."
+  (let* ((erc-flood-protect (not force))
+         (lines-obj (erc--make-input-split input-line)))
+    (setf (erc--input-split-refoldp lines-obj) t
+          (erc--input-split-cmdp lines-obj) nil)
+    (erc--send-input-lines (erc--run-send-hooks lines-obj)))
   t)
 
 (defun erc-cmd-MODE (line)
@@ -4580,7 +4609,7 @@ Otherwise leave the channel indicated by LINE."
                                  (format "PART %s" ch)
                                (format "PART %s :%s" ch reason))
                              nil ch))
-        (erc-display-message nil 'error (current-buffer) 'no-target)))
+        (erc-display-message nil '(notice error) (current-buffer) 'no-target)))
     t)
    (t nil)))
 (put 'erc-cmd-PART 'do-not-parse-args t)
@@ -4920,7 +4949,7 @@ be displayed."
           (progn
             (erc-log (format "cmd: TOPIC [%s]: %s" ch topic))
             (erc-server-send (format "TOPIC %s :%s" ch topic) nil ch))
-        (erc-display-message nil 'error (current-buffer) 'no-target)))
+        (erc-display-message nil '(notice error) (current-buffer) 'no-target)))
     t)
    (t nil)))
 (defalias 'erc-cmd-T #'erc-cmd-TOPIC)
@@ -6872,6 +6901,14 @@ ERC prints them as a single message joined by newlines.")
   (when (erc--input-split-cmdp state)
     (setf (erc--input-split-insertp state) nil)))
 
+(defun erc--make-input-split (string)
+  (make-erc--input-split
+   :string string
+   :insertp erc-insert-this
+   :sendp erc-send-this
+   :lines (split-string string erc--input-line-delim-regexp)
+   :cmdp (string-match erc-command-regexp string)))
+
 (defun erc-send-current-line ()
   "Parse current line and send it to IRC."
   (interactive)
@@ -6886,19 +6923,13 @@ ERC prints them as a single message joined by newlines.")
             (expand-abbrev))
           (widen)
           (let* ((str (erc-user-input))
-                 (state (make-erc--input-split
-                         :string str
-                         :insertp erc-insert-this
-                         :sendp erc-send-this
-                         :lines (split-string
-                                 str erc--input-line-delim-regexp)
-                         :cmdp (string-match erc-command-regexp str))))
+                 (state (erc--make-input-split str)))
             (run-hook-with-args 'erc--input-review-functions state)
             (when-let (((not (erc--input-split-abortp state)))
                        (inhibit-read-only t)
+                       (erc--current-line-input-split state)
                        (old-buf (current-buffer)))
-              (let ((erc--msg-prop-overrides `((erc-msg . msg)
-                                               ,@erc--msg-prop-overrides)))
+              (progn ; unprogn this during next major surgery
                 (erc-set-active-buffer (current-buffer))
                 ;; Kill the input and the prompt
                 (delete-region erc-input-marker (erc-end-of-input-line))
@@ -6961,6 +6992,8 @@ queue.  Expect LINES-OBJ to be an `erc--input-split' object."
                       (run-hook-with-args 'erc-send-pre-hook str)
                       (make-erc-input :string str
                                       :insertp erc-insert-this
+                                      :refoldp (erc--input-split-refoldp
+                                                lines-obj)
                                       :sendp erc-send-this))))
         (run-hook-with-args 'erc-pre-send-functions state)
         (setf (erc--input-split-sendp lines-obj) (erc-input-sendp state)
@@ -6977,7 +7010,7 @@ queue.  Expect LINES-OBJ to be an `erc--input-split' object."
     (user-error "Multiline command detected" ))
   lines-obj)
 
-(defun erc--send-input-lines (lines-obj)
+(cl-defmethod erc--send-input-lines (lines-obj)
   "Send lines in `erc--input-split-lines' object LINES-OBJ."
   (when (erc--input-split-sendp lines-obj)
     (dolist (line (erc--input-split-lines lines-obj))
@@ -7041,16 +7074,15 @@ Return non-nil only if we actually send anything."
 
 (defun erc-display-msg (line)
   "Insert LINE into current buffer and run \"send\" hooks.
-Expect LINE to originate from input submitted interactively at
-the prompt, such as outgoing chat messages or echoed slash
-commands."
+Treat LINE as input submitted interactively at the prompt, such
+as outgoing chat messages and echoed slash commands."
   (when erc-insert-this
     (save-excursion
       (erc--assert-input-bounds)
       (let ((insert-position (marker-position (goto-char erc-insert-marker)))
-            (erc--msg-props (or erc--msg-props ; prefer `self' to `unknown'
+            (erc--msg-props (or erc--msg-props
                                 (let ((ovs erc--msg-prop-overrides))
-                                  (map-into `((erc-msg . self) ,@(reverse ovs))
+                                  (map-into `((erc-msg . msg) ,@(reverse ovs))
                                             'hash-table))))
             beg)
         (insert (erc-format-my-nick))
@@ -8102,8 +8134,9 @@ If optional argument HERE is non-nil, insert version number at point."
                     (let (modes (case-fold-search nil))
                       (dolist (var (apropos-internal "^erc-.*mode$"))
                         (when (and (boundp var)
+                                   (get var 'erc-module)
                                    (symbol-value var))
-                          (setq modes (cons (symbol-name var)
+                          (setq modes (cons (concat "`" (symbol-name var) "'")
                                             modes))))
                       modes)
                     ", ")))
@@ -8193,9 +8226,10 @@ All windows are opened in the current frame."
    (flood-ctcp-off . "FLOOD PROTECTION: Automatic CTCP responses turned off.")
    (flood-strict-mode
     . "FLOOD PROTECTION: Switched to Strict Flood Control mode.")
-   (disconnected . "\n\nConnection failed!  Re-establishing connection...\n")
+   (disconnected
+    . "\n\n*** Connection failed!  Re-establishing connection...\n")
    (disconnected-noreconnect
-    . "\n\nConnection failed!  Not re-establishing connection.\n")
+    . "\n\n*** Connection failed!  Not re-establishing connection.\n")
    (reconnecting . "Reconnecting in %ms: attempt %i/%n ...")
    (reconnect-canceled . "Canceled %u reconnect timer with %cs to go...")
    (finished . "\n\n*** ERC finished ***\n")
