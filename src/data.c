@@ -1324,7 +1324,7 @@ blv_invalidate (struct Lisp_Symbol *symbol)
   eassert (symbol->u.s.type == SYMBOL_LOCALIZED);
   blv->valcell = blv->defcell;
   if (blv->fwd.fwdptr)
-    fwd_set (blv->fwd, XCDR (blv->defcell), NULL);
+    fwd_set (blv->fwd, XCDR (blv->valcell), current_buffer);
   blv->buffer = Qnil;
 }
 
@@ -1826,7 +1826,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 	XSETCDR (blv->defcell, value);
 	/* Reflect new value to slot if default binding active.  */
 	if (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
-	  fwd_set (blv->fwd, value, NULL);
+	  fwd_set (blv->fwd, value, current_buffer);
       }
       break;
     case SYMBOL_BUFFER:
