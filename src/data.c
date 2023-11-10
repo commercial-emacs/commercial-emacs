@@ -1322,8 +1322,6 @@ blv_invalidate (struct Lisp_Symbol *symbol)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
   eassert (symbol->u.s.type == SYMBOL_LOCALIZED);
-  if (blv->fwd.fwdptr)
-    XSETCDR (blv->valcell, fwd_get (blv->fwd, NULL));
   blv->valcell = blv->defcell;
   if (blv->fwd.fwdptr)
     fwd_set (blv->fwd, XCDR (blv->defcell), NULL);
