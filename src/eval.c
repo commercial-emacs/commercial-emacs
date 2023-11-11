@@ -596,11 +596,11 @@ signal a `cyclic-variable-indirection' error.  */)
   switch (sym->u.s.type)
     {
     case SYMBOL_KBOARD:
-    case SYMBOL_PER_BUFFER:
+    case SYMBOL_BUFFER:
     case SYMBOL_FORWARDED:
       error ("Cannot make a built-in variable an alias: %s",
 	     SDATA (SYMBOL_NAME (new_alias)));
-    case SYMBOL_LOCAL_SOMEWHERE:
+    case SYMBOL_LOCALIZED:
       error ("Don't know how to make a buffer-local variable an alias: %s",
 	     SDATA (SYMBOL_NAME (new_alias)));
     case SYMBOL_PLAINVAL:
@@ -662,7 +662,7 @@ default_toplevel_binding (Lisp_Object symbol)
     {
       switch ((--pdl)->kind)
 	{
-	case SPECPDL_LET_BLD:
+	case SPECPDL_LET_DEFAULT:
 	case SPECPDL_LET:
 	  if (EQ (specpdl_symbol (pdl), symbol))
 	    binding = pdl;
@@ -685,7 +685,7 @@ lexbound_p (Lisp_Object symbol)
     {
       switch ((--pdl)->kind)
 	{
-	case SPECPDL_LET_BLD:
+	case SPECPDL_LET_DEFAULT:
 	case SPECPDL_LET:
 	  if (EQ (specpdl_symbol (pdl), Qinternal_interpreter_environment))
 	    {
@@ -3311,7 +3311,7 @@ bool
 locally_unbound_blv_let_bounded (struct Lisp_Symbol *symbol)
 {
   for (union specbinding *p = specpdl_ptr; p > specpdl; )
-    if ((--p)->kind == SPECPDL_LET_BLD
+    if ((--p)->kind == SPECPDL_LET_DEFAULT
 	&& XSYMBOL (specpdl_symbol (p)) == symbol
 	&& EQ (specpdl_buffer (p), Fcurrent_buffer ()))
       return true;
@@ -3360,15 +3360,15 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.old_value = SYMBOL_VAL (xsymbol);
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
-      specpdl_ptr->let.kind = SPECPDL_LET_BLV;
+    case SYMBOL_LOCALIZED:
+      specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.old_value = find_symbol_value (xsymbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       eassert (EQ (SYMBOL_BLV (xsymbol)->buffer, Fcurrent_buffer ()));
       /* See locally_unbound_blv_let_bounded.  */
       if (NILP (Flocal_variable_p (symbol, Fcurrent_buffer ())))
-	specpdl_ptr->let.kind = SPECPDL_LET_BLD;
+	specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
       break;
     case SYMBOL_FORWARDED:
     case SYMBOL_KBOARD:
@@ -3377,12 +3377,12 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.old_value = find_symbol_value (xsymbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       break;
-    case SYMBOL_PER_BUFFER:
+    case SYMBOL_BUFFER:
       /* See locally_unbound_blv_let_bounded.  */
       specpdl_ptr->let.kind =
 	NILP (Flocal_variable_p (symbol, Fcurrent_buffer ()))
-	? SPECPDL_LET_BLD
-	: SPECPDL_LET_BLV;
+	? SPECPDL_LET_DEFAULT
+	: SPECPDL_LET_LOCAL;
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.old_value = find_symbol_value (xsymbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
@@ -3397,8 +3397,8 @@ specbind (Lisp_Object argsym, Lisp_Object value)
   if (xsymbol->u.s.type == SYMBOL_PLAINVAL
       && xsymbol->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
     SET_SYMBOL_VAL (xsymbol, value);
-  else if (xsymbol->u.s.type == SYMBOL_PER_BUFFER
-	   && specpdl_kind (specpdl_ptr - 1) == SPECPDL_LET_BLD)
+  else if (xsymbol->u.s.type == SYMBOL_BUFFER
+	   && specpdl_kind (specpdl_ptr - 1) == SPECPDL_LET_DEFAULT)
     set_default_internal (specpdl_symbol (specpdl_ptr - 1), value, SET_INTERNAL_BIND);
   else
     set_internal (specpdl_symbol (specpdl_ptr - 1), value, Qnil, SET_INTERNAL_BIND);
@@ -3548,12 +3548,12 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
       }
       /* gets here first time through when redirect isn't PLAINVAL.  */
       FALLTHROUGH;
-    case SPECPDL_LET_BLD:
+    case SPECPDL_LET_DEFAULT:
       set_default_internal (specpdl_symbol (this_binding),
                             specpdl_old_value (this_binding),
                             bindflag);
       break;
-    case SPECPDL_LET_BLV:
+    case SPECPDL_LET_LOCAL:
       {
 	Lisp_Object symbol = specpdl_symbol (this_binding);
 	Lisp_Object where = specpdl_buffer (this_binding);
@@ -3844,7 +3844,7 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 	      }
 	      /* gets here first time through when redirect isn't PLAINVAL.  */
 	      FALLTHROUGH;
-	    case SPECPDL_LET_BLD:
+	    case SPECPDL_LET_DEFAULT:
 	      {
 		Lisp_Object sym = specpdl_symbol (tmp);
 		Lisp_Object old_value = specpdl_old_value (tmp);
@@ -3852,7 +3852,7 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		set_default_internal (sym, old_value, SET_INTERNAL_THREAD_SWITCH);
 	      }
 	      break;
-	    case SPECPDL_LET_BLV:
+	    case SPECPDL_LET_LOCAL:
 	      {
 		Lisp_Object symbol = specpdl_symbol (tmp);
 		Lisp_Object where = specpdl_buffer (tmp);
@@ -3968,8 +3968,8 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
 	switch (tmp->kind)
 	  {
 	  case SPECPDL_LET:
-	  case SPECPDL_LET_BLD:
-	  case SPECPDL_LET_BLV:
+	  case SPECPDL_LET_DEFAULT:
+	  case SPECPDL_LET_LOCAL:
 	    {
 	      Lisp_Object sym = specpdl_symbol (tmp);
 	      Lisp_Object val = specpdl_old_value (tmp);
@@ -4041,8 +4041,8 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
           break;
 #endif
 
-	case SPECPDL_LET_BLD:
-	case SPECPDL_LET_BLV:
+	case SPECPDL_LET_DEFAULT:
+	case SPECPDL_LET_LOCAL:
 	  mark_object (specpdl_buffer_addr (pdl));
 	  FALLTHROUGH;
 	case SPECPDL_LET:

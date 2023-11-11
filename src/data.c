@@ -17,6 +17,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
+
 #include <config.h>
 
 #include <math.h>
@@ -752,25 +753,28 @@ struct Lisp_Buffer_Local_Value *
 blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
-  Lisp_Object pair = assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
-				   BVAR (buffer, local_var_alist));
-  if (blv->fwd.fwdptr
-      && CONSP (pair)
-      && BUFFERP (blv->buffer)
-      && XBUFFER (blv->buffer) == buffer)
-    {
-      // No context switch, update lisp from C.
-      XSETCDR (pair, fwd_get (blv->fwd, buffer));
-    }
-
-  blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
-  if (CONSP (pair))
-    // future assignment modifies LOCAL_VAR_ALIST
-    blv->valcell = pair;
-  else
-    blv->valcell = blv->defcell;
+  Lisp_Object echo = Qunbound;
   if (blv->fwd.fwdptr)
-    fwd_set (blv->fwd, XCDR (blv->valcell), buffer);
+    {
+      echo = fwd_get (blv->fwd, buffer);
+      XSETCDR (blv->valcell, echo);
+    }
+  Lisp_Object pair =
+    assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
+		  BVAR (buffer, local_var_alist));
+  if (! EQ (Qunbound, echo)
+      && BUFFERP (blv->buffer)
+      && XBUFFER (blv->buffer) == buffer
+      && ! EQ (blv->defcell, blv->valcell))
+    {
+      // Play along with blv retardation for checking purposes.
+      eassert (EQ (pair, blv->valcell)); // PAIR is echo
+    }
+  blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
+  /* VALCELL same memory as LOCAL_VAR_ALIST.  */
+  blv->valcell = ! NILP (pair) ? pair : blv->defcell;
+  if (blv->fwd.fwdptr)
+    fwd_set (blv->fwd, XCDR (blv->valcell), buffer); /* if PAIR is echo, no-op */
   return blv;
 }
 
@@ -1313,6 +1317,17 @@ wrong_choice (Lisp_Object choice, Lisp_Object wrong)
   xsignal2 (Qerror, obj, wrong);
 }
 
+void
+blv_invalidate (struct Lisp_Symbol *symbol)
+{
+  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
+  eassert (symbol->u.s.type == SYMBOL_LOCALIZED);
+  blv->valcell = blv->defcell;
+  if (blv->fwd.fwdptr)
+    fwd_set (blv->fwd, XCDR (blv->valcell), current_buffer);
+  blv->buffer = Qnil;
+}
+
 Lisp_Object
 find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 {
@@ -1345,11 +1360,29 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
     case SYMBOL_PLAINVAL:
       result = SYMBOL_VAL (xsymbol);
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
-      result = XCDR (blv_update (xsymbol, b)->valcell);
+    case SYMBOL_LOCALIZED:
+      {
+	Lisp_Object pair = assq_no_quit (symbol, BVAR (b, local_var_alist));
+	if (xsymbol->u.s.c_variable.fwdptr && CONSP (pair))
+	  {
+	    /* Forwarding to and from the C variable occurs
+	       just-in-time.  */
+	    if (xsymbol->u.s.buffer_local_buffer == b)
+	      // No switch, update lisp from C.
+	      XSETCDR (pair, fwd_get (xsymbol->u.s.c_variable, b));
+	    else
+	      // Switch, update C from lisp.
+	      fwd_set (xsymbol->u.s.c_variable, XCDR (pair), b);
+	  }
+	xsymbol->u.s.buffer_local_buffer = b;
+	result = CONSP (pair) ? XCDR (pair) : xsymbol->u.s.buffer_local_default;
+	if (EQ (result, Qunbound))
+	  result = default_value (symbol);
+	eassert (EQ (result, XCDR (blv_update (xsymbol, b)->valcell)));
+      }
       break;
     case SYMBOL_FORWARDED:
-    case SYMBOL_PER_BUFFER:
+    case SYMBOL_BUFFER:
     case SYMBOL_KBOARD:
       result = fwd_get (SYMBOL_FWD (xsymbol), b);
       break;
@@ -1394,8 +1427,8 @@ DEFUN ("set", Fset, Sset, 2, 2, 0,
   return newval;
 }
 
-/* Ensure setting of VARIABLE in the buffer that localized VARIABLE
-   never attempts to change its default binding.  (Bug#65209)
+/* Ensure future setting of VARIABLE in the buffer that localized
+   VARIABLE never attempts to change its default binding.  (Bug#65209)
 
    set_internal() ensures VALCELL is never DEFCELL if local_variable_p
    is true, that is, the buffer has its own bespoke local binding.
@@ -1406,30 +1439,36 @@ locally_bind_new_blv (Lisp_Object variable)
 {
   Lisp_Object pair = Qnil;
   CHECK_SYMBOL (variable);
-  eassert (XSYMBOL (variable)->u.s.type == SYMBOL_LOCAL_SOMEWHERE);
-  pair = assq_no_quit (variable, BVAR (current_buffer, local_var_alist));
-  if (NILP (pair))
+  if (XSYMBOL (variable)->u.s.type == SYMBOL_LOCALIZED)
     {
-      struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (XSYMBOL (variable));
-      pair = Fcons (variable,
-		    blv->fwd.fwdptr
-		    ? fwd_get (blv->fwd, current_buffer)
-		    : XCDR (blv->defcell));
-      bset_local_var_alist
-	(current_buffer,
-	 Fcons (pair, BVAR (current_buffer, local_var_alist)));
+      pair = assq_no_quit (variable, BVAR (current_buffer, local_var_alist));
+      if (NILP (pair))
+	{
+	  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (XSYMBOL (variable));
+
+	  if (EQ (blv->buffer, Fcurrent_buffer ()))
+	    blv_invalidate (XSYMBOL (variable));
+
+	  pair = Fcons (variable,
+			blv->fwd.fwdptr
+			? fwd_get (blv->fwd, current_buffer)
+			: XCDR (blv->defcell));
+	  bset_local_var_alist
+	    (current_buffer,
+	     Fcons (pair, BVAR (current_buffer, local_var_alist)));
+	}
+      eassert (Flocal_variable_p (variable, Fcurrent_buffer ()));
     }
-  eassert (Flocal_variable_p (variable, Fcurrent_buffer ()));
   return pair;
 }
 
 /* The guts of `set'-related functions.  */
 
 void
-set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
+set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object buf,
               enum Set_Internal_Bind bindflag)
 {
-  Lisp_Object buf = ! NILP (obuf) ? obuf : Fcurrent_buffer();
+  Lisp_Object mybuf = ! NILP (buf) ? buf : Fcurrent_buffer();
   struct Lisp_Symbol *xsymbol;
   CHECK_SYMBOL (symbol);
   xsymbol = XSYMBOL (symbol);
@@ -1453,7 +1492,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 				: unbound
 				? Qmakunbound
 				: Qset,
-				obuf);
+				buf);
     }
 
  start:
@@ -1467,16 +1506,19 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
     case SYMBOL_PLAINVAL:
       SET_SYMBOL_VAL (xsymbol, newval);
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
+    case SYMBOL_LOCALIZED:
       {
 	Lisp_Object pair;
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
 
 	/* Update VALCELL.  */
-	if (! EQ (blv->buffer, buf)
+	if (! EQ (blv->buffer, mybuf)
+	    /* DEFCELL eq'ing VALCELL means we just blv_invalidate'd
+	       -OR- there's really no buffer-local binding.  In either
+	       case we (re)inspect local value bindings.  */
 	    || EQ (blv->defcell, blv->valcell))
 	  {
-	    blv->buffer = buf;
+	    blv->buffer = mybuf;
 	    eassert (blv->local_if_set == xsymbol->u.s.buffer_local_only);
 	    if (blv->local_if_set
 		&& bindflag == SET_INTERNAL_SET
@@ -1490,7 +1532,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 	      }
 	    else
 	      {
-		pair = assq_no_quit (symbol, BVAR (XBUFFER (buf),
+		pair = assq_no_quit (symbol, BVAR (XBUFFER (mybuf),
 						   local_var_alist));
 	      }
 	    blv->valcell = ! NILP (pair) ? pair : blv->defcell;
@@ -1502,22 +1544,22 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 	if (EQ (newval, Qunbound))
 	  blv->fwd.fwdptr = NULL;
 	if (blv->fwd.fwdptr)
-	  fwd_set (blv->fwd, newval, XBUFFER (buf));
+	  fwd_set (blv->fwd, newval, XBUFFER (mybuf));
       }
       break;
-    case SYMBOL_PER_BUFFER:
+    case SYMBOL_BUFFER:
       {
 	lispfwd valpp = SYMBOL_FWD (xsymbol);
 	eassert (BUFFER_OBJFWDP (valpp));
 	if (bindflag == SET_INTERNAL_SET)
 	  {
 	    int idx = PER_BUFFER_IDX (XBUFFER_OBJFWD (valpp)->offset);
-	    if (idx > 0 && ! LOCALIZED_SLOT_P (XBUFFER (buf), idx))
+	    if (idx > 0 && ! LOCALIZED_SLOT_P (XBUFFER (mybuf), idx))
 	      {
 		if (locally_unbound_blv_let_bounded (xsymbol)) // Bug#44733
 		  set_default_internal (symbol, newval, bindflag);
 		else
-		  SET_LOCALIZED_SLOT_P (XBUFFER (buf), idx, 1);
+		  SET_LOCALIZED_SLOT_P (XBUFFER (mybuf), idx, 1);
 	      }
 	  }
       }
@@ -1533,7 +1575,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 	    SET_SYMBOL_VAL (xsymbol, Qunbound);
 	  }
 	else
-	  fwd_set (valpp, newval, XBUFFER (buf));
+	  fwd_set (valpp, newval, XBUFFER (mybuf));
       }
       break;
     default:
@@ -1684,7 +1726,7 @@ default_value (Lisp_Object symbol)
     case SYMBOL_PLAINVAL:
       result = SYMBOL_VAL (sym);
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
+    case SYMBOL_LOCALIZED:
       {
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
 	/* Blandy's "realvalue" semantics for the default binding of
@@ -1698,7 +1740,7 @@ default_value (Lisp_Object symbol)
 	  result = XCDR (SYMBOL_BLV (sym)->defcell);
       }
       break;
-    case SYMBOL_PER_BUFFER:
+    case SYMBOL_BUFFER:
       {
 	lispfwd valpp = SYMBOL_FWD (sym);
 	if (PER_BUFFER_IDX (XBUFFER_OBJFWD (valpp)->offset))
@@ -1740,8 +1782,9 @@ local bindings in certain buffers.  */)
   (Lisp_Object symbol)
 {
   Lisp_Object value = default_value (symbol);
-  if (! EQ (value, Qunbound))
+  if (!EQ (value, Qunbound))
     return value;
+
   xsignal1 (Qvoid_variable, symbol);
 }
 
@@ -1775,13 +1818,10 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
       goto start;
       break;
     case SYMBOL_PLAINVAL:
-    case SYMBOL_FORWARDED:
-    case SYMBOL_KBOARD:
       set_internal (symbol, value, Qnil, bindflag);
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
+    case SYMBOL_LOCALIZED:
       {
-	// the default should not live in defcell!
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
 	XSETCDR (blv->defcell, value);
 	/* Reflect new value to slot if default binding active.  */
@@ -1789,7 +1829,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 	  fwd_set (blv->fwd, value, current_buffer);
       }
       break;
-    case SYMBOL_PER_BUFFER:
+    case SYMBOL_BUFFER:
       {
 	lispfwd valpp = SYMBOL_FWD (sym);
 	int offset = XBUFFER_OBJFWD (valpp)->offset;
@@ -1810,6 +1850,10 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 	  }
       }
       break;
+    case SYMBOL_KBOARD:
+    case SYMBOL_FORWARDED:
+      set_internal (symbol, value, Qnil, bindflag);
+      break;
     default:
       emacs_abort ();
       break;
@@ -1826,7 +1870,7 @@ The default value obtains in the absence of a buffer-local value.  */)
 }
 
 static struct Lisp_Buffer_Local_Value *
-make_blv (struct Lisp_Symbol *sym, Lisp_Object value, lispfwd fwd, bool local_if_set)
+make_blv (struct Lisp_Symbol *sym, Lisp_Object value, lispfwd fwd)
 {
   struct Lisp_Buffer_Local_Value *blv = xmalloc (sizeof *blv);
   Lisp_Object init = Fcons (make_lisp_ptr (sym, Lisp_Symbol),
@@ -1835,7 +1879,7 @@ make_blv (struct Lisp_Symbol *sym, Lisp_Object value, lispfwd fwd, bool local_if
 			     : value));
   blv->buffer = Qnil;
   blv->fwd = fwd;
-  blv->local_if_set = local_if_set;
+  blv->local_if_set = 0;
   blv->defcell = blv->valcell = init;
   __lsan_ignore_object (blv);
   return blv;
@@ -1864,26 +1908,28 @@ declaration.  */)
       XSETSYMBOL (variable, sym);
       goto start;
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
+    case SYMBOL_LOCALIZED:
       eassert (SYMBOL_BLV (sym));
-      SYMBOL_BLV (sym)->local_if_set = true;
-      sym->u.s.buffer_local_only = true;
+      SYMBOL_BLV (sym)->local_if_set = 1;
+      sym->u.s.buffer_local_only = 1;
       break;
     case SYMBOL_PLAINVAL:
       {
 	Lisp_Object value =
 	  EQ (SYMBOL_VAL (sym), Qunbound) ? Qnil : SYMBOL_VAL (sym);
-	sym->u.s.type = SYMBOL_LOCAL_SOMEWHERE;
-	SET_SYMBOL_BLV (sym, make_blv (sym, value, (lispfwd) { NULL }, true));
-	sym->u.s.buffer_local_only = true;
+	sym->u.s.type = SYMBOL_LOCALIZED;
+	SET_SYMBOL_BLV (sym, make_blv (sym, value, (lispfwd) { NULL }));
+	SYMBOL_BLV (sym)->local_if_set = 1;
+	sym->u.s.buffer_local_only = 1;
       }
       break;
     case SYMBOL_FORWARDED:
       {
 	const lispfwd fwd = SYMBOL_FWD (sym);
-	sym->u.s.type = SYMBOL_LOCAL_SOMEWHERE;
-	SET_SYMBOL_BLV (sym, make_blv (sym, Qunbound, fwd, true));
-	sym->u.s.buffer_local_only = true;
+	sym->u.s.type = SYMBOL_LOCALIZED;
+	SET_SYMBOL_BLV (sym, make_blv (sym, Qunbound, fwd));
+	SYMBOL_BLV (sym)->local_if_set = 1;
+	sym->u.s.buffer_local_only = 1;
       }
       break;
     default:
@@ -1897,10 +1943,10 @@ convert_to_localized (Lisp_Object variable, Lisp_Object value, lispfwd fwd)
 {
   CHECK_SYMBOL (variable);
   // not a whiff of buffer-local state
-  eassert (XSYMBOL (variable)->u.s.type != SYMBOL_LOCAL_SOMEWHERE
+  eassert (XSYMBOL (variable)->u.s.type != SYMBOL_LOCALIZED
 	   && NILP (Flocal_variable_p (variable, Fcurrent_buffer ())));
-  XSYMBOL (variable)->u.s.type = SYMBOL_LOCAL_SOMEWHERE;
-  SET_SYMBOL_BLV (XSYMBOL (variable), make_blv (XSYMBOL (variable), value, fwd, false));
+  XSYMBOL (variable)->u.s.type = SYMBOL_LOCALIZED;
+  SET_SYMBOL_BLV (XSYMBOL (variable), make_blv (XSYMBOL (variable), value, fwd));
 }
 
 DEFUN ("make-local-variable", Fmake_local_variable, Smake_local_variable,
@@ -1935,7 +1981,7 @@ hook.  */)
       XSETSYMBOL (variable, sym);
       goto start;
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
+    case SYMBOL_LOCALIZED:
       locally_bind_new_blv (variable);
       break;
     case SYMBOL_PLAINVAL:
@@ -1946,7 +1992,7 @@ hook.  */)
       convert_to_localized (variable, Qunbound, SYMBOL_FWD (sym));
       locally_bind_new_blv (variable);
       break;
-    case SYMBOL_PER_BUFFER:
+    case SYMBOL_BUFFER:
       {
 	int offset = XBUFFER_OBJFWD (SYMBOL_FWD (sym))->offset;
 	int idx = PER_BUFFER_IDX (offset);
@@ -1957,51 +2003,6 @@ hook.  */)
 				  inherently buffer-local, */
 	else
 	  SET_LOCALIZED_SLOT_P (current_buffer, idx, true);
-      }
-      break;
-    default:
-      /* apparently localizing a SYMBOL_KBOARD is a silent no-op.  */
-      break;
-    }
-  return variable;
-}
-
-Lisp_Object
-kill_local_variable_internal (struct Lisp_Symbol *sym, struct buffer *buffer)
-{
-  Lisp_Object variable = make_lisp_ptr (sym, Lisp_Symbol);
- start:
-  switch (sym->u.s.type)
-    {
-    case SYMBOL_VARALIAS:
-      sym = SYMBOL_ALIAS (sym);
-      XSETSYMBOL (variable, sym);
-      goto start;
-      break;
-    case SYMBOL_PER_BUFFER:
-      {
-	lispfwd valpp = SYMBOL_FWD (sym);
-	int offset = XBUFFER_OBJFWD (valpp)->offset;
-	int idx = PER_BUFFER_IDX (offset);
-	if (idx > 0)
-	  {
-	    SET_LOCALIZED_SLOT_P (buffer, idx, 0);
-	    set_per_buffer_value (buffer, offset,
-				  per_buffer_default (offset));
-	  }
-      }
-      break;
-    case SYMBOL_LOCAL_SOMEWHERE:
-      {
-	/* Update watchers, delete from LOCAL_VAR_ALIST.  */
-	Lisp_Object pair = Fassq (variable, BVAR (buffer, local_var_alist));
-	if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
-	  notify_variable_watchers (variable, Qnil, Qmakunbound,
-				    make_lisp_ptr (buffer, Lisp_Vectorlike));
-	if (! NILP (pair))
-	  bset_local_var_alist
-	    (buffer, Fdelq (pair, BVAR (buffer, local_var_alist)));
-	blv_update (sym, buffer);
       }
       break;
     default:
@@ -2016,8 +2017,56 @@ DEFUN ("kill-local-variable", Fkill_local_variable, Skill_local_variable,
 From now on the default value will apply in this buffer.  Return VARIABLE.  */)
   (register Lisp_Object variable)
 {
+  struct Lisp_Symbol *sym;
   CHECK_SYMBOL (variable);
-  return kill_local_variable_internal (XSYMBOL (variable), current_buffer);
+  sym = XSYMBOL (variable);
+
+ start:
+  switch (sym->u.s.type)
+    {
+    case SYMBOL_VARALIAS:
+      sym = SYMBOL_ALIAS (sym);
+      XSETSYMBOL (variable, sym);
+      goto start;
+      break;
+    case SYMBOL_BUFFER:
+      {
+	lispfwd valpp = SYMBOL_FWD (sym);
+	int offset = XBUFFER_OBJFWD (valpp)->offset;
+	int idx = PER_BUFFER_IDX (offset);
+	if (idx > 0)
+	  {
+	    SET_LOCALIZED_SLOT_P (current_buffer, idx, 0);
+	    set_per_buffer_value (current_buffer, offset,
+				  per_buffer_default (offset));
+	  }
+      }
+      break;
+    case SYMBOL_LOCALIZED:
+      {
+	/* Update watchers, delete from LOCAL_VAR_ALIST.  */
+	Lisp_Object pair = Fassq (variable, BVAR (current_buffer, local_var_alist));
+	if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+	  notify_variable_watchers (variable, Qnil, Qmakunbound, Fcurrent_buffer ());
+	if (! NILP (pair))
+	  bset_local_var_alist
+	    (current_buffer,
+	     Fdelq (pair, BVAR (current_buffer, local_var_alist)));
+	/* If the symbol is set up with the current buffer's binding
+	   loaded, recompute its value.  We have to do it now, or else
+	   forwarded objects won't work right.  */
+	{
+	  Lisp_Object buf; XSETBUFFER (buf, current_buffer);
+	  if (EQ (buf, SYMBOL_BLV (sym)->buffer))
+	    blv_invalidate (sym);
+	}
+      }
+      break;
+    default:
+      break;
+    }
+
+  return variable;
 }
 
 DEFUN ("local-variable-p", Flocal_variable_p, Slocal_variable_p,
@@ -2028,10 +2077,10 @@ binding for VARIABLE.  BUFFER defaults to the current buffer.
 Users will generally prefer this to `buffer-local-boundp', which
 unlike `local-variable-p', also returns true if BUFFER falls back to
 VARIABLE's default binding.  */)
-  (Lisp_Object variable, Lisp_Object obuffer)
+  (Lisp_Object variable, Lisp_Object buffer)
 {
   Lisp_Object result = Qnil;
-  Lisp_Object buffer = ! NILP (obuffer) ? obuffer : Fcurrent_buffer ();
+  Lisp_Object mybuf = ! NILP (buffer) ? buffer : Fcurrent_buffer ();
   struct Lisp_Symbol *sym;
 
   CHECK_SYMBOL (variable);
@@ -2045,17 +2094,17 @@ VARIABLE's default binding.  */)
       XSETSYMBOL (variable, sym);
       goto start;
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
-      result = ! NILP (assq_no_quit (variable, BVAR (XBUFFER (buffer),
+    case SYMBOL_LOCALIZED:
+      result = ! NILP (assq_no_quit (variable, BVAR (XBUFFER (mybuf),
 						     local_var_alist)))
 	? Qt : Qnil;
       break;
-    case SYMBOL_PER_BUFFER:
+    case SYMBOL_BUFFER:
       {
 	lispfwd valpp = SYMBOL_FWD (sym);
 	int offset = XBUFFER_OBJFWD (valpp)->offset;
 	int idx = PER_BUFFER_IDX (offset);
-	if (idx == -1 || LOCALIZED_SLOT_P (XBUFFER (buffer), idx))
+	if (idx == -1 || LOCALIZED_SLOT_P (XBUFFER (mybuf), idx))
 	  result = Qt;
       }
       break;
@@ -2089,11 +2138,11 @@ value in BUFFER, or if VARIABLE is automatically buffer-local (see
       XSETSYMBOL (variable, sym);
       goto start;
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
+    case SYMBOL_LOCALIZED:
       result = SYMBOL_BLV (sym)->local_if_set
 	? Qt : Flocal_variable_p (variable, buffer);
       break;
-    case SYMBOL_PER_BUFFER:
+    case SYMBOL_BUFFER:
       result = Qt;
       break;
     default:
@@ -2133,11 +2182,11 @@ If the current binding is global (the default), the value is nil.  */)
     case SYMBOL_KBOARD:
       result = Fframe_terminal (selected_frame);
       break;
-    case SYMBOL_PER_BUFFER:
+    case SYMBOL_BUFFER:
       if (! NILP (Flocal_variable_p (variable, Qnil)))
 	result = Fcurrent_buffer ();
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
+    case SYMBOL_LOCALIZED:
       if (! NILP (Flocal_variable_p (variable, Qnil)))
 	result = Fcurrent_buffer ();
       else if (! EQ (SYMBOL_BLV (sym)->defcell, SYMBOL_BLV (sym)->valcell))
