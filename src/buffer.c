@@ -1067,63 +1067,40 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
   bset_case_eqv_table (b, XCHAR_TABLE (Vascii_downcase_table)->extras[2]);
   bset_invisibility_spec (b, Qt);
 
-  /* Reset all buffer locals to defaults.  */
-  if (ignore_perm)
-    bset_local_var_alist (b, Qnil);
-  else
+  Lisp_Object tail = Fcopy_sequence (BVAR (b, local_var_alist));
+  FOR_EACH_TAIL_SAFE (tail)
     {
-      Lisp_Object buffer;
-      XSETBUFFER (buffer, b);
-
-      for (Lisp_Object last_kept = Qnil,
-	     tail = BVAR (b, local_var_alist);
-	   CONSP (tail); tail = XCDR (tail))
+      Lisp_Object pair = XCAR (tail),
+	var = XCAR (pair),
+	prop_perm = Fget (var, Qpermanent_local);
+      eassert (XSYMBOL (var)->u.s.type == SYMBOL_LOCAL_SOMEWHERE);
+      if (ignore_perm || NILP (prop_perm)) // kill it
+	kill_local_variable_internal (XSYMBOL (var), b);
+      else if (EQ (prop_perm, Qpermanent_local_hook))
 	{
-	  Lisp_Object pair = XCAR (tail),
-	    var = XCAR (pair),
-	    prop_perm = Fget (var, Qpermanent_local);
-
-	  /* Watchers are run *before* modifying the var.  */
+	  /* Rewrite PAIR's binds.  A negligibly useful but
+	     baroque scheme foisted upon us by RMS of
+	     course.  */
+	  Lisp_Object nbinds = Qnil;
+	  for (Lisp_Object tail = XCDR (pair); CONSP (tail); tail = XCDR (tail))
+	    {
+	      Lisp_Object bind = XCAR (tail);
+	      /* Preserve BIND if it's t, or has
+		 `permanent-local-hook' property. */
+	      if (EQ (bind, Qt)
+		  || (SYMBOLP (bind)
+		      && ! NILP (Fget (bind, Qpermanent_local_hook))))
+		nbinds = Fcons (bind, nbinds);
+	    }
+	  nbinds = Fnreverse (nbinds);
 	  if (XSYMBOL (var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
-	    notify_variable_watchers (var, Qnil, Qmakunbound, buffer);
-
-          if (EQ (SYMBOL_BLV (XSYMBOL (var))->buffer, buffer))
-	    blv_invalidate (XSYMBOL (var));
-
-	  if (NILP (prop_perm)) // skip it
-	    {
-	      if (! NILP (last_kept))
-		XSETCDR (last_kept, XCDR (tail));
-	      else
-		bset_local_var_alist (b, XCDR (tail));
-	    }
-	  else // keep it
-	    {
-	      last_kept = tail;
-	      if (EQ (prop_perm, Qpermanent_local_hook))
-		{
-		  /* Rewrite PAIR's binds.  A negligibly useful but
-		     baroque scheme insisted upon by RMS of
-		     course.  */
-		  Lisp_Object nbinds = Qnil;
-		  for (Lisp_Object tail = XCDR (pair); CONSP (tail); tail = XCDR (tail))
-		    {
-		      Lisp_Object bind = XCAR (tail);
-		      /* Preserve BIND if it's t, or has
-			 `permanent-local-hook' property. */
-		      if (EQ (bind, Qt)
-			  || (SYMBOLP (bind)
-			      && ! NILP (Fget (bind, Qpermanent_local_hook))))
-			nbinds = Fcons (bind, nbinds);
-		    }
-		  nbinds = Fnreverse (nbinds);
-		  if (XSYMBOL (var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
-		    notify_variable_watchers (var, nbinds, Qmakunbound, buffer);
-		  XSETCDR (pair, nbinds);
-		}
-	    }
+	    notify_variable_watchers (var, nbinds, Qmakunbound,
+				      make_lisp_ptr (b, Lisp_Vectorlike));
+	  XSETCDR (pair, nbinds);
 	}
     }
+
+  eassert (! ignore_perm || NILP (BVAR (b, local_var_alist)));
 
   /* Douse local_flags bit for killed.  */
   for (int i = 0; i < last_per_buffer_idx; ++i)
@@ -2160,7 +2137,7 @@ set_buffer_internal (struct buffer *new_buf)
 	  {
 	    Lisp_Object var = XCAR (XCAR (tail));
 	    struct Lisp_Symbol *sym = XSYMBOL (var);
-	    if (sym->u.s.type == SYMBOL_LOCALIZED
+	    if (sym->u.s.type == SYMBOL_LOCAL_SOMEWHERE
 		&& SYMBOL_BLV (sym)->fwd.fwdptr)
 	      blv_update (sym, current_buffer); // yes, not b
 	  }
@@ -4728,7 +4705,7 @@ defvar_per_buffer (struct Lisp_Buffer_Objfwd *bo_fwd, const char *namestring,
   bo_fwd->offset = offset;
   bo_fwd->predicate = predicate;
   sym->u.s.declared_special = true;
-  sym->u.s.type = SYMBOL_BUFFER;
+  sym->u.s.type = SYMBOL_PER_BUFFER;
   SET_SYMBOL_FWD (sym, bo_fwd);
   sym->u.s.c_variable.fwdptr = bo_fwd;
   XSETSYMBOL (PER_BUFFER_SYMBOL (offset), sym);

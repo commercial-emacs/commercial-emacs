@@ -606,14 +606,14 @@ enum symbol_interned
 
 enum symbol_type
 {
-  SYMBOL_PLAINVAL,   /* plain old variable */
-  SYMBOL_VARALIAS,   /* variable alias */
-  SYMBOL_LOCALIZED,  /* buffer local variable */
+  SYMBOL_PLAINVAL,        /* plain old variable */
+  SYMBOL_VARALIAS,        /* variable alias */
+  SYMBOL_LOCAL_SOMEWHERE, /* buffer local somewhere (effed up) */
 
   /* Fragile: Forwarded subtypes go after SYMBOL_FORWARDED. */
-  SYMBOL_FORWARDED,  /* defvar_lisp, defvar_bool, defvar_int, ... */
-  SYMBOL_BUFFER,     /* defvar_per_buffer */
-  SYMBOL_KBOARD      /* defvar_kboard */
+  SYMBOL_FORWARDED,       /* defvar_lisp, defvar_bool, defvar_int, ... */
+  SYMBOL_PER_BUFFER,      /* defvar_per_buffer */
+  SYMBOL_KBOARD           /* defvar_kboard */
 };
 
 enum symbol_trapped_write
@@ -2033,7 +2033,7 @@ SYMBOL_ALIAS (struct Lisp_Symbol *sym)
 INLINE struct Lisp_Buffer_Local_Value *
 SYMBOL_BLV (struct Lisp_Symbol *sym)
 {
-  eassume (sym->u.s.type == SYMBOL_LOCALIZED && sym->u.s.val.blv);
+  eassume (sym->u.s.type == SYMBOL_LOCAL_SOMEWHERE && sym->u.s.val.blv);
   return sym->u.s.val.blv;
 }
 INLINE lispfwd
@@ -2058,7 +2058,7 @@ SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
 INLINE void
 SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
 {
-  eassume (sym->u.s.type == SYMBOL_LOCALIZED && v);
+  eassume (sym->u.s.type == SYMBOL_LOCAL_SOMEWHERE && v);
   sym->u.s.val.blv = v;
 }
 INLINE void
@@ -2532,7 +2532,18 @@ struct Lisp_Buffer_Objfwd
     Lisp_Object predicate;
   };
 
-/* Modelling blv as per-symbol instead of per-buffer was a mistake.  */
+/* Modelling blv as per-symbol instead of per-buffer was a mistake.
+   It's why upstream's SYMBOL_LOCALIZED really means
+   SYMBOL_LOCAL_SOMEWHERE, contrary to the misconception that it means
+   "buffer local here."
+
+   Once a symbol becomes buffer-local anywhere, Blandy-Monnier
+   subjected its value semantics to this awkward
+   Lisp_Buffer_Local_Value struct, on the off-chance that
+   current_buffer is the one where the symbol in question was
+   localized.  If not, the blv-getting machinery reduces to a
+   SYMBOL_PLAINVAL equivalent.
+*/
 struct Lisp_Buffer_Local_Value
   {
     /* Setting the variable creates a buffer-local binding
@@ -3097,8 +3108,8 @@ enum specbind_tag {
   SPECPDL_MODULE_ENVIRONMENT,   /* A live module environment.  */
 #endif
   SPECPDL_LET,			/* A plain and simple dynamic let-binding.  */
-  SPECPDL_LET_LOCAL,		/* Let-binding of blv when `local-variable-p' true.  */
-  SPECPDL_LET_DEFAULT		/* Let-binding of blv when `local-variable-p' false.  */
+  SPECPDL_LET_BLV,		/* Let of blv when `local-variable-p' true.  */
+  SPECPDL_LET_BLD		/* Let of blv when `local-variable-p' false.  */
 };
 
 union specbinding
@@ -3668,7 +3679,6 @@ extern void set_default_internal (Lisp_Object, Lisp_Object,
                                   enum Set_Internal_Bind bindflag);
 extern Lisp_Object expt_integer (Lisp_Object, Lisp_Object);
 extern void syms_of_data (void);
-extern void blv_invalidate (struct Lisp_Symbol *);
 
 /* Defined in cmds.c */
 extern void syms_of_cmds (void);
