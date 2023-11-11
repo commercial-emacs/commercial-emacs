@@ -403,6 +403,11 @@ in the order given by `git status'."
   (let (process-file-side-effects)
     (vc-git--rev-parse "HEAD")))
 
+(defun vc-git-short-revision (rev)
+  "Git-specific version of `vc-short-revision'."
+  (let (process-file-side-effects)
+    (vc-git--rev-parse rev 'short)))
+
 (defun vc-git--symbolic-ref (file)
   (or
    (vc-file-getprop file 'vc-git-symbolic-ref)
@@ -1829,11 +1834,14 @@ This requires git 1.8.4 or later, for the \"-L\" option of \"git log\"."
     ;; does not (and cannot) quote.
     (vc-git--rev-parse (concat rev "~1"))))
 
-(defun vc-git--rev-parse (rev)
+(defun vc-git--rev-parse (rev &optional short)
   (with-temp-buffer
     (and
-     (vc-git--out-ok "rev-parse" rev)
-     (buffer-substring-no-properties (point-min) (+ (point-min) 40)))))
+     (apply #'vc-git--out-ok "rev-parse"
+            (append (when short '("--short"))
+                    (list rev)))
+     (goto-char (point-min))
+     (buffer-substring-no-properties (point) (pos-eol)))))
 
 (defun vc-git-next-revision (file rev)
   "Git-specific version of `vc-next-revision'."

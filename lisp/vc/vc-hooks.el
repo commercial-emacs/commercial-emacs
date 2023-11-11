@@ -502,6 +502,11 @@ If FILE is not registered, this function always returns nil."
                            (vc-call-backend
                             backend 'working-revision file))))))
 
+(defun vc-default-short-revision (_backend rev)
+  "Return a \"shortened\" version of the revision REV.
+This default implementation simply returns REV unchanged."
+  rev)
+
 (defun vc-default-registered (backend file)
   "Check if FILE is registered in BACKEND using vc-BACKEND-master-templates."
   (let ((sym (vc-make-backend-sym backend 'master-templates)))

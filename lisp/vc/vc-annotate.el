@@ -409,7 +409,9 @@ should be applied to the background or to the foreground."
 				  nil nil "20")))))))
   (vc-ensure-vc-buffer)
   (setq vc-annotate-display-mode display-mode) ;Not sure why.  --Stef
-  (let* ((temp-buffer-name (format "*Annotate %s (rev %s)*" (buffer-name) rev))
+  (let* ((temp-buffer-name (format "*Annotate %s (rev %s)*" (buffer-name)
+                                   (vc-call-backend (vc-backend file)
+                                                    'short-revision rev)))
          (temp-buffer-show-function 'vc-annotate-display-select)
          ;; If BUF is specified, we presume the caller maintains current line,
          ;; so we don't need to do it here.  This implementation may give
