@@ -33,13 +33,14 @@
 
 (ert-deftest completion-test1 ()
   (with-temp-buffer
-    (cl-flet* ((test/completion-table (string pred action)
-                 (let ((completion-ignore-case t))
-                   (complete-with-action action '("test: ") string pred)))
+    (cl-flet* ((test/completion-table (_string _pred action)
+                                      (if (eq action 'lambda)
+                                          nil
+                                        "test: "))
                (test/completion-at-point ()
-                 (list (copy-marker (point-min))
-                       (copy-marker (point))
-                       #'test/completion-table)))
+                                         (list (copy-marker (point-min))
+                                               (copy-marker (point))
+                                               #'test/completion-table)))
       (let ((completion-at-point-functions (list #'test/completion-at-point)))
         (insert "TEST")
         (completion-at-point)
@@ -183,8 +184,7 @@
 
 (defun completion--pcm-score (comp)
   "Get `completion-score' from COMP."
-  ;; FIXME, uses minibuffer.el implementation details
-  (completion--flex-score comp completion-pcm--regexp))
+  (get-text-property 0 'completion-score comp))
 
 (defun completion--pcm-first-difference-pos (comp)
   "Get `completions-first-difference' from COMP."
