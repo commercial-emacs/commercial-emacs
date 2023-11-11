@@ -743,11 +743,13 @@ DEFUN ("setcdr", Fsetcdr, Ssetcdr, 2, 2, 0,
   return newcdr;
 }
 
-/* The jit comes from updating the lisp from C right before we
-   need SYMBOL's most recent value.  */
+/* If BLV lived in buffer rather than symbol, we wouldn't
+   have to be so careful updating it  Its truth would
+   also become independent of an ever-changing current_buffer.
+*/
 
-static Lisp_Object
-blv_jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
+struct Lisp_Buffer_Local_Value *
+blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
   Lisp_Object pair = assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
@@ -760,26 +762,15 @@ blv_jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
       // No context switch, update lisp from C.
       XSETCDR (pair, fwd_get (blv->fwd, buffer));
     }
-  return pair;
-}
 
-/* If BLV lived in buffer rather than symbol, we wouldn't
-   have to be so careful updating it  Its truth would
-   also become independent of an ever-changing current_buffer.
-*/
-
-struct Lisp_Buffer_Local_Value *
-blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
-{
-  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
-  Lisp_Object pair = blv_jit_read (symbol, buffer);
-  /* Future assignment modifies... */
-  blv->valcell = CONSP (pair)
-    ? pair         /* BUFFER's local_var_alist directly */
-    : blv->defcell /* SYMBOL's global default binding */;
+  blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
+  if (CONSP (pair))
+    // future assignment modifies LOCAL_VAR_ALIST
+    blv->valcell = pair;
+  else
+    blv->valcell = blv->defcell;
   if (blv->fwd.fwdptr)
     fwd_set (blv->fwd, XCDR (blv->valcell), buffer);
-  blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
   return blv;
 }
 
@@ -1355,21 +1346,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
       result = SYMBOL_VAL (xsymbol);
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
-      if (b == current_buffer)
-	{
-	  // blv_update side effects which Blandy and Company relied on
-	  // to accidentally achieve context switches.
-	  struct Lisp_Buffer_Local_Value *blv = blv_update (xsymbol, b);
-	  result = XCDR (blv->valcell);
-	}
-      else
-	{
-	  // blv_jit_read avoids side effects.
-	  Lisp_Object pair = blv_jit_read (xsymbol, b);
-	  eassert (! EQ (SYMBOL_BLV (xsymbol)->buffer,
-			 make_lisp_ptr (b, Lisp_Vectorlike)));
-	  result = XCDR (CONSP (pair) ? pair : SYMBOL_BLV (xsymbol)->defcell);
-	}
+      result = XCDR (blv_update (xsymbol, b)->valcell);
       break;
     case SYMBOL_FORWARDED:
     case SYMBOL_PER_BUFFER:

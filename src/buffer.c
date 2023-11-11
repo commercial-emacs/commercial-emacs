@@ -2089,59 +2089,58 @@ DEFUN ("current-buffer", Fcurrent_buffer, Scurrent_buffer, 0, 0, 0,
 void
 set_buffer_internal (struct buffer *new_buf)
 {
-  Lisp_Object tail;
-  struct buffer *old_buf = current_buffer;
-  BUFFER_CHECK_INDIRECTION (new_buf);
+  struct buffer *old_buf;
 
 #ifdef USE_MMAP_FOR_BUFFERS
   if (new_buf->text->beg == NULL)
     enlarge_buffer_text (new_buf, 0);
 #endif /* USE_MMAP_FOR_BUFFERS */
 
-  if (new_buf == old_buf)
+  if (new_buf == current_buffer)
     return;
+
+  BUFFER_CHECK_INDIRECTION (new_buf);
+
+  old_buf = current_buffer;
   current_buffer = new_buf;
   last_known_column_point = -1; /* Invalidate indentation cache.  */
 
-  /* Set base's undo list to child's.  */
   if (old_buf)
     {
+      /* Set base's undo list to child's.  */
       if (old_buf->base_buffer)
 	bset_undo_list (old_buf->base_buffer, BVAR (old_buf, undo_list));
 
-      /* Backgrounds old markers.  */
+      /* Backgrounds markers.  */
       record_buffer_markers (old_buf);
     }
 
-  /* Set child's undo list to base's.  */
-  if (current_buffer->base_buffer)
-    bset_undo_list (current_buffer, BVAR (current_buffer->base_buffer, undo_list));
-
-  /* Foregrounds new markers.  */
-  fetch_buffer_markers (current_buffer);
-
-  /* Perform context switching blv_update. Afterwards, no C variables
-     will reflect OLD_BUF's view.
-  */
-  if (old_buf)
+  if (current_buffer)
     {
-      tail = BVAR (old_buf, local_var_alist);
-      FOR_EACH_TAIL_SAFE (tail)
-	{
-	  Lisp_Object var = XCAR (XCAR (tail));
-	  struct Lisp_Symbol *sym = XSYMBOL (var);
-	  blv_update (sym, current_buffer);
-	}
+      /* Set child's undo list to base's.  */
+      if (current_buffer->base_buffer)
+	bset_undo_list (current_buffer, BVAR (current_buffer->base_buffer, undo_list));
+
+      /* Foregrounds markers.  */
+      fetch_buffer_markers (current_buffer);
     }
 
-  /* Intersection of OLD_BUF and NEW_BUF blv's switched.  Now do rest
-     of NEW_BUF's blv's.  */
-  tail = BVAR (current_buffer, local_var_alist);
-  FOR_EACH_TAIL_SAFE (tail)
+  /* Update defvar_per_buffer variables.  */
+  struct buffer *const arr[] = {old_buf, current_buffer};
+  for (int i = 0; i < 2; ++i)
     {
-      Lisp_Object var = XCAR (XCAR (tail));
-      struct Lisp_Symbol *sym = XSYMBOL (var);
-      blv_update (sym, current_buffer);
+      struct buffer *b = arr[i];
+      if (b)
+	for (Lisp_Object tail = BVAR (b, local_var_alist);
+	     CONSP (tail);
+	     tail = XCDR (tail))
+	  {
+	    Lisp_Object var = XCAR (XCAR (tail));
+	    struct Lisp_Symbol *sym = XSYMBOL (var);
+	    if (sym->u.s.type == SYMBOL_LOCAL_SOMEWHERE
+		&& SYMBOL_BLV (sym)->fwd.fwdptr)
+	      blv_update (sym, current_buffer); // yes, not b
+	  }
     }
 }
 
