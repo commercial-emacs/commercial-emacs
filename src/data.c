@@ -1369,6 +1369,19 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 	  eassert (! EQ (SYMBOL_BLV (xsymbol)->buffer,
 			 make_lisp_ptr (b, Lisp_Vectorlike)));
 	  result = XCDR (CONSP (pair) ? pair : SYMBOL_BLV (xsymbol)->defcell);
+#ifdef ENABLE_CHECKING
+	  Lisp_Object myresult;
+	  if (xsymbol->u.s.c_variable.fwdptr)
+	    myresult = fwd_get (xsymbol->u.s.c_variable, b);
+	  else if ((pair = assq_no_quit (symbol, BVAR (b, local_var_alist)),
+		    CONSP (pair)))
+	    myresult = XCDR (pair);
+	  else if (! EQ (xsymbol->u.s.buffer_local_default, Qunbound))
+	    myresult = xsymbol->u.s.buffer_local_default;
+	  else
+	    myresult = default_value (symbol);
+	  eassert (EQ (result, myresult));
+#endif
 	}
       break;
     case SYMBOL_FORWARDED:
@@ -1521,6 +1534,8 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 
 	/* VALCELL settled, now update its cdr.  */
 	XSETCDR (blv->valcell, newval);
+	if (EQ (blv->valcell, blv->defcell))
+	  xsymbol->u.s.buffer_local_default = newval;
 
 	if (EQ (newval, Qunbound))
 	  blv->fwd.fwdptr = NULL;
@@ -1807,6 +1822,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 	// the default should not live in defcell!
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
 	XSETCDR (blv->defcell, value);
+	sym->u.s.buffer_local_default = value;
 	/* Reflect new value to slot if default binding active.  */
 	if (blv->fwd.fwdptr && EQ (blv->defcell, blv->valcell))
 	  fwd_set (blv->fwd, value, current_buffer);
@@ -1853,13 +1869,13 @@ make_blv (struct Lisp_Symbol *sym, Lisp_Object value, lispfwd fwd, bool local_if
 {
   struct Lisp_Buffer_Local_Value *blv = xmalloc (sizeof *blv);
   Lisp_Object init = Fcons (make_lisp_ptr (sym, Lisp_Symbol),
-			    (fwd.fwdptr
-			     ? fwd_get (fwd, current_buffer)
-			     : value));
+			    fwd.fwdptr
+			    ? fwd_get (fwd, current_buffer)
+			    : value);
   blv->buffer = Qnil;
   blv->fwd = fwd;
   blv->local_if_set = local_if_set;
-  blv->defcell = blv->valcell = init;
+  blv->defcell = blv->valcell = sym->u.s.buffer_local_default = init;
   __lsan_ignore_object (blv);
   return blv;
 }
