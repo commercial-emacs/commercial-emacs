@@ -5040,7 +5040,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		mark_automatic_object (make_lisp_ptr (SYMBOL_ALIAS (ptr),
 						      Lisp_Symbol));
 		break;
-	      case SYMBOL_LOCALIZED:
+	      case SYMBOL_LOCAL_SOMEWHERE:
 		{
 		  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (ptr);
 		  mark_stack_push (&blv->buffer);
@@ -5050,7 +5050,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		break;
 	      case SYMBOL_FORWARDED:
 		/* Either not a Lisp_Object var, or already staticpro'd.  */
-	      case SYMBOL_BUFFER:
+	      case SYMBOL_PER_BUFFER:
 	      case SYMBOL_KBOARD:
 		/* Marked when we see the corresponding object.  */
 		break;
@@ -5452,7 +5452,7 @@ sweep_symbols (struct thread_state *thr)
             }
 	  else
             {
-              if (sym->u.s.type == SYMBOL_LOCALIZED)
+              if (sym->u.s.type == SYMBOL_LOCAL_SOMEWHERE)
 		{
                   xfree (SYMBOL_BLV (sym));
                   /* Avoid re-free (bug#29066).  */

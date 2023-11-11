@@ -2323,12 +2323,12 @@ dump_pre_dump_symbol (struct dump_context *ctx, struct Lisp_Symbol *symbol)
   eassert (!dump_recall_symbol_cvar (ctx, symbol_lv));
   switch (symbol->u.s.type)
     {
-    case SYMBOL_LOCALIZED:
+    case SYMBOL_LOCAL_SOMEWHERE:
       dump_remember_symbol_aux (ctx, symbol_lv,
 				dump_blv (ctx, symbol->u.s.val.blv));
       break;
     case SYMBOL_KBOARD:
-    case SYMBOL_BUFFER:
+    case SYMBOL_PER_BUFFER:
     case SYMBOL_FORWARDED:
       dump_remember_symbol_aux (ctx, symbol_lv,
 				dump_fwd (ctx, symbol->u.s.val.fwd));
@@ -2394,11 +2394,11 @@ dump_symbol (struct dump_context *ctx,
                             &symbol->u.s.val.alias, Lisp_Symbol,
                             WEIGHT_NORMAL);
       break;
-    case SYMBOL_LOCALIZED:
+    case SYMBOL_LOCAL_SOMEWHERE:
       dump_field_fixup_later (ctx, &out, symbol, &symbol->u.s.val.blv);
       break;
     case SYMBOL_KBOARD:
-    case SYMBOL_BUFFER:
+    case SYMBOL_PER_BUFFER:
     case SYMBOL_FORWARDED:
       dump_field_fixup_later (ctx, &out, symbol, &symbol->u.s.val.fwd);
       break;
@@ -2418,7 +2418,7 @@ dump_symbol (struct dump_context *ctx,
 
   switch (symbol->u.s.type)
     {
-    case SYMBOL_LOCALIZED:
+    case SYMBOL_LOCAL_SOMEWHERE:
       {
 	dump_off aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
 	dump_remember_fixup_ptr_raw
@@ -2430,7 +2430,7 @@ dump_symbol (struct dump_context *ctx,
       }
       break;
     case SYMBOL_KBOARD:
-    case SYMBOL_BUFFER:
+    case SYMBOL_PER_BUFFER:
     case SYMBOL_FORWARDED:
       {
 	dump_off aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
