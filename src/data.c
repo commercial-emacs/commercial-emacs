@@ -1366,8 +1366,6 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 	{
 	  // blv_jit_read avoids side effects.
 	  Lisp_Object pair = blv_jit_read (xsymbol, b);
-	  eassert (! EQ (SYMBOL_BLV (xsymbol)->buffer,
-			 make_lisp_ptr (b, Lisp_Vectorlike)));
 	  result = XCDR (CONSP (pair) ? pair : SYMBOL_BLV (xsymbol)->defcell);
 #if 0
 	  Lisp_Object myresult;
