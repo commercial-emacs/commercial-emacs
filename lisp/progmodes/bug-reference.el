@@ -35,8 +35,6 @@
 
 ;;; Code:
 
-(require 'thingatpt)
-
 (defgroup bug-reference nil
   "Hyperlinking references to bug reports."
   ;; Somewhat arbitrary, by analogy with eg goto-address.
@@ -663,18 +661,9 @@ have been run, the auto-setup is inhibited.")
   (if (and bug-reference-mode (eq font-lock-support-mode 'jit-lock-mode))
       (jit-lock-register #'bug-reference-fontify)
     (jit-lock-unregister #'bug-reference-fontify)
-    (setq thing-at-point-provider-alist
-          (delete '((url . bug-reference--url-at-point))
-                  thing-at-point-provider-alist))
     (save-restriction
       (widen)
       (bug-reference-unfontify (point-min) (point-max)))))
-
-;;;###autoload
-(define-minor-mode bug-reference-mode
-  "Toggle hyperlinking bug references in the buffer (Bug Reference mode)."
-  :after-hook (bug-reference--run-auto-setup)
-  (bug-reference--init bug-reference-mode))
 
 (defun bug-reference-mode-force-auto-setup ()
   "Enable `bug-reference-mode' and force auto-setup.
