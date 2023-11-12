@@ -1369,7 +1369,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 	  eassert (! EQ (SYMBOL_BLV (xsymbol)->buffer,
 			 make_lisp_ptr (b, Lisp_Vectorlike)));
 	  result = XCDR (CONSP (pair) ? pair : SYMBOL_BLV (xsymbol)->defcell);
-#ifdef ENABLE_CHECKING
+#if 0
 	  Lisp_Object myresult;
 	  if (xsymbol->u.s.c_variable.fwdptr)
 	    myresult = fwd_get (xsymbol->u.s.c_variable, b);
