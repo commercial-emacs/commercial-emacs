@@ -1057,7 +1057,7 @@ command_loop (void)
 
   kset_prefix_arg (current_kboard, Qnil);
   kset_last_prefix_arg (current_kboard, Qnil);
-  Vdeactivate_mark = Qnil;
+  Fset (Qdeactivate_mark, Qnil);
   cancel_echoing ();
 
   this_command_key_count = 0;
@@ -1092,7 +1092,7 @@ command_loop (void)
       /* Reselect current window's buffer.  */
       set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
 
-      Vdeactivate_mark = Qnil;
+      Fset (Qdeactivate_mark, Qnil);
 
       /* Reinstate mouse drag events in case tool bar resizes in
          xdisp.c set this flag to true.  */
@@ -1185,7 +1185,7 @@ command_loop (void)
       Vdisable_point_adjustment = Qnil;
 
       /* Clear deactivate-mark if set by process filters and timers.  */
-      Vdeactivate_mark = Qnil;
+      Fset (Qdeactivate_mark, Qnil);
 
       /* Remap command through active keymaps.  */
       Vthis_original_command = cmd;
@@ -1271,7 +1271,7 @@ command_loop (void)
 	    Vtransient_mark_mode = Qidentity;
 
 	  /* Set PRIMARY if `select-active-regions' is non-nil.  */
-	  if (!NILP (Vdeactivate_mark))
+	  if (! NILP (find_symbol_value (XSYMBOL (Qdeactivate_mark), current_buffer)))
 	    call0 (Qdeactivate_mark); /* Sets PRIMARY appropriately.  */
 	  else
 	    {
