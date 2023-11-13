@@ -1367,17 +1367,15 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 	  // blv_jit_read avoids side effects.
 	  Lisp_Object pair = blv_jit_read (xsymbol, b);
 	  result = XCDR (CONSP (pair) ? pair : SYMBOL_BLV (xsymbol)->defcell);
-#if 0
+#ifdef ENABLE_CHECKING
 	  Lisp_Object myresult;
 	  if (xsymbol->u.s.c_variable.fwdptr)
 	    myresult = fwd_get (xsymbol->u.s.c_variable, b);
 	  else if ((pair = assq_no_quit (symbol, BVAR (b, local_var_alist)),
 		    CONSP (pair)))
 	    myresult = XCDR (pair);
-	  else if (! EQ (xsymbol->u.s.buffer_local_default, Qunbound))
-	    myresult = xsymbol->u.s.buffer_local_default;
 	  else
-	    myresult = default_value (symbol);
+	    myresult = XCDR (xsymbol->u.s.buffer_local_default);
 	  eassert (EQ (result, myresult));
 #endif
 	}
