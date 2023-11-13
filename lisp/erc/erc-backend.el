@@ -731,7 +731,7 @@ error data is something ERC recognizes.  Print an explanation to
 the server buffer in any case."
   (when (eq (process-status process) 'failed)
     (erc-display-message
-     nil 'error (process-buffer process)
+     nil '(notice error) (process-buffer process)
      (format "Process exit status: %S" (process-exit-status process)))
     (pcase (process-exit-status process)
       (111
@@ -998,7 +998,7 @@ When `erc-server-reconnect-attempts' is a number, increment
                     (- erc-server-reconnect-attempts
                        (cl-incf erc-server-reconnect-count (or incr 1)))))
         (proc (buffer-local-value 'erc-server-process buffer)))
-    (erc-display-message nil 'error buffer 'reconnecting
+    (erc-display-message nil '(notice error) buffer 'reconnecting
                          ?m erc-server-reconnect-timeout
                          ?i (if count erc-server-reconnect-count "N")
                          ?n (if count erc-server-reconnect-attempts "A"))
@@ -1176,7 +1176,7 @@ Use DISPLAY-FN to show the results."
 When FORCE is non-nil, bypass flood protection so that STRING is
 sent directly without modifying the queue.  When FORCE is the
 symbol `no-penalty', exempt this round from accumulating a
-timeout penalty.
+timeout penalty and schedule it to run ASAP instead of blocking.
 
 If TARGET is specified, look up encoding information for that
 channel in `erc-encoding-coding-alist' or
@@ -1184,6 +1184,11 @@ channel in `erc-encoding-coding-alist' or
 
 See `erc-server-flood-margin' for an explanation of the flood
 protection algorithm."
+  (erc--server-send string force target))
+
+(cl-defmethod erc--server-send (string force target)
+  "Encode and send STRING to `erc-server-process'.
+Expect STRING, FORCE, and TARGET to originate from `erc-server-send'."
   (erc-log (concat "erc-server-send: " string "(" (buffer-name) ")"))
   (setq erc-server-last-sent-time (erc-current-time))
   (let ((encoding (erc-coding-system-for-target target)))
@@ -1204,14 +1209,17 @@ protection algorithm."
                         (when (fboundp 'set-process-coding-system)
                           (set-process-coding-system erc-server-process
                                                      'raw-text encoding))
-                        (process-send-string erc-server-process str))
+                        (if (and (eq force 'no-penalty))
+                            (run-at-time nil nil #'process-send-string
+                                         erc-server-process str)
+                          (process-send-string erc-server-process str)))
                     ;; See `erc-server-send-queue' for full
                     ;; explanation of why we need this condition-case
                     (error nil)))
               (setq erc-server-flood-queue
                     (append erc-server-flood-queue
                             (list (cons str encoding))))
-              (erc-server-send-queue (current-buffer))))
+              (run-at-time nil nil #'erc-server-send-queue (current-buffer))))
           t)
       (message "ERC: No process running")
       nil)))

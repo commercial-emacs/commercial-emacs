@@ -317,7 +317,7 @@
         (insert "Howdy")
         (erc-send-current-line)
         (save-excursion (forward-line -1)
-                        (should (looking-at "No target"))
+                        (should (looking-at (rx "*** No target")))
                         (forward-line -1)
                         (should (looking-at "<tester> Howdy")))
         (should (looking-back "ServNet 6> "))
@@ -2543,7 +2543,8 @@
     (kill-buffer "#chan")))
 
 (defconst erc-tests--modules
-  '( autoaway autojoin bufbar button capab-identify completion dcc fill identd
+  '( autoaway autojoin bufbar button capab-identify
+     command-indicator completion dcc fill identd
      imenu irccontrols keep-place list log match menu move-to-prompt netsplit
      networks nickbar nicks noncommands notifications notify page readonly
      replace ring sasl scrolltobottom services smiley sound
