@@ -752,6 +752,8 @@ blv_jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
   Lisp_Object pair = assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
 				   BVAR (buffer, local_var_alist));
+  eassert (! BUFFERP (blv->buffer)
+	   || XBUFFER (blv->buffer) == symbol->u.s.buffer_local_buffer);
   if (blv->fwd.fwdptr
       && CONSP (pair)
       && BUFFERP (blv->buffer)
@@ -763,10 +765,8 @@ blv_jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
   return pair;
 }
 
-/* If BLV lived in buffer rather than symbol, we wouldn't
-   have to be so careful updating it  Its truth would
-   also become independent of an ever-changing current_buffer.
-*/
+/* Get rid of mercurial `struct Lisp_Buffer_Local_Value` middle man
+   who requires careful updating.  */
 
 struct Lisp_Buffer_Local_Value *
 blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
@@ -775,11 +775,12 @@ blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
   Lisp_Object pair = blv_jit_read (symbol, buffer);
   /* Future assignment modifies... */
   blv->valcell = CONSP (pair)
-    ? pair         /* BUFFER's local_var_alist directly */
-    : blv->defcell /* SYMBOL's global default binding */;
+    ? pair         /* ... BUFFER's local_var_alist directly */
+    : blv->defcell /* ... SYMBOL's global default binding */;
   if (blv->fwd.fwdptr)
     fwd_set (blv->fwd, XCDR (blv->valcell), buffer);
   blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
+  symbol->u.s.buffer_local_buffer = buffer;
   return blv;
 }
 
@@ -1507,6 +1508,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 	    || EQ (blv->defcell, blv->valcell))
 	  {
 	    blv->buffer = buf;
+	    xsymbol->u.s.buffer_local_buffer = XBUFFER (buf);
 	    eassert (blv->local_if_set == xsymbol->u.s.buffer_local_only);
 	    if (blv->local_if_set
 		&& bindflag == SET_INTERNAL_SET

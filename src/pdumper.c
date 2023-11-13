@@ -2410,6 +2410,7 @@ dump_symbol (struct dump_context *ctx,
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.plist, WEIGHT_NORMAL);
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.buffer_local_default, WEIGHT_NORMAL);
   dump_field_lv_rawptr (ctx, &out, symbol, &symbol->u.s.next, Lisp_Symbol, WEIGHT_STRONG);
+  dump_field_lv_rawptr (ctx, &out, symbol, &symbol->u.s.buffer_local_buffer, Lisp_Vectorlike, WEIGHT_STRONG);
 
   if (symbol->u.s.c_variable.fwdptr)
     dump_field_fixup_later (ctx, &out, symbol, &symbol->u.s.c_variable);
