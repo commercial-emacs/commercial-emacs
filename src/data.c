@@ -1369,10 +1369,8 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 	  result = XCDR (CONSP (pair) ? pair : SYMBOL_BLV (xsymbol)->defcell);
 #ifdef ENABLE_CHECKING
 	  Lisp_Object myresult;
-	  if (xsymbol->u.s.c_variable.fwdptr)
-	    myresult = fwd_get (xsymbol->u.s.c_variable, b);
-	  else if ((pair = assq_no_quit (symbol, BVAR (b, local_var_alist)),
-		    CONSP (pair)))
+	  if ((pair = assq_no_quit (symbol, BVAR (b, local_var_alist)),
+	       CONSP (pair)))
 	    myresult = XCDR (pair);
 	  else
 	    myresult = XCDR (xsymbol->u.s.buffer_local_default);
