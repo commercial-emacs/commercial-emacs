@@ -795,7 +795,7 @@ comparing the subr with a much slower Lisp implementation."
                            '(:let-bound-value
                              :buffer-local-value :buffer-local-value)))))))
 
-(ert-deftest data-tests-make_symbol_constant ()
+(ert-deftest data-tests-make-symbol-constant ()
   "Can't set variable marked with 'make_symbol_constant'."
   (should-error (setq most-positive-fixnum 1) :type 'setting-constant))
 
