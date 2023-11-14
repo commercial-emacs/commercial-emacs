@@ -775,7 +775,7 @@ jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
 
 /* Simplify after jettisoning Lisp_Buffer_Local_Value.  */
 
-static void
+Lisp_Object
 switch_buffer_local_context (struct Lisp_Symbol *xsymbol, struct buffer *buffer)
 {
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
@@ -792,25 +792,7 @@ switch_buffer_local_context (struct Lisp_Symbol *xsymbol, struct buffer *buffer)
      contaminated by previous BUFFER_LOCAL_BUFFER's C context.  */
   xsymbol->u.s.buffer_local_buffer = buffer;
   blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
-}
-
-/* Get rid of mercurial `struct Lisp_Buffer_Local_Value` middle man
-   who requires careful updating.  */
-
-struct Lisp_Buffer_Local_Value *
-blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer)
-{
-  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
-  Lisp_Object pair = jit_read (symbol, buffer);
-  /* Future assignment modifies... */
-  blv->valcell = CONSP (pair)
-    ? pair         /* ... BUFFER's local_var_alist directly */
-    : blv->defcell /* ... SYMBOL's global default binding */;
-  if (blv->fwd.fwdptr)
-    fwd_set (blv->fwd, XCDR (blv->valcell), buffer);
-  blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
-  symbol->u.s.buffer_local_buffer = buffer;
-  return blv;
+  return pair;
 }
 
 /* It has been previously suggested to make this function an alias for
@@ -1540,55 +1522,42 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
       {
-	Lisp_Object pair;
+	Lisp_Object pair = switch_buffer_local_context (xsymbol, XBUFFER (buf));
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
 	eassert (! BUFFERP (blv->buffer)
 		 || XBUFFER (blv->buffer) == xsymbol->u.s.buffer_local_buffer);
-	/* Update VALCELL.  */
-	if (true)
+	eassert (blv->local_if_set == xsymbol->u.s.buffer_local_only);
+
+	if (NILP (pair)
+	    && xsymbol->u.s.buffer_local_only
+	    && bindflag == SET_INTERNAL_SET
+	    /* locally_unbound_blv_let_bounded means
+	       "assignment sets default binding."  If not,
+	       then okay to set value binding.  */
+	    && ! locally_unbound_blv_let_bounded (xsymbol))
 	  {
-	    xsymbol->u.s.buffer_local_buffer = XBUFFER (buf);
-	    blv->buffer = buf;
-	    eassert (blv->local_if_set == xsymbol->u.s.buffer_local_only);
-	    if (blv->local_if_set
-		&& bindflag == SET_INTERNAL_SET
-		/* locally_unbound_blv_let_bounded means
-		   "assignment sets default binding."  If not,
-		   then okay to set value binding.  */
-		&& ! locally_unbound_blv_let_bounded (xsymbol))
-	      {
-		/* Fulfill contract of `make-variable-buffer-local'.  */
-		pair = locally_bind_new_blv (symbol);
-	      }
-	    else
-	      {
-		pair = assq_no_quit (symbol, BVAR (XBUFFER (buf),
-						   local_var_alist));
-	      }
-	    blv->valcell = ! NILP (pair) ? pair : blv->defcell;
+	    /* Fulfill contract of `make-variable-buffer-local'.  */
+	    pair = locally_bind_new_blv (symbol);
 	  }
 
-	/* VALCELL settled, now update its cdr.  */
-	XSETCDR (blv->valcell, newval);
-	eassert (EQ (blv->valcell, blv->defcell) == NILP (pair));
-	if (NILP (pair))
-	  xsymbol->u.s.buffer_local_default = newval;
+	if (! NILP (pair))
+	  {
+	    XSETCDR (pair, newval);
+	    blv->valcell = pair;
+	  }
+	else
+	  {
+	    xsymbol->u.s.buffer_local_default = newval;
+	    XSETCDR (blv->defcell, newval);
+	    blv->valcell = blv->defcell;
+	  }
 
 	if (EQ (newval, Qunbound))
 	  xsymbol->u.s.c_variable.fwdptr = blv->fwd.fwdptr = NULL;
 	eassert ((blv->fwd.fwdptr != NULL) ==
 		 (xsymbol->u.s.c_variable.fwdptr != NULL));
 	if (xsymbol->u.s.c_variable.fwdptr)
-	  {
-	    // everyone points to same per-buffer variable.
-	    eassert (*(const ptrdiff_t *)
-		     ((ptrdiff_t) xsymbol->u.s.c_variable.fwdptr
-		      + sizeof (enum Lisp_Fwd_Type))
-		     == *(const ptrdiff_t *)
-		     ((ptrdiff_t) blv->fwd.fwdptr
-		      + sizeof (enum Lisp_Fwd_Type)));
-	    fwd_set (xsymbol->u.s.c_variable, newval, XBUFFER (buf));
-	  }
+	  fwd_set (xsymbol->u.s.c_variable, newval, XBUFFER (buf));
       }
       break;
     case SYMBOL_PER_BUFFER:

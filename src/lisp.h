@@ -3665,7 +3665,7 @@ extern uintmax_t cons_to_unsigned (Lisp_Object, uintmax_t);
 
 extern AVOID args_out_of_range (Lisp_Object, Lisp_Object);
 extern AVOID circular_list (Lisp_Object);
-extern struct Lisp_Buffer_Local_Value *blv_update (struct Lisp_Symbol *symbol, struct buffer *buffer);
+extern Lisp_Object switch_buffer_local_context (struct Lisp_Symbol *xsymbol, struct buffer *buffer);
 
 enum Set_Internal_Bind {
   SET_INTERNAL_SET,

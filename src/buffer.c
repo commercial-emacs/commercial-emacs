@@ -2129,8 +2129,7 @@ set_buffer_internal (struct buffer *new_buf)
       FOR_EACH_TAIL_SAFE (tail)
 	{
 	  Lisp_Object var = XCAR (XCAR (tail));
-	  struct Lisp_Symbol *sym = XSYMBOL (var);
-	  blv_update (sym, current_buffer);
+	  switch_buffer_local_context (XSYMBOL (var), current_buffer);
 	}
     }
 
@@ -2140,8 +2139,7 @@ set_buffer_internal (struct buffer *new_buf)
   FOR_EACH_TAIL_SAFE (tail)
     {
       Lisp_Object var = XCAR (XCAR (tail));
-      struct Lisp_Symbol *sym = XSYMBOL (var);
-      blv_update (sym, current_buffer);
+      switch_buffer_local_context (XSYMBOL (var), current_buffer);
     }
 }
 
