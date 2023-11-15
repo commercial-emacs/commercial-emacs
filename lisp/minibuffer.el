@@ -2395,9 +2395,14 @@ These include:
              (base-prefix (buffer-substring (minibuffer--completion-prompt-end)
                                             (+ start base-size)))
              (base-suffix
-              (if (eq (alist-get 'category (cdr md)) 'file)
-                  (buffer-substring (save-excursion (or (search-forward "/" nil t) (point-max)))
-                                    (point-max))
+              (if (or (eq (alist-get 'category (cdr md)) 'file)
+                      completion-in-region-mode-predicate)
+                  (buffer-substring
+                   (save-excursion
+                     (if completion-in-region-mode-predicate
+                         (point)
+                       (or (search-forward "/" nil t) (point-max))))
+                   (point-max))
                 ""))
              (all-md (completion--metadata (buffer-substring-no-properties
                                             start (point))
@@ -4702,13 +4707,15 @@ instead of the default completion table."
                       history)
             (user-error "No history available"))))
     ;; FIXME: Can we make it work for CRM?
-    (completion-in-region
-     (minibuffer--completion-prompt-end) (point-max)
-     (lambda (string pred action)
-       (if (eq action 'metadata)
-           '(metadata (display-sort-function . identity)
-                      (cycle-sort-function . identity))
-         (complete-with-action action completions string pred))))))
+    (let ((completion-in-region-mode-predicate
+           (lambda () (get-buffer-window "*Completions*" 0))))
+      (completion-in-region
+       (minibuffer--completion-prompt-end) (point-max)
+       (lambda (string pred action)
+         (if (eq action 'metadata)
+             '(metadata (display-sort-function . identity)
+                        (cycle-sort-function . identity))
+           (complete-with-action action completions string pred)))))))
 
 (defun minibuffer-complete-defaults ()
   "Complete minibuffer defaults as far as possible.
@@ -4719,7 +4726,9 @@ instead of the completion table."
              (functionp minibuffer-default-add-function))
     (setq minibuffer-default-add-done t
           minibuffer-default (funcall minibuffer-default-add-function)))
-  (let ((completions (ensure-list minibuffer-default)))
+  (let ((completions (ensure-list minibuffer-default))
+        (completion-in-region-mode-predicate
+         (lambda () (get-buffer-window "*Completions*" 0))))
     (completion-in-region
      (minibuffer--completion-prompt-end) (point-max)
      (lambda (string pred action)
