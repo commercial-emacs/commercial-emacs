@@ -758,7 +758,8 @@ jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
 	   (symbol->u.s.c_variable.fwdptr != NULL));
   if (symbol->u.s.c_variable.fwdptr
       && CONSP (pair)
-      && symbol->u.s.buffer_local_buffer == buffer)
+      && BUFFERP (symbol->u.s.buffer_local_buffer)
+      && XBUFFER (symbol->u.s.buffer_local_buffer) == buffer)
     {
       // everyone points to same per-buffer variable.
       eassert (*(const ptrdiff_t *)
@@ -790,7 +791,7 @@ switch_buffer_local_context (struct Lisp_Symbol *xsymbol, struct buffer *buffer)
 	     buffer);
   /* Update this AFTER jit_read else BUFFER's val bindings get
      contaminated by previous BUFFER_LOCAL_BUFFER's C context.  */
-  xsymbol->u.s.buffer_local_buffer = buffer;
+  xsymbol->u.s.buffer_local_buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
   blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
   return pair;
 }
@@ -1890,7 +1891,8 @@ make_blv (struct Lisp_Symbol *sym, Lisp_Object value, lispfwd fwd, bool local_if
   struct Lisp_Buffer_Local_Value *blv = xmalloc (sizeof *blv);
   Lisp_Object default_val = fwd.fwdptr ? fwd_get (fwd, current_buffer) : value;
   blv->buffer = Qnil;
-  sym->u.s.buffer_local_buffer = NULL;
+  sym->u.s.type = SYMBOL_LOCAL_SOMEWHERE;
+  sym->u.s.buffer_local_buffer = Qnil;
   blv->fwd = fwd;
   blv->local_if_set = local_if_set;
   sym->u.s.buffer_local_default = default_val;
@@ -2059,7 +2061,7 @@ kill_local_variable_internal (struct Lisp_Symbol *sym, struct buffer *buffer)
 	if (! NILP (pair))
 	  bset_local_var_alist
 	    (buffer, Fdelq (pair, BVAR (buffer, local_var_alist)));
-	if (buffer == sym->u.s.buffer_local_buffer
+	if (buffer == XBUFFER (sym->u.s.buffer_local_buffer)
 	    && sym->u.s.c_variable.fwdptr)
 	  fwd_set (sym->u.s.c_variable, sym->u.s.buffer_local_default, buffer);
       }

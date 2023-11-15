@@ -720,7 +720,7 @@ struct Lisp_Symbol
       lispfwd c_variable;
 
       /* See find_symbol_value() for buffer switching logic.  */
-      struct buffer *buffer_local_buffer;
+      Lisp_Object buffer_local_buffer;
     } s;
     GCALIGNED_UNION_MEMBER
   } u;

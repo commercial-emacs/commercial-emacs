@@ -2589,7 +2589,7 @@ init_symbol (Lisp_Object val, Lisp_Object name)
   p->u.s.buffer_local_only = false;
   p->u.s.buffer_local_default = Qunbound;
   p->u.s.c_variable = (lispfwd) { NULL };
-  p->u.s.buffer_local_buffer = NULL;
+  p->u.s.buffer_local_buffer = Qnil;
 }
 
 DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
