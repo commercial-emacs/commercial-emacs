@@ -1495,22 +1495,17 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 	       "assignment sets default binding."  If not,
 	       then okay to set value binding.  */
 	    && ! locally_unbound_blv_let_bounded (xsymbol))
-	  {
-	    /* Fulfill contract of `make-variable-buffer-local'.  */
-	    pair = locally_bind_new_blv (symbol);
-	  }
+	  /* Fulfill contract of `make-variable-buffer-local'.  */
+	  pair = locally_bind_new_blv (symbol);
 
 	if (! NILP (pair))
-	  {
-	    XSETCDR (pair, newval);
-	  }
+	  XSETCDR (pair, newval);
 	else
-	  {
-	    xsymbol->u.s.buffer_local_default = newval;
-	  }
+	  xsymbol->u.s.buffer_local_default = newval;
 
 	if (EQ (newval, Qunbound))
 	  xsymbol->u.s.c_variable.fwdptr = NULL;
+
 	if (xsymbol->u.s.c_variable.fwdptr)
 	  fwd_set (xsymbol->u.s.c_variable, newval, XBUFFER (buf));
       }
