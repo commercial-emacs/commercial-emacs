@@ -2409,6 +2409,7 @@ dump_symbol (struct dump_context *ctx,
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.function, WEIGHT_NORMAL);
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.plist, WEIGHT_NORMAL);
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.buffer_local_default, WEIGHT_NORMAL);
+  dump_field_lv (ctx, &out, symbol, &symbol->u.s.buffer_local_buffer, WEIGHT_NORMAL);
   dump_field_lv_rawptr (ctx, &out, symbol, &symbol->u.s.next, Lisp_Symbol, WEIGHT_STRONG);
 
   if (symbol->u.s.c_variable.fwdptr)

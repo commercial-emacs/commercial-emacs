@@ -753,7 +753,7 @@ jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
 				   BVAR (buffer, local_var_alist));
   struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
   eassert (! BUFFERP (blv->buffer)
-	   || XBUFFER (blv->buffer) == symbol->u.s.buffer_local_buffer);
+	   || EQ (blv->buffer, symbol->u.s.buffer_local_buffer));
   eassert ((blv->fwd.fwdptr != NULL) ==
 	   (symbol->u.s.c_variable.fwdptr != NULL));
   if (symbol->u.s.c_variable.fwdptr
@@ -1526,7 +1526,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 	Lisp_Object pair = switch_buffer_local_context (xsymbol, XBUFFER (buf));
 	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
 	eassert (! BUFFERP (blv->buffer)
-		 || XBUFFER (blv->buffer) == xsymbol->u.s.buffer_local_buffer);
+		 || EQ (blv->buffer, xsymbol->u.s.buffer_local_buffer));
 	eassert (blv->local_if_set == xsymbol->u.s.buffer_local_only);
 
 	if (NILP (pair)
@@ -2058,7 +2058,8 @@ kill_local_variable_internal (struct Lisp_Symbol *sym, struct buffer *buffer)
 	if (! NILP (pair))
 	  bset_local_var_alist
 	    (buffer, Fdelq (pair, BVAR (buffer, local_var_alist)));
-	if (buffer == XBUFFER (sym->u.s.buffer_local_buffer)
+	if (BUFFERP (sym->u.s.buffer_local_buffer)
+	    && buffer == XBUFFER (sym->u.s.buffer_local_buffer)
 	    && sym->u.s.c_variable.fwdptr)
 	  fwd_set (sym->u.s.c_variable, sym->u.s.buffer_local_default, buffer);
       }
