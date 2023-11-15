@@ -1933,7 +1933,6 @@ declaration.  */)
       {
 	Lisp_Object value =
 	  EQ (SYMBOL_VAL (sym), Qunbound) ? Qnil : SYMBOL_VAL (sym);
-	sym->u.s.type = SYMBOL_LOCAL_SOMEWHERE;
 	SET_SYMBOL_BLV (sym, make_blv (sym, value, (lispfwd) { NULL }, true));
 	sym->u.s.buffer_local_only = true;
       }
@@ -1941,7 +1940,6 @@ declaration.  */)
     case SYMBOL_FORWARDED:
       {
 	const lispfwd fwd = SYMBOL_FWD (sym);
-	sym->u.s.type = SYMBOL_LOCAL_SOMEWHERE;
 	SET_SYMBOL_BLV (sym, make_blv (sym, Qunbound, fwd, true));
 	sym->u.s.buffer_local_only = true;
       }
@@ -1959,7 +1957,6 @@ convert_to_localized (Lisp_Object variable, Lisp_Object value, lispfwd fwd)
   // not a whiff of buffer-local state
   eassert (XSYMBOL (variable)->u.s.type != SYMBOL_LOCAL_SOMEWHERE
 	   && NILP (Flocal_variable_p (variable, Fcurrent_buffer ())));
-  XSYMBOL (variable)->u.s.type = SYMBOL_LOCAL_SOMEWHERE;
   SET_SYMBOL_BLV (XSYMBOL (variable), make_blv (XSYMBOL (variable), value, fwd, false));
 }
 
