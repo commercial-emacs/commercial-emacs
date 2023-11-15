@@ -122,6 +122,9 @@ Otherwise display all the abbrevs."
     found))
 
 (defun prepare-abbrev-list-buffer (&optional local)
+  "Return buffer listing abbreviations and expansions for each abbrev table.
+
+LOCAL is a flag, if non-nil display only local abbrevs."
   (let ((local-table local-abbrev-table))
     (with-current-buffer (get-buffer-create "*Abbrevs*")
       (erase-buffer)
@@ -333,6 +336,21 @@ Don't use this function in a Lisp program; use `define-abbrev' instead."
   (add-abbrev global-abbrev-table "Global" arg))
 
 (defun add-abbrev (table type arg)
+  "Define abbrev in TABLE, whose expansion is ARG words before point.
+This command reads the abbreviation from the minibuffer, with prompt TYPE.
+
+ARG of zero means the entire region is the expansion.
+If there's an active region, use that as the expansion.
+
+A negative ARG means to undefine the specified abbrev.
+
+TYPE is an arbitrary string used to prompt user for the kind of
+abbrev, such as \"Global\", \"Mode\".  (This has no influence on the
+choice of the actual TABLE).
+
+See `inverse-add-abbrev' for the opposite task.
+
+Don't use this function in a Lisp program; use `define-abbrev' instead."
   (let ((exp
          (cond
           ((or (and (null arg) (use-region-p))
@@ -353,7 +371,7 @@ Don't use this function in a Lisp program; use `define-abbrev' instead."
     (if (or (null exp)
 	    (not (abbrev-expansion name table))
 	    (y-or-n-p (format "%s expands into \"%s\"; redefine? "
-			      name (abbrev-expansion name table))))
+                              name (abbrev-expansion name table))))
 	(define-abbrev table (downcase name) exp))))
 
 (defun inverse-add-mode-abbrev (n)
@@ -393,6 +411,18 @@ to define an abbrev by specifying the abbreviation in the minibuffer."
   (inverse-add-abbrev global-abbrev-table "Global" n))
 
 (defun inverse-add-abbrev (table type arg)
+  "Define the word before point as an abbrev in TABLE.
+This command reads the expansion from the minibuffer, using prompt TYPE,
+defines the abbrev, and then expands the abbreviation in the current buffer.
+
+ARG means use the ARG-th word before point as the abbreviation.
+Negative ARG means use the ARG-th word after point.
+
+TYPE is an arbitrary string used to prompt user for the kind of
+abbrev, such as \"Global\", \"Mode\".  (This has no influence on the
+choice of the actual TABLE).
+
+See also `add-abbrev', which performs the opposite task."
   (let (name exp start end)
     (save-excursion
       (forward-word (1+ (- arg)))
@@ -1102,6 +1132,8 @@ Presumes that `standard-output' points to `current-buffer'."
   (insert ")\n"))
 
 (defun abbrev--describe (sym)
+  "Describe abbrev SYM.
+Print on `standard-output' the abbrev, count of use, expansion."
   (when (symbol-value sym)
     (prin1 (symbol-name sym))
     (if (null (abbrev-get sym :system))
@@ -1243,6 +1275,8 @@ which see."
   (setq font-lock-multiline nil))
 
 (defun abbrev--possibly-save (query &optional arg)
+  "Maybe save abbrevs: Hook function for use by `save-some-buffer-functions'.
+Associated meaning for QUERY and ARG."
   ;; Query mode.
   (if (eq query 'query)
       (and save-abbrevs abbrevs-changed)
