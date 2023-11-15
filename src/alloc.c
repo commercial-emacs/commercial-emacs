@@ -5031,6 +5031,8 @@ process_mark_stack (ptrdiff_t base_sp)
 	      }
 	    mark_stack_push (&ptr->u.s.function);
 	    mark_stack_push (&ptr->u.s.plist);
+	    mark_stack_push (&ptr->u.s.buffer_local_default);
+	    mark_stack_push (&ptr->u.s.buffer_local_buffer);
 	    switch (ptr->u.s.type)
 	      {
 	      case SYMBOL_PLAINVAL:
@@ -5041,13 +5043,6 @@ process_mark_stack (ptrdiff_t base_sp)
 						      Lisp_Symbol));
 		break;
 	      case SYMBOL_LOCAL_SOMEWHERE:
-		{
-		  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (ptr);
-		  mark_stack_push (&blv->buffer);
-		  mark_stack_push (&blv->valcell);
-		  mark_stack_push (&blv->defcell);
-		}
-		break;
 	      case SYMBOL_FORWARDED:
 		/* Either not a Lisp_Object var, or already staticpro'd.  */
 	      case SYMBOL_PER_BUFFER:
@@ -5454,7 +5449,6 @@ sweep_symbols (struct thread_state *thr)
             {
               if (sym->u.s.type == SYMBOL_LOCAL_SOMEWHERE)
 		{
-                  xfree (SYMBOL_BLV (sym));
                   /* Avoid re-free (bug#29066).  */
                   sym->u.s.type = SYMBOL_PLAINVAL;
                 }

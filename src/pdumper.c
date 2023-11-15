@@ -530,9 +530,9 @@ struct dump_context
   /* Hash table of staticpro values: avoids double relocations.  */
   Lisp_Object staticpro_table;
 
-  /* Hash table mapping symbols to their pre-copy-queue fwd or blv
-     structures (which we dump immediately before the start of the
-     discardable section). */
+  /* Hash table mapping symbols to their pre-copy-queue fwd structures
+     (which we dump immediately before the start of the discardable
+     section). */
   Lisp_Object symbol_aux;
   Lisp_Object symbol_cvar;
 
@@ -2258,30 +2258,6 @@ dump_fwd (struct dump_context *ctx, lispfwd fwd)
 }
 
 static dump_off
-dump_blv (struct dump_context *ctx,
-          const struct Lisp_Buffer_Local_Value *blv)
-{
-#if CHECK_STRUCTS && !defined HASH_Lisp_Buffer_Local_Value_3C363FAC3C
-# error "Lisp_Buffer_Local_Value changed. See CHECK_STRUCTS comment in config.h."
-#endif
-  struct Lisp_Buffer_Local_Value out;
-  dump_object_start (ctx, &out, sizeof (out));
-  DUMP_FIELD_COPY (&out, blv, local_if_set);
-  if (blv->fwd.fwdptr)
-    dump_field_fixup_later (ctx, &out, blv, &blv->fwd.fwdptr);
-  dump_field_lv (ctx, &out, blv, &blv->buffer, WEIGHT_NORMAL);
-  dump_field_lv (ctx, &out, blv, &blv->defcell, WEIGHT_STRONG);
-  dump_field_lv (ctx, &out, blv, &blv->valcell, WEIGHT_STRONG);
-  dump_off offset = dump_object_finish (ctx, &out, sizeof (out));
-  if (blv->fwd.fwdptr)
-    dump_remember_fixup_ptr_raw
-      (ctx,
-       offset + dump_offsetof (struct Lisp_Buffer_Local_Value, fwd),
-       dump_fwd (ctx, blv->fwd));
-  return offset;
-}
-
-static dump_off
 dump_recall_symbol_aux (struct dump_context *ctx, Lisp_Object symbol)
 {
   Lisp_Object symbol_aux = ctx->symbol_aux;
@@ -2323,10 +2299,6 @@ dump_pre_dump_symbol (struct dump_context *ctx, struct Lisp_Symbol *symbol)
   eassert (!dump_recall_symbol_cvar (ctx, symbol_lv));
   switch (symbol->u.s.type)
     {
-    case SYMBOL_LOCAL_SOMEWHERE:
-      dump_remember_symbol_aux (ctx, symbol_lv,
-				dump_blv (ctx, symbol->u.s.val.blv));
-      break;
     case SYMBOL_KBOARD:
     case SYMBOL_PER_BUFFER:
     case SYMBOL_FORWARDED:
@@ -2394,16 +2366,16 @@ dump_symbol (struct dump_context *ctx,
                             &symbol->u.s.val.alias, Lisp_Symbol,
                             WEIGHT_NORMAL);
       break;
-    case SYMBOL_LOCAL_SOMEWHERE:
-      dump_field_fixup_later (ctx, &out, symbol, &symbol->u.s.val.blv);
-      break;
     case SYMBOL_KBOARD:
     case SYMBOL_PER_BUFFER:
     case SYMBOL_FORWARDED:
       dump_field_fixup_later (ctx, &out, symbol, &symbol->u.s.val.fwd);
       break;
+    case SYMBOL_LOCAL_SOMEWHERE:
+      break;
     default:
       emacs_abort ();
+      break;
     }
 
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.function, WEIGHT_NORMAL);
@@ -2411,7 +2383,6 @@ dump_symbol (struct dump_context *ctx,
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.buffer_local_default, WEIGHT_NORMAL);
   dump_field_lv (ctx, &out, symbol, &symbol->u.s.buffer_local_buffer, WEIGHT_NORMAL);
   dump_field_lv_rawptr (ctx, &out, symbol, &symbol->u.s.next, Lisp_Symbol, WEIGHT_STRONG);
-
   if (symbol->u.s.c_variable.fwdptr)
     dump_field_fixup_later (ctx, &out, symbol, &symbol->u.s.c_variable);
 
@@ -2419,17 +2390,6 @@ dump_symbol (struct dump_context *ctx,
 
   switch (symbol->u.s.type)
     {
-    case SYMBOL_LOCAL_SOMEWHERE:
-      {
-	dump_off aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
-	dump_remember_fixup_ptr_raw
-	  (ctx,
-	   offset + dump_offsetof (struct Lisp_Symbol, u.s.val.blv),
-	   (aux_offset
-	    ? aux_offset
-	    : dump_blv (ctx, symbol->u.s.val.blv)));
-      }
-      break;
     case SYMBOL_KBOARD:
     case SYMBOL_PER_BUFFER:
     case SYMBOL_FORWARDED:

@@ -751,23 +751,11 @@ jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
 {
   Lisp_Object pair = assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
 				   BVAR (buffer, local_var_alist));
-  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (symbol);
-  eassert (! BUFFERP (blv->buffer)
-	   || EQ (blv->buffer, symbol->u.s.buffer_local_buffer));
-  eassert ((blv->fwd.fwdptr != NULL) ==
-	   (symbol->u.s.c_variable.fwdptr != NULL));
   if (symbol->u.s.c_variable.fwdptr
       && CONSP (pair)
       && BUFFERP (symbol->u.s.buffer_local_buffer)
       && XBUFFER (symbol->u.s.buffer_local_buffer) == buffer)
     {
-      // everyone points to same per-buffer variable.
-      eassert (*(const ptrdiff_t *)
-	       ((ptrdiff_t) symbol->u.s.c_variable.fwdptr
-		+ sizeof (enum Lisp_Fwd_Type))
-	       == *(const ptrdiff_t *)
-	       ((ptrdiff_t) blv->fwd.fwdptr
-		+ sizeof (enum Lisp_Fwd_Type)));
       // No context switch, update lisp from C.
       XSETCDR (pair, fwd_get (symbol->u.s.c_variable, buffer));
     }
@@ -779,12 +767,7 @@ jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
 Lisp_Object
 switch_buffer_local_context (struct Lisp_Symbol *xsymbol, struct buffer *buffer)
 {
-  struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
   Lisp_Object pair = jit_read (xsymbol, buffer);
-  eassert (EQ (xsymbol->u.s.buffer_local_default, XCDR (blv->defcell)));
-  blv->valcell = CONSP (pair)
-    ? pair         /* ... BUFFER's local_var_alist directly */
-    : blv->defcell /* ... SYMBOL's global default binding */;
   if (xsymbol->u.s.c_variable.fwdptr)
     fwd_set (xsymbol->u.s.c_variable,
 	     CONSP (pair) ? XCDR (pair) : xsymbol->u.s.buffer_local_default,
@@ -792,7 +775,6 @@ switch_buffer_local_context (struct Lisp_Symbol *xsymbol, struct buffer *buffer)
   /* Update this AFTER jit_read else BUFFER's val bindings get
      contaminated by previous BUFFER_LOCAL_BUFFER's C context.  */
   xsymbol->u.s.buffer_local_buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
-  blv->buffer = make_lisp_ptr (buffer, Lisp_Vectorlike);
   return pair;
 }
 
@@ -1376,10 +1358,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
       {
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
 	Lisp_Object pair = jit_read (xsymbol, b);
-	eassert (EQ (xsymbol->u.s.buffer_local_default,
-		     XCDR (blv->defcell)));
 	result = CONSP (pair)
 	  ? XCDR (pair) : xsymbol->u.s.buffer_local_default;
 	if (b == current_buffer)
@@ -1447,28 +1426,13 @@ locally_bind_new_blv (Lisp_Object variable)
   pair = assq_no_quit (variable, BVAR (current_buffer, local_var_alist));
   if (NILP (pair))
     {
-      struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
-      eassert (EQ (xsymbol->u.s.buffer_local_default,
-		   XCDR (blv->defcell)));
-      eassert ((blv->fwd.fwdptr != NULL) ==
-	       (xsymbol->u.s.c_variable.fwdptr != NULL));
       if (xsymbol->u.s.c_variable.fwdptr)
-	{
-	  // everyone points to same per-buffer variable.
-	  eassert (*(const ptrdiff_t *)
-		   ((ptrdiff_t) xsymbol->u.s.c_variable.fwdptr
-		    + sizeof (enum Lisp_Fwd_Type))
-		   == *(const ptrdiff_t *)
-		   ((ptrdiff_t) blv->fwd.fwdptr
-		    + sizeof (enum Lisp_Fwd_Type)));
-	  pair = Fcons (variable, fwd_get (xsymbol->u.s.c_variable,
-					   current_buffer));
-	}
+	pair = Fcons (variable, fwd_get (xsymbol->u.s.c_variable,
+					 current_buffer));
       else
 	pair = Fcons (variable, xsymbol->u.s.buffer_local_default);
       bset_local_var_alist
-	(current_buffer,
-	 Fcons (pair, BVAR (current_buffer, local_var_alist)));
+	(current_buffer, Fcons (pair, BVAR (current_buffer, local_var_alist)));
     }
   /* set_internal() won't modify the default binding if
      local_variable_p is true, that is, the buffer has its own bespoke
@@ -1524,11 +1488,6 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
     case SYMBOL_LOCAL_SOMEWHERE:
       {
 	Lisp_Object pair = switch_buffer_local_context (xsymbol, XBUFFER (buf));
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (xsymbol);
-	eassert (! BUFFERP (blv->buffer)
-		 || EQ (blv->buffer, xsymbol->u.s.buffer_local_buffer));
-	eassert (blv->local_if_set == xsymbol->u.s.buffer_local_only);
-
 	if (NILP (pair)
 	    && xsymbol->u.s.buffer_local_only
 	    && bindflag == SET_INTERNAL_SET
@@ -1544,19 +1503,14 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 	if (! NILP (pair))
 	  {
 	    XSETCDR (pair, newval);
-	    blv->valcell = pair;
 	  }
 	else
 	  {
 	    xsymbol->u.s.buffer_local_default = newval;
-	    XSETCDR (blv->defcell, newval);
-	    blv->valcell = blv->defcell;
 	  }
 
 	if (EQ (newval, Qunbound))
-	  xsymbol->u.s.c_variable.fwdptr = blv->fwd.fwdptr = NULL;
-	eassert ((blv->fwd.fwdptr != NULL) ==
-		 (xsymbol->u.s.c_variable.fwdptr != NULL));
+	  xsymbol->u.s.c_variable.fwdptr = NULL;
 	if (xsymbol->u.s.c_variable.fwdptr)
 	  fwd_set (xsymbol->u.s.c_variable, newval, XBUFFER (buf));
       }
@@ -1742,20 +1696,15 @@ default_value (Lisp_Object symbol)
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
       {
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
 	/* Blandy's "realvalue" semantics for the default binding of
 	   Mcgrath localized slots: if not locally-bound, use
 	   latest forwarded-to C variable.  */
-	if (blv->fwd.fwdptr
+	if (sym->u.s.c_variable.fwdptr
 	    && NILP (Flocal_variable_p (symbol, Fcurrent_buffer ())))
-	  result = fwd_get (blv->fwd, current_buffer);
+	  result = fwd_get (sym->u.s.c_variable, current_buffer);
 	/* Else use default at time of buffer-localization.  */
 	if (NILP (result))
-	  {
-	    eassert (EQ (sym->u.s.buffer_local_default,
-			 XCDR (SYMBOL_BLV (sym)->defcell)));
-	    result = sym->u.s.buffer_local_default;
-	  }
+	  result = sym->u.s.buffer_local_default;
       }
       break;
     case SYMBOL_PER_BUFFER:
@@ -1841,8 +1790,6 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
       {
-	struct Lisp_Buffer_Local_Value *blv = SYMBOL_BLV (sym);
-	XSETCDR (blv->defcell, value);
 	sym->u.s.buffer_local_default = value;
 	// Side effect ugliness: this takes care of forwarding the new
 	// value to the C variable if necessary.
@@ -1885,20 +1832,13 @@ The default value obtains in the absence of a buffer-local value.  */)
   return value;
 }
 
-static struct Lisp_Buffer_Local_Value *
+static void
 make_blv (struct Lisp_Symbol *sym, Lisp_Object value, lispfwd fwd, bool local_if_set)
 {
-  struct Lisp_Buffer_Local_Value *blv = xmalloc (sizeof *blv);
-  Lisp_Object default_val = fwd.fwdptr ? fwd_get (fwd, current_buffer) : value;
-  blv->buffer = Qnil;
   sym->u.s.type = SYMBOL_LOCAL_SOMEWHERE;
   sym->u.s.buffer_local_buffer = Qnil;
-  blv->fwd = fwd;
-  blv->local_if_set = local_if_set;
-  sym->u.s.buffer_local_default = default_val;
-  blv->defcell = blv->valcell = Fcons (make_lisp_ptr (sym, Lisp_Symbol), default_val);
-  __lsan_ignore_object (blv);
-  return blv;
+  sym->u.s.buffer_local_only = local_if_set;
+  sym->u.s.buffer_local_default = fwd.fwdptr ? fwd_get (fwd, current_buffer) : value;
 }
 
 DEFUN ("make-variable-buffer-local", Fmake_variable_buffer_local,
@@ -1925,23 +1865,19 @@ declaration.  */)
       goto start;
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
-      eassert (SYMBOL_BLV (sym));
-      SYMBOL_BLV (sym)->local_if_set = true;
       sym->u.s.buffer_local_only = true;
       break;
     case SYMBOL_PLAINVAL:
       {
 	Lisp_Object value =
 	  EQ (SYMBOL_VAL (sym), Qunbound) ? Qnil : SYMBOL_VAL (sym);
-	SET_SYMBOL_BLV (sym, make_blv (sym, value, (lispfwd) { NULL }, true));
-	sym->u.s.buffer_local_only = true;
+	make_blv (sym, value, (lispfwd) { NULL }, true);
       }
       break;
     case SYMBOL_FORWARDED:
       {
 	const lispfwd fwd = SYMBOL_FWD (sym);
-	SET_SYMBOL_BLV (sym, make_blv (sym, Qunbound, fwd, true));
-	sym->u.s.buffer_local_only = true;
+	make_blv (sym, Qunbound, fwd, true);
       }
       break;
     default:
@@ -1957,7 +1893,7 @@ convert_to_localized (Lisp_Object variable, Lisp_Object value, lispfwd fwd)
   // not a whiff of buffer-local state
   eassert (XSYMBOL (variable)->u.s.type != SYMBOL_LOCAL_SOMEWHERE
 	   && NILP (Flocal_variable_p (variable, Fcurrent_buffer ())));
-  SET_SYMBOL_BLV (XSYMBOL (variable), make_blv (XSYMBOL (variable), value, fwd, false));
+  make_blv (XSYMBOL (variable), value, fwd, false);
 }
 
 DEFUN ("make-local-variable", Fmake_local_variable, Smake_local_variable,
@@ -2150,7 +2086,7 @@ value in BUFFER, or if VARIABLE is automatically buffer-local (see
       goto start;
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
-      result = SYMBOL_BLV (sym)->local_if_set
+      result = sym->u.s.buffer_local_only
 	? Qt : Flocal_variable_p (variable, buffer);
       break;
     case SYMBOL_PER_BUFFER:
@@ -2191,14 +2127,8 @@ If the current binding is global (the default), the value is nil.  */)
 	result = Fcurrent_buffer ();
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
-      {
-	bool q_bespoke = ! NILP (Flocal_variable_p (variable,
-						    Fcurrent_buffer ()));
-	eassert (q_bespoke == ! EQ (SYMBOL_BLV (sym)->defcell,
-				    SYMBOL_BLV (sym)->valcell));
-	if (q_bespoke)
-	  result = Fcurrent_buffer ();
-      }
+      if (! NILP (Flocal_variable_p (variable, Fcurrent_buffer ())))
+	result = Fcurrent_buffer ();
       break;
     case SYMBOL_FORWARDED:
     case SYMBOL_PLAINVAL:

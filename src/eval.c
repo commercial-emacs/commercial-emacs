@@ -3365,7 +3365,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       specpdl_ptr->let.symbol = symbol;
       specpdl_ptr->let.old_value = find_symbol_value (xsymbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
-      eassert (EQ (SYMBOL_BLV (xsymbol)->buffer, Fcurrent_buffer ()));
+      eassert (XBUFFER (xsymbol->u.s.buffer_local_buffer) == current_buffer);
       /* See locally_unbound_blv_let_bounded.  */
       if (NILP (Flocal_variable_p (symbol, Fcurrent_buffer ())))
 	specpdl_ptr->let.kind = SPECPDL_LET_BLD;

@@ -695,7 +695,6 @@ struct Lisp_Symbol
       union {
 	Lisp_Object value;
 	struct Lisp_Symbol *alias;
-	struct Lisp_Buffer_Local_Value *blv;
 	lispfwd fwd;
       } val;
 
@@ -2030,12 +2029,6 @@ SYMBOL_ALIAS (struct Lisp_Symbol *sym)
   eassume (sym->u.s.type == SYMBOL_VARALIAS && sym->u.s.val.alias);
   return sym->u.s.val.alias;
 }
-INLINE struct Lisp_Buffer_Local_Value *
-SYMBOL_BLV (struct Lisp_Symbol *sym)
-{
-  eassume (sym->u.s.type == SYMBOL_LOCAL_SOMEWHERE && sym->u.s.val.blv);
-  return sym->u.s.val.blv;
-}
 INLINE lispfwd
 SYMBOL_FWD (struct Lisp_Symbol *sym)
 {
@@ -2054,12 +2047,6 @@ SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
 {
   eassume (sym->u.s.type == SYMBOL_VARALIAS && v);
   sym->u.s.val.alias = v;
-}
-INLINE void
-SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
-{
-  eassume (sym->u.s.type == SYMBOL_LOCAL_SOMEWHERE && v);
-  sym->u.s.val.blv = v;
 }
 INLINE void
 SET_SYMBOL_FWD (struct Lisp_Symbol *sym, void const *v)
@@ -2530,34 +2517,6 @@ struct Lisp_Buffer_Objfwd
     int offset;
     /* One of Qnil, Qintegerp, Qsymbolp, Qstringp, Qfloatp or Qnumberp.  */
     Lisp_Object predicate;
-  };
-
-/* Modelling blv as per-symbol instead of per-buffer was a mistake.
-   It's why upstream's SYMBOL_LOCALIZED really means
-   SYMBOL_LOCAL_SOMEWHERE, contrary to the misconception that it means
-   "buffer local here."
-
-   Once a symbol becomes buffer-local anywhere, Blandy-Monnier
-   subjected its value semantics to this awkward
-   Lisp_Buffer_Local_Value struct, on the off-chance that
-   current_buffer is the one where the symbol in question was
-   localized.  If not, the blv-getting machinery reduces to a
-   SYMBOL_PLAINVAL equivalent.
-*/
-struct Lisp_Buffer_Local_Value
-  {
-    /* Setting the variable creates a buffer-local binding
-       (cf. `defvar-local').  */
-    bool_bf local_if_set : 1;
-    /* a DEFVAR_LISP.  */
-    lispfwd fwd;
-    /* The buffer for which the loaded binding was found.  */
-    Lisp_Object buffer;
-    /* A cons cell of the form (SYMBOL . DEFAULT-VALUE).  */
-    Lisp_Object defcell;
-    /* A cons cell of the form (SYMBOL . VALUE).
-       This is `eq' to DEFCELL if unassigned.  */
-    Lisp_Object valcell;
   };
 
 /* Like Lisp_Objfwd except that value lives in a slot in the
