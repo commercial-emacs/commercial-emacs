@@ -732,9 +732,9 @@ See also: `erc-get-channel-user-list'."
   "A topic string for the channel.  Should only be used in channel-buffers.")
 
 (defvar-local erc-channel-modes nil
-  "List of strings representing channel modes.
-E.g. (\"i\" \"m\" \"s\" \"b Quake!*@*\")
-\(not sure the ban list will be here, but why not)")
+  "List of letters, as strings, representing channel modes.
+For example, (\"i\" \"m\" \"s\").  Modes that take accompanying
+parameters are not included.")
 
 (defvar-local erc-insert-marker nil
   "The place where insertion of new text in erc buffers should happen.")
@@ -4551,6 +4551,10 @@ returns."
     (erc--send-input-lines (erc--run-send-hooks lines-obj)))
   t)
 
+;; FIXME if the user types /MODE<RET>, LINE becomes "\n", which
+;; matches the pattern, so "\n" is sent to the server.  Perhaps
+;; instead of `do-not-parse-args', this should just join &rest
+;; arguments.
 (defun erc-cmd-MODE (line)
   "Change or display the mode value of a channel or user.
 The first word specifies the target.  The rest is the mode string
@@ -5913,9 +5917,19 @@ See also: `erc-echo-notice-in-user-buffers',
 The server buffer is given by BUFFER."
   (with-current-buffer buffer
     (when erc-user-mode
-      (let ((mode (if (functionp erc-user-mode)
-                      (funcall erc-user-mode)
-                    erc-user-mode)))
+      (let* ((mode (if (functionp erc-user-mode)
+                       (funcall erc-user-mode)
+                     erc-user-mode))
+             (as-pair (erc--parse-user-modes mode))
+             (have (erc--user-modes))
+             (redundant-want (seq-intersection (car as-pair) have))
+             (redundant-drop (seq-difference (cadr as-pair) have)))
+        (when redundant-want
+          (erc-display-message nil 'notice buffer 'user-mode-redundant-add
+                               ?m (apply #'string redundant-want)))
+        (when redundant-drop
+          (erc-display-message nil 'notice buffer 'user-mode-redundant-drop
+                               ?m (apply #'string redundant-drop)))
         (when (stringp mode)
           (erc-log (format "changing mode for %s to %s" nick mode))
           (erc-server-send (format "MODE %s %s" nick mode)))))))
@@ -6191,22 +6205,53 @@ See also `erc-channel-begin-receiving-names'."
 
 (defun erc-parse-prefix ()
   "Return an alist of valid prefix character types and their representations.
-Example: (operator) o => @, (voiced) v => +."
-  (let ((str (or (erc-with-server-buffer (erc--get-isupport-entry 'PREFIX t))
-                 ;; provide a sane default
-                 "(qaohv)~&@%+"))
-        types chars)
-    (when (string-match "^(\\([^)]+\\))\\(.+\\)$" str)
-      (setq types (match-string 1 str)
-            chars (match-string 2 str))
-      (let ((len (min (length types) (length chars)))
-            (i 0)
-            (alist nil))
-        (while (< i len)
-          (setq alist (cons (cons (elt types i) (elt chars i))
-                            alist))
-          (setq i (1+ i)))
-        alist))))
+For example, if the current ISUPPORT \"PREFIX\" is \"(ov)@+\",
+return an alist `equal' to ((?v . ?+) (?o . ?@)).  For historical
+reasons, ensure the ordering of the returned alist is opposite
+that of the advertised parameter."
+  (let* ((str (or (erc--get-isupport-entry 'PREFIX t) "(qaohv)~&@%+"))
+         (i 0)
+         (j (string-search ")" str))
+         collected)
+    (when j
+      (while-let ((u (aref str (cl-incf i)))
+                  ((not (=  ?\) u))))
+        (push (cons u (aref str (cl-incf j))) collected)))
+    collected))
+
+(defvar-local erc--parsed-prefix nil
+  "Cons of latest advertised PREFIX and its parsed alist.
+Only usable for the current server session.")
+
+;; As of ERC 5.6, `erc-channel-receive-names' is the only caller, and
+;; it runs infrequently.  In the future, extensions, like
+;; `multi-prefix', may benefit more from a two-way translation table.
+(cl-defstruct erc--parsed-prefix
+  "Server-local channel-membership-prefix data."
+  (key nil :type (or null string))
+  (letters "qaohv" :type string)
+  (statuses "~&@%+" :type string)
+  (alist nil :type (list-of cons)))
+
+(defun erc--parse-prefix ()
+  "Return (possibly cached) status prefix translation alist for the server.
+Ensure the returned value describes the most recent \"PREFIX\"
+ISUPPORT parameter received from the current server and that the
+original ordering is preserved."
+  (erc-with-server-buffer
+    (let ((key (erc--get-isupport-entry 'PREFIX)))
+      (or (and key
+               erc--parsed-prefix
+               (eq (cdr key) (erc--parsed-prefix-key erc--parsed-prefix))
+               (erc--parsed-prefix-alist erc--parsed-prefix))
+          (let ((alist (nreverse (erc-parse-prefix))))
+            (setq erc--parsed-prefix
+                  (make-erc--parsed-prefix
+                   :key (cdr key)
+                   :letters (apply #'string (map-keys alist))
+                   :statuses (apply #'string (map-values alist))
+                   :alist alist))
+            alist)))))
 
 (defcustom erc-channel-members-changed-hook nil
   "This hook is called every time the variable `channel-members' changes.
@@ -6456,7 +6501,9 @@ TOPIC string to the current topic."
 
 (defun erc-set-modes (tgt mode-string)
   "Set the modes for the TGT provided as MODE-STRING."
-  (let* ((modes (erc-parse-modes mode-string))
+  (declare (obsolete "see comment atop `erc--update-modes'" "30.1"))
+  (let* ((modes (with-suppressed-warnings ((obsolete erc-parse-modes))
+                  (erc-parse-modes mode-string)))
          (add-modes (nth 0 modes))
          ;; list of triples: (mode-char 'on/'off argument)
          (arg-modes (nth 2 modes)))
@@ -6502,6 +6549,7 @@ for modes without parameters to add and remove respectively.  The
 arg-modes is a list of triples of the form:
 
   (MODE-CHAR ON/OFF ARGUMENT)."
+  (declare (obsolete "see comment atop `erc--update-modes'" "30.1"))
   (if (string-match "^\\s-*\\(\\S-+\\)\\(\\s-.*$\\|$\\)" mode-string)
       (let ((chars (mapcar #'char-to-string (match-string 1 mode-string)))
             ;; arguments in channel modes
@@ -6546,8 +6594,10 @@ arg-modes is a list of triples of the form:
   "Update the mode information for TGT, provided as MODE-STRING.
 Optional arguments: NICK, HOST and LOGIN - the attributes of the
 person who changed the modes."
+  (declare (obsolete "see comment atop `erc--update-modes'" "30.1"))
   ;; FIXME: neither of nick, host, and login are used!
-  (let* ((modes (erc-parse-modes mode-string))
+  (let* ((modes (with-suppressed-warnings ((obsolete erc-parse-modes))
+                  (erc-parse-modes mode-string)))
          (add-modes (nth 0 modes))
          (remove-modes (nth 1 modes))
          ;; list of triples: (mode-char 'on/'off argument)
@@ -6596,9 +6646,137 @@ person who changed the modes."
           ;; nick modes - ignored at this point
           (t nil))))
 
+(defun erc--update-membership-prefix (nick letter state)
+  "Update status prefixes for NICK in current channel buffer.
+Expect LETTER to be a status char and STATE to be a boolean."
+  (erc-update-current-channel-member nick nil nil
+                                     (and (= letter ?v) state)
+                                     (and (= letter ?h) state)
+                                     (and (= letter ?o) state)
+                                     (and (= letter ?a) state)
+                                     (and (= letter ?q) state)))
+
+(defvar erc--update-channel-modes-omit-status-p nil)
+
+(defun erc--update-channel-modes (string &rest args)
+  "Update `erc-channel-modes' and dispatch individual mode handlers.
+Also update status prefixes, as needed.  Expect STRING to be a
+\"modestring\" and ARGS to match mode-specific parameters.  When
+`erc--update-channel-modes-omit-status-p' is non-nil, forgo
+setting status prefixes for channel members."
+  (cl-assert erc-server-process)
+  (cl-assert erc--target)
+  (cl-assert (erc--target-channel-p erc--target))
+  (pcase-let* ((status-letters
+                (and (not erc--update-channel-modes-omit-status-p)
+                     (or (erc-with-server-buffer
+                           (erc--parse-prefix)
+                           (erc--parsed-prefix-letters erc--parsed-prefix))
+                         "qaovhbQAOVHB")))
+               (`(,type-a ,type-b ,type-c ,type-d)
+                (or (cdr (erc--get-isupport-entry 'CHANMODES))
+                    '(nil "Kk" "Ll" nil)))
+               (+p t))
+    (dolist (c (append string nil))
+      (let ((letter (char-to-string c)))
+        (cond ((= ?+ c) (setq +p t))
+              ((= ?- c) (setq +p nil))
+              ((and status-letters (string-search letter status-letters))
+               (erc--update-membership-prefix (pop args) c (if +p 'on 'off)))
+              ((and type-a (string-search letter type-a))
+               (erc--handle-channel-mode 'a c +p (pop args)))
+              ((string-search letter type-b)
+               (erc--handle-channel-mode 'b c +p (pop args)))
+              ((string-search letter type-c)
+               (erc--handle-channel-mode 'c c +p (and +p (pop args))))
+              ((or (null type-d) (string-search letter type-d))
+               (setq erc-channel-modes
+                     (if +p
+                         (cl-pushnew letter erc-channel-modes :test #'equal)
+                       (delete letter erc-channel-modes))))
+              (type-d ; OK to print error because server buffer exists
+               (erc-display-message nil '(notice error) (erc-server-buffer)
+                                    (format "Unknown channel mode: %S" c))))))
+    (setq erc-channel-modes (erc-sort-strings erc-channel-modes))
+    (erc-update-mode-line (current-buffer))))
+
+(defvar-local erc--user-modes nil
+  "List of current user modes, analogous to `erc-channel-modes'.")
+
+(defun erc--user-modes (&optional as-string-p)
+  "Return user mode letters as chars or, with AS-STRING-P, a single string."
+  (let ((modes (erc-with-server-buffer erc--user-modes)))
+    (if as-string-p
+        (apply #'string (if (memq as-string-p '(+ ?+)) (cons '?+ modes) modes))
+      modes)))
+
+(defun erc--parse-user-modes (string)
+  "Return a list of mode chars to add and remove, based on STRING."
+  (let ((addp t)
+        add-modes remove-modes)
+    (seq-doseq (c string)
+      (pcase c
+        (?+ (setq addp t))
+        (?- (setq addp nil))
+        (_ (push c (if addp add-modes remove-modes)))))
+    (list (nreverse add-modes)
+          (nreverse remove-modes))))
+
+(defun erc--merge-user-modes (adding dropping)
+  "Update `erc--user-modes' with chars ADDING and DROPPING."
+  (sort (seq-difference (seq-union erc--user-modes adding) dropping) #'-))
+
+;; XXX this comment is referenced elsewhere (grep before deleting).
+;;
+;; The function `erc-update-modes' was deprecated in ERC 5.6 with no
+;; immediate public replacement.  Third parties needing such a thing
+;; are encouraged to write to emacs-erc@gnu.org with ideas for a
+;; mode-handler API, possibly one incorporating mode-letter specific
+;; handlers, like `erc--handle-channel-mode' below.
+(defun erc--update-modes (raw-args)
+  "Handle user or channel mode update from server.
+Expect RAW-ARGS to be a \"modestring\" followed by mode-specific
+arguments."
+  (if (and erc--target (erc--target-channel-p erc--target))
+      (apply #'erc--update-channel-modes raw-args)
+    (setq erc--user-modes
+          (apply #'erc--merge-user-modes
+                 (erc--parse-user-modes (car raw-args))))))
+
+(defun erc--init-channel-modes (channel raw-args)
+  "Set CHANNEL modes from RAW-ARGS."
+  (let ((erc--update-channel-modes-omit-status-p t))
+    (erc-with-buffer (channel)
+      (apply #'erc--update-channel-modes raw-args))))
+
+(cl-defgeneric erc--handle-channel-mode (type letter state arg)
+  "Handle a STATE change for mode LETTER of TYPE with ARG.
+Expect to be called in the affected target buffer.  Expect TYPE
+to be a symbol, namely, one of `a', `b', `c', or `d'.  Expect
+LETTER to be a character, STATE to be a boolean, and ARGUMENT to
+be either a string or nil."
+  (erc-log (format "Channel-mode %c (type %s, arg %S) %s"
+                   letter type arg (if state 'enabled 'disabled))))
+
+;; We could specialize on (eql 'c), but that may be too brittle.
+(cl-defmethod erc--handle-channel-mode (_ (_ (eql ?l)) state arg)
+  (erc-update-channel-limit (erc--target-string erc--target)
+                            (if state 'on 'off)
+                            arg))
+
+;; We could specialize on (eql 'b), but that may be too brittle.
+(cl-defmethod erc--handle-channel-mode (_ (_ (eql ?k)) state arg)
+  ;; Mimic old parsing behavior in which an ARG of "*" was discarded
+  ;; even though `erc-update-channel-limit' checks STATE first.
+  (erc-update-channel-key (erc--target-string erc--target)
+                          (if state 'on 'off)
+                          (if (equal arg "*") nil arg)))
+
 (defun erc-update-channel-limit (channel onoff n)
-  ;; FIXME: what does ONOFF actually do?  -- Lawrence 2004-01-08
-  "Update CHANNEL's user limit to N."
+  "Update CHANNEL's user limit to N.
+Expect ONOFF to be `on' when the mode is being enabled and `off'
+otherwise.  And because this mode is of \"type C\", expect N to
+be non-nil only when enabling."
   (if (or (not (eq onoff 'on))
           (and (stringp n) (string-match "^[0-9]+$" n)))
       (erc-with-buffer
@@ -8274,6 +8452,10 @@ All windows are opened in the current frame."
    (ops . "%i operator%s: %o")
    (ops-none . "No operators in this channel.")
    (undefined-ctcp . "Undefined CTCP query received. Silently ignored")
+   (user-mode-redundant-add
+    . "Already have user mode(s): %m. Requesting again anyway.")
+   (user-mode-redundant-drop
+    . "Already without user mode(s): %m. Requesting removal anyway.")
    (variable-not-bound . "Variable not bound!")
    (ACTION . "* %n %a")
    (CTCP-CLIENTINFO . "Client info for %n: %m")

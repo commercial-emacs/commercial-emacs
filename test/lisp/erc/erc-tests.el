@@ -643,6 +643,131 @@
 
       (should (equal '("de" "" "fg@xy") (erc-parse-user "abc\nde!fg@xy"))))))
 
+(ert-deftest erc--parse-prefix ()
+  (erc-mode)
+  (erc-tests--set-fake-server-process "sleep" "1")
+  (setq erc--isupport-params (make-hash-table)
+        erc-server-parameters '(("PREFIX" . "(Yqaohv)!~&@%+")))
+
+  (let ((proc erc-server-process)
+        (expected '((?Y . ?!) (?q . ?~) (?a . ?&)
+                    (?o . ?@) (?h . ?%) (?v . ?+)))
+        cached)
+
+    (with-temp-buffer
+      (erc-mode)
+      (setq erc-server-process proc)
+      (should (equal expected (erc--parse-prefix))))
+
+    (should (equal expected (erc--parsed-prefix-alist erc--parsed-prefix)))
+    (setq cached erc--parsed-prefix)
+    (should (equal cached
+                   #s(erc--parsed-prefix ("(Yqaohv)!~&@%+")
+                                         "Yqaohv" "!~&@%+"
+                                         ((?Y . ?!) (?q . ?~) (?a . ?&)
+                                          (?o . ?@) (?h . ?%) (?v . ?+)))))
+    ;; Second target buffer reuses cached value.
+    (with-temp-buffer
+      (erc-mode)
+      (setq erc-server-process proc)
+      (should (eq (erc--parsed-prefix-alist cached) (erc--parse-prefix))))
+
+    ;; New value computed when cache broken.
+    (puthash 'PREFIX (list "(Yqaohv)!~&@%+") erc--isupport-params)
+    (with-temp-buffer
+      (erc-mode)
+      (setq erc-server-process proc)
+      (should-not (eq (erc--parsed-prefix-alist cached) (erc--parse-prefix)))
+      (should (equal (erc--parsed-prefix-alist
+                      (erc-with-server-buffer erc--parsed-prefix))
+                     expected)))))
+
+;; This tests exists to prove legacy behavior in order to incorporate
+;; it as a fallback in the 5.6+ replacement.
+(ert-deftest erc-parse-modes ()
+  (with-suppressed-warnings ((obsolete erc-parse-modes))
+    (should (equal (erc-parse-modes "+u") '(("u") nil nil)))
+    (should (equal (erc-parse-modes "-u") '(nil ("u") nil)))
+    (should (equal (erc-parse-modes "+o bob") '(nil nil (("o" on "bob")))))
+    (should (equal (erc-parse-modes "-o bob") '(nil nil (("o" off "bob")))))
+    (should (equal (erc-parse-modes "+uo bob") '(("u") nil (("o" on "bob")))))
+    (should (equal (erc-parse-modes "+o-u bob") '(nil ("u") (("o" on "bob")))))
+    (should (equal (erc-parse-modes "+uo-tv bob alice")
+                   '(("u") ("t") (("o" on "bob") ("v" off "alice")))))
+
+    (ert-info ("Modes of type B are always grouped as unary")
+      (should (equal (erc-parse-modes "+k h2") '(nil nil (("k" on "h2")))))
+      ;; Channel key args are thrown away.
+      (should (equal (erc-parse-modes "-k *") '(nil nil (("k" off nil))))))
+
+    (ert-info ("Modes of type C are grouped as unary even when disabling")
+      (should (equal (erc-parse-modes "+l 3") '(nil nil (("l" on "3")))))
+      (should (equal (erc-parse-modes "-l") '(nil nil (("l" off nil))))))))
+
+(ert-deftest erc--update-channel-modes ()
+  (erc-mode)
+  (setq erc-channel-users (make-hash-table :test #'equal)
+        erc-server-users (make-hash-table :test #'equal)
+        erc--isupport-params (make-hash-table)
+        erc--target (erc--target-from-string "#test"))
+  (erc-tests--set-fake-server-process "sleep" "1")
+
+  (let (calls)
+    (cl-letf (((symbol-function 'erc--handle-channel-mode)
+               (lambda (&rest r) (push r calls)))
+              ((symbol-function 'erc-update-mode-line) #'ignore))
+
+      (ert-info ("Unknown user not created")
+        (erc--update-channel-modes "+o" "bob")
+        (should-not (erc-get-channel-user "bob")))
+
+      (ert-info ("Status updated when user known")
+        (puthash "bob" (cons (erc-add-server-user
+                              "bob" (make-erc-server-user :nickname "bob"))
+                             (make-erc-channel-user))
+                 erc-channel-users)
+        ;; Also asserts fallback behavior for traditional prefixes.
+        (should-not (erc-channel-user-op-p "bob"))
+        (erc--update-channel-modes "+o" "bob")
+        (should (erc-channel-user-op-p "bob"))
+        (erc--update-channel-modes "-o" "bob") ; status revoked
+        (should-not (erc-channel-user-op-p "bob")))
+
+      (ert-info ("Unknown nullary added and removed")
+        (should-not erc-channel-modes)
+        (erc--update-channel-modes "+u")
+        (should (equal erc-channel-modes '("u")))
+        (erc--update-channel-modes "-u")
+        (should-not erc-channel-modes)
+        (should-not calls))
+
+      (ert-info ("Fallback for Type B includes mode letter k")
+        (erc--update-channel-modes "+k" "h2")
+        (should (equal (pop calls) '(b ?k t "h2")))
+        (should-not erc-channel-modes)
+        (erc--update-channel-modes "-k" "*")
+        (should (equal (pop calls) '(b ?k nil "*")))
+        (should-not erc-channel-modes))
+
+      (ert-info ("Fallback for Type C includes mode letter l")
+        (erc--update-channel-modes "+l" "3")
+        (should (equal (pop calls) '(c ?l t "3")))
+        (should-not erc-channel-modes)
+        (erc--update-channel-modes "-l" nil)
+        (should (equal (pop calls) '(c ?l nil nil)))
+        (should-not erc-channel-modes))
+
+      (ert-info ("Advertised supersedes heuristics")
+        (setq erc-server-parameters
+              '(("PREFIX" . "(ov)@+")
+                ("CHANMODES" . "eIbq,k,flj,CFLMPQRSTcgimnprstuz")))
+        (erc--update-channel-modes "+qu" "fool!*@*")
+        (should (equal (pop calls) '(a ?q t "fool!*@*")))
+        (should (equal erc-channel-modes '("u")))
+        (should-not (erc-channel-user-owner-p "bob")))
+
+      (should-not calls))))
+
 (ert-deftest erc--parse-isupport-value ()
   (should (equal (erc--parse-isupport-value "a,b") '("a" "b")))
   (should (equal (erc--parse-isupport-value "a,b,c") '("a" "b" "c")))
