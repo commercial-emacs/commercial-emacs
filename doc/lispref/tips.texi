@@ -642,7 +642,8 @@ function, and should mention them in the order that they are written
 in a function call.  If the function has many arguments, then it is
 not feasible to mention them all in the first line; in that case, the
 first line should mention the first few arguments, including the most
-important arguments.
+important arguments.  Mandatory arguments should be documented before
+optional arguments.
 
 @item
 When a function's documentation string mentions the value of an argument
