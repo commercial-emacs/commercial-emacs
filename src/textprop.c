@@ -387,44 +387,58 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
       Lisp_Object this_cdr = CDR_SAFE (tail2);
       if (! CONSP (tail2) || ! EQ (val1, Fcar (this_cdr)))
 	{
+	  Lisp_Object buf = BUFFERP (object) ? object : Fcurrent_buffer ();
 	  changed = true;
-
 	  if (BUFFERP (object))
+	    /* For undo purposes.  */
+	    record_property_change (interval->position, LENGTH (interval),
+				    sym1, Fcar (this_cdr), object);
+	  if ((BUFFERP (object) || STRINGP (object))
+	      && NILP (Fminibufferp (buf, Qnil))
+	      && XBUFFER (buf)->text->monospace)
 	    {
-	      /* For undo purposes.  */
-	      record_property_change (interval->position, LENGTH (interval),
-				      sym1, Fcar (this_cdr), object);
-	      if (NILP (Fminibufferp (object, Qnil))
-		  && XBUFFER (object)->text->monospace)
+	      Lisp_Object tail = Vchar_property_alias_alist;
+	      FOR_EACH_TAIL_SAFE (tail)
 		{
-		  bool width_specified = false;
-		  if (EQ (sym1, Qface))
+		  if (CONSP (tail)
+		      && CONSP (XCDR (tail))
+		      && (EQ (XCAR (tail), Qdisplay)
+			  || EQ (XCAR (tail), Qinvisible)
+			  || EQ (XCAR (tail), Qcomposition)
+			  || EQ (XCAR (tail), Qwrap_prefix)
+			  || EQ (XCAR (tail), Qline_prefix))
+		      && ! NILP (Fmemq (sym1, XCDR (tail))))
 		    {
-		      struct frame *f = SELECTED_FRAME ();
-		      Lisp_Object lface = Fgethash (val1, f->face_hash_table, Qnil);
-		      if (! NILP (lface))
+		      XBUFFER (buf)->text->monospace = false;
+		      goto monospace_done;
+		    }
+		}
+	      if (EQ (sym1, Qface))
+		{
+		  struct frame *f = SELECTED_FRAME ();
+		  Lisp_Object lface = Fgethash (val1, f->face_hash_table, Qnil);
+		  if (! NILP (lface))
+		    {
+		      Lisp_Object *attrs = xvector_contents (lface);
+		      if (! UNSPECIFIEDP (*(attrs + LFACE_HEIGHT_INDEX))
+			  || ! UNSPECIFIEDP (*(attrs + LFACE_FONT_INDEX))
+			  || ! UNSPECIFIEDP (*(attrs + LFACE_SWIDTH_INDEX)))
 			{
-			  Lisp_Object *attrs = xvector_contents (lface);
-			  width_specified =
-			    ! UNSPECIFIEDP (*(attrs + LFACE_HEIGHT_INDEX))
-			    || ! UNSPECIFIEDP (*(attrs + LFACE_FONT_INDEX))
-			    || ! UNSPECIFIEDP (*(attrs + LFACE_SWIDTH_INDEX));
+			  XBUFFER (buf)->text->monospace = false;
+			  goto monospace_done;
 			}
 		    }
-
-		  if (width_specified
-		      || EQ (sym1, Qdisplay)
-		      || EQ (sym1, Qinvisible)
-		      || EQ (sym1, Qcomposition)
-		      || ! NILP (Fmemq (sym1, (Fassq (Qdisplay,
-						      Vchar_property_alias_alist))))
-		      || ! NILP (Fmemq (sym1, (Fassq (Qinvisible,
-						      Vchar_property_alias_alist))))
-		      || ! NILP (Fmemq (sym1, (Fassq (Qcomposition,
-						      Vchar_property_alias_alist)))))
-		    /* Forbid algebraic short-cuts for long lines. */
-		    XBUFFER (object)->text->monospace = false;
 		}
+	      if (EQ (sym1, Qdisplay)
+		  || EQ (sym1, Qinvisible)
+		  || EQ (sym1, Qcomposition)
+		  || EQ (sym1, Qwrap_prefix)
+		  || EQ (sym1, Qline_prefix))
+		{
+		  XBUFFER (buf)->text->monospace = false;
+		  goto monospace_done;
+		}
+	    monospace_done:;
 	    }
 	  if (! CONSP (tail2))
 	    /* INTERVAL's plist does not have sym1.  */

@@ -2969,11 +2969,7 @@ get_per_char_metric (struct font *font, const unsigned *char2b)
   return &metrics;
 }
 
-
-/* Move IT to window start POS.
-
-   If POS is not a beginning of line, must calculate continuation
-   lines width.  */
+/* Position IT at POS treating POS as the window start.  */
 
 void
 start_move_it (struct it *it, struct window *w, struct text_pos pos)
@@ -2982,60 +2978,57 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
   struct glyph_row *row = w->desired_matrix->rows + first_vpos;
   init_iterator (it, w, CHARPOS (pos), BYTEPOS (pos), row, DEFAULT_FACE_ID);
   it->first_vpos = first_vpos;
+  int restore_current_y = it->current_y;
 
-  if (it->method == GET_FROM_BUFFER
-      && it->line_wrap != TRUNCATE
-      && CHARPOS (pos) != BEGV
-      && FETCH_BYTE (BYTEPOS (pos) - 1) != '\n')
+#define WINDOW_START_ATTRS(OP)			\
+  it->max_ascent				\
+    OP it->max_descent				\
+    OP it->max_phys_ascent			\
+    OP it->max_phys_descent			\
+    OP it->vpos					\
+    OP it->current_x				\
+    OP it->hpos
+
+  /* init_iterator should have considered POS a window start.  */
+  eassert (! WINDOW_START_ATTRS (&& !));
+
+  reseat_preceding_line_start (it);
+  move_it_forward (it, CHARPOS (pos), -1, MOVE_TO_POS, NULL);
+  int glyph_x = it->current_x + it->pixel_width;
+  if (/* glyph doesn't fit on the line...  */
+      glyph_x > it->last_visible_x
+      /* ... or fringe would push us past.  */
+      || (glyph_x == it->last_visible_x
+	  && FRAME_WINDOW_P (it->f)
+	  && ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
+	      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
+	      : WINDOW_RIGHT_FRINGE_WIDTH (it->w))))
     {
-      /* POS is not bol.  Calculate continuation lines width. */
-      int first_y = it->current_y, new_x;
-      reseat_preceding_line_start (it);
-      eassert (it->line_wrap != TRUNCATE); /* reseat best not change this */
-
-      move_it_forward (it, CHARPOS (pos), -1, MOVE_TO_POS, NULL);
-      new_x = it->current_x + it->pixel_width;
-
-      /* Move off a line ending in the middle of a multi-glyph (e.g. a
-	 control character displayed as \003, or in the middle of an
-	 overlay string).  */
-      if (it->current_x > 0
-	  && (/* And glyph doesn't fit on the line.  */
-	      new_x > it->last_visible_x
-	      /* Or it fits exactly and we're on a window
-		 system frame.  */
-	      || (new_x == it->last_visible_x
-		  && FRAME_WINDOW_P (it->f)
-		  && ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
-		      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-		      : WINDOW_RIGHT_FRINGE_WIDTH (it->w)))))
+      if ((it->current.dpvec_index >= 0
+	   || it->current.overlay_string_index >= 0)
+	  && it->c != '\n')
 	{
-	  if ((it->current.dpvec_index >= 0
-	       || it->current.overlay_string_index >= 0)
-	      /* Being on a newline of a display vector or overlay
-		 string means we're not continued.  Proceeding
-		 would cause C-e to break.  */
-	      && it->c != '\n')
-	    {
-	      set_iterator_to_next (it, true);
-	      emulate_display_sline (it, -1, -1, 0);
-	    }
-
-	  it->continuation_lines_width += it->current_x;
+	  /* Before updating continuation_lines_width, move off
+	     display vector or overlay string provided we're not on a
+	     newline therein (else C-e would appear to move too
+	     far).  */
+	  set_iterator_to_next (it, true);
+	  emulate_display_sline (it, -1, -1, 0);
 	}
-      else if (it->current.dpvec_index > 0)
-	/* Make caller redisplay character at POS */
-	it->current.dpvec_index = 0;
 
-      /* Starting a new display line unaffected by continued line
-	 height.  */
-      it->max_ascent = it->max_descent = 0;
-      it->max_phys_ascent = it->max_phys_descent = 0;
-
-      it->current_y = first_y;
-      it->vpos = 0;
-      it->current_x = it->hpos = 0;
+      it->continuation_lines_width += it->current_x;
     }
+
+  if (it->line_wrap == TRUNCATE)
+    it->continuation_lines_width = 0; // doesn't apply
+
+  if (it->current.dpvec_index > 0)
+    it->current.dpvec_index = 0; /* Forces redisplaying display vector */
+
+  /* IT is the window-start sline unaffected by continued line height.  */
+  it->current_y = restore_current_y;
+  WINDOW_START_ATTRS (=) = 0;
+#undef WINDOW_START_ATTRS
 }
 
 
@@ -6340,10 +6333,8 @@ preceding_line_start_visible (struct it *it)
 }
 
 
-/* Reseat iterator IT at the visible line start.  Skip invisible text
-   that is so either due to text properties or due to selective
-   display.  At the end, update IT's overlay information, face
-   information etc.  */
+/* Reseat IT at the visible line start (invisible text generally
+   issues from text properties or selective display).  */
 
 void
 reseat_preceding_line_start (struct it *it)
@@ -7242,8 +7233,7 @@ get_display_element (struct it *it)
 }
 
 
-/* Actually increment IT.
-   RESEAT_P apparently skips to line end.  */
+/* Actually increment IT.  */
 
 void
 set_iterator_to_next (struct it *it, bool reseat_p)
@@ -8378,7 +8368,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  else
 	    line_number_pending = true;
 	}
-      /* If there's a line-/wrap-prefix, handle it, if we didn't already.  */
+
       if (it->area == TEXT_AREA && ! it->string_from_prefix_prop_p)
 	handle_line_prefix (it);
     }
@@ -8504,9 +8494,9 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 
 	      if (/* Lines are continued.  */
 		  it->line_wrap != TRUNCATE
-		  && (/* And glyph doesn't fit on the line.  */
+		  && (/* ... and glyph doesn't fit on the line.  */
 		      new_x > it->last_visible_x
-		      /* Or fits exactly and display-graphic-p. */
+		      /* ... or fringe would push us past.  */
 		      || (new_x == it->last_visible_x
 			  && FRAME_WINDOW_P (it->f)
 			  && ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
@@ -14289,7 +14279,6 @@ do { if (polling_stopped_here) start_polling ();	\
 static void
 redisplay_internal (void)
 {
-
   struct window *sw, /* stash window */
     *w = XWINDOW (selected_window);
   struct frame *fr, *sf;
