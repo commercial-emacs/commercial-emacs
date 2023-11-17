@@ -3004,18 +3004,6 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
 	      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
 	      : WINDOW_RIGHT_FRINGE_WIDTH (it->w))))
     {
-      if ((it->current.dpvec_index >= 0
-	   || it->current.overlay_string_index >= 0)
-	  && it->c != '\n')
-	{
-	  /* Before updating continuation_lines_width, move off
-	     display vector or overlay string provided we're not on a
-	     newline therein (else C-e would appear to move too
-	     far).  */
-	  set_iterator_to_next (it, true);
-	  emulate_display_sline (it, -1, -1, 0);
-	}
-
       it->continuation_lines_width += it->current_x;
     }
 
