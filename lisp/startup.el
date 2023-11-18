@@ -2015,7 +2015,10 @@ a face or button specification."
 					   (call-interactively
 					    'recover-session)))
 				" to recover the files you were editing."))))
-
+  ;; Insert the permissions notice if the user has yet to grant Emacs
+  ;; storage permissions.
+  (when (fboundp 'android-after-splash-screen)
+    (funcall 'android-after-splash-screen t))
   (when concise
     (fancy-splash-insert
      :face 'variable-pitch "\n"
@@ -2216,6 +2219,11 @@ splash screen in another window."
 	   (insert "\n\nIf an Emacs session crashed recently, "
 		   "type M-x recover-session RET\nto recover"
 		   " the files you were editing.\n"))
+
+      ;; Insert the permissions notice if the user has yet to grant
+      ;; Emacs storage permissions.
+      (when (fboundp 'android-after-splash-screen)
+        (funcall 'android-after-splash-screen nil))
 
       (use-local-map splash-screen-keymap)
 
