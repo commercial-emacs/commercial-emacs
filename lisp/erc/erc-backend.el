@@ -132,8 +132,10 @@
 (defvar erc-verbose-server-ping)
 (defvar erc-whowas-on-nosuchnick)
 
+(declare-function erc--init-channel-modes "erc" (channel raw-args))
 (declare-function erc--open-target "erc" (target))
 (declare-function erc--target-from-string "erc" (string))
+(declare-function erc--update-modes "erc" (raw-args))
 (declare-function erc-active-buffer "erc" nil)
 (declare-function erc-add-default-channel "erc" (channel))
 (declare-function erc-banlist-update "erc" (proc parsed))
@@ -179,7 +181,6 @@
 (declare-function erc-server-buffer "erc" nil)
 (declare-function erc-set-active-buffer "erc" (buffer))
 (declare-function erc-set-current-nick "erc" (nick))
-(declare-function erc-set-modes "erc" (tgt mode-string))
 (declare-function erc-time-diff "erc" (t1 t2))
 (declare-function erc-trim-string "erc" (s))
 (declare-function erc-update-mode-line "erc" (&optional buffer))
@@ -194,8 +195,6 @@
                   (proc parsed nick login host msg))
 (declare-function erc-update-channel-topic "erc"
                   (channel topic &optional modify))
-(declare-function erc-update-modes "erc"
-                  (tgt mode-string &optional _nick _host _login))
 (declare-function erc-update-user-nick "erc"
                   (nick &optional new-nick host login full-name info))
 (declare-function erc-open "erc"
@@ -1289,8 +1288,10 @@ protection algorithm."
                              nil #'erc-server-send-queue buffer)))))))
 
 (defun erc-message (message-command line &optional force)
-  "Send LINE to the server as a privmsg or a notice.
-MESSAGE-COMMAND should be either \"PRIVMSG\" or \"NOTICE\".
+  "Send LINE, possibly expanding a target specifier beforehand.
+Expect MESSAGE-COMMAND to be an IRC command with a single
+positional target parameter followed by a trailing parameter.
+
 If the target is \",\", the last person you've got a message from will
 be used.  If the target is \".\", the last person you've sent a message
 to will be used."
@@ -1807,7 +1808,7 @@ add things to `%s' instead."
                        (t (erc-get-buffer tgt)))))
         (with-current-buffer (or buf
                                  (current-buffer))
-          (erc-update-modes tgt mode nick host login))
+          (erc--update-modes (cdr (erc-response.command-args parsed))))
           (if (or (string= login "") (string= host ""))
               (erc-display-message parsed 'notice buf
                                    'MODE-nick ?n nick
@@ -2101,7 +2102,9 @@ primitive value."
                        (erc-with-server-buffer erc--isupport-params)))
             (value (with-memoization (gethash key table)
                      (when-let ((v (assoc (symbol-name key)
-                                          erc-server-parameters)))
+                                          (or erc-server-parameters
+                                              (erc-with-server-buffer
+                                                erc-server-parameters)))))
                        (if (cdr v)
                            (erc--parse-isupport-value (cdr v))
                          '--empty--)))))
@@ -2110,6 +2113,22 @@ primitive value."
         (`(,head . ,_) (if single head (cons key value))))
     (when table
       (remhash key table))))
+
+;; While it's better to depend on interfaces than specific types,
+;; using `cl-struct-slot-value' or similar to extract a known slot at
+;; runtime would incur a small "ducktyping" tax, which should probably
+;; be avoided when running dozens of times per incoming message.
+(defmacro erc--with-isupport-data (param var &rest body)
+  "Return structured data stored in VAR for \"ISUPPORT\" PARAM.
+Expect VAR's value to be an instance of `erc--isupport-data'.  If
+VAR is uninitialized or stale, evaluate BODY and assign the
+result to VAR."
+  (declare (indent defun))
+  `(erc-with-server-buffer
+     (pcase-let (((,@(list '\` (list param  '\, 'key)))
+                  (erc--get-isupport-entry ',param)))
+       (or (and ,var (eq key (erc--isupport-data-key ,var)) ,var)
+           (setq ,var (progn ,@body))))))
 
 (define-erc-response-handler (005)
   "Set the variable `erc-server-parameters' and display the received message.
@@ -2131,8 +2150,11 @@ A server may send more than one 005 message."
             key
             value
             negated)
-        (when (string-match "^\\([A-Z]+\\)=\\(.*\\)$\\|^\\(-\\)?\\([A-Z]+\\)$"
-                            section)
+        (when (string-match
+               (rx bot (| (: (group (+ (any "A-Z"))) "=" (group (* nonl)))
+                          (: (? (group "-")) (group (+ (any "A-Z")))))
+                   eot)
+               section)
           (setq key (or (match-string 1 section) (match-string 4 section))
                 value (match-string 2 section)
                 negated (and (match-string 3 section) '-))
@@ -2147,7 +2169,7 @@ A server may send more than one 005 message."
   (let* ((nick (car (erc-response.command-args parsed)))
          (modes (mapconcat #'identity
                            (cdr (erc-response.command-args parsed)) " ")))
-    (erc-set-modes nick modes)
+    (erc--update-modes (cdr (erc-response.command-args parsed)))
     (erc-display-message parsed 'notice 'active 's221 ?n nick ?m modes)))
 
 (define-erc-response-handler (252)
@@ -2313,7 +2335,7 @@ See `erc-display-server-message'." nil
   (let ((channel (cadr (erc-response.command-args parsed)))
         (modes (mapconcat #'identity (cddr (erc-response.command-args parsed))
                           " ")))
-    (erc-set-modes channel modes)
+    (erc--init-channel-modes channel (cddr (erc-response.command-args parsed)))
     (erc-display-message
      parsed 'notice (erc-get-buffer channel proc)
      's324 ?c channel ?m modes)))
