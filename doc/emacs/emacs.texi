@@ -149,6 +149,7 @@ Important General Concepts
                           editing action.
 * Mouse Input::         Using the mouse and keypads.
 * Commands::            Named functions run by key sequences to do editing.
+* Other Input::         Input besides the mouse, keyboard and keypads.
 * Entering Emacs::      Starting Emacs from the shell.
 * Exiting::             Stopping or killing Emacs.
 
