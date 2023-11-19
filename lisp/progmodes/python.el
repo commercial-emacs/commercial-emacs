@@ -4762,6 +4762,11 @@ the if condition."
                       (not (python-syntax-comment-or-string-p))
                       python-skeleton-autoinsert)))
 
+(defun python--completion-predicate (_ buffer)
+  (provided-mode-derived-p
+   (buffer-local-value 'major-mode buffer)
+   'python-base-mode))
+
 (defmacro python-skeleton-define (name doc &rest skel)
   "Define a `python-mode' skeleton using NAME DOC and SKEL.
 The skeleton will be bound to python-skeleton-NAME and will
@@ -4770,7 +4775,7 @@ be added to `python-mode-skeleton-abbrev-table'."
   (let* ((name (symbol-name name))
          (function-name (intern (concat "python-skeleton-" name))))
     `(progn
-       (function-put ',function-name 'command-modes '(python-base-mode))
+       (put ',function-name 'completion-predicate #'python--completion-predicate)
        (define-abbrev python-mode-skeleton-abbrev-table
          ,name "" ',function-name :system t)
        (setq python-skeleton-available
@@ -4797,7 +4802,7 @@ The skeleton will be bound to python-skeleton-NAME."
             `(< ,(format "%s:" name) \n \n
                 > _ \n)))
     `(progn
-       (function-put ',function-name 'completion-predicate #'ignore)
+       (put ',function-name 'completion-predicate #'ignore)
        (define-skeleton ,function-name
          ,(or doc
               (format "Auxiliary skeleton for %s statement." name))
@@ -6424,7 +6429,7 @@ Add import for undefined name `%s' (empty to skip): "
   (add-hook 'flymake-diagnostic-functions #'python-flymake nil t))
 
 ;;; Completion predicates for M-x
-;; Commands that only make sense when editing Python code.
+;; Commands that only make sense when editing Python code
 (dolist (sym '(python-add-import
                python-check
                python-fill-paragraph
@@ -6458,7 +6463,12 @@ Add import for undefined name `%s' (empty to skip): "
                python-shell-send-defun
                python-shell-send-statement
                python-sort-imports))
-  (function-put sym 'command-modes '(python-base-mode)))
+  (put sym 'completion-predicate #'python--completion-predicate))
+
+(defun python-shell--completion-predicate (_ buffer)
+  (provided-mode-derived-p
+   (buffer-local-value 'major-mode buffer)
+   'python-base-mode 'inferior-python-mode))
 
 ;; Commands that only make sense in the Python shell or when editing
 ;; Python code.
@@ -6473,8 +6483,8 @@ Add import for undefined name `%s' (empty to skip): "
                python-shell-font-lock-turn-off
                python-shell-font-lock-turn-on
                python-shell-package-enable
-               python-shell-completion-complete-or-indent))
-  (function-put sym 'command-modes '(python-base-mode inferior-python-mode)))
+               python-shell-completion-complete-or-indent  ))
+  (put sym 'completion-predicate #'python-shell--completion-predicate))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist
