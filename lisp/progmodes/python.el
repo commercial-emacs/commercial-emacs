@@ -4765,7 +4765,7 @@ the if condition."
 (defun python--completion-predicate (_ buffer)
   (provided-mode-derived-p
    (buffer-local-value 'major-mode buffer)
-   'python-base-mode))
+   'python-mode))
 
 (defmacro python-skeleton-define (name doc &rest skel)
   "Define a `python-mode' skeleton using NAME DOC and SKEL.
@@ -6468,7 +6468,7 @@ Add import for undefined name `%s' (empty to skip): "
 (defun python-shell--completion-predicate (_ buffer)
   (provided-mode-derived-p
    (buffer-local-value 'major-mode buffer)
-   'python-base-mode 'inferior-python-mode))
+   'python-mode 'inferior-python-mode))
 
 ;; Commands that only make sense in the Python shell or when editing
 ;; Python code.

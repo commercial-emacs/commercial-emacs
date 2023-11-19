@@ -1676,8 +1676,8 @@ The door of all subtleties!
   "Test that `set-auto-mode' deduces correct modes from shebangs."
   (files-tests--check-shebang "#!/bin/bash" 'sh-mode)
   (files-tests--check-shebang "#!/usr/bin/env bash" 'sh-mode)
-  (files-tests--check-shebang "#!/usr/bin/env python" 'python-base-mode)
-  (files-tests--check-shebang "#!/usr/bin/env python3" 'python-base-mode)
+  (files-tests--check-shebang "#!/usr/bin/env python" 'python-mode)
+  (files-tests--check-shebang "#!/usr/bin/env python3" 'python-mode)
   (files-tests--check-shebang "#!/usr/bin/env -S awk -v FS=\"\\t\" -v OFS=\"\\t\" -f" 'awk-mode)
   (files-tests--check-shebang "#!/usr/bin/env -S make -f" 'makefile-mode)
   (files-tests--check-shebang "#!/usr/bin/make -f" 'makefile-mode))
