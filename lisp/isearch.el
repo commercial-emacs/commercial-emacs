@@ -4026,6 +4026,7 @@ since they have special meaning in a regexp."
 (defvar isearch-lazy-highlight-point-max nil)
 (defvar isearch-lazy-highlight-buffer nil)
 (defvar isearch-lazy-highlight-case-fold-search nil)
+(defvar isearch-lazy-highlight-invisible nil)
 (defvar isearch-lazy-highlight-regexp nil)
 (defvar isearch-lazy-highlight-lax-whitespace nil)
 (defvar isearch-lazy-highlight-regexp-lax-whitespace nil)
@@ -4071,6 +4072,8 @@ by other Emacs features."
                             isearch-lazy-highlight-window-group))
 		 (not (eq isearch-lazy-highlight-case-fold-search
 			  isearch-case-fold-search))
+		 (not (eq isearch-lazy-highlight-invisible
+		          isearch-invisible))
 		 (not (eq isearch-lazy-highlight-regexp
 			  isearch-regexp))
 		 (not (eq isearch-lazy-highlight-regexp-function
@@ -4149,6 +4152,7 @@ by other Emacs features."
 	  isearch-lazy-highlight-wrapped      nil
 	  isearch-lazy-highlight-last-string  isearch-string
 	  isearch-lazy-highlight-case-fold-search isearch-case-fold-search
+	  isearch-lazy-highlight-invisible isearch-invisible
 	  isearch-lazy-highlight-regexp       isearch-regexp
 	  isearch-lazy-highlight-lax-whitespace   isearch-lax-whitespace
 	  isearch-lazy-highlight-regexp-lax-whitespace isearch-regexp-lax-whitespace
@@ -4198,8 +4202,10 @@ Attempt to do the search exactly the way the pending Isearch would."
 	    (isearch-forward isearch-lazy-highlight-forward)
 	    ;; Count all invisible matches, but highlight only
 	    ;; matches that can be opened by visiting them later
-	    (search-invisible (or (not (null isearch-lazy-count))
-				  'can-be-opened))
+	    (search-invisible
+             (or (not (null isearch-lazy-count))
+		 (and (eq isearch-lazy-highlight-invisible 'open)
+                      'can-be-opened)))
 	    (retry t)
 	    (success nil))
 	;; Use a loop like in `isearch-search'.
@@ -4219,7 +4225,9 @@ Attempt to do the search exactly the way the pending Isearch would."
   (when (or (not isearch-lazy-count)
             ;; Recheck the match that possibly was intended
             ;; for counting only, but not for highlighting
-            (let ((search-invisible 'can-be-opened))
+            (let ((search-invisible
+                   (and (eq isearch-lazy-highlight-invisible 'open)
+                        'can-be-opened)))
               (funcall isearch-filter-predicate mb me)))
     (let ((ov (make-overlay mb me)))
       (push ov isearch-lazy-highlight-overlays)
@@ -4368,9 +4376,9 @@ Attempt to do the search exactly the way the pending Isearch would."
 			  ;; value `open' since then lazy-highlight
 			  ;; will open all overlays with matches.
 			  (if (not (let ((search-invisible
-					  (if (eq search-invisible 'open)
+					  (if (eq isearch-lazy-highlight-invisible 'open)
 					      'can-be-opened
-					    search-invisible)))
+					    isearch-lazy-highlight-invisible)))
 				     (funcall isearch-filter-predicate mb me)))
 			      (setq isearch-lazy-count-invisible
 				    (1+ (or isearch-lazy-count-invisible 0)))
