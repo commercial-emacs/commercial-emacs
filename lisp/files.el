@@ -4972,6 +4972,78 @@ Interactively, confirmation is required unless you supply a prefix argument."
     ;; the one at the old location.
     (vc-refresh-state)))
 
+(defun write-file-no-switch (filename &optional confirm)
+  "Like write-file but without switching to the new filename.
+...
+Write current buffer into file FILENAME.
+This makes the buffer visit that file, and marks it as not modified.
+
+Interactively, prompt for FILENAME.
+If you specify just a directory name as FILENAME, that means to write
+to a file in that directory.  In this case, the base name of the file
+is the same as that of the file visited in the buffer, or the buffer
+name sans leading directories, if any, if the buffer is not already
+visiting a file.
+
+You can also yank the file name into the minibuffer to edit it,
+using \\<minibuffer-local-map>\\[next-history-element].
+
+If optional second arg CONFIRM is non-nil, this function
+asks for confirmation before overwriting an existing file.
+Interactively, confirmation is required unless you supply a prefix argument."
+  (interactive
+   (list (if buffer-file-name
+	     (read-file-name "Write file: "
+			     nil nil nil nil)
+	   (read-file-name "Write file: " default-directory
+			   (expand-file-name
+			    (file-name-nondirectory (buffer-name))
+			    default-directory)
+			   nil nil))
+	 (not current-prefix-arg)))
+
+  (copy-file buffer-file-name filename)
+  ;; (let ((old-modes
+  ;;        (and buffer-file-name
+  ;;             ;; File may have gone away; ignore errors in that case.
+  ;;             (ignore-errors (file-modes buffer-file-name)))))
+  ;;   (or (null filename) (string-equal filename "")
+  ;;       (progn
+  ;;         ;; If arg is a directory name,
+  ;;         ;; use the default file name, but in that directory.
+  ;;         (if (directory-name-p filename)
+  ;;             (setq filename (concat filename
+  ;;       			     (file-name-nondirectory
+  ;;       			      (or buffer-file-name (buffer-name))))))
+  ;;         (and confirm
+  ;;              (file-exists-p filename)
+  ;;              ;; NS does its own confirm dialog.
+  ;;              (not (and (eq (framep-on-display) 'ns)
+  ;;       	         (listp last-nonmenu-event)
+  ;;       	         use-dialog-box))
+  ;;              (or (y-or-n-p (format-message
+  ;;                             "File `%s' exists; overwrite? " filename))
+  ;;       	   (user-error "Canceled")))
+  ;;         (set-visited-file-name filename (not confirm))))
+  ;;   (set-buffer-modified-p t)
+  ;;   ;; Make buffer writable if file is writable.
+  ;;   (and buffer-file-name
+  ;;        (file-writable-p buffer-file-name)
+  ;;        (setq buffer-read-only nil))
+  ;;   (save-buffer)
+  ;;   ;; If the old file was executable, then make the new file
+  ;;   ;; executable, too.
+  ;;   (when (and old-modes
+  ;;              (not (zerop (logand #o111 old-modes))))
+  ;;     (set-file-modes buffer-file-name
+  ;;                     (logior (logand #o111 old-modes)
+  ;;                             (file-modes buffer-file-name))))
+  ;;   ;; It's likely that the VC status at the new location is different from
+  ;;   ;; the one at the old location.
+  ;;   (vc-refresh-state)
+  ;;   )
+  )
+
 (defun rename-visited-file (new-location)
   "Rename the file visited by the current buffer to NEW-LOCATION.
 This command also sets the visited file name.  If the buffer
