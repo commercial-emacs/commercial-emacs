@@ -3945,7 +3945,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 			  = XHASH_TABLE (read_objects_map);
 			Lisp_Object number = make_fixnum (n);
 			hash_hash_t hash;
-			ptrdiff_t i = hash_lookup (h, number, &hash);
+			ptrdiff_t i = hash_lookup_get_hash (h, number, &hash);
 			if (i >= 0)
 			  /* Not normal, but input could be malformed.  */
 			  set_hash_value_slot (h, i, placeholder);
@@ -3963,7 +3963,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 			/* #N# -- reference to numbered object */
 			struct Lisp_Hash_Table *h
 			  = XHASH_TABLE (read_objects_map);
-			ptrdiff_t i = hash_lookup (h, make_fixnum (n), NULL);
+			ptrdiff_t i = hash_lookup (h, make_fixnum (n));
 			if (i < 0)
 			  invalid_syntax ("#", readcharfun);
 			obj = ANNOTATE (HASH_VALUE (h, i));
@@ -4251,7 +4251,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 		struct Lisp_Hash_Table *h2
 		  = XHASH_TABLE (read_objects_completed);
 		hash_hash_t hash;
-		ptrdiff_t i = hash_lookup (h2, placeholder, &hash);
+		ptrdiff_t i = hash_lookup_get_hash (h2, placeholder, &hash);
 		eassert (i < 0);
 		hash_put (h2, placeholder, Qnil, hash);
 		obj = placeholder;
@@ -4266,7 +4266,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 		    struct Lisp_Hash_Table *h2
 		      = XHASH_TABLE (read_objects_completed);
 		    hash_hash_t hash;
-		    ptrdiff_t i = hash_lookup (h2, obj, &hash);
+		    ptrdiff_t i = hash_lookup_get_hash (h2, obj, &hash);
 		    eassert (i < 0);
 		    hash_put (h2, obj, Qnil, hash);
 		  }
@@ -4278,7 +4278,8 @@ read0 (Lisp_Object readcharfun, bool annotated)
 		/* ...and #n# will use the real value from now on.  */
 		struct Lisp_Hash_Table *h = XHASH_TABLE (read_objects_map);
 		hash_hash_t hash;
-		ptrdiff_t i = hash_lookup (h, e->u.numbered.number, &hash);
+		ptrdiff_t i = hash_lookup_get_hash (h, e->u.numbered.number,
+						    &hash);
 		eassert (i >= 0);
 		set_hash_value_slot (h, i, obj);
 	      }
@@ -4334,7 +4335,7 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
      by #n=, which means that we can find it as a value in
      COMPLETED.  */
   if (EQ (subst->completed, Qt)
-      || hash_lookup (XHASH_TABLE (subst->completed), subtree, NULL) >= 0)
+      || hash_lookup (XHASH_TABLE (subst->completed), subtree) >= 0)
     subst->seen = Fcons (subtree, subst->seen);
 
   /* Recurse according to subtree's type.

@@ -2728,10 +2728,15 @@ equal_no_quit (Lisp_Object o1, Lisp_Object o2)
   return internal_equal (o1, o2, EQUAL_NO_QUIT, 0, Qnil);
 }
 
-/* EQUAL_KIND is one of:
-   - EQUAL_NO_QUIT, do not check for cycles or excessive recursion;
-   - EQUAL_PLAIN, do ordinary Lisp equality;
-   - EQUAL_INCLUDING_PROPERTIES, do equal-including-properties.
+static ptrdiff_t hash_lookup_with_hash (struct Lisp_Hash_Table *h,
+					Lisp_Object key, hash_hash_t hash);
+
+
+/* Return true if O1 and O2 are equal.  EQUAL_KIND specifies what kind
+   of equality test to use: if it is EQUAL_NO_QUIT, do not check for
+   cycles or large arguments or quits; if EQUAL_PLAIN, do ordinary
+   Lisp equality; and if EQUAL_INCLUDING_PROPERTIES, do
+   equal-including-properties.
 
    DEPTH and HT are used to detect cycles or excessive recursion.  */
 
@@ -2753,8 +2758,8 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	case Lisp_Vectorlike:
 	  {
 	    struct Lisp_Hash_Table *h = XHASH_TABLE (ht);
-	    hash_hash_t hash;
-	    ptrdiff_t i = hash_lookup (h, o1, &hash);
+	    hash_hash_t hash = hash_from_key (h, o1);
+	    ptrdiff_t i = hash_lookup_with_hash (h, o1, hash);
 	    if (i >= 0)
 	      { /* O1 was seen already.  */
 		Lisp_Object o2s = HASH_VALUE (h, i);
@@ -4729,26 +4734,40 @@ hash_table_thaw (Lisp_Object hash_table)
     }
 }
 
-/* Return index of KEY in H, or -1 if not found.
-   Also, if HASH is not NULL, return in *HASH the value of KEY in H.  */
-
-ptrdiff_t
-hash_lookup (struct Lisp_Hash_Table *h, Lisp_Object key, hash_hash_t *hash)
+/* Look up KEY with hash HASH in table H.
+   Return entry index or -1 if none.  */
+static ptrdiff_t
+hash_lookup_with_hash (struct Lisp_Hash_Table *h,
+		       Lisp_Object key, hash_hash_t hash)
 {
-  hash_hash_t hash_code = hash_from_key (h, key);
-  if (hash)
-    *hash = hash_code;
-
-  ptrdiff_t start_of_bucket = hash_index_index (h, hash_code);
-  ptrdiff_t i;
-  for (i = HASH_INDEX (h, start_of_bucket); 0 <= i; i = HASH_NEXT (h, i))
+  ptrdiff_t start_of_bucket = hash_index_index (h, hash);
+  for (ptrdiff_t i = HASH_INDEX (h, start_of_bucket);
+       0 <= i; i = HASH_NEXT (h, i))
     if (EQ (key, HASH_KEY (h, i))
 	|| (h->test.cmpfn
-	    && hash_code == HASH_HASH (h, i)
+	    && hash == HASH_HASH (h, i)
 	    && !NILP (h->test.cmpfn (key, HASH_KEY (h, i), h))))
-      break;
+      return i;
 
-  return i;
+  return -1;
+}
+
+/* Look up KEY in table H.  Return entry index or -1 if none.  */
+ptrdiff_t
+hash_lookup (struct Lisp_Hash_Table *h, Lisp_Object key)
+{
+  return hash_lookup_with_hash (h, key, hash_from_key (h, key));
+}
+
+/* Look up KEY in hash table H.  Return its hash value in *PHASH.
+   Value is the index of the entry in H matching KEY, or -1 if not found.  */
+ptrdiff_t
+hash_lookup_get_hash (struct Lisp_Hash_Table *h, Lisp_Object key,
+		      hash_hash_t *phash)
+{
+  EMACS_UINT hash = hash_from_key (h, key);
+  *phash = hash;
+  return hash_lookup_with_hash (h, key, hash);
 }
 
 static void
@@ -5455,7 +5474,7 @@ If KEY is not found, return DFLT which defaults to nil.  */)
   (Lisp_Object key, Lisp_Object table, Lisp_Object dflt)
 {
   struct Lisp_Hash_Table *h = check_hash_table (table);
-  ptrdiff_t i = hash_lookup (h, key, NULL);
+  ptrdiff_t i = hash_lookup_with_hash (h, key, hash_from_key (h, key));
   return i >= 0 ? HASH_VALUE (h, i) : dflt;
 }
 
@@ -5469,8 +5488,8 @@ VALUE.  In any case, return VALUE.  */)
   struct Lisp_Hash_Table *h = check_hash_table (table);
   check_mutable_hash_table (table, h);
 
-  EMACS_UINT hash;
-  ptrdiff_t i = hash_lookup (h, key, &hash);
+  EMACS_UINT hash = hash_from_key (h, key);
+  ptrdiff_t i = hash_lookup_with_hash (h, key, hash);
   if (i >= 0)
     set_hash_value_slot (h, i, value);
   else
