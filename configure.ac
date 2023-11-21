@@ -1002,7 +1002,7 @@ AC_ARG_WITH([native-compilation],
      *)      AC_MSG_ERROR([bad value $withval for native-compilation option]) ;;
    esac
    with_native_compilation=$withval],
-  [with_native_compilation=default]
+  [with_native_compilation=no]
 )
 AC_SUBST([NATIVE_COMPILATION_AOT])
 
