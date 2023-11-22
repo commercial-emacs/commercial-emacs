@@ -4393,26 +4393,33 @@ cmpfn_user_defined (Lisp_Object key1, Lisp_Object key2,
   return hash_table_user_defined_call (ARRAYELTS (args), args, h);
 }
 
+/* Reduce an EMACS_UINT hash value to hash_hash_t.  */
+static inline hash_hash_t
+reduce_emacs_uint_to_hash_hash (EMACS_UINT x)
+{
+  verify (sizeof x <= 2 * sizeof (hash_hash_t));
+  return (sizeof x == sizeof (hash_hash_t)
+	  ? x
+	  : x ^ (x >> (8 * (sizeof x - sizeof (hash_hash_t)))));
+}
+
 /* Ignore H and return a hash code for KEY which uses 'eq' to compare keys.  */
 
 static hash_hash_t
 hashfn_eq (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  return XHASH (key) ^ XTYPE (key);
+  return reduce_emacs_uint_to_hash_hash (XHASH (key) ^ XTYPE (key));
 }
 
-/* Ignore H and return a hash code for KEY which uses 'equal' to compare keys.
-   The hash code is at most INTMASK.  */
-
+/* Ignore H and return a hash code for KEY which uses 'equal' to
+   compare keys.  */
 static hash_hash_t
 hashfn_equal (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  return sxhash (key);
+  return reduce_emacs_uint_to_hash_hash (sxhash (key));
 }
 
-/* Ignore H and return a hash code for KEY which uses 'eql' to compare keys.
-   The hash code is at most INTMASK.  */
-
+/* Ignore H and return a hash code for KEY which uses 'eql' to compare keys.  */
 static hash_hash_t
 hashfn_eql (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
@@ -4428,7 +4435,8 @@ hashfn_user_defined (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
   Lisp_Object args[] = { h->test->user_hash_function, key };
   Lisp_Object hash = hash_table_user_defined_call (ARRAYELTS (args), args, h);
-  return FIXNUMP (hash) ? XUFIXNUM(hash) : sxhash (hash);
+  return reduce_emacs_uint_to_hash_hash (FIXNUMP (hash)
+					 ? XUFIXNUM(hash) : sxhash (hash));
 }
 
 struct hash_table_test const
@@ -4991,16 +4999,6 @@ hash_string (char const *ptr, ptrdiff_t len)
   return hash;
 }
 
-/* Return a hash for string PTR which has length LEN.  The hash
-   code returned is at most INTMASK.  */
-
-static EMACS_UINT
-sxhash_string (char const *ptr, ptrdiff_t len)
-{
-  EMACS_UINT hash = hash_string (ptr, len);
-  return SXHASH_REDUCE (hash);
-}
-
 /* Return a hash for the floating point value VAL.  */
 
 static EMACS_UINT
@@ -5010,7 +5008,7 @@ sxhash_float (double val)
   union double_and_words u = { .val = val };
   for (int i = 0; i < WORDS_PER_DOUBLE; i++)
     hash = sxhash_combine (hash, u.word[i]);
-  return SXHASH_REDUCE (hash);
+  return hash;
 }
 
 /* Return a hash for list LIST.  DEPTH is the current depth in the
@@ -5037,7 +5035,7 @@ sxhash_list (Lisp_Object list, int depth)
       hash = sxhash_combine (hash, hash2);
     }
 
-  return SXHASH_REDUCE (hash);
+  return hash;
 }
 
 
@@ -5057,7 +5055,7 @@ sxhash_vector (Lisp_Object vec, int depth)
       hash = sxhash_combine (hash, hash2);
     }
 
-  return SXHASH_REDUCE (hash);
+  return hash;
 }
 
 /* Return a hash for bool-vector VECTOR.  */
@@ -5073,7 +5071,7 @@ sxhash_bool_vector (Lisp_Object vec)
   for (i = 0; i < n; ++i)
     hash = sxhash_combine (hash, bool_vector_data (vec)[i]);
 
-  return SXHASH_REDUCE (hash);
+  return hash;
 }
 
 /* Return a hash for a bignum.  */
@@ -5088,17 +5086,17 @@ sxhash_bignum (Lisp_Object bignum)
   for (i = 0; i < nlimbs; ++i)
     hash = sxhash_combine (hash, mpz_getlimbn (*n, i));
 
-  return SXHASH_REDUCE (hash);
+  return hash;
 }
-
-
-/* Return OBJ's hash code clipped to INTMASK.  */
 
 EMACS_UINT
 sxhash (Lisp_Object obj)
 {
   return sxhash_obj (obj, 0);
 }
+
+/* Return a hash code for OBJ.  DEPTH is the current depth in the Lisp
+   structure.  */
 
 static EMACS_UINT
 sxhash_obj (Lisp_Object obj, int depth)
@@ -5115,7 +5113,7 @@ sxhash_obj (Lisp_Object obj, int depth)
       return XHASH (obj);
 
     case Lisp_String:
-      return sxhash_string (SSDATA (obj), SBYTES (obj));
+      return hash_string (SSDATA (obj), SBYTES (obj));
 
     case Lisp_Vectorlike:
       {
@@ -5135,7 +5133,7 @@ sxhash_obj (Lisp_Object obj, int depth)
 	      = XMARKER (obj)->buffer ? XMARKER (obj)->bytepos : 0;
 	    EMACS_UINT hash
 	      = sxhash_combine ((intptr_t) XMARKER (obj)->buffer, bytepos);
-	    return SXHASH_REDUCE (hash);
+	    return hash;
 	  }
 	else if (pvec_type == PVEC_BOOL_VECTOR)
 	  return sxhash_bool_vector (obj);
@@ -5144,7 +5142,7 @@ sxhash_obj (Lisp_Object obj, int depth)
 	    EMACS_UINT hash = OVERLAY_START (obj);
 	    hash = sxhash_combine (hash, OVERLAY_END (obj));
 	    hash = sxhash_combine (hash, sxhash_obj (XOVERLAY (obj)->plist, depth));
-	    return SXHASH_REDUCE (hash);
+	    return hash;
 	  }
 	else
 	  /* Others are 'equal' if they are 'eq', so take their
@@ -5178,6 +5176,15 @@ collect_interval (INTERVAL interval, Lisp_Object collector)
 			    Lisp Interface
  ***********************************************************************/
 
+/* Reduce X to a Lisp fixnum.  */
+static inline Lisp_Object
+hash_hash_to_fixnum (hash_hash_t x)
+{
+  return make_ufixnum (FIXNUM_BITS < 8 * sizeof x
+		       ? (x ^ x >> (8 * sizeof x - FIXNUM_BITS)) & INTMASK
+		       : x);
+}
+
 DEFUN ("sxhash-eq", Fsxhash_eq, Ssxhash_eq, 1, 1, 0,
        doc: /* Return an integer hash code for OBJ suitable for `eq'.
 If (eq A B), then (= (sxhash-eq A) (sxhash-eq B)).
@@ -5185,7 +5192,7 @@ If (eq A B), then (= (sxhash-eq A) (sxhash-eq B)).
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
-  return make_ufixnum (hashfn_eq (obj, NULL));
+  return hash_hash_to_fixnum (hashfn_eq (obj, NULL));
 }
 
 DEFUN ("sxhash-eql", Fsxhash_eql, Ssxhash_eql, 1, 1, 0,
@@ -5196,7 +5203,7 @@ isn't necessarily true.
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
-  return make_ufixnum (hashfn_eql (obj, NULL));
+  return hash_hash_to_fixnum (hashfn_eql (obj, NULL));
 }
 
 DEFUN ("sxhash-equal", Fsxhash_equal, Ssxhash_equal, 1, 1, 0,
@@ -5207,7 +5214,7 @@ opposite isn't necessarily true.
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
-  return make_ufixnum (hashfn_equal (obj, NULL));
+  return hash_hash_to_fixnum (hashfn_equal (obj, NULL));
 }
 
 DEFUN ("sxhash-equal-including-properties", Fsxhash_equal_including_properties,
@@ -5222,6 +5229,7 @@ Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
 {
   if (STRINGP (obj))
     {
+      /* FIXME: This is very wasteful.  We needn't cons at all.  */
       Lisp_Object collector = Fcons (Qnil, Qnil);
       traverse_intervals (string_intervals (obj), 0, collect_interval,
 			  collector);
@@ -5231,7 +5239,7 @@ Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
 					 sxhash (CDR (collector)))));
     }
 
-  return make_ufixnum (hashfn_equal (obj, NULL));
+  return hash_hash_to_fixnum (hashfn_equal (obj, NULL));
 }
 
 
