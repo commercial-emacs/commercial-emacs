@@ -7928,22 +7928,14 @@ If NOERROR, don't signal an error if we can't move that many lines."
 		(mod (current-column) (window-text-width)))))))
     (when target-hscroll
       (set-window-hscroll (selected-window) target-hscroll))
-    (when (or (and (or (< arg 0)
-		       (< (vertical-motion
-			   (cons (or goal-column
-				     (if (consp temporary-goal-column)
-					 (car temporary-goal-column)
-				       temporary-goal-column))
-				 arg))
-			  arg))
-		   (or (>= arg 0)
-		       (> (vertical-motion
-			   (cons (or goal-column
-				     (if (consp temporary-goal-column)
-					 (car temporary-goal-column)
-				       temporary-goal-column))
-				 arg))
-			  arg)))
+    (when (or (funcall (if (>= arg 0) #'< #'>)
+                       (vertical-motion
+		        (cons (or goal-column
+				  (if (consp temporary-goal-column)
+				      (car temporary-goal-column)
+				    temporary-goal-column))
+			      arg))
+		       arg)
 	      (and (< arg 0)
 		   (= (point) opoint)
 		   ;; If the goal column lies on a display string,

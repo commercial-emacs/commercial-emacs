@@ -111,7 +111,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    PRODUCE_GLYPHS().  If the next element does not fit, the glyph row
    is marked as a "continued line".  In addition to producing glyphs,
    display_sline() handles truncation and continuation, word wrap, and
-   cursor positioning (see set_cursor_from_row()).
+   cursor positioning (see move_cursor()).
 
    Simulating display.
 
@@ -372,7 +372,7 @@ static Lisp_Object message_dolog_marker3;
 
 /* The buffer position of the first character appearing entirely or
    partially on the line of the selected window which contains the
-   cursor; <= 0 if not known.  Set by set_cursor_from_row, used for
+   cursor; <= 0 if not known.  Set by move_cursor, used to
    redisplay optimization in redisplay_internal.  */
 
 static struct text_pos static_sline_start_pos;
@@ -744,9 +744,9 @@ static void redisplay_window (Lisp_Object, bool);
 static Lisp_Object redisplay_window_error (Lisp_Object);
 static Lisp_Object redisplay_window_0 (Lisp_Object);
 static Lisp_Object redisplay_window_1 (Lisp_Object);
-static bool set_cursor_from_row (struct window *, struct glyph_row *,
-				 struct glyph_matrix *, ptrdiff_t, ptrdiff_t,
-				 int, int);
+static bool move_cursor (struct window *, struct glyph_row *,
+			 struct glyph_matrix *, ptrdiff_t, ptrdiff_t,
+			 int, int);
 static bool cursor_row_fully_visible_p (struct window *, bool, bool, bool);
 static bool update_menu_bar (struct frame *, bool, bool);
 static bool try_window_reusing_current_matrix (struct window *);
@@ -1393,7 +1393,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	      /* For whatever reason, we're inside the display string.
 
 		 This behavior has been chalked up to move_it_forward
-		 and set_cursor_from_row disagreeing where best
+		 and move_cursor disagreeing where best
 		 to abandon us.
 
 		 Reseat to last display element at CHARPOS. */
@@ -1448,7 +1448,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	      /* For whatever reason, we're beyond the display string.
 
 		 This behavior has been chalked up to move_it_forward
-		 and set_cursor_from_row disagreeing where best
+		 and move_cursor disagreeing where best
 		 to abandon us.
 
 		 Reseat to last display element at CHARPOS.  */
@@ -2992,12 +2992,13 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
   /* init_iterator should have considered POS a window start.  */
   eassert (! WINDOW_START_ATTRS (&& !));
 
+  /* retroactively patch in continuation line, if any.  */
   reseat_preceding_line_start (it);
   move_it_forward (it, CHARPOS (pos), -1, MOVE_TO_POS, NULL);
   int glyph_x = it->current_x + it->pixel_width;
   if (/* glyph doesn't fit on the line...  */
       glyph_x > it->last_visible_x
-      /* ... or fringe would push us past.  */
+      /* ... or fringe would collide.  */
       || (glyph_x == it->last_visible_x
 	  && FRAME_WINDOW_P (it->f)
 	  && ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
@@ -3008,10 +3009,10 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
     }
 
   if (it->line_wrap == TRUNCATE)
-    it->continuation_lines_width = 0; // doesn't apply
+    it->continuation_lines_width = 0; /* doesn't apply */
 
   if (it->current.dpvec_index > 0)
-    it->current.dpvec_index = 0; /* Forces redisplaying display vector */
+    it->current.dpvec_index = 0; /* Forces redisplay of display vector */
 
   /* IT is the window-start sline unaffected by continued line height.  */
   it->current_y = restore_current_y;
@@ -4308,7 +4309,7 @@ handle_invisible_prop (struct it *it)
                  correct `charpos` values.  If we would not update
                  it->position here, the glyphs would belong to the
                  last visible character _before_ the invisible
-                 text, which confuses set_cursor_from_row.
+                 text, which confuses move_cursor.
 
                  We use the last invisible position instead of the
                  first because this way the cursor is always drawn on
@@ -8484,7 +8485,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 		  it->line_wrap != TRUNCATE
 		  && (/* ... and glyph doesn't fit on the line.  */
 		      new_x > it->last_visible_x
-		      /* ... or fringe would push us past.  */
+		      /* ... or fringe would collide.  */
 		      || (new_x == it->last_visible_x
 			  && FRAME_WINDOW_P (it->f)
 			  && ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
@@ -8687,7 +8688,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 	    {
 	      if (! saw_smaller_pos && IT_CHARPOS (*it) > to_charpos)
 		{
-		  if (ppos_p)
+		  if (closest_pos < ZV)
 		    {
 		      RESTORE_IT (it, &ppos_it, ppos_data);
 		      if (IT_CHARPOS (*it) != to_charpos)
@@ -8717,35 +8718,47 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 	 previously done.  */
       for (int i=0; i<2; ++i)
 	{
-	  if (it->line_wrap == TRUNCATE
-	      && it->current_x >= it->last_visible_x)
+	  if (it->line_wrap == TRUNCATE)
 	    {
-	      bool fringeless =
-		! FRAME_WINDOW_P (it->f)
-		|| 0 == ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
-			 ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-			 : WINDOW_RIGHT_FRINGE_WIDTH (it->w))
-		|| IT_OVERFLOW_NEWLINE_INTO_FRINGE (it);
-
-	      if (fringeless &&
-		  (! get_display_element (it) || BUFFER_POS_REACHED_P ()))
-		result = MOVE_POS_MATCH_OR_ZV;
-	      else if (fringeless && ITERATOR_AT_END_OF_LINE_P (it))
-		result = MOVE_NEWLINE_OR_CR;
-	      else if (ppos_p
-		       && ! saw_smaller_pos
-		       && IT_CHARPOS (*it) > to_charpos)
+	      if (it->current_x >= it->last_visible_x)
 		{
-		  if (closest_pos < ZV)
+		  bool fringeless =
+		    ! FRAME_WINDOW_P (it->f)
+		    || 0 == ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
+			     ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
+			     : WINDOW_RIGHT_FRINGE_WIDTH (it->w))
+		    || IT_OVERFLOW_NEWLINE_INTO_FRINGE (it);
+
+		  if (fringeless &&
+		      (! get_display_element (it) || BUFFER_POS_REACHED_P ()))
+		    result = MOVE_POS_MATCH_OR_ZV;
+		  else if (fringeless && ITERATOR_AT_END_OF_LINE_P (it))
+		    result = MOVE_NEWLINE_OR_CR;
+		  else if (ppos_p
+			   && ! saw_smaller_pos
+			   && IT_CHARPOS (*it) > to_charpos)
 		    {
-		      RESTORE_IT (it, &ppos_it, ppos_data);
-		      emulate_display_sline (it, closest_pos, -1, MOVE_TO_POS);
+		      if (closest_pos < ZV)
+			{
+			  RESTORE_IT (it, &ppos_it, ppos_data);
+			  emulate_display_sline (it, closest_pos, -1, MOVE_TO_POS);
+			}
+		      result = MOVE_POS_MATCH_OR_ZV;
 		    }
-		  result = MOVE_POS_MATCH_OR_ZV;
+		  else
+		    result = MOVE_LINE_TRUNCATED;
+		  goto done;
 		}
-	      else
-		result = MOVE_LINE_TRUNCATED;
-	      goto done;
+	    }
+	  else /* it->line_wrap != TRUNCATE */
+	    {
+	      /* Test this before outer loop's get_display_element()
+		 changes method.  Bug#67201*/
+	      if (BUFFER_POS_REACHED_P ())
+		{
+		  result = MOVE_POS_MATCH_OR_ZV;
+		  goto done;
+		}
 	    }
 
 	  /* Blink-and-you-miss-it advance step.  */
@@ -14600,7 +14613,7 @@ redisplay_internal (void)
 	    {
 	      eassert (static_sline_vpos == it.vpos);
 	      eassert (static_sline_y == it.current_y);
-	      set_cursor_from_row (w, row, w->current_matrix, 0, 0, 0, 0);
+	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
 	      if (cursor_row_fully_visible_p (w, false, true, false))
 		goto update;
 	      else
@@ -15227,51 +15240,37 @@ redisplay_window_1 (Lisp_Object window)
 
 
 /* Set cursor position of W.  Point is assumed to be within ROW.
-   DELTA and DELTA_BYTES are the numbers of characters and bytes by
-   which positions recorded in ROW differ from current buffer
-   positions.
+   DELTA is ROW's offset from rowspace to bufferspace.
 
-   Return true iff cursor is on this row.  */
+   Return true if cursor got moved to ROW.  */
 
 static bool
-set_cursor_from_row (struct window *w, struct glyph_row *row,
-		     struct glyph_matrix *matrix,
-		     ptrdiff_t delta, ptrdiff_t delta_bytes,
-		     int dy, int dvpos)
+move_cursor (struct window *w, struct glyph_row *row,
+	     struct glyph_matrix *matrix,
+	     ptrdiff_t delta, ptrdiff_t delta_bytes,
+	     int dy, int dvpos)
 {
-  struct glyph *glyph = row->glyphs[TEXT_AREA];
-  struct glyph *end = glyph + row->used[TEXT_AREA];
-  struct glyph *cursor = NULL;
-  /* The last known character position in row.  */
-  ptrdiff_t last_pos = MATRIX_ROW_START_CHARPOS (row) + delta;
   int x = row->x;
-  ptrdiff_t pt_old = PT - delta;
+  struct glyph *glyph = row->glyphs[TEXT_AREA];
+  struct glyph *glyph_before = glyph - 1;
+  struct glyph *glyph_after = glyph + row->used[TEXT_AREA];
+  struct glyph *end = row->reversed_p ? glyph_before : glyph_after;
+  const struct glyph *orig_end = end;
+  struct glyph *cursor = NULL;
   ptrdiff_t pos_before = MATRIX_ROW_START_CHARPOS (row) + delta;
   ptrdiff_t pos_after = MATRIX_ROW_END_CHARPOS (row) + delta;
-  struct glyph *glyph_before = glyph - 1, *glyph_after = end;
-  /* A glyph beyond the edge of TEXT_AREA.  */
-  struct glyph *glyphs_end = end;
-  /* True means we've found a match for cursor position, but that
-     glyph has the avoid_cursor_p flag set.  */
-  bool match_with_avoid_cursor = false;
-  /* True means we've seen at least one glyph that came from a
-     display string.  */
-  bool string_seen = false;
-  /* Largest and smallest buffer positions seen so far during scan of
-     glyph row.  */
-  ptrdiff_t bpos_max = pos_before;
+  ptrdiff_t pos_last = pos_before; /* last known */
+  ptrdiff_t bpos_max = pos_before; /* largest bufpos seen so far */
   ptrdiff_t bpos_min = pos_after;
-  /* Last buffer position covered by an overlay string with an integer
-     `cursor` property.  */
-  ptrdiff_t bpos_covered = 0;
-  /* True means the display string on which to display the cursor
-     comes from a text property, not from an overlay.  */
-  bool string_from_text_prop = false;
+  ptrdiff_t bpos_covered = 0; /* last bufpos covered by 'cursor prop overlay */
+  ptrdiff_t pt_row = PT - delta;
+  bool match_with_avoid_cursor = false; /* avoid_cursor_p glyph matched */
+  bool string_seen = false; /* at least one glyph came from display string */
+  bool string_from_text_prop = false; /* display string not from overlay */
 
   eassert (! row->mode_line_p);
-
-  /* Skip over row start and end glyphs lacking an object, e.g.,
-     truncation marks on terminal frames.  */
+  /* Skip start and end glyphs lacking an object, e.g., truncation
+     marks on terminal frames.  */
   if (MATRIX_ROW_DISPLAYS_TEXT_P (row))
     {
       if (! row->reversed_p)
@@ -15286,7 +15285,7 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	  while (end > glyph
 		 && NILP ((end - 1)->object)
 		 /* CHARPOS is zero for blanks and stretch glyphs
-		    inserted by `extend_face_to_end_of_line'.  */
+		    inserted by extend_face_to_end_of_line.  */
 		 && (end - 1)->charpos <= 0)
 	    --end;
 	  glyph_before = glyph - 1;
@@ -15297,7 +15296,6 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	  /* glyph row is reversed, we need to process it back to
 	     front, so swap the edge pointers.  */
 	  struct glyph *g;
-	  glyphs_end = end = glyph - 1;
 	  glyph += row->used[TEXT_AREA] - 1;
 
 	  while (glyph > end + 1
@@ -15317,36 +15315,30 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	  glyph_before = glyph + 1;
 	  glyph_after = end;
 	}
-    }
+    } /* if MATRIX_ROW_DISPLAYS_TEXT_P */
   else if (row->reversed_p)
     {
-      /* In R2L rows that don't display text, put the cursor on the
-	 rightmost glyph.  Case in point: an empty last line that is
-	 part of an R2L paragraph.  */
+      /* For R2L rows that don't display text (an empty last line),
+	 place cursor on rightmost glyph.  */
       cursor = end - 1;
-      /* Avoid placing the cursor on the last glyph of the row, where
-	 on terminal frames we hold the vertical border between
-	 adjacent windows.  */
+      /* For tty, avoid placing cursor on a vertical divider.  */
       if (! FRAME_WINDOW_P (WINDOW_XFRAME (w))
 	  && ! WINDOW_RIGHTMOST_P (w)
 	  && cursor == row->glyphs[LAST_AREA] - 1)
 	cursor--;
-      x = -1;	/* will be computed below, at label compute_x */
+      x = -1;	/* computed below at label compute_x */
     }
 
-  /* Step 1: Find the glyph at point, or failing that, find the two glyphs
+  /* Step 1: Find glyph at point or failing that, the two glyphs
      straddling point.  */
   if (! row->reversed_p)
     while (glyph < end && ! NILP (glyph->object))
       {
 	if (BUFFERP (glyph->object))
 	  {
-	    ptrdiff_t dpos = glyph->charpos - pt_old;
-
-	    if (glyph->charpos > bpos_max)
-	      bpos_max = glyph->charpos;
-	    if (glyph->charpos < bpos_min)
-	      bpos_min = glyph->charpos;
+	    ptrdiff_t dpos = glyph->charpos - pt_row;
+	    bpos_max = max (glyph->charpos, bpos_max);
+	    bpos_min = min (glyph->charpos, bpos_min);
 	    if (! glyph->avoid_cursor_p)
 	      {
 		if (dpos == 0)
@@ -15357,17 +15349,17 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 		  }
 		/* See if we've found a better approximation to
 		   POS_BEFORE or to POS_AFTER.  */
-		if (0 > dpos && dpos > pos_before - pt_old)
+		else if (0 > dpos && dpos > pos_before - pt_row)
 		  {
 		    pos_before = glyph->charpos;
 		    glyph_before = glyph;
 		  }
-		else if (0 < dpos && dpos < pos_after - pt_old)
+		else if (0 < dpos && dpos < pos_after - pt_row)
 		  {
 		    pos_after = glyph->charpos;
 		    glyph_after = glyph;
 		  }
-	      }
+	      } /* if ! glyph->avoid_cursor_p */
 	    else if (dpos == 0)
 	      match_with_avoid_cursor = true;
 	  }
@@ -15388,7 +15380,7 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	    if (FIXNUMP (chprop))
 	      {
 		bpos_covered = bpos_max + XFIXNUM (chprop);
-		if (bpos_max <= pt_old && bpos_covered >= pt_old)
+		if (bpos_max <= pt_row && pt_row <= bpos_covered)
 		  {
 		    /* The 'cursor' property covers buffer positions up
 		       to and including point.  Display cursor on glyph.  */
@@ -15406,25 +15398,25 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
       {
 	if (BUFFERP (glyph->object))
 	  {
-	    ptrdiff_t dpos = glyph->charpos - pt_old;
+	    ptrdiff_t dpos = glyph->charpos - pt_row;
 
 	    if (glyph->charpos > bpos_max)
 	      bpos_max = glyph->charpos;
 	    if (glyph->charpos < bpos_min)
 	      bpos_min = glyph->charpos;
-	    if (!glyph->avoid_cursor_p)
+	    if (! glyph->avoid_cursor_p)
 	      {
 		if (dpos == 0)
 		  {
 		    match_with_avoid_cursor = false;
 		    break;
 		  }
-		if (0 > dpos && dpos > pos_before - pt_old)
+		else if (0 > dpos && dpos > pos_before - pt_row)
 		  {
 		    pos_before = glyph->charpos;
 		    glyph_before = glyph;
 		  }
-		else if (0 < dpos && dpos < pos_after - pt_old)
+		else if (0 < dpos && dpos < pos_after - pt_row)
 		  {
 		    pos_after = glyph->charpos;
 		    glyph_after = glyph;
@@ -15445,14 +15437,13 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 		ptrdiff_t prop_pos =
 		  string_buffer_position_lim (glyph->object, pos_before,
 					      pos_after, false);
-
 		if (prop_pos >= pos_before)
 		  bpos_max = prop_pos;
 	      }
 	    if (FIXNUMP (chprop))
 	      {
 		bpos_covered = bpos_max + XFIXNUM (chprop);
-		if (bpos_max <= pt_old && bpos_covered >= pt_old)
+		if (bpos_max <= pt_row && pt_row <= bpos_covered)
 		  {
 		    cursor = glyph;
 		    break;
@@ -15460,32 +15451,32 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	      }
 	    string_seen = true;
 	  }
-	--glyph;
-	if (glyph == glyphs_end) /* don't dereference outside TEXT_AREA */
+	if (--glyph == orig_end) /* don't deref outside TEXT_AREA */
 	  {
-	    x--; /* can't use any pixel_width */
+	    --x; /* can't use any pixel_width */
 	    break;
 	  }
 	x -= glyph->pixel_width;
-    }
+      }
 
   /* Step 2: Keep looking if Step 1 failed.  */
   if (/* No exact match for glyph at point */
-      ! ((row->reversed_p ? glyph > glyphs_end : glyph < glyphs_end)
-	 && BUFFERP (glyph->object) && glyph->charpos == pt_old)
+      ! ((row->reversed_p ? glyph > orig_end : glyph < orig_end)
+	 && BUFFERP (glyph->object) && glyph->charpos == pt_row)
       /* Integer `cursor` property did not cover point.  */
-      && ! (bpos_max <= pt_old && bpos_covered >= pt_old))
+      && ! (bpos_max <= pt_row && bpos_covered >= pt_row))
     {
       /* An empty line has a single glyph whose OBJECT is nil and
 	 whose CHARPOS is the position of a newline on that line.  */
       bool empty_line_p =
-	((row->reversed_p ? glyph > glyphs_end : glyph < glyphs_end)
-	 && NILP (glyph->object) && glyph->charpos > 0
-	 /* Exclude continued and truncated rows inherently non-empty.  */
-	 && ! row->continued_p
-	 && ! row->truncated_on_right_p);
+	(row->reversed_p ? glyph > orig_end : glyph < orig_end)
+	&& NILP (glyph->object)
+	&& glyph->charpos > 0
+	/* Exclude continued and truncated rows inherently non-empty.  */
+	&& ! row->continued_p
+	&& ! row->truncated_on_right_p;
 
-      if (row->ends_in_ellipsis_p && pos_after == last_pos)
+      if (row->ends_in_ellipsis_p && pos_after == pos_last)
 	{
 	  ptrdiff_t ellipsis_pos;
 
@@ -15564,9 +15555,9 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 		  bool overlay_seen = (tem == 0);
 		  if (overlay_seen || pos <= tem)
 		    {
-		      if (tem == pt_old /* in buffer at PT */
+		      if (tem == pt_row /* in buffer at PT */
 			  || overlay_seen /* from overlay */
-			  || (tem - pt_old > 0 && tem < pos_after) /* nearer PT than POS_AFTER */)
+			  || (tem - pt_row > 0 && tem < pos_after) /* nearer PT than POS_AFTER */)
 			{
 			  /* this is the glyph we're looking for */
 			  ptrdiff_t strpos = glyph->charpos;
@@ -15621,7 +15612,7 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	     and return 0. */
 	  if (cursor == NULL
 	      && row->continued_p
-	      && (row->reversed_p ? glyph <= end : glyph >= end))
+	      && row->reversed_p ? glyph <= end : glyph >= end)
 	    return false;
 	}
       /* A truncated row may not include PT among its character positions.
@@ -15629,17 +15620,17 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	 recalculation of hscroll in hscroll_window_tree.  But if a
 	 display string covers point, defer to the string-handling
 	 code below to figure this out.  */
-      else if (row->truncated_on_left_p && pt_old < bpos_min)
+      else if (row->truncated_on_left_p && pt_row < bpos_min)
 	{
 	  cursor = glyph_before;
 	  x = -1;
 	}
-      else if ((row->truncated_on_right_p && pt_old > bpos_max)
+      else if ((row->truncated_on_right_p && pt_row > bpos_max)
 	       /* Zero-width characters produce no glyphs.  */
 	       || (! empty_line_p
 		   && (row->reversed_p
-		       ? glyph_after > glyphs_end
-		       : glyph_after < glyphs_end)))
+		       ? glyph_after > orig_end
+		       : glyph_after < orig_end)))
 	{
 	  cursor = glyph_after;
 	  x = -1;
@@ -15649,23 +15640,24 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
  compute_x:
   if (cursor != NULL)
     glyph = cursor;
-  else if (glyph == glyphs_end
-	   && pos_before == pos_after
-	   && STRINGP ((row->reversed_p
-			? row->glyphs[TEXT_AREA] + row->used[TEXT_AREA] - 1
-			: row->glyphs[TEXT_AREA])->object))
+  else
     {
-      /* All the row's glyphs come from a display string; put the
-	 cursor on the first glyph.  */
-      glyph = row->reversed_p
+      struct glyph *beg = row->reversed_p
 	? row->glyphs[TEXT_AREA] + row->used[TEXT_AREA] - 1
 	: row->glyphs[TEXT_AREA];
+      if (glyph == orig_end
+	  && pos_before == pos_after
+	  && STRINGP (beg->object))
+	{
+	  /* Row is a display string; place cursor on first glyph.  */
+	  glyph = beg;
+	}
     }
   if (x < 0)
     {
       /* Need to compute x that corresponds to GLYPH.  */
-      struct glyph *g;
-      for (g = row->glyphs[TEXT_AREA], x = row->x; g < glyph; g++)
+      x = row->x;
+      for (struct glyph *g = row->glyphs[TEXT_AREA]; g < glyph; ++g)
 	{
 	  if (g >= row->glyphs[TEXT_AREA] + row->used[TEXT_AREA])
 	    emacs_abort ();
@@ -15673,66 +15665,62 @@ set_cursor_from_row (struct window *w, struct glyph_row *row,
 	}
     }
 
-  if (/* We already have a candidate row.  */
-      w->cursor.vpos >= 0
-      /* That candidate is not the row we are processing.  */
+  /* Decide whether current row is better than GLYPH's.  */
+  if (w->cursor.vpos >= 0
+      /* Current row not GLYPH's row.  */
       && MATRIX_ROW (matrix, w->cursor.vpos) != row
-      /* Make sure candidate row occludes point.  */
-      && MATRIX_ROW_START_CHARPOS (MATRIX_ROW (matrix, w->cursor.vpos)) <= pt_old
-      && pt_old <= MATRIX_ROW_END_CHARPOS (MATRIX_ROW (matrix, w->cursor.vpos))
-      /* Make sure candidate row is still valid.  */
+      /* Current row spans point.  */
+      && MATRIX_ROW_START_CHARPOS (MATRIX_ROW (matrix, w->cursor.vpos)) <= pt_row
+      && pt_row <= MATRIX_ROW_END_CHARPOS (MATRIX_ROW (matrix, w->cursor.vpos))
+      /* Current row still valid.  */
       && cursor_row_p (MATRIX_ROW (matrix, w->cursor.vpos)))
     {
-      struct glyph *g1
+      struct glyph *glyph_cur
 	= MATRIX_ROW_GLYPH_START (matrix, w->cursor.vpos) + w->cursor.hpos;
 
-      /* Don't consider glyphs that are outside TEXT_AREA.  */
-      if (! (row->reversed_p ? glyph > glyphs_end : glyph < glyphs_end))
-	return false;
-      /* Keep the candidate whose buffer position is the closest to
-	 point or has the `cursor` property.  */
-      if (/* Previous candidate is a glyph in TEXT_AREA of that row.  */
-	  w->cursor.hpos >= 0
-	  && w->cursor.hpos < MATRIX_ROW_USED (matrix, w->cursor.vpos)
-	  && ((BUFFERP (g1->object)
-	       && (g1->charpos == pt_old /* An exact match always wins.  */
-		   || (BUFFERP (glyph->object)
-		       && eabs (g1->charpos - pt_old)
-		       < eabs (glyph->charpos - pt_old))))
-	      /* Previous candidate is a glyph from a string that has
-		 a non-nil `cursor` property.  */
-	      || (STRINGP (g1->object)
-		  && (! NILP (Fget_char_property (make_fixnum (g1->charpos),
-						  Qcursor, g1->object))
-		      /* Previous candidate is from the same display
-			 string as this one, and the display string
-			 came from a text property.  */
-		      || (EQ (g1->object, glyph->object)
-			  && string_from_text_prop)
-		      /* this candidate is from newline and its
-			 position is not an exact match */
-		      || (NILP (glyph->object)
-			  && glyph->charpos != pt_old)))))
-	return false;
-      /* If this candidate gives an exact match, use that.  */
-      if (! ((BUFFERP (glyph->object) && glyph->charpos == pt_old)
-	     /* If this candidate is a glyph created for the
-		terminating newline of a line, and point is on that
-		newline, it wins because it's an exact match.  */
-	     || (! row->continued_p
-		 && NILP (glyph->object)
-		 && glyph->charpos == 0
-		 && pt_old == MATRIX_ROW_END_CHARPOS (row) - 1))
-	  /* Otherwise, keep the candidate that comes from a row
-	     spanning less buffer positions.  This may win when one or
-	     both candidate positions are on glyphs that came from
-	     display strings, for which we cannot compare buffer
-	     positions.  */
+      if (row->reversed_p ? glyph <= orig_end : glyph >= orig_end)
+	return false; /* GLYPH outside TEXT_AREA.  */
+
+      if (0 <= w->cursor.hpos
+	  && w->cursor.hpos < MATRIX_ROW_USED (matrix, w->cursor.vpos))
+	{
+	  /* Current row within TEXT_AREA.  */
+	  if (BUFFERP (glyph_cur->object)
+	      /* GLYPH_CUR matches point exactly or closer than GLYPH.  */
+	      && (glyph_cur->charpos == pt_row
+		  || (BUFFERP (glyph->object)
+		      && eabs (glyph_cur->charpos - pt_row) < eabs (glyph->charpos - pt_row))))
+	    return false;
+	  if (STRINGP (glyph_cur->object)
+	      /* GLYPH_CUR has 'cursor property, or is same display string as
+		 GLYPH, or GLYPH's position not exact match.  */
+	      && (! NILP (Fget_char_property (make_fixnum (glyph_cur->charpos),
+					      Qcursor, glyph_cur->object))
+		  || (EQ (glyph_cur->object, glyph->object)
+		      && string_from_text_prop)
+		  || (NILP (glyph->object)
+		      && glyph->charpos != pt_row)))
+	    return false;
+	}
+
+      if (/* GLYPH not a perfect match.  */
+	  ! (BUFFERP (glyph->object) && glyph->charpos == pt_row)
+	  /* GLYPH not a terminating newline coinciding with point.  */
+	  && ! (! row->continued_p
+		&& NILP (glyph->object)
+		&& glyph->charpos == 0
+		&& pt_row == MATRIX_ROW_END_CHARPOS (row) - 1)
+	  /* Current row spans fewer characters than GLYPH's (a useful
+	     comparison when both row's starting glyphs come from
+	     display strings for which we cannot compare buffer
+	     positions).  */
 	  && MATRIX_ROW_END_CHARPOS (MATRIX_ROW (matrix, w->cursor.vpos))
 	     - MATRIX_ROW_START_CHARPOS (MATRIX_ROW (matrix, w->cursor.vpos))
 	     < MATRIX_ROW_END_CHARPOS (row) - MATRIX_ROW_START_CHARPOS (row))
 	return false;
     }
+
+  /* We'd rather move cursor to GLYPH's row.  */
   w->cursor.hpos = glyph - row->glyphs[TEXT_AREA];
   w->cursor.x = x;
   w->cursor.vpos = MATRIX_ROW_VPOS (row, matrix) + dvpos;
@@ -16525,7 +16513,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	    }
 	  else
 	    {
-	      set_cursor_from_row (w, row, w->current_matrix, 0, 0, 0, 0);
+	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
 	      if (! cursor_row_fully_visible_p (w, false, true, false))
 		rc = CURSOR_MOVEMENT_MUST_SCROLL;
 	      else
@@ -16539,7 +16527,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	{
 	  /* With bidi-reordered rows, there could be more than
 	     one candidate row whose start and end positions
-	     occlude point.  We need to let set_cursor_from_row
+	     occlude point.  We need to let move_cursor
 	     find the best candidate.  */
 	  /* FIXME: Revisit this when glyph "spilling" in
 	     continuation lines' rows is implemented for
@@ -16553,8 +16541,8 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	      if (MATRIX_ROW_START_CHARPOS (row) <= PT
 		  && PT <= MATRIX_ROW_END_CHARPOS (row)
 		  && cursor_row_p (row))
-		rv |= set_cursor_from_row (w, row, w->current_matrix,
-					   0, 0, 0, 0);
+		rv |= move_cursor (w, row, w->current_matrix,
+				   0, 0, 0, 0);
 	      /* As soon as we've found the exact match for point,
 		 or the first suitable row whose ends_at_zv_p flag
 		 is set, we are done.  */
@@ -16610,7 +16598,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	       && MATRIX_ROW_START_CHARPOS (row) == PT
 	       && cursor_row_p (row))
 	  {
-	    if (set_cursor_from_row (w, row, w->current_matrix, 0, 0, 0, 0))
+	    if (move_cursor (w, row, w->current_matrix, 0, 0, 0, 0))
 	      {
 		rc = CURSOR_MOVEMENT_SUCCESS;
 		break;
@@ -17161,7 +17149,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  else if (current_buffer == old)
 	    SET_TEXT_POS (lpoint, PT, PT_BYTE);
 
-	  set_cursor_from_row (w, row, w->desired_matrix, 0, 0, 0, 0);
+	  move_cursor (w, row, w->desired_matrix, 0, 0, 0, 0);
 
 	  /* Re-run pre-redisplay-function so it can update the region
 	     according to the new position of point.  */
@@ -17598,7 +17586,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  if (row->mode_line_p)
 	    ++row;
 	}
-      set_cursor_from_row (w, row, matrix, 0, 0, 0, 0);
+      move_cursor (w, row, matrix, 0, 0, 0, 0);
     }
 
   if (!cursor_row_fully_visible_p (w, false, false, false))
@@ -18087,8 +18075,8 @@ try_window_reusing_current_matrix (struct window *w)
 	      row = MATRIX_FIRST_TEXT_ROW (w->current_matrix);
 	      row = row_containing_pos (w, PT, row, NULL, dy);
 	      if (row)
-		set_cursor_from_row (w, row, w->current_matrix, 0, 0,
-				     dy, nrows_scrolled);
+		move_cursor (w, row, w->current_matrix, 0, 0,
+			     dy, nrows_scrolled);
 	      else
 		{
 		  clear_glyph_matrix (w->desired_matrix);
@@ -18326,13 +18314,12 @@ try_window_reusing_current_matrix (struct window *w)
 	  if (row < bottom_row)
 	    {
 	      /* Can't simply scan the row for point with
-		 bidi-reordered glyph rows.  Let set_cursor_from_row
+		 bidi-reordered glyph rows.  Let move_cursor
 		 figure out where to put the cursor, and if it fails,
 		 give up.  */
 	      if (! NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
 		{
-		  if (! set_cursor_from_row (w, row, w->current_matrix,
-					     0, 0, 0, 0))
+		  if (! move_cursor (w, row, w->current_matrix, 0, 0, 0, 0))
 		    {
 		      clear_glyph_matrix (w->desired_matrix);
 		      return false;
@@ -18372,9 +18359,9 @@ try_window_reusing_current_matrix (struct window *w)
   return false;
 }
 
-static struct glyph_row *find_last_unchanged_at_beg_row (struct window *);
-static struct glyph_row *find_first_unchanged_at_end_row (struct window *,
-                                                          ptrdiff_t *, ptrdiff_t *);
+static struct glyph_row *last_unchanged_row_before_gap (struct window *);
+static struct glyph_row *first_unchanged_row_after_gap (struct window *,
+							ptrdiff_t *, ptrdiff_t *);
 static struct glyph_row *
 find_last_row_displaying_text (struct glyph_matrix *, struct it *,
                                struct glyph_row *);
@@ -18420,7 +18407,7 @@ find_last_row_displaying_text (struct glyph_matrix *matrix, struct it *it,
    when the current matrix was built.  */
 
 static struct glyph_row *
-find_last_unchanged_at_beg_row (struct window *w)
+last_unchanged_row_before_gap (struct window *w)
 {
   ptrdiff_t first_changed_pos = BEG + BEG_UNCHANGED;
   struct glyph_row *row;
@@ -18464,85 +18451,49 @@ find_last_unchanged_at_beg_row (struct window *w)
 }
 
 
-/* Find the first glyph row in the current matrix of W that is not
-   affected by changes at the end of current_buffer since the
-   time W's current matrix was built.
+/* Return first glyph row unaffected by changes at the "end" (in gap
+   buffer parlance).  Return null if all rows were affected.
 
-   Return in *DELTA the number of chars by which buffer positions in
-   unchanged text at the end of current_buffer must be adjusted.
+   Return in *DELTA the character offset between glyph matrix and
+   buffer space?
 
    Return in *DELTA_BYTES the corresponding number of bytes.
-
-   Value is null if no such row exists, i.e. all rows are affected by
-   changes.  */
+*/
 
 static struct glyph_row *
-find_first_unchanged_at_end_row (struct window *w,
-				 ptrdiff_t *delta, ptrdiff_t *delta_bytes)
+first_unchanged_row_after_gap (struct window *w, ptrdiff_t *delta, ptrdiff_t *delta_bytes)
 {
-  struct glyph_row *row;
-  struct glyph_row *row_found = NULL;
-
+  struct glyph_row *row = MATRIX_ROW (w->current_matrix, w->window_end_vpos);
+  struct glyph_row *result = NULL;
   *delta = *delta_bytes = 0;
-
-  /* Display must not have been paused, otherwise the current matrix
-     is not up to date.  */
   eassert (w->window_end_valid);
 
-  /* A value of window_end_pos >= END_UNCHANGED means that the window
-     end is in the range of changed text.  If so, there is no
-     unchanged row at the end of W's current matrix.  */
   if (w->window_end_pos >= END_UNCHANGED)
-    return NULL;
+    /* end within changed region thus no unchanged row there.  */
+    return result;
 
-  /* Set row to the last row in W's current matrix displaying text.  */
-  row = MATRIX_ROW (w->current_matrix, w->window_end_vpos);
+  if (! MATRIX_ROW_DISPLAYS_TEXT_P (row))
+    return result;
 
-  /* If matrix is entirely empty, no unchanged row exists.  */
-  if (MATRIX_ROW_DISPLAYS_TEXT_P (row))
+  ptrdiff_t Z_matrix = MATRIX_ROW_END_CHARPOS (row) + w->window_end_pos;
+  ptrdiff_t Z_BYTE_matrix = MATRIX_ROW_END_BYTEPOS (row) + w->window_end_bytepos;
+  *delta = Z - Z_matrix;
+  *delta_bytes = Z_BYTE - Z_BYTE_matrix;
+
+  /* This relation holds from gap buffer arithmetic?  */
+  ptrdiff_t last_unchanged_pos = Z - END_UNCHANGED + BEG;
+
+  for (struct glyph_row *ftr = MATRIX_FIRST_TEXT_ROW (w->current_matrix);
+       row > ftr && row->enabled_p && MATRIX_ROW_DISPLAYS_TEXT_P (row);
+       --row)
     {
-      /* The value of row is the last glyph row in the matrix having a
-	 meaningful buffer position in it.  The end position of row
-	 corresponds to window_end_pos.  This allows us to translate
-	 buffer positions in the current matrix to current buffer
-	 positions for characters not in changed text.  */
-      ptrdiff_t Z_old =
-	MATRIX_ROW_END_CHARPOS (row) + w->window_end_pos;
-      ptrdiff_t Z_BYTE_old =
-	MATRIX_ROW_END_BYTEPOS (row) + w->window_end_bytepos;
-      ptrdiff_t last_unchanged_pos, last_unchanged_pos_old;
-      struct glyph_row *first_text_row
-	= MATRIX_FIRST_TEXT_ROW (w->current_matrix);
-
-      *delta = Z - Z_old;
-      *delta_bytes = Z_BYTE - Z_BYTE_old;
-
-      /* Set last_unchanged_pos to the buffer position of the last
-	 character in the buffer that has not been changed.  Z is the
-	 index + 1 of the last character in current_buffer, i.e. by
-	 subtracting END_UNCHANGED we get the index of the last
-	 unchanged character, and we have to add BEG to get its buffer
-	 position.  */
-      last_unchanged_pos = Z - END_UNCHANGED + BEG;
-      last_unchanged_pos_old = last_unchanged_pos - *delta;
-
-      /* Search backward from ROW for a row displaying a line that
-	 starts at a minimum position >= last_unchanged_pos_old.  */
-      for (; row > first_text_row; --row)
-	{
-	  /* This used to abort, but it can happen.
-	     It is ok to just stop the search instead here.  KFS.  */
-	  if (!row->enabled_p || !MATRIX_ROW_DISPLAYS_TEXT_P (row))
-	    break;
-
-	  if (MATRIX_ROW_START_CHARPOS (row) >= last_unchanged_pos_old)
-	    row_found = row;
-	}
+      /* Adding *DELTA to matrix space maps to buffer space. */
+      if (MATRIX_ROW_START_CHARPOS (row) + *delta >= last_unchanged_pos)
+	result = row;
     }
 
-  eassert (!row_found || MATRIX_ROW_DISPLAYS_TEXT_P (row_found));
-
-  return row_found;
+  eassert (! result || MATRIX_ROW_DISPLAYS_TEXT_P (result));
+  return result;
 }
 
 
@@ -18591,82 +18542,61 @@ sync_frame_with_window_matrix_rows (struct window *w)
 }
 
 
-/* Find the glyph row in window W containing CHARPOS.  Consider all
-   rows between START and END (not inclusive).  END null means search
-   all rows to the end of the display area of W.  Value is the row
-   containing CHARPOS or null.  */
+/* Return the row containing CHARPOS in the semi-open interval [ START, END ).
+   A null END searches all rows at or after START.
+*/
 
 struct glyph_row *
 row_containing_pos (struct window *w, ptrdiff_t charpos,
 		    struct glyph_row *start, struct glyph_row *end, int dy)
 {
-  struct glyph_row *row = start;
-  struct glyph_row *best_row = NULL;
-  ptrdiff_t mindif = BUF_ZV (XBUFFER (w->contents)) + 1;
-  int last_y;
-
-  /* If we happen to start on a header-line or a tab-line, skip that.  */
-  if (row->tab_line_p)
-    ++row;
-  if (row->mode_line_p)
-    ++row;
-
-  if ((end && row >= end) || !row->enabled_p)
-    return NULL;
-
-  last_y = window_text_bottom_y (w) - dy;
-
-  while (true)
+  ptrdiff_t best_diff = BUF_ZV (XBUFFER (w->contents)) + 1;
+  const int last_y = window_text_bottom_y (w) - dy;
+  struct glyph_row *result = NULL;
+  for (struct glyph_row *row = start
+	 + (start->tab_line_p ? 1 : 0)
+	 + (start->mode_line_p ? 1 : 0);
+       row->enabled_p
+	 && (! end || row < end)
+	 && MATRIX_ROW_BOTTOM_Y (row) <= last_y;
+       ++row)
     {
-      /* Give up if we have gone too far.  */
-      if ((end && row >= end) || !row->enabled_p)
-	return NULL;
-      /* This formerly returned if they were equal.
-	 I think that both quantities are of a "last plus one" type;
-	 if so, when they are equal, the row is within the screen. -- rms.  */
-      if (MATRIX_ROW_BOTTOM_Y (row) > last_y)
-	return NULL;
+	      /* The end position of a row equals the start
+		 position of the next row.  If CHARPOS is there, we
+		 would rather consider it displayed in the next
+		 line, except when this line ends in ZV.  */
 
       /* If it is in this row, return this row.  */
-      if (! (MATRIX_ROW_END_CHARPOS (row) < charpos
-	     || (MATRIX_ROW_END_CHARPOS (row) == charpos
-		 /* The end position of a row equals the start
-		    position of the next row.  If CHARPOS is there, we
-		    would rather consider it displayed in the next
-		    line, except when this line ends in ZV.  */
-		 && !row_for_charpos_p (row, charpos)))
-	  && charpos >= MATRIX_ROW_START_CHARPOS (row))
+      if (MATRIX_ROW_START_CHARPOS (row) <= charpos
+	  && charpos <= MATRIX_ROW_END_CHARPOS (row)
+	  && (charpos != MATRIX_ROW_END_CHARPOS (row)
+	      || row_for_charpos_p (row, charpos)))
 	{
-	  struct glyph *g;
-
 	  if (NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering))
-	      || (!best_row && !row->continued_p))
-	    return row;
-	  /* In bidi-reordered rows, there could be several rows whose
-	     edges surround CHARPOS, all of these rows belonging to
-	     the same continued line.  We need to find the row which
-	     fits CHARPOS the best.  */
-	  for (g = row->glyphs[TEXT_AREA];
-	       g < row->glyphs[TEXT_AREA] + row->used[TEXT_AREA];
-	       g++)
+	      || (! result && ! row->continued_p))
 	    {
-	      if (!STRINGP (g->object))
+	      result = row;
+	      break;
+	    }
+	  /* Several bidi-reordered rows in the same continued line
+	     could contain CHARPOS.  Whittle candidates to a best fit.  */
+	  for (struct glyph *g = row->glyphs[TEXT_AREA];
+	       g < row->glyphs[TEXT_AREA] + row->used[TEXT_AREA];
+	       ++g)
+	    {
+	      if (! STRINGP (g->object)
+		  && g->charpos > 0
+		  && eabs (g->charpos - charpos) < best_diff)
 		{
-		  if (g->charpos > 0 && eabs (g->charpos - charpos) < mindif)
-		    {
-		      mindif = eabs (g->charpos - charpos);
-		      best_row = row;
-		      /* Exact match always wins.  */
-		      if (mindif == 0)
-			return best_row;
-		    }
+		  best_diff = eabs (g->charpos - charpos);
+		  result = row;
 		}
 	    }
 	}
-      else if (best_row && !row->continued_p)
-	return best_row;
-      ++row;
+      else if (result && ! row->continued_p)
+	break;
     }
+  return result;
 }
 
 
@@ -18718,8 +18648,8 @@ try_window_insdel (struct window *w)
   struct frame *f = XFRAME (w->frame);
   struct glyph_matrix *current_matrix = w->current_matrix;
   struct glyph_matrix *desired_matrix = w->desired_matrix;
-  struct glyph_row *last_unchanged_at_beg_row;
-  struct glyph_row *first_unchanged_at_end_row;
+  struct glyph_row *before_gap;
+  struct glyph_row *after_gap;
   struct glyph_row *row;
   struct glyph_row *bottom_row;
   int bottom_vpos;
@@ -18728,7 +18658,7 @@ try_window_insdel (struct window *w)
   int dvpos, dy;
   struct text_pos start_pos;
   struct run run;
-  int first_unchanged_at_end_vpos = 0;
+  int after_gap_vpos = 0;
   struct glyph_row *last_text_row, *last_text_row_at_end;
   struct text_pos start;
   ptrdiff_t first_changed_charpos, last_changed_charpos;
@@ -18901,7 +18831,7 @@ try_window_insdel (struct window *w)
 	  /* Set the cursor.  */
 	  row = row_containing_pos (w, PT, r0, NULL, 0);
 	  if (row)
-	    set_cursor_from_row (w, row, current_matrix, 0, 0, 0, 0);
+	    move_cursor (w, row, current_matrix, 0, 0, 0, 0);
 	  return 1;
 	}
     }
@@ -18941,7 +18871,7 @@ try_window_insdel (struct window *w)
 	  /* Set the cursor.  */
 	  row = row_containing_pos (w, PT, r0, NULL, 0);
 	  if (row)
-	    set_cursor_from_row (w, row, current_matrix, 0, 0, 0, 0);
+	    move_cursor (w, row, current_matrix, 0, 0, 0, 0);
 	  return 2;
 	}
     }
@@ -18986,22 +18916,22 @@ try_window_insdel (struct window *w)
      last row in W's current matrix not affected by changes at the
      start of current_buffer.  Value is null if changes start in the
      first line of window.  */
-  last_unchanged_at_beg_row = find_last_unchanged_at_beg_row (w);
-  if (last_unchanged_at_beg_row)
+  before_gap = last_unchanged_row_before_gap (w);
+  if (before_gap)
     {
       /* Avoid starting to display in the middle of a character, a TAB
 	 for instance.  This is easier than to set up the iterator
 	 exactly, and it's not a frequent case, so the additional
 	 effort wouldn't really pay off.  */
-      while ((MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (last_unchanged_at_beg_row)
-	      || last_unchanged_at_beg_row->ends_in_newline_from_string_p)
-	     && last_unchanged_at_beg_row > w->current_matrix->rows)
-	--last_unchanged_at_beg_row;
+      while ((MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (before_gap)
+	      || before_gap->ends_in_newline_from_string_p)
+	     && before_gap > w->current_matrix->rows)
+	--before_gap;
 
-      if (MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (last_unchanged_at_beg_row))
+      if (MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (before_gap))
 	GIVE_UP (17);
 
-      if (! init_to_row_end (&it, w, last_unchanged_at_beg_row))
+      if (! init_to_row_end (&it, w, before_gap))
 	GIVE_UP (18);
       /* Give up if the row starts with a display property that draws
 	 on the fringes, since that could prevent correct display of
@@ -19013,11 +18943,11 @@ try_window_insdel (struct window *w)
 
       /* Start displaying new lines in the desired matrix at the same
 	 vpos we would use in the current matrix, i.e. below
-	 last_unchanged_at_beg_row.  */
-      it.vpos = 1 + MATRIX_ROW_VPOS (last_unchanged_at_beg_row,
+	 before_gap.  */
+      it.vpos = 1 + MATRIX_ROW_VPOS (before_gap,
 				     current_matrix);
       it.glyph_row = MATRIX_ROW (desired_matrix, it.vpos);
-      it.current_y = MATRIX_ROW_BOTTOM_Y (last_unchanged_at_beg_row);
+      it.current_y = MATRIX_ROW_BOTTOM_Y (before_gap);
 
       eassert (it.hpos == 0 && it.current_x == 0);
     }
@@ -19030,50 +18960,43 @@ try_window_insdel (struct window *w)
       start_pos = it.current.pos;
     }
 
-  /* Find the first row that is not affected by changes at the end of
-     the buffer.  Value will be null if there is no unchanged row, in
-     which case we must redisplay to the end of the window.  delta
-     will be set to the value by which buffer positions beginning with
-     first_unchanged_at_end_row have to be adjusted due to text
-     changes.  */
-  first_unchanged_at_end_row
-    = find_first_unchanged_at_end_row (w, &delta, &delta_bytes);
+  after_gap = first_unchanged_row_after_gap (w, &delta, &delta_bytes);
 
-  /* Set stop_pos to the buffer position up to which we will have to
-     display new lines.  If first_unchanged_at_end_row != NULL, this
-     is the buffer position of the start of the line displayed in that
-     row.  For first_unchanged_at_end_row == NULL, use 0 to indicate
-     that we don't stop at a buffer position.  */
+  /* Set stop_pos to the buffer position up to which we display new
+     lines.  If after_gap != NULL, this is the buffer
+     position of the start of the line displayed in that row.  For
+     after_gap == NULL, use 0 to indicate that we
+     don't stop at a buffer position.  */
   stop_pos = 0;
-  if (first_unchanged_at_end_row)
+  if (after_gap)
     {
-      eassert (last_unchanged_at_beg_row == NULL
-	       || first_unchanged_at_end_row >= last_unchanged_at_beg_row);
+      eassert (before_gap == NULL
+	       || after_gap >= before_gap);
 
       /* If this is a continuation line, move forward to the next one
 	 that isn't.  Changes in lines above affect this line.
-	 Caution: this may move first_unchanged_at_end_row to a row
+	 Caution: this may move after_gap to a row
 	 not displaying text.  */
-      while (MATRIX_ROW_CONTINUATION_LINE_P (first_unchanged_at_end_row)
-	     && MATRIX_ROW_DISPLAYS_TEXT_P (first_unchanged_at_end_row)
-	     && (MATRIX_ROW_BOTTOM_Y (first_unchanged_at_end_row)
+      while (MATRIX_ROW_CONTINUATION_LINE_P (after_gap)
+	     && MATRIX_ROW_DISPLAYS_TEXT_P (after_gap)
+	     && (MATRIX_ROW_BOTTOM_Y (after_gap)
 		 < it.last_visible_y))
-	++first_unchanged_at_end_row;
+	++after_gap;
 
-      if (!MATRIX_ROW_DISPLAYS_TEXT_P (first_unchanged_at_end_row)
-	  || (MATRIX_ROW_BOTTOM_Y (first_unchanged_at_end_row)
+      if (!MATRIX_ROW_DISPLAYS_TEXT_P (after_gap)
+	  || (MATRIX_ROW_BOTTOM_Y (after_gap)
 	      >= it.last_visible_y))
-	first_unchanged_at_end_row = NULL;
+	after_gap = NULL;
       else
 	{
-	  stop_pos = (MATRIX_ROW_START_CHARPOS (first_unchanged_at_end_row)
+	  stop_pos = (MATRIX_ROW_START_CHARPOS (after_gap)
 		      + delta);
-	  first_unchanged_at_end_vpos
-	    = MATRIX_ROW_VPOS (first_unchanged_at_end_row, current_matrix);
+	  after_gap_vpos
+	    = MATRIX_ROW_VPOS (after_gap, current_matrix);
 	  eassert (stop_pos >= Z - END_UNCHANGED);
 	}
     }
-  else if (last_unchanged_at_beg_row == NULL)
+  else if (before_gap == NULL)
     GIVE_UP (19);
 
 
@@ -19085,12 +19008,12 @@ try_window_insdel (struct window *w)
   overlay_arrow_seen = false;
   if (it.current_y < it.last_visible_y
       && !f->fonts_changed
-      && (first_unchanged_at_end_row == NULL
+      && (after_gap == NULL
 	  || IT_CHARPOS (it) < stop_pos))
     it.glyph_row->reversed_p = false;
   while (it.current_y < it.last_visible_y
 	 && !f->fonts_changed
-	 && (first_unchanged_at_end_row == NULL
+	 && (after_gap == NULL
 	     || IT_CHARPOS (it) < stop_pos))
     {
       if (display_sline (&it, -1))
@@ -19119,16 +19042,16 @@ try_window_insdel (struct window *w)
   /* Compute differences in buffer positions, y-positions etc.  for
      lines reused at the bottom of the window.  Compute what we can
      scroll.  */
-  if (first_unchanged_at_end_row
+  if (after_gap
       /* No lines reused because we displayed everything up to the
          bottom of the window.  */
       && it.current_y < it.last_visible_y)
     {
       dvpos = (it.vpos
-	       - MATRIX_ROW_VPOS (first_unchanged_at_end_row,
+	       - MATRIX_ROW_VPOS (after_gap,
 				  current_matrix));
-      dy = it.current_y - first_unchanged_at_end_row->y;
-      run.current_y = first_unchanged_at_end_row->y;
+      dy = it.current_y - after_gap->y;
+      run.current_y = after_gap->y;
       run.desired_y = run.current_y + dy;
       run.height = it.last_visible_y - max (run.current_y, run.desired_y);
     }
@@ -19136,7 +19059,7 @@ try_window_insdel (struct window *w)
     {
       delta = delta_bytes = dvpos = dy
 	= run.current_y = run.desired_y = run.height = 0;
-      first_unchanged_at_end_row = NULL;
+      after_gap = NULL;
     }
 
   /* Find the cursor if not already found.  We have to decide whether
@@ -19144,30 +19067,29 @@ try_window_insdel (struct window *w)
      not a very frequent case.)  This decision has to be made before
      the current matrix is altered.  A value of cursor.vpos < 0 means
      that PT is either in one of the lines beginning at
-     first_unchanged_at_end_row or below the window.  Don't care for
+     after_gap or below the window.  Don't care for
      lines that might be displayed later at the window end; as
      mentioned, this is not a frequent case.  */
   if (w->cursor.vpos < 0)
     {
       /* Cursor in unchanged rows at the top?  */
       if (PT < CHARPOS (start_pos)
-	  && last_unchanged_at_beg_row)
+	  && before_gap)
 	{
 	  row = row_containing_pos (w, PT,
 				    MATRIX_FIRST_TEXT_ROW (w->current_matrix),
-				    last_unchanged_at_beg_row + 1, 0);
+				    before_gap + 1, 0);
 	  if (row)
-	    set_cursor_from_row (w, row, w->current_matrix, 0, 0, 0, 0);
+	    move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
 	}
 
-      /* Start from first_unchanged_at_end_row looking for PT.  */
-      else if (first_unchanged_at_end_row)
+      /* Start from after_gap looking for PT.  */
+      else if (after_gap)
 	{
-	  row = row_containing_pos (w, PT - delta,
-				    first_unchanged_at_end_row, NULL, 0);
+	  row = row_containing_pos (w, PT - delta, after_gap,
+				    NULL, 0);
 	  if (row)
-	    set_cursor_from_row (w, row, w->current_matrix, delta,
-				 delta_bytes, dy, dvpos);
+	    move_cursor (w, row, w->current_matrix, delta, delta_bytes, dy, dvpos);
 	}
 
       /* Give up if cursor was not found.  */
@@ -19225,7 +19147,7 @@ try_window_insdel (struct window *w)
 	  /* Terminal frame.  In this case, dvpos gives the number of
 	     lines to scroll by; dvpos < 0 means scroll up.  */
 	  int from_vpos
-	    = MATRIX_ROW_VPOS (first_unchanged_at_end_row, w->current_matrix);
+	    = MATRIX_ROW_VPOS (after_gap, w->current_matrix);
 	  int from = WINDOW_TOP_EDGE_LINE (w) + from_vpos;
 	  int end = (WINDOW_TOP_EDGE_LINE (w)
 		     + window_wants_tab_line (w)
@@ -19237,7 +19159,7 @@ try_window_insdel (struct window *w)
 	  /* Perform the operation on the screen.  */
 	  if (dvpos > 0)
 	    {
-	      /* Scroll last_unchanged_at_beg_row to the end of the
+	      /* Scroll before_gap to the end of the
 		 window down dvpos lines.  */
 	      set_terminal_window (f, end);
 
@@ -19246,18 +19168,17 @@ try_window_insdel (struct window *w)
 	      if (!FRAME_SCROLL_REGION_OK (f))
 		ins_del_lines (f, end - dvpos, -dvpos);
 
-	      /* Insert dvpos empty lines in front of
-                 last_unchanged_at_beg_row.  */
+	      /* Insert dvpos empty lines in front of before_gap.  */
 	      ins_del_lines (f, from, dvpos);
 	    }
 	  else if (dvpos < 0)
 	    {
-	      /* Scroll up last_unchanged_at_beg_vpos to the end of
-		 the window to last_unchanged_at_beg_vpos - |dvpos|.  */
+	      /* Scroll up before_gap_vpos to the end of
+		 the window to before_gap_vpos - |dvpos|.  */
 	      set_terminal_window (f, end);
 
 	      /* Delete dvpos lines in front of
-		 last_unchanged_at_beg_vpos.  ins_del_lines will set
+		 before_gap_vpos.  ins_del_lines will set
 		 the cursor to the given vpos and emit |dvpos| delete
 		 line sequences.  */
 	      ins_del_lines (f, from + dvpos, dvpos);
@@ -19281,17 +19202,17 @@ try_window_insdel (struct window *w)
   bottom_vpos = MATRIX_ROW_VPOS (bottom_row, current_matrix);
   if (dvpos < 0)
     {
-      rotate_matrix (current_matrix, first_unchanged_at_end_vpos + dvpos,
+      rotate_matrix (current_matrix, after_gap_vpos + dvpos,
 		     bottom_vpos, dvpos);
       clear_glyph_matrix_rows (current_matrix, bottom_vpos + dvpos,
 			       bottom_vpos);
     }
   else if (dvpos > 0)
     {
-      rotate_matrix (current_matrix, first_unchanged_at_end_vpos,
+      rotate_matrix (current_matrix, after_gap_vpos,
 		     bottom_vpos, dvpos);
-      clear_glyph_matrix_rows (current_matrix, first_unchanged_at_end_vpos,
-			       first_unchanged_at_end_vpos + dvpos);
+      clear_glyph_matrix_rows (current_matrix, after_gap_vpos,
+			       after_gap_vpos + dvpos);
     }
 
   /* For frame-based redisplay, make sure that current frame and window
@@ -19302,21 +19223,21 @@ try_window_insdel (struct window *w)
   /* Adjust buffer positions in reused rows.  */
   if (delta || delta_bytes)
     increment_matrix_positions (current_matrix,
-				first_unchanged_at_end_vpos + dvpos,
+				after_gap_vpos + dvpos,
 				bottom_vpos, delta, delta_bytes);
 
   /* Adjust Y positions.  */
   if (dy)
     shift_glyph_matrix (w, current_matrix,
-			first_unchanged_at_end_vpos + dvpos,
+			after_gap_vpos + dvpos,
 			bottom_vpos, dy);
 
-  if (first_unchanged_at_end_row)
+  if (after_gap)
     {
-      first_unchanged_at_end_row += dvpos;
-      if (first_unchanged_at_end_row->y >= it.last_visible_y
-	  || !MATRIX_ROW_DISPLAYS_TEXT_P (first_unchanged_at_end_row))
-	first_unchanged_at_end_row = NULL;
+      after_gap += dvpos;
+      if (after_gap->y >= it.last_visible_y
+	  || !MATRIX_ROW_DISPLAYS_TEXT_P (after_gap))
+	after_gap = NULL;
     }
 
   /* If scrolling up, there may be some lines to display at the end of
@@ -19372,15 +19293,15 @@ try_window_insdel (struct window *w)
     }
 
   /* Update window_end_pos and window_end_vpos.  */
-  if (first_unchanged_at_end_row && !last_text_row_at_end)
+  if (after_gap && !last_text_row_at_end)
     {
       /* Window end line if one of the preserved rows from the current
 	 matrix.  Set row to the last row displaying text in current
-	 matrix starting at first_unchanged_at_end_row, after
+	 matrix starting at after_gap, after
 	 scrolling.  */
-      eassert (MATRIX_ROW_DISPLAYS_TEXT_P (first_unchanged_at_end_row));
+      eassert (MATRIX_ROW_DISPLAYS_TEXT_P (after_gap));
       row = find_last_row_displaying_text (w->current_matrix, &it,
-					   first_unchanged_at_end_row);
+					   after_gap);
       eassume (row && MATRIX_ROW_DISPLAYS_TEXT_P (row));
       adjust_window_ends (w, row, true);
       eassert (w->window_end_bytepos >= 0);
@@ -19398,7 +19319,7 @@ try_window_insdel (struct window *w)
       adjust_window_ends (w, last_text_row, false);
       eassert (w->window_end_bytepos >= 0);
     }
-  else if (first_unchanged_at_end_row == NULL
+  else if (after_gap == NULL
 	   && last_text_row == NULL
 	   && last_text_row_at_end == NULL)
     {
@@ -22138,7 +22059,7 @@ done:
       && PT >= MATRIX_ROW_START_CHARPOS (row)
       && PT <= MATRIX_ROW_END_CHARPOS (row)
       && cursor_row_p (row))
-    set_cursor_from_row (it->w, row, it->w->desired_matrix, 0, 0, 0, 0);
+    move_cursor (it->w, row, it->w->desired_matrix, 0, 0, 0, 0);
 
   /* Prepare for the next line.  This line starts horizontally at (X
      HPOS) = (0 0).  Vertical positions are incremented.  As a

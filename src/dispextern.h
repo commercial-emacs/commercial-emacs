@@ -299,20 +299,15 @@ struct display_pos
   /* Buffer or string position.  */
   struct text_pos pos;
 
-  /* If this is a position in an overlay string, overlay_string_index
-     is the index of that overlay string in the sequence of overlay
-     strings at `pos' in the order redisplay processes them.  A value
-     < 0 means that this is not a position in an overlay string.  */
+  /* The order in which this overlay among possibly several overlays
+     at POS gets processed, or -1 if not applicable.  */
   ptrdiff_t overlay_string_index;
 
-  /* If this is a position in an overlay string, string_pos is the
-     position within that string.  */
+  /* Position within overlay string, if applicable.  */
   struct text_pos string_pos;
 
-  /* If the character at the position above is a control character or
-     has a display table entry, dpvec_index is an index in the display
-     table or control character translation of that character.  A
-     value < 0 means this is not a position in such a translation.  */
+  /* Index into display table or control character translation, or -1
+     if not applicable.  */
   int dpvec_index;
 };
 
@@ -699,37 +694,23 @@ struct glyph_pool
 			     Glyph Matrix
  ***********************************************************************/
 
-/* Glyph Matrix.
+/* Three kinds:
 
-   Three kinds of glyph matrices exist:
+   1. A frame matrix is used in tty frames where redisplay requires
+   the "whole screen due to limited terminal capabilities" (wtf?).
+   Used only in the update phase of redisplay.
 
-   1. Frame glyph matrices.  These are used for terminal frames whose
-   redisplay needs a view of the whole screen due to limited terminal
-   capabilities.  Frame matrices are used only in the update phase
-   of redisplay.  They are built in update_frame and not used after
-   the update has been performed.
+   2. A window matrix pointing to rows (same memory) from a parent
+   frame matrix.
 
-   2. Window glyph matrices on frames having frame glyph matrices.
-   Such matrices are sub-matrices of their corresponding frame matrix,
-   i.e., frame glyph matrices and window glyph matrices share the same
-   glyph memory, which is allocated in the form of a glyph_pool structure.
-   Glyph rows in such a window matrix are slices of frame matrix rows.
+   3. A window matrix managing its own glyphs.  Useful for variable
+   width and height.
 
-   3. Free-standing window glyph matrices managing their own glyph
-   storage.  This form is used in window-based redisplay which
-   includes variable width and height fonts etc.
-
-   The size of a window's row vector depends on the height of fonts
-   defined on its frame.  It is chosen so that the vector is large
-   enough to describe all lines in a window when it is displayed in
-   the smallest possible character size.  When new fonts are loaded,
-   or window sizes change, the row vector is adjusted accordingly.  */
+*/
 
 struct glyph_matrix
 {
-  /* The pool from which glyph memory is allocated, if any.  This is
-     null for frame matrices and for window matrices managing their
-     own storage.  */
+  /* For allocating rows in type 2.  */
   struct glyph_pool *pool;
 
   /* Vector of glyph row structures.  The row at nrows - 1 is reserved
@@ -766,7 +747,7 @@ struct glyph_matrix
   int left_margin_glyphs, right_margin_glyphs;
 
   /* Flag indicating that scrolling should not be tried in
-     update_window.  This flag is set by functions like try_window_id
+     update_window.  This flag is set by functions like try_window_insdel
      which do their own scrolling.  */
   bool_bf no_scrolling_p : 1;
 
@@ -808,23 +789,8 @@ void check_matrix_pointer_lossage (struct glyph_matrix *);
 			     Glyph Rows
  ***********************************************************************/
 
-/* Area in window glyph matrix.  If values are added or removed,
-   the function mark_glyph_matrix in alloc.c may need to be changed.  */
-
-enum glyph_row_area
-{
-  ANY_AREA = -1,
-  LEFT_MARGIN_AREA,
-  TEXT_AREA,
-  RIGHT_MARGIN_AREA,
-  LAST_AREA
-};
-
-
-/* Rows of glyphs in a windows or frame glyph matrix.
-
-   Each row is partitioned into three areas.  The start and end of
-   each area is recorded in a pointer as shown below.
+/* A glyph row is comprised of three contiguous arrays held in
+   glyph_row.glyphs.  Adjust mark_glyph_matrix if adding areas.
 
    +--------------------+-------------+---------------------+
    |  left margin area  |  text area  |  right margin area  |
@@ -834,106 +800,88 @@ enum glyph_row_area
 			|                                   |
 			glyphs[TEXT_AREA]                   |
 			                      glyphs[LAST_AREA]
+*/
+enum glyph_row_area
+{
+  ANY_AREA = -1,
+  LEFT_MARGIN_AREA,
+  TEXT_AREA,
+  RIGHT_MARGIN_AREA,
+  LAST_AREA
+};
 
-   Rows in frame matrices reference glyph memory allocated in a frame
-   glyph pool (see the description of struct glyph_pool).  Rows in
-   window matrices on frames having frame matrices reference slices of
-   the glyphs of corresponding rows in the frame matrix.
-
-   Rows in window matrices on frames having no frame matrices point to
-   glyphs allocated from the heap via xmalloc;
-   glyphs[LEFT_MARGIN_AREA] is the start address of the allocated
-   glyph structure array.
-
-   NOTE: layout of first four members of this structure is important,
-   see clear_glyph_row and copy_row_except_pointers to check why.  */
+/* Kludge: clear_glyph_row and copy_row_except_pointers depend on
+   first four members maintaining their position within the
+   struct.  */
 
 struct glyph_row
 {
-  /* Pointers to beginnings of areas.  The end of an area A is found at
-     A + 1 in the vector.  The last element of the vector is the end
-     of the whole row.
+  /* Array of `struct glyph` arrays denoting rows.
 
-     Kludge alert: Even if used[TEXT_AREA] == 0, glyphs[TEXT_AREA][0]'s
-     position field is used.  It is -1 if this row does not correspond
-     to any text; it is some buffer position if the row corresponds to
-     an empty display line that displays a line end.  This is what old
-     redisplay used to do.  (Except in code for terminal frames, this
-     kludge is no longer used, I believe. --gerd).
+     When we refer to an area's A's "end." we mean GLYPHS[A + 1].
 
-     See also start, end, displays_text_p and ends_at_zv_p for cleaner
-     ways to do it.  The special meaning of positions 0 and -1 will be
-     removed some day, so don't use it in new code.  */
+     Kludge: Even if used[A] == 0, GLYPHS[A][0]'s position field is -1
+     for degenerate rows, or a buffer position for an otherwise empty
+     "line end."  (wtf, like a newline or ZV?)
+
+     The fields START, END, DISPLAYS_TEXT_P and ENDS_AT_ZV_P represent
+     an alternative but equally clumsy method of tracking area
+     boundaries.  */
   struct glyph *glyphs[1 + LAST_AREA];
 
-  /* Number of glyphs actually filled for each area.  This could have
-     size LAST_AREA, but it's 1 + LAST_AREA to simplify offset
-     calculations.  */
+  /* Number of glyphs actually filled for each area. */
   short used[1 + LAST_AREA];
 
-  /* Hash code.  This hash code is available as soon as the row
-     is constructed, i.e. after a call to display_sline.  */
+  /* Available as soon as the row is constructed in display_sline.  */
   unsigned hash;
 
-  /* Window-relative x and y-position of the top-left corner of this
-     row.  If y < 0, this means that eabs (y) pixels of the row are
-     invisible because it is partially visible at the top of a window.
-     If x < 0, this means that eabs (x) pixels of the first glyph of
-     the text area of the row are invisible because the glyph is
-     partially visible.  */
+  /* Window-relative x and y-position of the row's origin or top-left
+     corner.  A negative y is however many row pixels were scrolled
+     off in a partially visible top row.  A negative x is however many
+     row pixels were horizontally scrolled off. */
   int x, y;
 
-  /* Width of the row in pixels without taking face extension at the
-     end of the row into account, and without counting truncation
-     and continuation glyphs at the end of a row on ttys.  */
+  /* Row width excluding face extension at row end.  */
   int pixel_width;
 
-  /* Logical ascent/height of this line.  The value of ascent is zero
-     and height is 1 on terminal frames.  */
+  /* Logical ascent/height.  ASCENT is zero and HEIGHT is one for tty.  */
   int ascent, height;
 
-  /* Physical ascent/height of this line.  If max_ascent > ascent,
-     this line overlaps the line above it on the display.  Otherwise,
-     if max_height > height, this line overlaps the line beneath it.  */
+  /* Physical ascent/height.  Row whose PHYS_ASCENT exceeds ASCENT
+     overlaps the row above.  Row whose PHYS_HEIGHT exceeds
+     HEIGHT overlaps the row below.  */
   int phys_ascent, phys_height;
 
-  /* Portion of row that is visible.  Partially visible rows may be
-     found at the top and bottom of a window.  This is 1 for tty
-     frames.  It may be < 0 in case of completely invisible rows.  */
+  /* Visible portion of row.  Partially visible rows may be
+     found at the top and bottom of a window.  This is 1 for tty.
+     It may be < 0 for completely invisible rows.  */
   int visible_height;
 
-  /* Extra line spacing added after this row.  Do not consider this
-     in last row when checking if row is fully visible.  */
+  /* Additional spacing following row.  Not to be considered
+     when checking if final row is fully visible.  */
   int extra_line_spacing;
 
-  /* First position in this row.  This is the text position, including
-     overlay position information etc, where the display of this row
-     started, and can thus be less than the position of the first
-     glyph (e.g. due to invisible text or horizontal scrolling).
-     BIDI Note: In R2L rows, that have its reversed_p flag set, this
-     position is at or beyond the right edge of the row.  */
+  /* Position state generally coincident with first glyph except when
+     pushed backwards (or forwards under R2L) by horizontally
+     scrolling or non-visible text.  */
   struct display_pos start;
 
-  /* Text position at the end of this row.  This is the position after
-     the last glyph on this row.  It can be greater than the last
-     glyph position + 1, due to a newline that ends the line,
-     truncation, invisible text etc.  In an up-to-date display, this
-     should always be equal to the start position of the next row.
-     BIDI Note: In R2L rows, this position is at or beyond the left
-     edge of the row.  */
+  /* Position state generally one past the last glyph except when
+     pushed forwards (or backwards under R2L) by a newline,
+     truncation, or other non-visible text.  After redisplay, this
+     should equal START of the following row.  */
   struct display_pos end;
 
-  /* The smallest and the largest buffer positions that contributed to
-     glyphs in this row.  Note that due to bidi reordering, these are
-     in general different from the text positions stored in `start'
-     and `end' members above, and also different from the buffer
-     positions recorded in the glyphs displayed the leftmost and
-     rightmost on the screen.  */
-  struct text_pos minpos, maxpos;
+  /* The numerically smallest buffer position.  MINPOS.pos generally
+     corresponds to START except under bidi right-to-left.  */
+  struct text_pos minpos;
 
-  /* Non-zero means the overlay arrow bitmap is on this line.
-     -1 means use default overlay arrow bitmap, else
-     it specifies actual fringe bitmap number.  */
+  /* The numerically largest buffer position.  MAXPOS.pos generally
+     corresponds to END under bidi right-to-left.  */
+  struct text_pos maxpos;
+
+  /* Overlay arrow bitmap index if positive.  Default bitmap if
+     negative.  Not applicable if zero.  */
   int overlay_arrow_bitmap;
 
   /* Left fringe bitmap number (enum fringe_bitmap_type).  */
@@ -966,120 +914,112 @@ struct glyph_row
   /* Vertical offset of the right fringe bitmap.  */
   signed right_fringe_offset : FRINGE_HEIGHT_BITS;
 
-  /* True means that at least one of the left and right fringe bitmaps is
-     periodic and thus depends on the y-position of the row.  */
+  /* Whether left or right fringe bitmap is periodic and thus
+     depends on the row's y-coordinate.  */
   bool_bf fringe_bitmap_periodic_p : 1;
 
-  /* True means that we must draw the bitmaps of this row.  */
+  /* Whether bitmaps must be drawn.  */
   bool_bf redraw_fringe_bitmaps_p : 1;
 
-  /* In a desired matrix, true means that this row must be updated.  In a
-     current matrix, false means that the row has been invalidated, i.e.
-     the row's contents do not agree with what is visible on the
-     screen.  */
+  /* Whether row must be updated in the desired matrix, or whether row
+     is valid in the current matrix (row contents agree with screen
+     contents).  */
   bool_bf enabled_p : 1;
 
-  /* True means row displays a text line that is truncated on the left or
-     right side.  */
+  /* Whether row is left-truncated.  */
   bool_bf truncated_on_left_p : 1;
+
+  /* Whether row is right-truncated.  */
   bool_bf truncated_on_right_p : 1;
 
-  /* True means that this row displays a continued line, i.e. it has a
-     continuation mark at the right side.  */
+  /* Whether row is logically continued on next row, i.e., a
+     continuation line.  */
   bool_bf continued_p : 1;
 
-  /* False means that this row does not contain any text, i.e., it is
-     a blank line at the window and buffer end.  */
+  /* Whether not a degenerate line ending in ZV.  */
   bool_bf displays_text_p : 1;
 
-  /* True means that this line ends at ZV.  */
+  /* Whether lines ends in ZV.  */
   bool_bf ends_at_zv_p : 1;
 
-  /* True means the face of the last glyph in the text area is drawn to
-     the right end of the window.  This flag is used in
-     update_text_area to optimize clearing to the end of the area.  */
+  /* Whether last glyph in text area coincides with window's right edge.
+     Used by update_text_area to "clear the end of the area." (wtf)  */
   bool_bf fill_line_p : 1;
 
-  /* True means display a bitmap on X frames indicating that this
-     line contains no text and ends in ZV.  */
+  /* Whether to draw a bitmap indicating a degenerate line ending in
+     ZV.  */
   bool_bf indicate_empty_line_p : 1;
 
-  /* True means this row contains glyphs that overlap each other because
-     of lbearing or rbearing.  */
+  /* Whether row contains overlapping glyphs due to LBEARING or
+     RBEARING.  */
   bool_bf contains_overlapping_glyphs_p : 1;
 
-  /* True means this row is as wide as the window it is displayed in, including
-     scroll bars, fringes, and internal borders.  This also
-     implies that the row doesn't have marginal areas.  */
+  /* Whether row's width corresponds to window width and thus lacks
+     margin areas.  How is this different from
+     exact_window_width_line_p?  */
   bool_bf full_width_p : 1;
 
-  /* True means row is a mode or header/tab-line.  */
+  /* Whether row is a mode, header, or tab line.  */
   bool_bf mode_line_p : 1;
 
-  /* True means row is a tab-line.  */
+  /* Whether row is a tab line.  */
   bool_bf tab_line_p : 1;
 
-  /* True in a current row means this row is overlapped by another row.  */
+  /* Whether row is underneath another row.  */
   bool_bf overlapped_p : 1;
 
-  /* True means this line ends in the middle of a character consisting
-     of more than one glyph.  Some glyphs have been put in this row,
-     the rest are put in rows below this one.  */
+  /* Whether the row ends with a glyph of a multiglyph character
+     concluded in the following row.  */
   bool_bf ends_in_middle_of_char_p : 1;
 
-  /* True means this line starts in the middle of a character consisting
-     of more than one glyph.  Some glyphs have been put in the
-     previous row, the rest are put in this row.  */
+  /* Whether the row starts with a glyph of a multiglyph character
+     begun in the preceding row.  */
   bool_bf starts_in_middle_of_char_p : 1;
 
-  /* True in a current row means this row overlaps others.  */
+  /* Whether this row is atop another row.  */
   bool_bf overlapping_p : 1;
 
-  /* True means some glyphs in this row are displayed in mouse-face.  */
+  /* Whether some row glyphs are in mouse-face.  */
   bool_bf mouse_face_p : 1;
 
-  /* True means this row was ended by a newline from a string.  */
+  /* Whether row terminates in a newline from a 'display property.  */
   bool_bf ends_in_newline_from_string_p : 1;
 
-  /* True means this row width is exactly the width of the window, and the
-     final newline character is hidden in the right fringe.  */
+  /* Whether row width corresponds to window width and would thus
+     "hide" the final newline in the right fringe.  How is this
+     different from full_width_p?  */
   bool_bf exact_window_width_line_p : 1;
 
-  /* True means this row currently shows the cursor in the right fringe.  */
+  /* Whether row shows cursor in right fringe.  */
   bool_bf cursor_in_fringe_p : 1;
 
-  /* True means the last glyph in the row is part of an ellipsis.  */
+  /* Whether last glyph composes an ellipsis.  */
   bool_bf ends_in_ellipsis_p : 1;
 
-  /* True means display a bitmap on X frames indicating that this
-     the first line of the buffer.  */
+  /* Whether to draw a bitmap delineating bob.  */
   bool_bf indicate_bob_p : 1;
 
-  /* True means display a bitmap on X frames indicating that this
-     the top line of the window, but not start of the buffer.  */
+  /* Whether to draw a bitmap delineating window top.  */
   bool_bf indicate_top_line_p : 1;
 
-  /* True means display a bitmap on X frames indicating that this
-     the last line of the buffer.  */
+  /* Whether to draw a bitmap delineating eob.  */
   bool_bf indicate_eob_p : 1;
 
-  /* True means display a bitmap on X frames indicating that this
-     the bottom line of the window, but not end of the buffer.  */
+  /* Whether to draw a bitmap delineating window's bottom.  */
   bool_bf indicate_bottom_line_p : 1;
 
-  /* True means the row was reversed to display text in a
-     right-to-left paragraph.  */
+  /* Whether bidi right-to-left applies.  */
   bool_bf reversed_p : 1;
 
-  /* Whether or not a stipple was drawn in this row at some point.  */
+  /* Whether a stipple was ever drawn at this row.  */
   bool_bf stipple_p : 1;
 
-  /* Continuation lines width at the start of the row.  */
+  /* Continuation lines width from row start.  */
   int continuation_lines_width;
 
 #ifdef HAVE_WINDOW_SYSTEM
-  /* Non-NULL means the current clipping area.  This is temporarily
-     set while exposing a region.  Coordinates are frame-relative.  */
+  /* Current clipping area temporarily set while exposing a region.
+     Coordinates are frame-relative.  */
   const Emacs_Rectangle *clip;
 #endif
 };
@@ -1659,7 +1599,7 @@ enum face_underline_type
    For each Lisp face, 0..N realized faces can exist for different
    frames and different charsets.  Realized faces are built from Lisp
    faces and text properties/overlays by merging faces and adding
-   unspecified attributes from the `default' face.  */
+   unspecified attributes from the `default` face.  */
 
 struct face
 {

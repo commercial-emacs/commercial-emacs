@@ -1697,7 +1697,6 @@ default_value (Lisp_Object symbol)
 	if (sym->u.s.c_variable.fwdptr
 	    && NILP (Flocal_variable_p (symbol, Fcurrent_buffer ())))
 	  result = fwd_get (sym->u.s.c_variable, current_buffer);
-	/* Else use default at time of buffer-localization.  */
 	if (NILP (result))
 	  result = sym->u.s.buffer_local_default;
       }
@@ -1885,7 +1884,7 @@ static void
 convert_to_localized (Lisp_Object variable, Lisp_Object value, lispfwd fwd)
 {
   CHECK_SYMBOL (variable);
-  // not a whiff of buffer-local state
+  /* not a whiff of buffer-local state */
   eassert (XSYMBOL (variable)->u.s.type != SYMBOL_LOCAL_SOMEWHERE
 	   && NILP (Flocal_variable_p (variable, Fcurrent_buffer ())));
   make_blv (XSYMBOL (variable), value, fwd, false);

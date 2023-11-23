@@ -2191,7 +2191,7 @@ buffer, whether or not it is currently displayed in some window.  */)
       int start_x UNINIT;
       int first_x, to_x = -1;
 
-      bool start_x_given = !NILP (cur_col);
+      bool start_x_given = ! NILP (cur_col);
       if (start_x_given)
 	{
 	  start_col = extract_float (cur_col);
@@ -2204,7 +2204,7 @@ buffer, whether or not it is currently displayed in some window.  */)
 	 will sometimes err by one column.  */
       int lnum_width = 0;
       int lnum_pixel_width = 0;
-      if (!NILP (Vdisplay_line_numbers))
+      if (! NILP (Vdisplay_line_numbers))
 	line_number_display_width (w, &lnum_width, &lnum_pixel_width);
       SET_TEXT_POS (pt, PT, PT_BYTE);
       itdata = bidi_shelve_cache ();
@@ -2301,6 +2301,9 @@ buffer, whether or not it is currently displayed in some window.  */)
 	to_x = window_column_x (w, window, XFLOATINT (lcols), lcols)
 	  + lnum_pixel_width;
 
+      bool myguy = (it.method == GET_FROM_STRING
+		    && it.current.pos.charpos == current_thread->m_current_buffer->begv);
+
       if (nlines <= 0)
 	{
 	  /* EZ palaver: dbffbe0 */
@@ -2359,6 +2362,10 @@ buffer, whether or not it is currently displayed in some window.  */)
 	}
 
       SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
+
+      if (myguy)
+	fprintf (stderr, "wtf %ld\n", PT_BYTE);
+
       bidi_unshelve_cache (itdata, 0);
     }
 
