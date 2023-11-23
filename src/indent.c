@@ -2301,9 +2301,6 @@ buffer, whether or not it is currently displayed in some window.  */)
 	to_x = window_column_x (w, window, XFLOATINT (lcols), lcols)
 	  + lnum_pixel_width;
 
-      bool myguy = (it.method == GET_FROM_STRING
-		    && it.current.pos.charpos == current_thread->m_current_buffer->begv);
-
       if (nlines <= 0)
 	{
 	  /* EZ palaver: dbffbe0 */
@@ -2362,10 +2359,6 @@ buffer, whether or not it is currently displayed in some window.  */)
 	}
 
       SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
-
-      if (myguy)
-	fprintf (stderr, "wtf %ld\n", PT_BYTE);
-
       bidi_unshelve_cache (itdata, 0);
     }
 

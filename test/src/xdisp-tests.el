@@ -409,4 +409,46 @@ Bug present here and in GNU since it doesn't sustain a rerun."
                         "t")
           (should (equal width (car (window-text-pixel-size nil from (point))))))))))
 
+
+(ert-deftest xdisp-tests--ornery-display-string ()
+  "I dunno awrhygty@outlook.com, but dude makes good tests (Bug#67201)."
+  (skip-unless (not noninteractive))
+  (xdisp-tests--visible-buffer
+   (let ((s (make-string 1000 ?-))
+         (v (concat "0123456789"
+                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                    "abcdefghijklmnopqrstuvwxyz"))
+         (line-prefix "[start]")
+         (wrap-prefix "[wrap]")
+         (ww (window-width))
+         truncate-lines)
+     (dotimes (i (length s))
+       (put-text-property i (1+ i) 'display (string (aref v (% i (length v)))) s))
+     (add-text-properties 0 (length s)
+                          `(line-prefix
+                            ,(propertize line-prefix 'face '(:background "red"))
+                            wrap-prefix ,wrap-prefix)
+                          s)
+     (save-excursion (insert s))
+     (scroll-up-command 1)
+     (should (= (window-start) (point)))
+     (should (equal (char-to-string
+                     (aref v (% (- (* 1 ww) (+ (length line-prefix)))
+                                (length v))))
+                    (get-text-property (point) 'display)))
+     (scroll-up-command 1)
+     (should (= (window-start) (point)))
+     (should (equal (char-to-string
+                     (aref v (% (- (* 2 ww) (+ (length line-prefix)
+                                               (length wrap-prefix)))
+                                (length v))))
+                    (get-text-property (point) 'display)))
+     (forward-char (- ww (length wrap-prefix)))
+     (should (equal (char-to-string
+                     (aref v (% (- (* 3 ww) (+ (length line-prefix)
+                                               (length wrap-prefix)
+                                               (length wrap-prefix)))
+                                (length v))))
+                    (get-text-property (point) 'display))))))
+
 ;;; xdisp-tests.el ends here

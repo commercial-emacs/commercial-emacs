@@ -15240,7 +15240,7 @@ redisplay_window_1 (Lisp_Object window)
 
 
 /* Set cursor position of W.  Point is assumed to be within ROW.
-   DELTA is ROW's offset from rowspace to bufferspace.
+   Adding DELTA takes position from rowspace to bufferspace.
 
    Return true if cursor got moved to ROW.  */
 
@@ -15611,8 +15611,10 @@ move_cursor (struct window *w, struct glyph_row *row,
 	     [e.g., a continued before-string], don't update w->cursor
 	     and return 0. */
 	  if (cursor == NULL
-	      && row->continued_p
-	      && row->reversed_p ? glyph <= end : glyph >= end)
+	      && row->reversed_p ? glyph <= end : glyph >= end
+	      && row->reversed_p ? end > orig_end : end < orig_end
+	      && STRINGP (end->object)
+	      && row->continued_p)
 	    return false;
 	}
       /* A truncated row may not include PT among its character positions.
@@ -18396,63 +18398,58 @@ find_last_row_displaying_text (struct glyph_matrix *matrix, struct it *it,
 }
 
 
-/* Return the last row in the current matrix of W that is not affected
-   by changes at the start of current_buffer that occurred since W's
-   current matrix was built.  Value is null if no such row exists.
+/* Return last glyph row unaffected by changes at the "start" (does
+   that mean before the gap?).  Return null if all rows were affected.
 
-   BEG_UNCHANGED is the number of characters unchanged at the start of
-   current_buffer.  BEG + BEG_UNCHANGED is the buffer position of the
-   first changed character in current_buffer.  Characters at positions <
-   BEG + BEG_UNCHANGED are at the same buffer positions as they were
-   when the current matrix was built.  */
+   BEG_UNCHANGED is the number of unchanged characters before the gap.
+   BEG + BEG_UNCHANGED is the buffer position of the first changed
+   character.  Characters preceding BEG + BEG_UNCHANGED remain at
+   their initial positions when the current matrix was built.
+*/
 
 static struct glyph_row *
 last_unchanged_row_before_gap (struct window *w)
 {
-  ptrdiff_t first_changed_pos = BEG + BEG_UNCHANGED;
-  struct glyph_row *row;
-  struct glyph_row *row_found = NULL;
-  int yb = window_text_bottom_y (w);
+  struct glyph_row *result = NULL;
+  const ptrdiff_t first_changed_pos = BEG + BEG_UNCHANGED;
+  const int text_bottom_y = window_text_bottom_y (w);
 
-  /* Find the last row displaying unchanged text.  */
-  for (row = MATRIX_FIRST_TEXT_ROW (w->current_matrix);
+  for (struct glyph_row *row = MATRIX_FIRST_TEXT_ROW (w->current_matrix);
        MATRIX_ROW_DISPLAYS_TEXT_P (row)
 	 && MATRIX_ROW_START_CHARPOS (row) < first_changed_pos;
        ++row)
     {
-      if (/* If row ends before first_changed_pos, it is unchanged,
-	     except in some case.  */
-	  MATRIX_ROW_END_CHARPOS (row) <= first_changed_pos
-	  /* When row ends in ZV and we write at ZV it is not
-             unchanged.  */
-	  && ! row->ends_at_zv_p
-	  /* When first_changed_pos is the end of a continued line,
-	     row is not unchanged because it may be no longer
-	     continued.  */
-	  && ! (MATRIX_ROW_END_CHARPOS (row) == first_changed_pos
-		&& (row->continued_p
-		    || row->exact_window_width_line_p))
-	  /* If ROW->end is beyond ZV, then ROW->end is outdated and
-	     needs to be recomputed, so don't consider this row as
-	     unchanged.  This happens when the last line was
-	     bidi-reordered and was killed immediately before this
-	     redisplay cycle.  In that case, ROW->end stores the
-	     buffer position of the first visual-order character of
-	     the killed text, which is now beyond ZV.  */
-	  && CHARPOS (row->end.pos) <= ZV)
-	row_found = row;
+      /* Under what circumstances could ROW admit changes?  Ensure
+	 their negation. */
+      bool could_change =
+	/* We could write to ZV.  */
+	row->ends_at_zv_p
+	/* Row could stop being continued if first_changed_pos
+	   coincides with a continued line end.  */
+	|| (MATRIX_ROW_END_CHARPOS (row) == first_changed_pos
+	    && (row->continued_p || row->exact_window_width_line_p))
+	/* Another stupidly incomprehensible EZ exception: when last
+	   line is bidi-reordered and killed before a redisplay,
+	   ROW->end stores the buffer position of the first
+	   visual-order character of the killed text, which is now
+	   beyond ZV.  */
+	|| CHARPOS (row->end.pos) > ZV;
+
+      if (! could_change
+	  && MATRIX_ROW_END_CHARPOS (row) <= first_changed_pos)
+	result = row;
 
       /* Stop if last visible row.  */
-      if (MATRIX_ROW_BOTTOM_Y (row) >= yb)
+      if (MATRIX_ROW_BOTTOM_Y (row) >= text_bottom_y)
 	break;
     }
 
-  return row_found;
+  return result;
 }
 
 
-/* Return first glyph row unaffected by changes at the "end" (in gap
-   buffer parlance).  Return null if all rows were affected.
+/* Return first glyph row unaffected by changes at the "end" (does that
+   mean after the gap?).  Return null if all rows were affected.
 
    Return in *DELTA the character offset between glyph matrix and
    buffer space?
@@ -18480,7 +18477,11 @@ first_unchanged_row_after_gap (struct window *w, ptrdiff_t *delta, ptrdiff_t *de
   *delta = Z - Z_matrix;
   *delta_bytes = Z_BYTE - Z_BYTE_matrix;
 
-  /* This relation holds from gap buffer arithmetic?  */
+  /* END_UNCHANGED is not a fucking end.  "END" refers to after the
+     gap.  It's a scalar "minimum Z - GPT" (wtf?).
+
+     So LUP = BEG + (Z - minimal(Z - GPT)) = maximal(BEG + GPT)?
+   */
   ptrdiff_t last_unchanged_pos = Z - END_UNCHANGED + BEG;
 
   for (struct glyph_row *ftr = MATRIX_FIRST_TEXT_ROW (w->current_matrix);
@@ -18489,6 +18490,8 @@ first_unchanged_row_after_gap (struct window *w, ptrdiff_t *delta, ptrdiff_t *de
     {
       /* Adding *DELTA to matrix space maps to buffer space. */
       if (MATRIX_ROW_START_CHARPOS (row) + *delta >= last_unchanged_pos)
+	/* Unchanged, or equivalently minimal row pos still past
+	   maximal gap?  Gap is where shit changes?  */
 	result = row;
     }
 
@@ -18998,7 +19001,6 @@ try_window_insdel (struct window *w)
     }
   else if (before_gap == NULL)
     GIVE_UP (19);
-
 
   /* Display new lines.  Set last_text_row to the last new line
      displayed which has text on it, i.e. might end up as being the
