@@ -191,6 +191,16 @@ been restored with a slightly revised role contingent on a few
 assumptions explained in its doc string.  For clarity, it has been
 renamed 'erc-ensure-target-buffer-on-privmsg'.
 
+** A smarter, more responsive prompt.
+ERC's prompt can be told to respond dynamically to incoming and
+outgoing messages by leveraging the familiar function variant of the
+option 'erc-prompt'.  With this release, only predefined functions can
+take full advantage of this new dynamism, but an interface to empower
+third parties with the same possibilities may follow suit.  To get
+started, customize 'erc-prompt' to 'erc-prompt-format', and see the
+option of the same name ('erc-prompt-format') for a rudimentary
+templating facility reminiscent of 'erc-mode-line-format'.
+
 ** Module 'scrolltobottom' now optionally more aggressive.
 Enabling the experimental option 'erc-scrolltobottom-all' makes ERC
 more vigilant about staking down the input area in all ERC windows.
@@ -252,6 +262,15 @@ Enabled by default, this option now produces more useful feedback
 whenever ERC rejects prompt input containing whitespace-only lines.
 When paired with option 'erc-send-whitespace-lines', ERC echoes a
 tally of blank lines padded and trailing blanks culled.
+
+** A context-dependent mode segment in header and mode lines.
+The "%m" specifier has traditionally expanded to a lone "+" in server
+and query buffers and a string containing all switch modes (plus
+"limit" and "key" args) in channel buffers.  It now becomes a string
+of user modes in server buffers and disappears completely in query
+buffers.  In channels, it's grown to include all letters and their
+possibly truncated arguments, with the exception of stateful list
+modes, like "b".
 
 ** Miscellaneous UX changes.
 Some minor quality-of-life niceties have finally made their way to

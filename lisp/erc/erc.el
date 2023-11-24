@@ -751,7 +751,74 @@ parameters are not included.")
 (defcustom erc-prompt "ERC>"
   "Prompt used by ERC.  Trailing whitespace is not required."
   :group 'erc-display
-  :type '(choice string function))
+  :type '(choice string
+                 (function-item :tag "Interpret format specifiers"
+                                erc-prompt-format)
+                 function))
+
+(defvar erc--prompt-format-face-example
+  #("%p%m%a\u00b7%b>"
+    0 2 (font-lock-face erc-my-nick-prefix-face)
+    2 4 (font-lock-face font-lock-keyword-face)
+    4 6 (font-lock-face erc-error-face)
+    6 7 (font-lock-face shadow)
+    7 9 (font-lock-face font-lock-constant-face)
+    9 10 (font-lock-face shadow))
+  "An example value for option `erc-prompt-format' with faces.")
+
+(defcustom erc-prompt-format erc--prompt-format-face-example
+  "Format string when `erc-prompt' is `erc-prompt-format'.
+ERC recognizes these substitution specifiers:
+
+ %a - away indicator
+ %b - buffer name
+ %t - channel or query target, server domain, or dialed address
+ %S - target@network or buffer name
+ %s - target@server or server
+ %N - current network, like Libera.Chat
+ %p - channel membership prefix, like @ or +
+ %n - current nickname
+ %c - channel modes with args for select modes
+ %C - channel modes with all args
+ %u - user modes
+ %m - channel modes sans args in channels, user modes elsewhere
+ %M - like %m but show nothing in query buffers
+
+To pick your own colors, do something like:
+
+  (setopt erc-prompt-format
+          (concat
+           (propertize \"%b\" \\='font-lock-face \\='erc-input-face)
+           (propertize \"%a\" \\='font-lock-face \\='erc-error-face)))
+
+Please remember that ERC ignores this option completely unless
+the \"parent\" option `erc-prompt' is set to `erc-prompt-format'."
+  :package-version '(ERC . "5.6")
+  :group 'erc-display
+  :type `(choice (const :tag "{Prefix}{Mode}{Away}{MIDDLE DOT}{Buffer}>"
+                        ,erc--prompt-format-face-example)
+                 string))
+
+(defun erc-prompt-format ()
+  "Make predefined `format-spec' substitutions.
+
+See option `erc-prompt-format' and option `erc-prompt'."
+  (format-spec erc-prompt-format
+               (erc-compat--defer-format-spec-in-buffer
+                (?C erc--channel-modes 3 ",")
+                (?M erc--format-modes 'no-query-p)
+                (?N erc-format-network)
+                (?S erc-format-target-and/or-network)
+                (?a erc--format-away-indicator)
+                (?b buffer-name)
+                (?c erc-format-channel-modes)
+                (?m erc--format-modes)
+                (?n erc-current-nick)
+                (?p erc--format-channel-status-prefix)
+                (?s erc-format-target-and/or-server)
+                (?t erc-format-target)
+                (?u erc--format-user-modes))
+               'ignore-missing)) ; formerly `only-present'
 
 (defun erc-prompt ()
   "Return the input prompt as a string.
@@ -2992,23 +3059,70 @@ debugging purposes, try `erc-debug-irc-protocol'."
           (cl-assert (< erc-insert-marker erc-input-marker))
           (cl-assert (= (field-end erc-insert-marker) erc-input-marker)))))
 
-(defvar erc--refresh-prompt-hook nil)
+(defvar erc--merge-prop-behind-p nil
+  "When non-nil, put merged prop(s) behind existing.")
+
+(defvar erc--refresh-prompt-hook nil
+  "Hook called after refreshing the prompt in the affected buffer.")
+
+(defvar-local erc--inhibit-prompt-display-property-p nil
+  "Tell `erc-prompt' related functions to avoid the `display' text prop.
+Modules can enable this when needing to reserve the prompt's
+display property for some other purpose, such as displaying it
+elsewhere, abbreviating it, etc.")
+
+(defconst erc--prompt-properties '( rear-nonsticky t
+                                    erc-prompt t ; t or `hidden'
+                                    field erc-prompt
+                                    front-sticky t
+                                    read-only t)
+  "Mandatory text properties added to ERC's prompt.")
+
+(defvar erc--refresh-prompt-continue-request nil
+  "State flag for refreshing prompt in all buffers.
+When the value is zero, functions assigned to the variable
+`erc-prompt' can set this to run `erc--refresh-prompt-hook' (1)
+or `erc--refresh-prompt' (2) in all buffers of the server.")
+
+(defun erc--refresh-prompt-continue (&optional hooks-only-p)
+  "Ask ERC to refresh the prompt in all buffers.
+Functions assigned to `erc-prompt' can call this if needing to
+recreate the prompt in other buffers as well.  With HOOKS-ONLY-P,
+run `erc--refresh-prompt-hook' in other buffers instead of doing
+a full refresh."
+  (when (and erc--refresh-prompt-continue-request
+             (zerop erc--refresh-prompt-continue-request))
+    (setq erc--refresh-prompt-continue-request (if hooks-only-p 1 2))))
 
 (defun erc--refresh-prompt ()
   "Re-render ERC's prompt when the option `erc-prompt' is a function."
   (erc--assert-input-bounds)
   (unless (erc--prompt-hidden-p)
-    (when (functionp erc-prompt)
-      (save-excursion
-        (goto-char erc-insert-marker)
-        (set-marker-insertion-type erc-insert-marker nil)
-        ;; Avoid `erc-prompt' (the named function), which appends a
-        ;; space, and `erc-display-prompt', which propertizes all but
-        ;; that space.
-        (insert-and-inherit (funcall erc-prompt))
-        (set-marker-insertion-type erc-insert-marker t)
-        (delete-region (point) (1- erc-input-marker))))
-    (run-hooks 'erc--refresh-prompt-hook)))
+    (let ((erc--refresh-prompt-continue-request
+           (or erc--refresh-prompt-continue-request 0)))
+      (when (functionp erc-prompt)
+        (save-excursion
+          (goto-char (1- erc-input-marker))
+          ;; Avoid `erc-prompt' (the named function), which appends a
+          ;; space, and `erc-display-prompt', which propertizes all
+          ;; but that space.
+          (let ((s (funcall erc-prompt))
+                (p (point))
+                (erc--merge-prop-behind-p t))
+            (erc--merge-prop 0 (length s) 'font-lock-face 'erc-prompt-face s)
+            (add-text-properties 0 (length s) erc--prompt-properties s)
+            (insert s)
+            (delete-region erc-insert-marker p))))
+      (run-hooks 'erc--refresh-prompt-hook)
+      (when-let (((> erc--refresh-prompt-continue-request 0))
+                 (n erc--refresh-prompt-continue-request)
+                 (erc--refresh-prompt-continue-request -1)
+                 (b (current-buffer)))
+        (erc-with-all-buffers-of-server erc-server-process
+            (lambda () (not (eq b (current-buffer))))
+          (if (= n 1)
+              (run-hooks 'erc--refresh-prompt-hook)
+            (erc--refresh-prompt)))))))
 
 (defun erc--check-msg-prop (prop &optional val)
   "Return PROP's value in `erc--msg-props' when populated.
@@ -3246,9 +3360,12 @@ value.  See also `erc-button-add-face'."
         new)
     (while (< pos to)
       (setq new (if old
-                    (if (listp val)
-                        (append val (ensure-list old))
-                      (cons val (ensure-list old)))
+                    ;; Can't `nconc' without more info.
+                    (if erc--merge-prop-behind-p
+                        `(,@(ensure-list old) ,@(ensure-list val))
+                      (if (listp val)
+                          (append val (ensure-list old))
+                        (cons val (ensure-list old))))
                   val))
       (put-text-property pos end prop new object)
       (setq pos end
@@ -5208,12 +5325,7 @@ If FACE is non-nil, it will be used to propertize the prompt.  If it is nil,
         ;; Do not extend the text properties when typing at the end
         ;; of the prompt, but stuff typed in front of the prompt
         ;; shall remain part of the prompt.
-        (setq prompt (propertize prompt
-                                 'rear-nonsticky t
-                                 'erc-prompt t ; t or `hidden'
-                                 'field 'erc-prompt
-                                 'front-sticky t
-                                 'read-only t))
+        (setq prompt (apply #'propertize prompt erc--prompt-properties))
         (erc-put-text-property 0 (1- (length prompt))
                                'font-lock-face (or face 'erc-prompt-face)
                                prompt)
@@ -6651,6 +6763,12 @@ or t, for type D.")
   "Possibly stale `erc--channel-mode-types' instance for the server.
 Use the getter of the same name to retrieve the current value.")
 
+(defvar-local erc--mode-line-mode-string nil
+  "Computed mode-line or header-line component for user/channel modes.")
+
+(defvar erc--mode-line-chanmodes-arg-len 10
+  "Max length at which to truncate channel-mode args in header line.")
+
 (defun erc--channel-mode-types ()
   "Return variable `erc--channel-mode-types', possibly initializing it."
   (erc--with-isupport-data CHANMODES erc--channel-mode-types
@@ -6685,13 +6803,16 @@ complement relevant letters in STRING."
                (erc--update-membership-prefix (pop args) c (if +p 'on 'off)))
               ((and-let* ((group (or (aref table c) (and fallbackp ?d))))
                  (erc--handle-channel-mode group c +p
-                                           (and (or (/= group ?c) +p)
+                                           (and (/= group ?d)
+                                                (or (/= group ?c) +p)
                                                 (pop args)))
                  t))
               ((not fallbackp)
                (erc-display-message nil '(notice error) (erc-server-buffer)
                                     (format "Unknown channel mode: %S" c))))))
     (setq erc-channel-modes (sort erc-channel-modes #'string<))
+    (setq erc--mode-line-mode-string
+          (concat "+" (erc--channel-modes erc--mode-line-chanmodes-arg-len)))
     (erc-update-mode-line (current-buffer))))
 
 (defvar-local erc--user-modes nil
@@ -6702,15 +6823,59 @@ Analogous to `erc-channel-modes' but chars rather than strings.")
   "Return user \"MODE\" letters in a form described by AS-TYPE.
 When AS-TYPE is the symbol `strings' (plural), return a list of
 strings.  When it's `string' (singular), return the same list
-concatenated into a single string.  When it's a single char, like
-?+, return the same value as `string' but with AS-TYPE prepended.
-When AS-TYPE is nil, return a list of chars."
+concatenated into a single string.  When AS-TYPE is nil, return a
+list of chars."
   (let ((modes (or erc--user-modes (erc-with-server-buffer erc--user-modes))))
     (pcase as-type
       ('strings (mapcar #'char-to-string modes))
       ('string (apply #'string modes))
-      ((and (pred characterp) c) (apply #'string (cons c modes)))
       (_ modes))))
+
+(defun erc--channel-modes (&optional as-type sep)
+  "Return channel \"MODE\" settings in a form described by AS-TYPE.
+When AS-TYPE is the symbol `strings' (plural), return letter keys
+as a list of sorted string.  When it's `string' (singular),
+return keys as a single string.  When it's a number N, return a
+single string consisting of the concatenated and sorted keys
+followed by a space and then their corresponding args, each
+truncated to N chars max.  ERC joins these args together with
+SEP, which defaults to a single space.  Otherwise, return a
+sorted alist of letter and arg pairs.  In all cases that include
+values, respect `erc-show-channel-key-p' and optionally omit the
+secret key associated with the letter k."
+  (and-let* ((modes erc--channel-modes)
+             (tobj (erc--channel-mode-types))
+             (types (erc--channel-mode-types-table tobj)))
+    (let (out)
+      (maphash (lambda (k v)
+                 (unless (eq ?a (aref types k))
+                   (push (cons k
+                               (and (not (eq t v))
+                                    (not (and (eq k ?k)
+                                              (not (bound-and-true-p
+                                                    erc-show-channel-key-p))))
+                                    v))
+                         out)))
+               modes)
+      (setq out (cl-sort out #'< :key #'car))
+      (pcase as-type
+        ('strings (mapcar (lambda (o) (char-to-string (car o))) out))
+        ('string (apply #'string (mapcar #'car out)))
+        ((and (pred natnump) c)
+         (let (keys vals)
+           (pcase-dolist (`(,k . ,v) out)
+             (when v
+               (push (if (> (length v) c)
+                         (with-memoization
+                             (gethash (list c k v)
+                                      (erc--channel-mode-types-shortargs tobj))
+                           (truncate-string-to-width v c 0 nil t))
+                       v)
+                     vals))
+             (push k keys))
+           (concat (apply #'string (nreverse keys)) (and vals " ")
+                   (string-join (nreverse vals) (or sep " ")))))
+        (_ out)))))
 
 (defun erc--parse-user-modes (string &optional current extrap)
   "Return lists of chars from STRING to add to and drop from CURRENT.
@@ -6742,11 +6907,14 @@ dropped were they not already absent."
 (defun erc--update-user-modes (string)
   "Update `erc--user-modes' from \"MODE\" STRING.
 Return its value, a list of characters sorted by character code."
-  (setq erc--user-modes
-        (pcase-let ((`(,adding ,dropping)
-                     (erc--parse-user-modes string erc--user-modes)))
-          (sort (seq-difference (nconc erc--user-modes adding) dropping)
-                #'<))))
+  (prog1
+      (setq erc--user-modes
+            (pcase-let ((`(,adding ,dropping)
+                         (erc--parse-user-modes string erc--user-modes)))
+              (sort (seq-difference (nconc erc--user-modes adding) dropping)
+                    #'<)))
+    (setq erc--mode-line-mode-string
+          (concat "+" (erc--user-modes 'string)))))
 
 (defun erc--update-channel-modes (string &rest args)
   "Update `erc-channel-modes' and call individual mode handlers.
@@ -6790,14 +6958,24 @@ expect STATE to be a boolean and ARGUMENT either a string or nil."
   (erc-log (format "Channel-mode %c (type %s, arg %S) %s"
                    letter type arg (if state 'enabled 'disabled))))
 
-(cl-defmethod erc--handle-channel-mode :before (_ c state arg)
-  "Record STATE change and ARG, if enabling, for mode letter C."
+(cl-defmethod erc--handle-channel-mode :before (type c state arg)
+  "Record STATE change for mode letter C.
+When STATE is non-nil, add or update C's mapping in
+`erc--channel-modes', associating it with ARG if C takes a
+parameter and t otherwise.  When STATE is nil, forget the
+mapping.  For type A, add up update a permanent mapping for C,
+associating it with an integer indicating a running total of
+STATE changes since joining the channel.  In most cases, this
+won't match the number known to the server."
   (unless erc--channel-modes
     (cl-assert (erc--target-channel-p erc--target))
     (setq erc--channel-modes (make-hash-table)))
-  (if state
-      (puthash c (or arg t) erc--channel-modes)
-    (remhash c erc--channel-modes)))
+  (if (= type ?a)
+      (cl-callf (lambda (s) (+ (or s 0) (if state +1 -1)))
+          (gethash c erc--channel-modes))
+    (if state
+        (puthash c (or arg t) erc--channel-modes)
+      (remhash c erc--channel-modes))))
 
 (cl-defmethod erc--handle-channel-mode :before ((_ (eql ?d)) c state _)
   "Update `erc-channel-modes' for any character C of nullary type D.
@@ -8199,6 +8377,62 @@ shortened server name instead."
         (format-time-string erc-mode-line-away-status-format a)
       "")))
 
+(defvar-local erc--away-indicator nil
+  "Cons containing an away indicator for the connection.")
+
+(defvar erc-away-status-indicator "A"
+  "String shown by various formatting facilities to indicate away status.
+Currently only used by the option `erc-prompt-format'.")
+
+(defun erc--format-away-indicator ()
+  "Return char with `display' property of `erc--away-indicator'."
+  (and-let* ((indicator (erc-with-server-buffer
+                          (or erc--away-indicator
+                              (setq erc--away-indicator (list "")))))
+             (newcar (if (erc-away-time) erc-away-status-indicator "")))
+    ;; Inform other buffers of the change when necessary.
+    (let ((dispp (not erc--inhibit-prompt-display-property-p)))
+      (unless (eq newcar (car indicator))
+        (erc--refresh-prompt-continue (and dispp 'hooks-only-p))
+        (setcar indicator newcar))
+      (if dispp
+          (propertize "(away?)" 'display indicator)
+        newcar))))
+
+(defvar-local erc--user-modes-indicator nil
+  "Cons containing connection-wide indicator for user modes.")
+
+;; If adding more of these functions, should factor out commonalities.
+;; As of ERC 5.6, this is identical to the away variant aside from
+;; the var names and `eq', which isn't important.
+(defun erc--format-user-modes ()
+  "Return server's user modes as a string"
+  (and-let* ((indicator (erc-with-server-buffer
+                          (or erc--user-modes-indicator
+                              (setq erc--user-modes-indicator (list "")))))
+             (newcar (erc--user-modes 'string)))
+    (let ((dispp (not erc--inhibit-prompt-display-property-p)))
+      (unless (string= newcar (car indicator))
+        (erc--refresh-prompt-continue (and dispp 'hooks-only-p))
+        (setcar indicator newcar))
+      (if dispp
+          (propertize "(user-modes?)" 'display indicator)
+        newcar))))
+
+(defun erc--format-channel-status-prefix ()
+  "Return the current channel membership prefix."
+  (and (erc--target-channel-p erc--target)
+       (erc-get-user-mode-prefix (erc-current-nick))))
+
+(defun erc--format-modes (&optional no-query-p)
+  "Return a string of channel modes in channels and user modes elsewhere.
+With NO-QUERY-P, return nil instead of user modes in query
+buffers.  Also return nil when mode information is unavailable."
+  (cond ((erc--target-channel-p erc--target)
+         (erc--channel-modes 'string))
+        ((not (and erc--target no-query-p))
+         (erc--format-user-modes))))
+
 (defun erc-format-channel-modes ()
   "Return the current channel's modes."
   (concat (apply #'concat
@@ -8230,7 +8464,7 @@ shortened server name instead."
   (with-current-buffer buffer
     (let ((spec `((?a . ,(erc-format-away-status))
                   (?l . ,(erc-format-lag-time))
-                  (?m . ,(erc-format-channel-modes))
+                  (?m . ,(or erc--mode-line-mode-string ""))
                   (?n . ,(or (erc-current-nick) ""))
                   (?N . ,(erc-format-network))
                   (?o . ,(or (erc-controls-strip erc-channel-topic) ""))
