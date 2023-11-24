@@ -2992,6 +2992,9 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
   /* init_iterator should have considered POS a window start.  */
   eassert (! WINDOW_START_ATTRS (&& !));
 
+  if (it->line_wrap == TRUNCATE)
+    return;
+
   /* retroactively patch in continuation line, if any.  */
   reseat_preceding_line_start (it);
   move_it_forward (it, CHARPOS (pos), -1, MOVE_TO_POS, NULL);
@@ -3007,9 +3010,6 @@ start_move_it (struct it *it, struct window *w, struct text_pos pos)
     {
       it->continuation_lines_width += it->current_x;
     }
-
-  if (it->line_wrap == TRUNCATE)
-    it->continuation_lines_width = 0; /* doesn't apply */
 
   if (it->current.dpvec_index > 0)
     it->current.dpvec_index = 0; /* Forces redisplay of display vector */
