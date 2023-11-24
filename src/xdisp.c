@@ -8753,7 +8753,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  else /* it->line_wrap != TRUNCATE */
 	    {
 	      /* Test this before outer loop's get_display_element()
-		 changes method.  Bug#67201*/
+		 changes method (Bug#67201).  */
 	      if (BUFFER_POS_REACHED_P ())
 		{
 		  result = MOVE_POS_MATCH_OR_ZV;

@@ -2510,7 +2510,7 @@ struct Lisp_Objfwd
   };
 
 /* Like Lisp_Objfwd except value lives not in OBJVAR
-   bur rather the current buffer's slot at byte OFFSET.  */
+   but rather the current buffer's slot at byte OFFSET.  */
 struct Lisp_Buffer_Objfwd
   {
     enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Buffer_Obj */

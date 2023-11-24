@@ -756,13 +756,13 @@ jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
       && BUFFERP (symbol->u.s.buffer_local_buffer)
       && XBUFFER (symbol->u.s.buffer_local_buffer) == buffer)
     {
-      // No context switch, update lisp from C.
+      /* No context switch, update lisp from C.  */
       XSETCDR (pair, fwd_get (symbol->u.s.c_variable, buffer));
     }
   return pair;
 }
 
-/* Simplify after jettisoning Lisp_Buffer_Local_Value.  */
+/* This is anathema to multithreading.  */
 
 Lisp_Object
 switch_buffer_local_context (struct Lisp_Symbol *xsymbol, struct buffer *buffer)
