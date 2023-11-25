@@ -1801,7 +1801,6 @@ more projects.  After finishing, a message is printed summarizing
 the progress.  The function returns the number of detected
 projects."
   (interactive "DDirectory: \nP")
-  (project--ensure-read-project-list)
   (let ((dirs (if recursive
                   (directory-files-recursively dir "" t)
                 (directory-files dir t)))
