@@ -2856,6 +2856,9 @@ forall_firstchar_1 (re_char *p, re_char *pend,
       else
         switch (*p)
           {
+          case no_op:
+            p++; continue;
+
           /* Cases which stop the iteration.  */
           case succeed:
           case exactn:
@@ -2871,15 +2874,9 @@ forall_firstchar_1 (re_char *p, re_char *pend,
           /* Cases which may match the empty string.  */
           case at_dot:
           case begbuf:
-          case no_op:
           case wordbound:
           case notwordbound:
           case begline:
-            p++;
-            continue;
-
-          /* Cases which may match the empty string and may
-             tell us something about the next char.  */
           case endline:
           case endbuf:
           case wordbeg:
@@ -3200,6 +3197,11 @@ analyze_first_fastmap (const re_char *p, void *arg)
 	}
       return true;
 
+    case at_dot:
+    case begbuf:
+    case wordbound:
+    case notwordbound:
+    case begline:
     case endline:
     case endbuf:
     case wordbeg:
@@ -3243,6 +3245,11 @@ analyze_first_null (const re_char *p, void *arg)
     case notcategoryspec:
       return true;
 
+    case at_dot:
+    case begbuf:
+    case wordbound:
+    case notwordbound:
+    case begline:
     case endline:
     case endbuf:
     case wordbeg:
@@ -3981,6 +3988,13 @@ mutually_exclusive_one (re_char *p2, void *arg)
     case symend:
       RETURN_CONSTRAIN (*data->p1 == syntaxspec
                         && (data->p1[1] == Ssymbol || data->p1[1] == Sword));
+
+    case at_dot:
+    case begbuf:
+    case wordbound:
+    case notwordbound:
+    case begline:
+      RETURN_CONSTRAIN (false);
 
     case duplicate:
       /* At this point, we know nothing about what this can match, sadly.  */
