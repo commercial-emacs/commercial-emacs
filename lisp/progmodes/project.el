@@ -1649,13 +1649,6 @@ has changed, and NO-WRITE is nil."
                (not (bound-and-true-p ert--running-tests)))
       (project--write-project-list))))
 
-;;;###autoload
-(defun project-remember-project (pr &optional no-write)
-  "Add project PR to the front of the project list.
-Save the result in `project-list-file' if the list of projects
-has changed, and NO-WRITE is nil."
-  (project--remember-dir (project-root pr) no-write))
-
 (defun project--remove-from-project-list (project-root report-message)
   "Remove directory PROJECT-ROOT of a missing project from the project list.
 If the directory was in the list before the removal, save the
@@ -1721,26 +1714,19 @@ It's also possible to enter an arbitrary directory not in the list."
                              default-directory nil t)
       dir)))
 
-(defvar project--name-history)
-
 (defun project-prompt-project-name ()
   "Prompt the user for a project, by name, that is one of the known project roots.
 The project is chosen among projects known from the project list,
 see `project-list-file'.
 It's also possible to enter an arbitrary directory not in the list."
   (let* ((dir-choice "... (choose a dir)")
-         project--name-history
          (choices
           (let (ret)
-            ;; Iterate in reverse order so project--name-history is in
-            ;; the correct order.
-            (dolist (dir (reverse (project-known-project-roots)))
+            (dolist (dir (project-known-project-roots))
               ;; we filter out directories that no longer map to a project,
               ;; since they don't have a clean project-name.
-              (when-let (proj (project--find-in-directory dir))
-                (let ((name (project-name proj)))
-                  (push name project--name-history)
-                  (push (cons name proj) ret))))
+              (if-let (proj (project--find-in-directory dir))
+                  (push (cons (project-name proj) proj) ret)))
             ret))
          ;; XXX: Just using this for the category (for the substring
          ;; completion style).
@@ -1749,9 +1735,7 @@ It's also possible to enter an arbitrary directory not in the list."
          (pr-name ""))
     (while (equal pr-name "")
       ;; If the user simply pressed RET, do this again until they don't.
-      (setq pr-name
-            (let (history-add-new-input)
-              (completing-read "Select project: " table nil t nil 'project--name-history))))
+      (setq pr-name (completing-read "Select project: " table nil t)))
     (if (equal pr-name dir-choice)
         (read-directory-name "Select directory: " default-directory nil t)
       (let ((proj (assoc pr-name choices)))
