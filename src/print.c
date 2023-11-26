@@ -2039,8 +2039,8 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 #endif
     default:
       emacs_abort ();
+      break;
     }
-  emacs_abort ();
 }
 
 static char
