@@ -4770,7 +4770,7 @@ be added to `python-mode-skeleton-abbrev-table'."
   (let* ((name (symbol-name name))
          (function-name (intern (concat "python-skeleton-" name))))
     `(progn
-       (function-put ',function-name 'command-modes '(python-base-mode))
+       (function-put ',function-name 'command-modes '(python-mode))
        (define-abbrev python-mode-skeleton-abbrev-table
          ,name "" ',function-name :system t)
        (setq python-skeleton-available
@@ -6474,7 +6474,7 @@ Add import for undefined name `%s' (empty to skip): "
                python-shell-font-lock-turn-on
                python-shell-package-enable
                python-shell-completion-complete-or-indent))
-  (function-put sym 'command-modes '(python-base-mode inferior-python-mode)))
+  (function-put sym 'command-modes '(python-mode inferior-python-mode)))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist
