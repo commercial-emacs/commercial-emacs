@@ -2383,105 +2383,10 @@ stupid (and also obsolete)."
 
 (defvar byte-compile--for-effect)
 
-(defun byte-compile--output-docform-recurse
-    (info position form cvecindex docindex specindex quoted)
-  "Print a form with a doc string.  INFO is (prefix postfix).
-POSITION is where the next doc string is to be inserted.
-CVECINDEX is the index in the FORM of the constant vector, or nil.
-DOCINDEX is the index of the doc string (or nil) in the FORM.
-If SPECINDEX is non-nil, it is the index in FORM
-of the function bytecode string.  In that case,
-we output that argument and the following argument
-\(the constants vector) together, for lazy loading.
-QUOTED says that we have to put a quote before the
-list that represents a doc string reference.
-`defvaralias', `autoload' and `custom-declare-variable' need that.
-
-Return the position after any inserted docstrings as comments."
-  (let ((index 0)
-        doc-string-position)
-    ;; Insert the doc string, and make it a comment with #@LENGTH.
-    (when (and byte-compile-dynamic-docstrings
-               (stringp (nth docindex form)))
-      (goto-char position)
-      (setq doc-string-position
-            (byte-compile-output-as-comment
-             (nth docindex form) nil)
-            position (point))
-      (goto-char (point-max)))
-
-    (insert (car info))
-    (prin1 (car form) byte-compile--outbuffer)
-    (while (setq form (cdr form))
-      (setq index (1+ index))
-      (insert " ")
-      (cond ((and (numberp specindex) (= index specindex)
-                  ;; Don't handle the definition dynamically
-                  ;; if it refers (or might refer)
-                  ;; to objects already output
-                  ;; (for instance, gensyms in the arg list).
-                  (let (non-nil)
-                    (when (hash-table-p print-number-table)
-                      (maphash (lambda (_k v) (if v (setq non-nil t)))
-                               print-number-table))
-                    (not non-nil)))
-             ;; Output the byte code and constants specially
-             ;; for lazy dynamic loading.
-             (goto-char position)
-             (let ((lazy-position (byte-compile-output-as-comment
-                                   (cons (car form) (nth 1 form))
-                                   t)))
-               (setq position (point))
-               (goto-char (point-max))
-               (princ (format "(#$ . %d) nil" lazy-position)
-                      byte-compile--outbuffer)
-               (setq form (cdr form))
-               (setq index (1+ index))))
-            ((eq index cvecindex)
-             (let* ((cvec (car form))
-                    (len (length cvec))
-                    (index2 0)
-                    elt)
-               (insert "[")
-               (while (< index2 len)
-                 (setq elt (aref cvec index2))
-                 (if (byte-code-function-p elt)
-                     (setq position
-                           (byte-compile--output-docform-recurse
-                            '("#[" "]") position
-                            (append elt nil) ; Convert the vector to a list.
-                            2 4 specindex nil))
-                   (prin1 elt byte-compile--outbuffer))
-                 (setq index2 (1+ index2))
-                 (unless (eq index2 len)
-                   (insert " ")))
-               (insert "]")))
-            ((= index docindex)
-             (cond
-              (doc-string-position
-               (princ (format (if quoted "'(#$ . %d)"  "(#$ . %d)")
-                              doc-string-position)
-                      byte-compile--outbuffer))
-              ((stringp (car form))
-               (let ((print-escape-newlines nil))
-                 (goto-char (prog1 (1+ (point))
-                              (prin1 (car form)
-                                     byte-compile--outbuffer)))
-                 (insert "\\\n")
-                 (goto-char (point-max))))
-              (t (prin1 (car form) byte-compile--outbuffer))))
-            (t (prin1 (car form) byte-compile--outbuffer))))
-    (insert (cadr info))
-    position))
-
-(defun byte-compile-output-docform (preface tailpiece name info form
-                                            cvecindex docindex
-                                            specindex quoted)
-  "Print a form with a doc string.  INFO is (prefix postfix).
-If PREFACE, NAME, and TAILPIECE are non-nil, print them too,
-before/after INFO and the FORM but after the doc string itself.
-CVECINDEX is the index in the FORM of the constant vector, or nil.
-DOCINDEX is the index of the doc string (or nil) in the FORM.
+(defun byte-compile-output-docform (preface name info form specindex quoted)
+  "Print a form with a doc string.  INFO is (prefix doc-index postfix).
+If PREFACE and NAME are non-nil, print them too,
+before INFO and the FORM but after the doc string itself.
 If SPECINDEX is non-nil, it is the index in FORM
 of the function bytecode string.  In that case,
 we output that argument and the following argument
@@ -2860,10 +2765,9 @@ otherwise."
             (princ ")" byte-compile--outbuffer)))))))
 
 (defun byte-compile-output-as-comment (exp quoted)
-  "Print Lisp object EXP in the output file at point, inside a comment.
-Return the file (byte) position it will have.  Leave point after
-the inserted text.  If QUOTED is non-nil, print with quoting;
-otherwise, print without quoting."
+  "Print Lisp object EXP in the output file, inside a comment.
+Return the file (byte) position it will have.
+If QUOTED is non-nil, print with quoting; otherwise, print without quoting."
   (with-current-buffer byte-compile--outbuffer
     (let ((position (point)))
       ;; Insert EXP, and make it a comment with #@LENGTH.
@@ -2871,24 +2775,21 @@ otherwise, print without quoting."
       (if quoted
           (prin1 exp byte-compile--outbuffer)
         (princ exp byte-compile--outbuffer))
-      (setq end (point-marker))
-      (set-marker-insertion-type end t)
-
       (goto-char position)
       ;; Quote certain special characters as needed.
       ;; get_doc_string in doc.c does the unquoting.
-      (while (search-forward "\^A" end t)
+      (while (search-forward "\^A" nil t)
         (replace-match "\^A\^A" t t))
       (goto-char position)
-      (while (search-forward "\000" end t)
+      (while (search-forward "\000" nil t)
         (replace-match "\^A0" t t))
       (goto-char position)
-      (while (search-forward "\037" end t)
+      (while (search-forward "\037" nil t)
         (replace-match "\^A_" t t))
-      (goto-char end)
+      (goto-char (point-max))
       (insert "\037")
       (goto-char position)
-      (insert "#@" (format "%d" (- (position-bytes end)
+      (insert "#@" (format "%d" (- (position-bytes (point-max))
                                    (position-bytes position))))
 
       ;; Save the file position of the object.
@@ -2897,8 +2798,7 @@ otherwise, print without quoting."
       ;; position to a file position.
       (prog1
           (- (position-bytes (point)) (point-min) -1)
-        (goto-char end)
-        (set-marker end nil)))))
+        (goto-char (point-max))))))
 
 (defun byte-compile--reify-function (fun)
   "Return an expression which will evaluate to a function value FUN.
