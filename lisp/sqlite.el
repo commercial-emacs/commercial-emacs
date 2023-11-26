@@ -39,7 +39,8 @@ back the transaction changes."
         (res-var (gensym))
         (commit-var (gensym)))
     `(let ((,db-var ,db)
-           (,func-var (lambda () ,@body)))
+           (,func-var (lambda () ,@body))
+           ,res-var ,commit-var)
        (if (fboundp 'sqlite-transaction)
            (unwind-protect
                (progn
