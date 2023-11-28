@@ -644,6 +644,26 @@ value is a list.
 @end example
 @end defun
 
+@defun seq-mapsub function sequence
+  This function returns the result of applying @var{function} to
+@var{sequence} and its sub-sequences.  The first sequence used is
+@var{sequence}, the second sequence used is everything in
+@var{sequence} after the first element, the third sequence used is
+everything after the second element, and so on. The returned value is
+a list. If @var{sequence} is empty, then the returned list is empty.
+
+@example
+@group
+(seq-mapsub #'identity [1 2 3])
+@result{} ([1 2 3] [2 3] [3])
+@end group
+@group
+(seq-mapsub #'identity [])
+@result{} nil
+@end group
+@end example
+@end defun
+
 @defun seq-filter predicate sequence
 @cindex filtering sequences
   This function returns a list of all the elements in @var{sequence}

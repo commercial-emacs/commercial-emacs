@@ -121,6 +121,16 @@ Evaluate BODY for each created sequence.
       (should (equal (seq-elt result 1) '(5 1)))
       (should (equal (seq-elt result 2) '(4 0))))))
 
+(ert-deftest test-seq-mapsub ()
+  (should (equal (seq-mapsub #'identity [1 2 3])
+                 '([1 2 3] [2 3] [3])))
+  (should (equal (seq-mapsub #'identity '(1 2 3))
+                 '((1 2 3) (2 3) (3))))
+  (should (equal (seq-mapsub #'identity nil)
+                 nil))
+  (should (equal (seq-mapsub #'identity [])
+                 nil)))
+
 (ert-deftest test-seq-filter ()
   (with-test-sequences (seq '(6 7 8 9 10))
     (should (equal (seq-filter #'test-sequences-evenp seq) '(6 8 10)))
