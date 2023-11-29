@@ -3334,8 +3334,8 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       XSETSYMBOL (symbol, xsymbol);
     }
 
-#if defined HAVE_GCC_TLS
-  if (! current_thread->cooperative && ! NILP (symbol))
+#ifdef HAVE_GCC_TLS
+  if (! current_thread->cooperative)
     {
       if (NILP (Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray)))
 	{
@@ -3346,13 +3346,17 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 	  XSYMBOL (symbol)->u.s.val = xsymbol->u.s.val;
 	  XSYMBOL (symbol)->u.s.function = xsymbol->u.s.function;
 	  XSYMBOL (symbol)->u.s.plist = xsymbol->u.s.plist;
+	  XSYMBOL (symbol)->u.s.buffer_local_only = xsymbol->u.s.buffer_local_only;
+	  XSYMBOL (symbol)->u.s.buffer_local_default = xsymbol->u.s.buffer_local_default;
+	  XSYMBOL (symbol)->u.s.c_variable = (lispfwd) { NULL };
+	  XSYMBOL (symbol)->u.s.buffer_local_buffer = xsymbol->u.s.buffer_local_buffer;
 	  xsymbol = XSYMBOL (symbol);
 	}
     }
 #endif
 
   /* First, push old value onto let-stack.  Unintuitively, its KIND
-     depends on the REDIRECT of the argument symbol.  */
+     depends on ARGSYM's type, not its own.  */
   switch (xsymbol->u.s.type)
     {
     case SYMBOL_PLAINVAL:

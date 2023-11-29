@@ -670,7 +670,7 @@ run_thread (void *state)
   eassert (handlerlist == push_handler (Qunbound, CATCHER));
   handlerlist->next = handlerlist->nextfree = NULL;
 
-  internal_condition_case (invoke_thread, Qt, record_thread_error);
+  internal_condition_case (invoke_thread, Qerror, record_thread_error);
 
   update_processes_for_thread_death (self);
 
