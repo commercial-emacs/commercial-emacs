@@ -482,11 +482,6 @@ There can be multiple entries for the same NAME if it has several aliases.")
       (`(,(pred byte-code-function-p) . ,exps)
        (cons fn (mapcar #'byte-optimize-form exps)))
 
-      (`(,(pred (not symbolp)) . ,_)
-       (byte-compile-warn "`%s' is a malformed function"
-			  (prin1-to-string fn))
-       form)
-
       ((guard (when for-effect
 		(when-let ((tmp (byte-opt--fget fn 'side-effect-free)))
 		  (or byte-compile-delete-errors
