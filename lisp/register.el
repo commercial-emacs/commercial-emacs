@@ -343,59 +343,64 @@ display such a window regardless."
     (unless (or executing-kbd-macro (null register-use-preview))
       (register-preview buffer nil types))
     (unwind-protect
-         (progn
-           (minibuffer-with-setup-hook
-               (lambda ()
-                 (setq timer
-                       (run-with-idle-timer
-                        0.01 'repeat
-                        (lambda ()
-                          (with-selected-window (minibuffer-window)
-                            (let ((input (minibuffer-contents)))
-                              (when (> (length input) 1)
-                                (let ((new (substring input 1))
-                                      (old (substring input 0 1)))
-                                  (setq input (if (or (null smatch)
-                                                      (member new strs))
-                                                  new old))
-                                  (delete-minibuffer-contents)
-                                  (insert input)))
-                              (when (and smatch (not (string= input ""))
-                                         (not (member input strs)))
-                                (setq input "")
-                                (delete-minibuffer-contents)
-                                (minibuffer-message "Not matching"))
-                              (when (not (string= input pat))
-                                (setq pat input))))
-                          (if (setq win (get-buffer-window buffer))
-                              (with-selected-window win
-                                (let ((ov (make-overlay (point-min) (point-min))))
-                                  (goto-char (point-min))
-                                  (remove-overlays)
-                                  (unless (string= pat "")
-                                    (if (re-search-forward (concat "^" pat) nil t)
-                                        (progn (move-overlay
-                                                ov
-                                                (match-beginning 0) (pos-eol))
-                                               (overlay-put ov 'face 'match)
-                                               (when msg
-                                                 (with-selected-window (minibuffer-window)
-                                                   (minibuffer-message msg pat))))
-                                      (with-selected-window (minibuffer-window)
-                                        (minibuffer-message
-                                         "Register `%s' is empty" pat))))))
-                            (unless (string= pat "")
-                              (if (member pat strs)
-                                  (with-selected-window (minibuffer-window)
-                                    (minibuffer-message msg pat))
-                                (with-selected-window (minibuffer-window)
-                                  (minibuffer-message
-                                   "Register `%s' is empty" pat)))))))))
-             (setq result (read-from-minibuffer
-                           prompt nil map nil nil (register-preview-get-defaults act))))
-           (cl-assert (and result (not (string= result "")))
-                      nil "No register specified")
-           (string-to-char result))
+        (progn
+          (minibuffer-with-setup-hook
+              (lambda ()
+                (setq timer
+                      (run-with-idle-timer
+                       0.01 'repeat
+                       (lambda ()
+                         (with-selected-window (minibuffer-window)
+                           (let ((input (minibuffer-contents)))
+                             (when (> (length input) 1)
+                               (let ((new (substring input 1))
+                                     (old (substring input 0 1)))
+                                 (setq input (if (or (null smatch)
+                                                     (member new strs))
+                                                 new old))
+                                 (delete-minibuffer-contents)
+                                 (insert input)))
+                             (when (and smatch (not (string= input ""))
+                                        (not (member input strs)))
+                               (setq input "")
+                               (delete-minibuffer-contents)
+                               (minibuffer-message "Not matching"))
+                             (when (not (string= input pat))
+                               (setq pat input))))
+                         (if (setq win (get-buffer-window buffer))
+                             (with-selected-window win
+                               (let ((ov (make-overlay (point-min) (point-min))))
+                                 (goto-char (point-min))
+                                 (remove-overlays)
+                                 (unless (string= pat "")
+                                   (if (re-search-forward (concat "^" pat) nil t)
+                                       (progn (move-overlay
+                                               ov
+                                               (match-beginning 0) (pos-eol))
+                                              (overlay-put ov 'face 'match)
+                                              (when msg
+                                                (with-selected-window (minibuffer-window)
+                                                  (minibuffer-message msg pat))))
+                                     (with-selected-window (minibuffer-window)
+                                       (minibuffer-message
+                                        "Register `%s' is empty" pat))))))
+                           (unless (string= pat "")
+                             (if (member pat strs)
+                                 (with-selected-window (minibuffer-window)
+                                   (minibuffer-message msg pat))
+                               (with-selected-window (minibuffer-window)
+                                 (minibuffer-message
+                                  "Register `%s' is empty" pat)))))))))
+
+            (setq result (read-from-minibuffer
+                          prompt nil map nil nil (register-preview-get-defaults act))))
+          (when (or (eq ?\C-g last-input-event)
+                    (eq 'escape last-input-event)
+                    (eq ?\C-\[ last-input-event))
+            (keyboard-quit))
+          (cl-assert (and result (not (string= result "")))
+                     nil "No register specified")
+          (string-to-char result))
       (when timer (cancel-timer timer))
       (let ((w (get-buffer-window buffer)))
         (and (window-live-p w) (delete-window w)))

@@ -31,6 +31,8 @@
   "Test for https://debbugs.gnu.org/27634 ."
   (dolist (event (list ?\C-g 'escape ?\C-\[))
     (cl-letf (((symbol-function 'read-key) #'ignore)
+              ((symbol-function 'read-from-minibuffer)
+               (lambda (&rest _args) "dummy"))
               (last-input-event event)
               (register-alist nil))
       (should (equal 'quit
