@@ -533,6 +533,42 @@ Instead, use the @code{advertised-calling-convention} declaration
 compiler emit a warning message when it compiles Lisp programs which
 use the deprecated calling convention.
 
+@ifnottex
+In this section we outline examples of the use of the @code{(fn)} facility.
+
+@itemize @minus
+@item Explaining @code{&rest} in a @code{defmacro}:
+
+@file{subr.el}: @code{lambda}.  This is a canonical example where the
+arguments are unclear, and the @code{(fn)} facility helps to spell out
+the arglist @code{&rest}.
+
+@example
+(defmacro lambda (&rest cdr)
+  "Return an anonymous function. (...)
+\(fn ARGS [DOCSTRING] [INTERACTIVE] BODY)"...)
+@end example
+
+@item Explaining @code{&rest} in a @code{defun}, concretely:
+
+@file{keymap.el} : @code{define-keymap}.  The single parameter
+@code{&rest definitions} list is not clear, so the @code{fn} facility
+explains it.
+
+@item Renaming parameters to give context in a @code{defalias}:
+
+@file{abbrev.el} : @code{(abbrev-get)}.  Here @code{get}'s general argument of
+@code{symbol} is renamed as @code{abbrev}.
+
+@item Naming list constituents in a required argument:
+
+@file{macroexp.el} : @code{macroexp--accumulate}. The argument of
+@code{var+list}, which is more clearly described as @code{(var list)}.
+@end itemize
+
+@end ifnottex
+
+
 @cindex computed documentation string
 @kindex :documentation
 Documentation strings are usually static, but occasionally it can be
