@@ -7240,6 +7240,15 @@ process_quit (void)
     }
 }
 
+#ifdef HAVE_GCC_TLS
+void
+block_input (void)
+{
+  if (current_thread->cooperative)
+    ++interrupt_input_blocked;
+}
+#endif
+
 /* Undo any number of BLOCK_INPUT calls down to level LEVEL,
    and reinvoke any pending signal if the level is now 0 and
    a fatal error is not already in progress.  */
@@ -7247,12 +7256,17 @@ process_quit (void)
 void
 unblock_input_to (int level)
 {
-  interrupt_input_blocked = level;
-  if (interrupt_input_blocked < 0)
-    emacs_abort ();
-  else if (interrupt_input_blocked == 0
-	   && ! fatal_error_in_progress)
-    process_pending_signals ();
+#ifdef HAVE_GCC_TLS
+  if (current_thread->cooperative)
+#endif
+    {
+      interrupt_input_blocked = level;
+      if (interrupt_input_blocked < 0)
+	emacs_abort ();
+      else if (interrupt_input_blocked == 0
+	       && ! fatal_error_in_progress)
+	process_pending_signals ();
+    }
 }
 
 /* End critical section.

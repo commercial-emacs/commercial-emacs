@@ -48,12 +48,15 @@ INLINE_HEADER_BEGIN
 extern volatile int interrupt_input_blocked;
 
 /* Begin critical section. */
-
+#ifdef HAVE_GCC_TLS
+extern void block_input (void);
+#else
 INLINE void
 block_input (void)
 {
-  interrupt_input_blocked++;
+  ++interrupt_input_blocked;
 }
+#endif
 
 extern void unblock_input (void);
 extern void totally_unblock_input (void);
