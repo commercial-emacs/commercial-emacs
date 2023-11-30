@@ -2113,7 +2113,7 @@ struct Lisp_Hash_Table;
 
 struct hash_table_test
 {
-  /* Name of the function used to compare keys.  */
+  /* Function used to compare keys; always a bare symbol.  */
   Lisp_Object name;
 
   /* User-supplied hash function, or nil.  */
