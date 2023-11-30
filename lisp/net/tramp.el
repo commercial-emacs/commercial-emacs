@@ -544,14 +544,17 @@ host runs a restricted shell, it shall be added to this list, too."
 
 ;;;###tramp-autoload
 (defcustom tramp-local-host-regexp
-  (rx
-   bos
-   (| (literal tramp-system-name)
-      (| "localhost" "localhost4" "localhost6" "127.0.0.1" "::1"))
-   eos)
+  (rx bos
+      (| (literal tramp-system-name)
+	 (| "localhost" "127.0.0.1" "::1"
+	    ;; Fedora.
+	    "localhost4" "localhost6"
+	    ;; Ubuntu.
+	    "ip6-localhost" "ip6-loopback"))
+      eos)
   "Host names which are regarded as local host.
 If the local host runs a chrooted environment, set this to nil."
-  :version "29.1"
+  :version "30.1"
   :type '(choice (const :tag "Chrooted environment" nil)
 		 (regexp :tag "Host regexp")))
 
@@ -6721,7 +6724,14 @@ If PROCESS is a process object which contains the property
 `remote-pid', or PROCESS is a number and REMOTE is a remote file name,
 PROCESS is interpreted as process on the respective remote host, which
 will be the process to signal.
+If PROCESS is a string, it is interpreted as process object with
+the respective process name, or as a number.
 SIGCODE may be an integer, or a symbol whose name is a signal name."
+  (when (stringp process)
+    (setq process (or (get-process process)
+		      (and (string-match-p (rx bol (+ digit) eol) process)
+			   (string-to-number process))
+		      (signal 'wrong-type-argument (list #'processp process)))))
   (let (pid vec)
     (cond
      ((processp process)
