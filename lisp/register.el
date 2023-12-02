@@ -94,7 +94,6 @@ of the marked text."
   :type '(choice (const :tag "None" nil)
 		 (character :tag "Use register" :value ?+)))
 
-;; FIXME: This is no more needed, remove it.
 (defcustom register-preview-delay 1
   "If non-nil, time to wait in seconds before popping up register preview window.
 If nil, do not show register previews, unless `help-char' (or a member of
@@ -102,6 +101,7 @@ If nil, do not show register previews, unless `help-char' (or a member of
   :version "24.4"
   :type '(choice number (const :tag "No preview unless requested" nil))
   :group 'register)
+(make-obsolete-variable 'register-preview-delay "No longer used." "30.1")
 
 (defcustom register-preview-default-keys (mapcar #'string (number-sequence ?a ?z))
   "Default keys for setting a new register."
@@ -132,7 +132,8 @@ See the documentation of the variable `register-alist' for possible VALUEs."
 (defun register-preview-default (r)
   "Function that is the default value of the variable `register-preview-function'."
   (format "%s: %s\n"
-	  (single-key-description (car r))
+	  (propertize (string (car r))
+                      'display (single-key-description (car r)))
 	  (register-describe-oneline (car r))))
 
 (defvar register-preview-function #'register-preview-default
