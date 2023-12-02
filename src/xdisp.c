@@ -15363,7 +15363,8 @@ move_cursor (struct window *w, struct glyph_row *row,
 	    else if (dpos == 0)
 	      match_with_avoid_cursor = true;
 	  }
-	else if (STRINGP (glyph->object))
+	else if (STRINGP (glyph->object)
+		 && !glyph->avoid_cursor_p)
 	  {
 	    ptrdiff_t glyph_pos = glyph->charpos;
 	    Lisp_Object chprop = Fget_char_property (make_fixnum (glyph_pos), Qcursor,
