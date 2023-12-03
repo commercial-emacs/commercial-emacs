@@ -1102,6 +1102,7 @@ the like."
   "&" #'eww-browse-with-external-browser
   "d" #'eww-download
   "w" #'eww-copy-page-url
+  "c" #'eww-copy-point-link-url
   "A" #'eww-copy-alternate-url
   "C" #'url-cookie-list
   "v" #'eww-view-source
@@ -1136,6 +1137,7 @@ the like."
           ["Download" eww-download t]
           ["View page source" eww-view-source]
           ["Copy page URL" eww-copy-page-url t]
+          ["Copy link URL pointed" eww-copy-point-link-url t]
           ["List histories" eww-list-histories t]
           ["Switch to buffer" eww-switch-to-buffer t]
           ["List buffers" eww-list-buffers t]
@@ -1983,6 +1985,17 @@ Differences in #targets are ignored."
   (interactive nil eww-mode)
   (message "%s" (plist-get eww-data :url))
   (kill-new (plist-get eww-data :url)))
+
+(defun eww-copy-point-link-url ()
+  "Copy the URL of the link pointed by the pointer to the killring."
+  (interactive nil eww-mode)
+  (let ((url (get-text-property (point) 'shr-url)))
+    (if url
+        (progn
+          (kill-new url)
+          (message "%s" url))
+      (progn (message "No url at the point.")
+             nil))))
 
 (defun eww-download ()
   "Download URL to `eww-download-directory'.
