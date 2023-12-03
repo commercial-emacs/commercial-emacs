@@ -30,6 +30,7 @@
 (declare-function sqlite-available-p "sqlite.c")
 (declare-function sqlite-commit "sqlite.c")
 (declare-function sqlite-select "sqlite.c")
+(declare-function sqlite-rollback "sqlite.c")
 
 (defsubst multi-test--on-conflict-p ()
   (when (bound-and-true-p multisession--db)
