@@ -2561,6 +2561,7 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
     ["Delete Image Tag..." image-dired-delete-tag
      :help "Delete image tag from current or marked files"]))
 
+(declare-function shell-command-guess "dired-aux")
 (defun dired-context-menu (menu click)
   "Populate MENU with Dired mode commands at CLICK."
   (when (mouse-posn-property (event-start click) 'dired-filename)

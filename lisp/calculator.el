@@ -1477,7 +1477,6 @@ a multiplication."
 (defun calculator-register-read-with-preview (prompt)
   "Similar to `register-read-with-preview' but for calculator registers."
   (let ((register-alist calculator-registers)
-        (register-preview-delay 1)
         (register-preview-function
          (lambda (r)
            (format "%s: %s\n"
