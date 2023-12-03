@@ -2176,8 +2176,8 @@ readevalloop (Lisp_Object readcharfun,
      lexical environment, otherwise, turn off lexical binding.  */
   lex_bound = find_symbol_value (XSYMBOL (Qlexical_binding), NULL);
   specbind (Qinternal_interpreter_environment,
-	    (NILP (lex_bound) || EQ (lex_bound, Qunbound)
-	     ? Qnil : list1 (Qt)));
+	    ! NILP (lex_bound) && ! EQ (lex_bound, Qunbound)
+	    ? list1 (Qt) : Qnil);
   specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);
 
   /* Ensure sourcename is absolute, except whilst preloading.  */
@@ -5019,9 +5019,8 @@ defalias (struct Lisp_Subr *sname, char *string)
 }
 #endif /* NOTDEF */
 
-/* Define an "integer variable"; a symbol whose value is forwarded to a
-   C variable of type intmax_t.  Sample call (with "xx" to fool make-docfile):
-   DEFxxVAR_INT ("emacs-priority", &emacs_priority, "Documentation");  */
+/* Define a global Lisp symbol whose value is forwarded to a C
+   variable of type intmax_t.  */
 void
 defvar_int (struct Lisp_Intfwd const *i_fwd, char const *namestring)
 {

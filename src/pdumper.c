@@ -152,7 +152,7 @@ dump_trace (const char *fmt, ...)
 static ssize_t dump_read_all (int fd, void *buf, size_t bytes_to_read);
 
 static dump_off
-ptrdiff_t_to_dump_off (ptrdiff_t value)
+ptrdiff_t_to_dump_off (const ptrdiff_t value)
 {
   eassert (DUMP_OFF_MIN <= value);
   eassert (value <= DUMP_OFF_MAX);
@@ -195,25 +195,25 @@ enum emacs_reloc_type
     /* Copy raw bytes from the dump into Emacs.  The length field in
        the emacs_reloc is the number of bytes to copy.  */
     RELOC_EMACS_COPY_FROM_DUMP,
-    /* Set a piece of memory in Emacs to a value we store directly in
-       this relocation.  The length field contains the number of bytes
-       we actually copy into Emacs.  */
+    /* Set a memory location to the value stored directly at this
+       relocation.  The length field in the emacs_reloc is the number
+       of bytes to copy.  */
     RELOC_EMACS_IMMEDIATE,
-    /* Set an aligned pointer-sized object in Emacs to a pointer into
-       the loaded dump at the given offset.  The length field is
-       always the machine word size.  */
+    /* Set an aligned pointer-sized object in Emacs to point into the
+       loaded dump at the given offset.  The length field in the
+       emacs_reloc is the machine word size.  */
     RELOC_EMACS_DUMP_PTR_RAW,
-    /* Set an aligned pointer-sized object in Emacs to point to
-       something also in Emacs.  The length field is always
-       the machine word size.  */
+    /* Set an aligned pointer-sized object to point to an object in
+       the Emacs image.  The length field in the emacs_reloc is the
+       machine word size.  */
     RELOC_EMACS_EMACS_PTR_RAW,
-    /* Set an aligned Lisp_Object in Emacs to point to a value in the
-       dump.  The length field is the _tag type_ of the Lisp_Object,
-       not a byte count!  */
+    /* Set an aligned Lisp_Object to point to a value in the dump.
+       The length field in the emacs_reloc is the Lisp_Object type
+       tag, not a byte count!  */
     RELOC_EMACS_DUMP_LV,
-    /* Set an aligned Lisp_Object in Emacs to point to a value in the
-       Emacs image.  The length field is the _tag type_ of the
-       Lisp_Object, not a byte count!  */
+    /* Set an aligned Lisp_Object to point to a value in the Emacs
+       image.  The length field in the emacs_reloc is the Lisp_Object
+       type tag, not a byte count!  */
     RELOC_EMACS_EMACS_LV,
   };
 
@@ -652,10 +652,7 @@ emacs_ptr_at (const ptrdiff_t offset)
 static dump_off
 emacs_offset (const void *emacs_ptr)
 {
-  /* TODO: assert that EMACS_PTR is actually in the Emacs image.  */
-  eassert (emacs_ptr != NULL);
-  intptr_t emacs_ptr_value = (intptr_t) emacs_ptr;
-  ptrdiff_t emacs_ptr_relative = emacs_ptr_value - (intptr_t) emacs_basis ();
+  const ptrdiff_t emacs_ptr_relative = (intptr_t) emacs_ptr - (intptr_t) emacs_basis ();
   return ptrdiff_t_to_dump_off (emacs_ptr_relative);
 }
 
@@ -1294,12 +1291,11 @@ dump_remember_cold_op (struct dump_context *ctx,
     dump_push (&ctx->cold_queue, Fcons (make_fixnum (op), arg));
 }
 
-/* Add a dump relocation that points into Emacs.
+/* Add a dump (versus emacs) relocation that updates the pointer stored at
+   DUMP_OFFSET to point into the Emacs binary upon dump load.  The
+   pointer-sized value at DUMP_OFFSET in the dump file should contain
+   a number relative to emacs_basis().  */
 
-   Add a relocation that updates the pointer stored at DUMP_OFFSET to
-   point into the Emacs binary upon dump load.  The pointer-sized
-   value at DUMP_OFFSET in the dump file should contain a number
-   relative to emacs_basis().  */
 static void
 dump_reloc_dump_to_emacs_ptr_raw (struct dump_context *ctx,
                                   dump_off dump_offset)
@@ -1310,12 +1306,11 @@ dump_reloc_dump_to_emacs_ptr_raw (struct dump_context *ctx,
                       dump_off_to_lisp (dump_offset)));
 }
 
-/* Add a dump relocation that points a Lisp_Object back at the dump.
-
-   Add a relocation that updates the Lisp_Object at DUMP_OFFSET in the
-   dump to point to another object in the dump.  The Lisp_Object-sized
-   value at DUMP_OFFSET in the dump file should contain the offset of
-   the target object relative to the start of the dump.  */
+/* Add a dump (versus emacs) relocation that updates the Lisp_Object
+   at DUMP_OFFSET in the dump to point to another object in the dump.
+   The Lisp_Object-sized value at DUMP_OFFSET in the dump file should
+   contain the offset of the target object relative to the start of
+   the dump.  */
 static void
 dump_reloc_dump_to_dump_lv (struct dump_context *ctx,
                             dump_off dump_offset,
@@ -1343,12 +1338,11 @@ dump_reloc_dump_to_dump_lv (struct dump_context *ctx,
                     dump_off_to_lisp (dump_offset)));
 }
 
-/* Add a dump relocation that points a raw pointer back at the dump.
-
-   Add a relocation that updates the raw pointer at DUMP_OFFSET in the
-   dump to point to another object in the dump.  The pointer-sized
-   value at DUMP_OFFSET in the dump file should contain the offset of
-   the target object relative to the start of the dump.  */
+/* Add a dump (versus emacs) relocation that updates the raw pointer
+   at DUMP_OFFSET in the dump to point to another object in the dump.
+   The pointer-sized value at DUMP_OFFSET in the dump file should
+   contain the offset of the target object relative to the start of
+   the dump.  */
 static void
 dump_reloc_dump_to_dump_ptr_raw (struct dump_context *ctx,
                                  dump_off dump_offset)
@@ -1359,9 +1353,7 @@ dump_reloc_dump_to_dump_ptr_raw (struct dump_context *ctx,
                       dump_off_to_lisp (dump_offset)));
 }
 
-/* Add a dump relocation that points to a Lisp object in Emacs.
-
-   Add a relocation that updates the Lisp_Object at DUMP_OFFSET in the
+/* Add a dump (versus emacs) relocation that updates the Lisp_Object at DUMP_OFFSET in the
    dump to point to a lisp object in Emacs.  The Lisp_Object-sized
    value at DUMP_OFFSET in the dump file should contain the offset of
    the target object relative to emacs_basis().  TYPE is the type of
@@ -1392,7 +1384,8 @@ dump_reloc_dump_to_emacs_lv (struct dump_context *ctx,
                     dump_off_to_lisp (dump_offset)));
 }
 
-/* Add an Emacs relocation that copies arbitrary bytes from the dump.
+/* Add an emacs (versus dump) relocation that copies arbitrary bytes
+   from the dump.
 
    When the dump is loaded, Emacs copies SIZE bytes from OFFSET in
    dump to LOCATION in the Emacs data section.  This copying happens
@@ -1421,13 +1414,12 @@ dump_emacs_reloc_copy_from_dump (struct dump_context *ctx, dump_off dump_offset,
                     dump_off_to_lisp (size)));
 }
 
-/* Add an Emacs relocation that sets values to arbitrary bytes.
+/* Add an emacs (versus dump) relocation that sets values to arbitrary
+   bytes.
 
    When the dump is loaded, Emacs copies SIZE bytes from the
-   relocation itself to the adjusted location inside Emacs EMACS_PTR.
-   SIZE is the number of bytes to copy.  See struct emacs_reloc for
-   the maximum size that this mechanism can support.  The value comes
-   from VALUE_PTR.
+   relocation itself to an offset of EMACS_PTR.  SIZE is the number of
+   bytes to copy.
  */
 static void
 dump_emacs_reloc_immediate (struct dump_context *ctx,
@@ -1464,8 +1456,9 @@ DEFINE_EMACS_IMMEDIATE_FN (dump_emacs_reloc_immediate_intmax_t, intmax_t)
 DEFINE_EMACS_IMMEDIATE_FN (dump_emacs_reloc_immediate_int, int)
 DEFINE_EMACS_IMMEDIATE_FN (dump_emacs_reloc_immediate_bool, bool)
 
-/* Add an emacs relocation that makes a raw pointer in Emacs point
-   into the dump.  */
+/* Add an emacs (versus dump) relocation that points into the
+   dump.  */
+
 static void
 dump_emacs_reloc_to_dump_ptr_raw (struct dump_context *ctx,
 				  const void *emacs_ptr, dump_off dump_offset)
@@ -1479,11 +1472,9 @@ dump_emacs_reloc_to_dump_ptr_raw (struct dump_context *ctx,
                     dump_off_to_lisp (dump_offset)));
 }
 
-/* Add an emacs relocation that points into the dump.
+/* Add an emacs (versus dump) relocation that points to a dumped
+   Lisp_Object.  */
 
-   When the dump is loaded, the Lisp_Object at EMACS_ROOT in Emacs to
-   point to VALUE.  VALUE can be any Lisp value; this function
-   automatically queues the value for dumping if necessary.  */
 static void
 dump_emacs_reloc_to_lv (struct dump_context *ctx,
 			Lisp_Object const *emacs_ptr)
@@ -1493,12 +1484,6 @@ dump_emacs_reloc_to_lv (struct dump_context *ctx,
   else
     {
       if (ctx->flags.dump_object_contents)
-        /* Conditionally use RELOC_EMACS_EMACS_LV or
-           RELOC_EMACS_DUMP_LV depending on where the target object
-           lives.  We could just have decode_emacs_reloc pick the
-           right type, but we might as well maintain the invariant
-           that the types on ctx->emacs_relocs correspond to the types
-           of emacs_relocs we actually emit.  */
 	dump_push (&ctx->emacs_relocs,
 		   list3 (make_fixnum (dump_object_emacs_ptr (*emacs_ptr)
 				       ? RELOC_EMACS_EMACS_LV
@@ -1509,8 +1494,9 @@ dump_emacs_reloc_to_lv (struct dump_context *ctx,
     }
 }
 
-/* Add an emacs relocation that makes a raw pointer in Emacs point
-   back into the Emacs image.  */
+/* Add an emacs (versus dump) relocation that assigns a raw pointer
+   back to another location in the image.  */
+
 static void
 dump_emacs_reloc_to_emacs_ptr_raw (struct dump_context *ctx, void *emacs_ptr,
 				   void const *target_emacs_ptr)
@@ -1523,9 +1509,6 @@ dump_emacs_reloc_to_emacs_ptr_raw (struct dump_context *ctx, void *emacs_ptr,
                     dump_off_to_lisp (emacs_offset (emacs_ptr)),
                     dump_off_to_lisp (emacs_offset (target_emacs_ptr))));
 }
-
-/* Add an Emacs relocation that makes a raw pointer in Emacs point to
-   a different part of Emacs.  */
 
 enum dump_fixup_type
   {
@@ -1612,8 +1595,7 @@ dump_roots (struct dump_context *ctx)
     {
       Fputhash (dump_off_to_lisp (emacs_offset (staticvec[i])),
 		Qt, ctx->staticpro_table);
-      if (staticvec[i] != &Vinternal_interpreter_environment)
-	dump_emacs_reloc_to_lv (ctx, staticvec[i]);
+      dump_emacs_reloc_to_lv (ctx, staticvec[i]);
     }
 }
 

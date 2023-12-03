@@ -881,11 +881,9 @@ scan_c_stream (FILE *infile)
 	    }
 	  else if (c == 'V')
 	    {
-	      c = getc (infile);
-	      if (c != 'A')
-		continue;
-	      c = getc (infile);
-	      if (c != 'R')
+	      int v0 = getc (infile), v1 = getc (infile);
+	      if (! ((v0 == 'A' && v1 == 'R')
+		     || (v0 == 'O' && v1 == 'O')))
 		continue;
 	      c = getc (infile);
 	      if (c != '_')

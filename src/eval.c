@@ -31,6 +31,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "atimer.h"
 #include "syntax.h"
 
+PER_THREAD_STATIC Lisp_Object Vinternal_interpreter_environment;
+
 /* Non-nil means record all fset's and provide's, to be undone
    if the file being autoloaded is not fully loaded.
    They are recorded by being consed onto the front of Vautoload_queue:
@@ -217,6 +219,7 @@ init_eval_once (void)
   /* Don't forget to update docs (lispref node "Eval").  */
   max_lisp_eval_depth = 1600;
   Vrun_hooks = Qnil;
+  Vinternal_interpreter_environment = Qnil;
   pdumper_do_now_and_after_load (init_eval_once_for_pdumper);
 }
 
@@ -478,10 +481,9 @@ usage: (setq [SYM VAL]...)  */)
       val = eval_sub (arg);
       /* Like for eval_sub, we do not check declared_special here since
 	 it's been done when let-binding.  */
-      Lisp_Object lex_binding
-	= (SYMBOLP (sym)
-	   ? Fassq (sym, Vinternal_interpreter_environment)
-	   : Qnil);
+      Lisp_Object lex_binding = SYMBOLP (sym)
+	? Fassq (sym, Vinternal_interpreter_environment)
+	: Qnil;
       if (! NILP (lex_binding))
 	XSETCDR (lex_binding, val); /* SYM is lexically bound.  */
       else
@@ -674,9 +676,9 @@ default_toplevel_binding (Lisp_Object symbol)
   return binding;
 }
 
-/* Look for a lexical-binding of SYMBOL somewhere up the stack.
-   This will only find bindings created with interpreted code, since once
-   compiled names of lexical variables are basically gone anyway.  */
+/* Find SYMBOL's prevailing lexical binding.  This applies only to
+   bindings created with interpreted code.  Once compiled, lexical
+   variable names are "basically gone anyway."  */
 static bool
 lexbound_p (Lisp_Object symbol)
 {
@@ -694,8 +696,8 @@ lexbound_p (Lisp_Object symbol)
 	        return true;
 	    }
 	  break;
-
-	default: break;
+	default:
+	  break;
 	}
     }
   return false;
@@ -820,7 +822,16 @@ usage: (defvar SYMBOL &optional INITVALUE DOCSTRING)  */)
 
   CHECK_SYMBOL (sym);
 
-  if (! NILP (tail))
+  if (NILP (tail)) /* a pithy (defvar FOO) */
+    {
+      if (! NILP (Vinternal_interpreter_environment)
+	  && ! XSYMBOL (sym)->u.s.declared_special)
+	/* Make a special variable only within let-block.  */
+	Vinternal_interpreter_environment
+	  = Fcons (sym, Vinternal_interpreter_environment);
+      /* Otherwise (defvar FOO) is a no-op.  */
+    }
+  else
     {
       if (! NILP (XCDR (tail)) && ! NILP (XCDR (XCDR (tail))))
 	error ("Too many arguments");
@@ -828,20 +839,6 @@ usage: (defvar SYMBOL &optional INITVALUE DOCSTRING)  */)
       tail = XCDR (tail);
       return defvar (sym, exp, CAR (tail), true);
     }
-  else if (! NILP (Vinternal_interpreter_environment)
-	   && (SYMBOLP (sym) && ! XSYMBOL (sym)->u.s.declared_special))
-    /* A simple (defvar foo) with lexical scoping does "nothing" except
-       declare that var to be dynamically scoped *locally* (i.e. within
-       the current file or let-block).  */
-    Vinternal_interpreter_environment
-      = Fcons (sym, Vinternal_interpreter_environment);
-  else
-    {
-      /* Simple (defvar <var>) should not count as a definition at all.
-	 It could get in the way of other definitions, and unloading this
-	 package could try to make the variable unbound.  */
-    }
-
   return sym;
 }
 
@@ -3335,8 +3332,9 @@ specbind (Lisp_Object argsym, Lisp_Object value)
     }
 
 #ifdef HAVE_GCC_TLS
-  if (! current_thread->cooperative)
+  if (! NILP (current_thread->obarray))
     {
+      eassert (! main_thread_p (current_thread));
       if (NILP (Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray)))
 	{
 	  symbol = Fintern (SYMBOL_NAME (symbol), current_thread->obarray);
@@ -4234,23 +4232,13 @@ the Lisp backtrace.  */);
 Used to avoid infinite loops if the debugger itself has an error.
 Don't set this unless you're sure that can't happen.  */);
 
-  /* When lexical binding is being used,
-   Vinternal_interpreter_environment is non-nil, and contains an alist
-   of lexically-bound variable, or (t), indicating an empty
-   environment.  The lisp name of this variable would be
-   `internal-interpreter-environment' if it weren't hidden.
-   Every element of this list can be either a cons (VAR . VAL)
-   specifying a lexical binding, or a single symbol VAR indicating
-   that this variable should use dynamic scoping.  */
+  /* Under dynamic scoping, Vinternal_interpreter_environment is nil.
+     Under lexical scoping, it is a list of either (VAR . VAL)
+     bindings or bare VAR symbols indicating VAR is dynamically scoped
+     for the environment's duration.  The special list (t) denotes
+     an empty lexical environment.  */
   DEFSYM (Qinternal_interpreter_environment,
 	  "internal-interpreter-environment");
-  DEFVAR_LISP ("internal-interpreter-environment",
-		Vinternal_interpreter_environment,
-	       doc: /* If non-nil, the current lexical environment of the lisp interpreter.
-When lexical binding is not being used, this variable is nil.
-A value of `(t)' indicates an empty environment, otherwise it is an
-alist of active lexical bindings.  */);
-  Vinternal_interpreter_environment = Qnil;
   /* Don't export this variable to Elisp, so no one can mess with it
      (Just imagine if someone makes it buffer-local).  */
   Funintern (Qinternal_interpreter_environment, Qnil);

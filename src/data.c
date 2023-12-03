@@ -1339,6 +1339,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 
   if (! NILP (current_thread->obarray))
     {
+      eassert (! main_thread_p (current_thread));
       Lisp_Object found = oblookup (current_thread->obarray,
 				    SSDATA (xsymbol->u.s.name),
 				    SCHARS (xsymbol->u.s.name),

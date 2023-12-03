@@ -2959,13 +2959,12 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
       = {Lisp_Fwd_Bool, &globals.f_##vname};	\
     defvar_bool (&b_fwd, lname);		\
   } while (false)
-#define DEFVAR_INT(lname, vname, doc)		\
-  do {						\
-    static struct Lisp_Intfwd const i_fwd	\
-      = {Lisp_Fwd_Int, &globals.f_##vname};	\
-    defvar_int (&i_fwd, lname);			\
+#define DEFVAR_INT(lname, vname, doc)			\
+  do {							\
+    static struct Lisp_Intfwd const i_fwd		\
+      = {Lisp_Fwd_Int, &globals.f_##vname};		\
+    defvar_int (&i_fwd, lname);				\
   } while (false)
-
 #define DEFVAR_KBOARD(lname, vname, doc)			\
   do {								\
     static struct Lisp_Kboard_Objfwd const ko_fwd		\
