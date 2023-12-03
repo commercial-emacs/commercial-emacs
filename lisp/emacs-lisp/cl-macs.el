@@ -3807,6 +3807,331 @@ STRUCT-TYPE and SLOT-NAME are symbols.  INST is a structure instance."
 TYPE is a type descriptor as accepted by `cl-typep', which see."
   `(pred (pcase--flip cl-typep ',type)))
 
+;;; Pcase lambda-list pattern
+
+;; This pattern is like `cl-destructuring-bind', but with `pcase'.  We
+;; can't use `cl--do-arglist' for this, because `cl--do-arglist' uses
+;; `pop' to modify earlier variables while setting later ones, which
+;; doesn't seem to work with `pcase'.
+
+(defconst cl--pcase-lambda-list-constructs
+  '(&whole &optional &rest &key &allow-other-keys &aux)
+  "Symbols that change how the following elements are understood.")
+
+(define-error 'cl--pcase-lambda-list-bad-lambda-list
+              "Error in `cl-lambda' pattern.")
+
+(defun cl--pcase-cl-lambda-var-groups (lambda-list)
+  "Return the alist of variable groups in LAMBDA-LIST.
+
+Lists are of the form
+`([&whole WHOLE-VAR] [POS-VARS] [&optional OPT-VARS] [&rest REST-VAR]
+[&key KEY-VARS] [&aux AUX-VARS])'."
+  (let ((whole-var) (processing-whole)
+        (pos-var)
+        (opt-var) (processing-opts)
+        (rest-var) (processing-rest) (dotted-rest-var)
+        (key-var) (processing-keys) (allow-other-keys)
+        (aux-var) (processing-auxs)
+        (remaining-list (cl-copy-list lambda-list)))
+
+    (when (not (proper-list-p remaining-list))
+      (cl-shiftf dotted-rest-var
+                 (cdr (last remaining-list))
+                 nil))
+
+    (cl-flet ((missing-after (cdr) (or (null cdr)
+                                       (memq (car cdr) cl--pcase-lambda-list-constructs)))
+              (stop-processing () (setq processing-whole nil
+                                        processing-opts nil
+                                        processing-rest nil
+                                        processing-keys nil
+                                        processing-auxs nil)))
+      (cl-loop
+       for (first . rest) on lambda-list
+       do
+       (pcase first
+         ('&whole
+          (if (or (missing-after rest)
+                  whole-var pos-var opt-var
+                  rest-var key-var allow-other-keys aux-var)
+              (signal 'cl--pcase-lambda-list-bad-lambda-list (list lambda-list))
+            (stop-processing)
+            (setq processing-whole t)))
+
+         ('&optional
+          (if (or (missing-after rest)
+                  opt-var rest-var key-var allow-other-keys aux-var)
+              (signal 'cl--pcase-lambda-list-bad-lambda-list
+                      (list lambda-list))
+            (stop-processing)
+            (setq processing-opts t)))
+
+         ((or '&rest '&body)
+          (if (or (missing-after rest)
+                  rest-var key-var allow-other-keys aux-var
+                  dotted-rest-var)
+              (signal 'cl--pcase-lambda-list-bad-lambda-list
+                      (list lambda-list))
+            (stop-processing)
+            (setq processing-rest t)))
+
+         ('&key
+          (if (or (missing-after rest)
+                  key-var allow-other-keys aux-var
+                  dotted-rest-var)
+              (signal 'cl--pcase-lambda-list-bad-lambda-list
+                      (list lambda-list))
+            (stop-processing)
+            (setq processing-keys t)))
+
+         ('&allow-other-keys
+          (if (or (not processing-keys)
+                  allow-other-keys
+                  dotted-rest-var)
+              (signal 'cl--pcase-lambda-list-bad-lambda-list
+                      (list lambda-list))
+            (stop-processing)
+            (setq allow-other-keys t)))
+
+         ('&aux
+          (if (or (missing-after rest)
+                  aux-var
+                  dotted-rest-var)
+              (signal 'cl--pcase-lambda-list-bad-lambda-list
+                      (list lambda-list))
+            (stop-processing)
+            (setq processing-auxs t)))
+
+         ((guard processing-whole)
+          (setq whole-var first
+                processing-whole nil))
+
+         ((guard processing-rest)
+          (setq rest-var first
+                processing-rest nil))
+
+         ((guard processing-opts)
+          (push first opt-var))
+
+         ((guard processing-keys)
+          (push first key-var))
+
+         ((guard processing-auxs)
+          (push first aux-var))
+
+         ('&environment
+          (signal 'cl--pcase-lambda-list-bad-lambda-list
+                  (list lambda-list)))
+
+         (_
+          (if (or opt-var rest-var key-var aux-var
+                  allow-other-keys)
+              (signal 'cl--pcase-lambda-list-bad-lambda-list
+                      (list lambda-list))
+            (push first pos-var))))))
+
+    `((whole . ,whole-var)
+      (pos . ,(nreverse pos-var))
+      (opt . ,(nreverse opt-var))
+      (rest . ,(or dotted-rest-var rest-var))
+      (key . ,(nreverse key-var))
+      (allow-other-keys . ,allow-other-keys)
+      (aux . ,(nreverse aux-var)))))
+
+(defun cl--pcase-cl-lambda-positional-pattern (pos-vars opt-vars rest-var key-vars)
+  "Build a pattern for the positional, `&optional', and `&rest' variables.
+
+POS-VARS is the list of the positional variables.  OPT-VARS is the list of
+the optional variables.  REST-VAR is the `&rest' variable."
+  ;; A modified version of the back-quote pattern to better work with
+  ;; optional values.
+  (cond
+   (pos-vars `(and (pred consp)
+                   (app car-safe ,(car pos-vars))
+                   (app cdr-safe ,(cl--pcase-cl-lambda-positional-pattern
+                                   (cdr pos-vars) opt-vars
+                                   rest-var key-vars))))
+   (opt-vars (pcase-let (((or `(,var ,default ,supplied)
+                              `(,var ,default)
+                              `(,var)
+                              var)
+                          (car opt-vars)))
+               `(and (pred listp)
+                     (app car-safe (or (and (pred null)
+                                            ,@(when supplied `((let ,supplied nil)))
+                                            ,@(when default `((let ,var ,default))))
+                                       ,(if supplied
+                                            `(and (let ,supplied t)
+                                                  ,var)
+                                          var)))
+                     (app cdr-safe ,(cl--pcase-cl-lambda-positional-pattern
+                                     nil (cdr opt-vars)
+                                     rest-var key-vars)))))
+   (rest-var rest-var)
+   ;; `pcase' allows `(,a ,b) to match (1 2 3), so we need to make
+   ;; sure there aren't more values left.  However, if we are using
+   ;; `&key', then we allow more values.
+   (key-vars '_)
+   (t '(pred null))))
+
+;;;###autoload
+(defun cl--pcase-cl-lambda-plist-keys (list)
+  "Get every other element in LIST, to get the keys in a property list."
+  (cl-loop for key in list by #'cddr collect key))
+
+(defun cl--pcase-cl-lambda-&key-pattern (key-vars allow-other-keys plist-var)
+  "Build a `pcase' pattern for the `&key' variables.
+
+KEY-VARS are the forms of the key variables.  ALLOW-OTHER-KEYS is
+whether `&allow-other-keys' was used.  PLIST-VAR is the variable
+holding the property list."
+  (let* ((specified-keys nil)
+         (pat-list
+          (cl-loop
+           for bind in key-vars
+           append (pcase-let* (((or (or `((,key ,var) ,default ,supplied)
+                                        `((,key ,var) ,default)
+                                        `((,key ,var)))
+                                    (and (or `(,var ,default ,supplied)
+                                             `(,var ,default)
+                                             `(,var)
+                                             (and (pred symbolp)
+                                                  var))
+                                         ;; Strip a leading underscore, since it
+                                         ;; only means that this argument is
+                                         ;; unused, but shouldn't affect the
+                                         ;; key's name (bug#12367).
+                                         (let key (intern
+                                                   (format ":%s"
+                                                           (let ((name (symbol-name var)))
+                                                             (if (eq ?_ (aref name 0))
+                                                                 (substring name 1)
+                                                               name)))))))
+                                bind)
+                               (const-key (macroexp-const-p key))
+                               (used-key (if const-key
+                                             key
+                                           (gensym (format "plist-key-%s" var)))))
+                    (unless allow-other-keys
+                      (push key specified-keys))
+                    `(,@(unless (equal used-key key)
+                          `((let ,used-key ,key)))
+                      ,@(cond
+                         (supplied
+                          (let ((key-found (gensym "key-found")))
+                            `((let ,key-found (plist-member ,plist-var ,used-key
+                                                            #'equal))
+                              (or (and (guard ,key-found)
+                                       (let ,var (cadr ,key-found))
+                                       (let ,supplied t))
+                                  (and (let ,var ,default)
+                                       (let ,supplied nil))))))
+                         (default
+                          (let ((key-found (gensym "key-found")))
+                            `((let ,var
+                                (if-let ((,key-found (plist-member ,plist-var
+                                                                   ,used-key
+                                                                   #'equal)))
+                                    (cl-second ,key-found)
+                                  ,default)))))
+                         (t
+                          `((let ,var  (plist-get ,plist-var ,used-key #'equal))))))))))
+    `(and ,@(unless allow-other-keys
+              `((guard (or (null (cl-set-difference (cl--pcase-cl-lambda-plist-keys ,plist-var)
+                                                    (list ,@specified-keys)
+                                                    :test #'equal))
+                           (plist-get ,plist-var :allow-other-keys)))))
+          ,@pat-list)))
+
+(defun cl--pcase-cl-lambda-&aux-pattern (aux-vars)
+  "Build `pcase' pattern for `&aux' variables.
+
+AUX-VARS is the list of bindings."
+  `(and ,@(cl-loop for bind in aux-vars
+                   collect (pcase-let (((or `(,var ,val)
+                                            `(,var)
+                                            var)
+                                        bind))
+                             `(let ,var ,val)))))
+
+;;;###autoload
+(pcase-defmacro cl-lambda (lambda-list)
+  "Match a CL lambda list.  See the Info node `(cl)Argument Lists'.
+
+This pattern does not support `&environment'.
+
+`&key' will fail to match if there are more keys in the plist
+then specified, unless `&allow-other-keys' is given or unless the
+plist associates the key `:allow-other-keys' with a non-nil
+value.  Unlike `cl-destructuring-bind', this pattern does not
+signal an error if there are unmatched keys in the plist.
+
+Unlike the back-quote pattern, the pattern will fail to match if the
+non-optional part of LAMBDA-LIST is shorter than EXPVAL.
+
+For this `pcase' pattern, the variables in LAMBDA-LIST can
+themselves be `pcase' patterns, instead of just symbols as in a
+normal CL lambda list.  However, lambda-list constructs like
+`&optional', `&key', and `&aux' use sub-lists to specify default
+values and other features.  For example,
+
+    (cl-lambda (&optional (opt1 default1 opt1-supplied)))
+
+Therefore, to avoid ambiguity, the use of sub-patterns can only
+be done within the sub-list for those constructs.  For example,
+
+    (cl-lambda (&optional ((and opt1 (guard (listp opt1)))
+                           nil)))
+
+For similar reasons, the cdr of a dotted list (as opposed to the
+element following `&rest') for the remainder of a list cannot be
+a sub-pattern."
+  (let* ((groups (cl--pcase-cl-lambda-var-groups lambda-list))
+         (whole-var (alist-get 'whole groups))
+         (pos-vars (alist-get 'pos groups))
+         (opt-vars (alist-get 'opt groups))
+         (rest-var (alist-get 'rest groups))
+         (key-vars (alist-get 'key groups))
+         (allow-other-keys (alist-get 'allow-other-keys groups))
+         (aux-vars (alist-get 'aux groups)))
+    (remq nil
+          `(and (pred listp)
+                ,(when whole-var
+                   whole-var)
+                ,(when (or pos-vars opt-vars rest-var)
+                   (cl--pcase-cl-lambda-positional-pattern
+                    pos-vars opt-vars
+                    rest-var key-vars))
+                ,@(when key-vars
+                    (let ((plist-var (gensym "maybe-plist")))
+                      (cond
+                       (rest-var
+                        (list (cl--pcase-cl-lambda-&key-pattern
+                               key-vars allow-other-keys
+                               rest-var)))
+                       ((or pos-vars opt-vars)
+                        (if whole-var
+                            `((let ,plist-var (nthcdr ,(+ (length pos-vars)
+                                                          (length opt-vars))
+                                                      ,whole-var))
+                              ,(cl--pcase-cl-lambda-&key-pattern
+                                key-vars allow-other-keys
+                                plist-var))
+                          `((app (nthcdr ,(+ (length pos-vars)
+                                             (length opt-vars)))
+                                 ,plist-var)
+                            ,(cl--pcase-cl-lambda-&key-pattern
+                              key-vars allow-other-keys
+                              plist-var))))
+                       (t
+                        `((and ,plist-var
+                               ,(cl--pcase-cl-lambda-&key-pattern
+                                 key-vars allow-other-keys
+                                 plist-var)))))))
+                ,(when aux-vars
+                   (cl--pcase-cl-lambda-&aux-pattern aux-vars))))))
+
 ;; Local variables:
 ;; generated-autoload-file: "cl-loaddefs.el"
 ;; End:
