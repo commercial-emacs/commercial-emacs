@@ -27417,9 +27417,13 @@ produce_image_glyph (struct it *it)
 
   take_vertical_position_into_account (it);
 
-  /* Automatically crop wide image glyphs at right edge so we can
-     draw the cursor on same display row.  */
-  if ((crop = it->pixel_width - (it->last_visible_x - it->current_x), crop > 0)
+  /* Automatically crop wide image glyphs at right edge so we can draw
+     the cursor on same display row.  But don't do that under
+     word-wrap, unless the image starts at column zero, because
+     wrapping correctly needs the real pixel width of the image.  */
+  if ((it->line_wrap != WORD_WRAP || it->hpos == 0)
+      && (crop = it->pixel_width - (it->last_visible_x - it->current_x),
+	  crop > 0)
       && (it->hpos == 0 || it->pixel_width > it->last_visible_x / 4))
     {
       it->pixel_width -= crop;
