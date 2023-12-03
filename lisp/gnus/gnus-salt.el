@@ -601,45 +601,28 @@ Two predefined functions are available:
     (when (or t (gnus-visual-p 'tree-highlight 'highlight))
       (gnus-tree-highlight-node gnus-tmp-number beg end))))
 
-(defmacro gnus--let-eval (bindings evalsym &rest body)
-  "Build an environment in which to evaluate expressions.
-BINDINGS is a `let'-style list of bindings to use for the environment.
-EVALSYM is then bound in BODY to a function that takes a sexp and evaluates
-it in the environment specified by BINDINGS."
-  (declare (indent 2) (debug ((&rest (sym form)) sym body)))
-  (if (ignore-errors (let ((x 3)) (eq (eval '(- x 1) '((x . 4))) x)))
-      ;; Use lexical vars if possible.
-      `(let* ((env (list ,@(mapcar (lambda (binding)
-                                     `(cons ',(car binding) ,(cadr binding)))
-                                   bindings)))
-             (,evalsym (lambda (exp) (eval exp env))))
-         ,@body)
-    `(let (,@bindings (,evalsym #'eval)) ,@body)))
-
 (defun gnus-tree-highlight-node (article beg end)
   "Highlight current line according to `gnus-summary-highlight'."
-  (let ((list gnus-summary-highlight)
-	face)
-    (with-current-buffer gnus-summary-buffer
-      (let ((uncached (memq article gnus-newsgroup-undownloaded)))
-        (gnus--let-eval
-            ((score (or (cdr (assq article gnus-newsgroup-scored))
-			gnus-summary-default-score 0))
-	     (default gnus-summary-default-score)
-	     (default-high gnus-summary-default-high-score)
-	     (default-low gnus-summary-default-low-score)
-             (uncached uncached)
-             (downloaded (not uncached))
-	     (mark (or (gnus-summary-article-mark article) gnus-unread-mark)))
-            evalfun
-          ;; Eval the cars of the lists until we find a match.
-          (while (and list
-                      (not (funcall evalfun (caar list))))
-            (setq list (cdr list))))))
-    (unless (eq (setq face (cdar list)) (gnus-get-text-property-excluding-characters-with-faces beg 'face))
-      (gnus-put-text-property-excluding-characters-with-faces
-       beg end 'face
-       (if (boundp face) (symbol-value face) face)))))
+  (with-current-buffer gnus-summary-buffer
+    (let ((lst gnus-summary-highlight)
+          (env `((score . ,(or (cdr (assq article gnus-newsgroup-scored))
+		               gnus-summary-default-score 0))
+	         (default . ,gnus-summary-default-score)
+	         (default-high . ,gnus-summary-default-high-score)
+	         (default-low . ,gnus-summary-default-low-score)
+                 (uncached . ,(memq article gnus-newsgroup-undownloaded))
+                 (downloaded . ,(not (memq article gnus-newsgroup-undownloaded)))
+	         (mark . ,(or (gnus-summary-article-mark article) gnus-unread-mark)))))
+      ;; Eval the cars of the lists until we find a match.
+      (while (and lst (null (eval (car (car lst)) env)))
+        (setq lst (cdr lst)))
+      (let ((face (cdr (car lst))))
+        (unless (eq face (gnus-get-text-property-excluding-characters-with-faces
+                          beg 'face))
+          (gnus-put-text-property-excluding-characters-with-faces
+           beg end 'face (if (boundp face)
+                             (symbol-value face)
+                           face)))))))
 
 (defun gnus-tree-indent (level)
   (insert (make-string (1- (* (1+ gnus-tree-node-length) level)) ? )))
