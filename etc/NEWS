@@ -985,6 +985,14 @@ will return the URL for that bug.
 *** New command 'customize-dirlocals'.
 This command pops up a buffer to edit the settings in ".dir-locals.el".
 
+** ERT
+
++++
+*** Syntax highlighting unit testing support.
+An ERT extension ('ert-font-lock') now provides support for face
+assignment unit testing.  For more information, see the "(ert) Syntax
+Highlighting Tests" node in the ERT manual.
+
 
 * New Modes and Packages in Emacs 30.1
 
