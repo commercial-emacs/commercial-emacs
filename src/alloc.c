@@ -3968,7 +3968,7 @@ staticpro (Lisp_Object const *varaddress)
   for (int i = 0; i < staticidx; ++i)
     eassert (staticvec[i] != varaddress);
   if (staticidx >= NSTATICS)
-    fatal ("NSTATICS too small; try increasing and recompiling Emacs.");
+    fatal ("NSTATICS exceeded");
   staticvec[staticidx++] = varaddress;
 }
 

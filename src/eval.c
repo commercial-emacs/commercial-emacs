@@ -2461,7 +2461,7 @@ eval_sub (Lisp_Object form)
 	     macro can know reliably if the code it outputs will be
 	     interpreted using lexical-binding or not.  */
 	  specbind (Qlexical_binding,
-		    NILP (Vinternal_interpreter_environment) ? Qnil : Qt);
+		    !NILP (Vinternal_interpreter_environment) ? Qt : Qnil);
 
 	  /* Make the macro aware of any defvar declarations in scope. */
 	  Lisp_Object dynvars = Vmacroexp__dynvars;
@@ -4100,6 +4100,8 @@ Lisp_Object backtrace_top_function (void)
 void
 syms_of_eval (void)
 {
+  staticpro (&Vinternal_interpreter_environment);
+
   DEFVAR_INT ("max-lisp-eval-depth", max_lisp_eval_depth,
 	      doc: /* Limit on depth in `eval', `apply' and `funcall' before error.
 
