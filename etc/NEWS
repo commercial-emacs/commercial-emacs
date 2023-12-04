@@ -245,6 +245,14 @@ region with 'duplicate-dwim'.
 
 * Changes in Specialized Modes and Packages in Emacs 30.1
 
+** Info
+
+---
+*** New user option 'Info-urls'.
+Browse any online info manual, not just the 'emacs' and 'elisp'
+manuals. By default, allow browsing online info manuals of all
+Emacs-contained manuals.
+
 +++
 ** New command 'lldb'.
 Run the LLDB debugger, analogous to the 'gud-gdb' command.  Note that
