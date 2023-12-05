@@ -376,6 +376,15 @@ prefix argument and defaults to 1."
                completion-preview-next-candidate))
   (put cmd 'completion-predicate #'completion-preview--active-p))
 
+(defun completion-preview--window-selection-change (window)
+  "Hide completion preview in WINDOW after switching to another window.
+Completion Preview mode adds this function to
+`window-selection-change-functions', which see."
+  (unless (or (eq window (selected-window))
+              (eq window (minibuffer-selected-window)))
+    (with-current-buffer (window-buffer window)
+      (completion-preview-active-mode -1))))
+
 ;;;###autoload
 (define-minor-mode completion-preview-mode
   "Show in-buffer completion suggestions in a preview as you type.
@@ -390,8 +399,13 @@ completion suggestion, and \\[completion-preview-prev-candidate]
 cycles backward."
   :lighter " CP"
   (if completion-preview-mode
-      (add-hook 'post-command-hook #'completion-preview--post-command nil t)
+      (progn
+        (add-hook 'post-command-hook #'completion-preview--post-command nil t)
+        (add-hook 'window-selection-change-functions
+                  #'completion-preview--window-selection-change nil t))
     (remove-hook 'post-command-hook #'completion-preview--post-command t)
+    (remove-hook 'window-selection-change-functions
+                 #'completion-preview--window-selection-change t)
     (completion-preview-active-mode -1)))
 
 (provide 'completion-preview)
