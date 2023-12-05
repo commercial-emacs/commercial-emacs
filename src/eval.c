@@ -31,8 +31,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "atimer.h"
 #include "syntax.h"
 
-PER_THREAD_STATIC Lisp_Object Vinternal_interpreter_environment;
-
 /* Non-nil means record all fset's and provide's, to be undone
    if the file being autoloaded is not fully loaded.
    They are recorded by being consed onto the front of Vautoload_queue:
@@ -219,7 +217,6 @@ init_eval_once (void)
   /* Don't forget to update docs (lispref node "Eval").  */
   max_lisp_eval_depth = 1600;
   Vrun_hooks = Qnil;
-  Vinternal_interpreter_environment = Qnil;
   pdumper_do_now_and_after_load (init_eval_once_for_pdumper);
 }
 
@@ -4100,8 +4097,6 @@ Lisp_Object backtrace_top_function (void)
 void
 syms_of_eval (void)
 {
-  staticpro (&Vinternal_interpreter_environment);
-
   DEFVAR_INT ("max-lisp-eval-depth", max_lisp_eval_depth,
 	      doc: /* Limit on depth in `eval', `apply' and `funcall' before error.
 
@@ -4234,16 +4229,16 @@ the Lisp backtrace.  */);
 Used to avoid infinite loops if the debugger itself has an error.
 Don't set this unless you're sure that can't happen.  */);
 
-  /* Under dynamic scoping, Vinternal_interpreter_environment is nil.
-     Under lexical scoping, it is a list of either (VAR . VAL)
-     bindings or bare VAR symbols indicating VAR is dynamically scoped
-     for the environment's duration.  The special list (t) denotes
-     an empty lexical environment.  */
-  DEFSYM (Qinternal_interpreter_environment,
-	  "internal-interpreter-environment");
-  /* Don't export this variable to Elisp, so no one can mess with it
-     (Just imagine if someone makes it buffer-local).  */
-  Funintern (Qinternal_interpreter_environment, Qnil);
+  DEFSYM (Qinternal_interpreter_environment, "internal-interpreter-environment");
+  DEFVAR_LISP ("internal-interpreter-environment",
+	       Vinternal_interpreter_environment,
+	       doc: /* Under dynamic scoping, Vinternal_interpreter_environment is nil.
+Under lexical scoping, it is a list of either (VAR . VAL) bindings or
+bare VAR symbols indicating VAR is dynamically scoped for the
+environment's duration.  The special list (t) denotes an empty lexical
+environment.  */);
+  Funintern (Qinternal_interpreter_environment, Qnil); /* Don't surface to user.  */
+  Vinternal_interpreter_environment = Qnil;
 
   DEFVAR_LISP ("internal-make-interpreted-closure-function",
 	       Vinternal_make_interpreted_closure_function,

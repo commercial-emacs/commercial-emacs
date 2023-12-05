@@ -4621,8 +4621,9 @@ intern_driver (Lisp_Object string, Lisp_Object obarray, Lisp_Object index)
    interned in the current obarray.  */
 
 Lisp_Object
-intern_1 (const char *str, ptrdiff_t len)
+intern (const char *str)
 {
+  const ptrdiff_t len = strlen (str);
   Lisp_Object obarray = check_obarray (Vobarray);
   Lisp_Object tem = oblookup (obarray, str, len, len);
 
@@ -4634,8 +4635,9 @@ intern_1 (const char *str, ptrdiff_t len)
 }
 
 Lisp_Object
-intern_c_string_1 (const char *str, ptrdiff_t len)
+intern_c_string (const char *str)
 {
+  const ptrdiff_t len = strlen (str);
   Lisp_Object obarray = check_obarray (Vobarray);
   Lisp_Object tem = oblookup (obarray, str, len, len);
 
@@ -5043,11 +5045,9 @@ defvar_bool (struct Lisp_Boolfwd const *b_fwd, char const *namestring)
   Vbyte_boolean_vars = Fcons (sym, Vbyte_boolean_vars);
 }
 
-/* Similar but define a variable whose value is the Lisp Object stored
-   at address.  Two versions: with and without gc-marking of the C
-   variable.  The nopro version is used when that variable will be
-   gc-marked for some other reason, since marking the same slot twice
-   can cause trouble with strings.  */
+/* Marking the same slot twice "can cause trouble with strings," so
+   for those variables known to be exogenously marked, don't
+   staticpro.  */
 void
 defvar_lisp_nopro (struct Lisp_Objfwd const *o_fwd, char const *namestring)
 {

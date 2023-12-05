@@ -4088,8 +4088,8 @@ extern ptrdiff_t evxprintf (char **, ptrdiff_t *, char *, ptrdiff_t,
 
 /* Defined in lread.c.  */
 extern Lisp_Object check_obarray (Lisp_Object);
-extern Lisp_Object intern_1 (const char *, ptrdiff_t);
-extern Lisp_Object intern_c_string_1 (const char *, ptrdiff_t);
+extern Lisp_Object intern (const char *);
+extern Lisp_Object intern_c_string (const char *);
 extern Lisp_Object intern_driver (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void init_symbol (Lisp_Object, Lisp_Object);
 extern Lisp_Object oblookup (Lisp_Object, const char *, ptrdiff_t, ptrdiff_t);
@@ -4113,18 +4113,6 @@ extern void init_obarray_once (void);
 extern void init_lread (void);
 extern void syms_of_lread (void);
 extern void mark_lread (void);
-
-INLINE Lisp_Object
-intern (const char *str)
-{
-  return intern_1 (str, strlen (str));
-}
-
-INLINE Lisp_Object
-intern_c_string (const char *str)
-{
-  return intern_c_string_1 (str, strlen (str));
-}
 
 /* Defined in eval.c.  */
 extern Lisp_Object Vautoload_queue;

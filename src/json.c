@@ -917,8 +917,8 @@ json_to_lisp (json_t *json, const struct json_configuration *conf)
                   ptrdiff_t key_str_len = strlen (key_str);
                   char *keyword_key_str = SAFE_ALLOCA (1 + key_str_len + 1);
                   keyword_key_str[0] = ':';
-                  strcpy (&keyword_key_str[1], key_str);
-                  Lisp_Object key = intern_1 (keyword_key_str, key_str_len + 1);
+                  sprintf (&keyword_key_str[1], "%s", key_str);
+                  Lisp_Object key = intern (keyword_key_str);
                   /* Build the plist as value-key since we're going to
                      reverse it in the end.*/
                   result = Fcons (key, result);
