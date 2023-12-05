@@ -665,7 +665,7 @@ dump_builtin_symbol_p (Lisp_Object object)
 }
 
 /* Return whether OBJECT has the same bit pattern in all Emacs
-   invocations --- i.e., is invariant across a dump.  Note that some
+   invocations, i.e., is invariant across a dump.  Note that some
    self-representing objects still need to be dumped!
 */
 static bool
@@ -1256,13 +1256,12 @@ dump_enqueue_object (struct dump_context *ctx,
                      Lisp_Object object,
                      struct link_weight weight)
 {
-  /*  Fixnums are bit-invariant, and don't need dumping. */
+  /* Fixnums are bit-invariant, and don't need dumping.  */
   if (! FIXNUMP (object))
     {
       dump_off state = dump_recall_object (ctx, object);
       bool already_dumped_object = state > DUMP_OBJECT_NOT_SEEN;
-      if (ctx->flags.assert_already_seen)
-        eassert (already_dumped_object);
+      eassert (! ctx->flags.assert_already_seen || already_dumped_object);
       if (! already_dumped_object)
         {
           if (state == DUMP_OBJECT_NOT_SEEN)
