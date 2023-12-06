@@ -2561,7 +2561,9 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
     ["Delete Image Tag..." image-dired-delete-tag
      :help "Delete image tag from current or marked files"]))
 
-(declare-function shell-command-guess "dired-aux")
+(declare-function shell-command-guess "dired-aux" (files))
+(defvar shell-command-guess-open)
+
 (defun dired-context-menu (menu click)
   "Populate MENU with Dired mode commands at CLICK."
   (when (mouse-posn-property (event-start click) 'dired-filename)
@@ -2577,6 +2579,9 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
            :help "Edit file at mouse click"]
           ["Find in Other Window" dired-mouse-find-file-other-window
            :help "Edit file at mouse click in other window"]
+          ,@(when shell-command-guess-open
+              '(["Open" dired-do-open
+                 :help "Open externally"]))
           ,@(when commands
               (list (cons "Open With"
                           (append
