@@ -2577,9 +2577,6 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
            :help "Edit file at mouse click"]
           ["Find in Other Window" dired-mouse-find-file-other-window
            :help "Edit file at mouse click in other window"]
-          ,@(when shell-command-guess-open
-              '(["Open" dired-do-open
-                 :help "Open externally"]))
           ,@(when commands
               (list (cons "Open With"
                           (append
