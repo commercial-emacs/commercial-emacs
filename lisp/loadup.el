@@ -281,7 +281,6 @@
 
 (if (featurep 'x)
     (progn
-      (load "touch-screen")
       (load "x-dnd")
       (load "term/common-win")
       (load "term/x-win")))
