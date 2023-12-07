@@ -773,7 +773,8 @@ without directory names."
   "Return a list of tags tables included by the current table.
 Assumes the tags table is the current buffer."
   (or tags-included-tables
-      (setq tags-included-tables (funcall tags-included-tables-function))))
+      (setq tags-included-tables (and (functionp tags-included-tables-function)
+                                      (funcall tags-included-tables-function)))))
 
 (defun tags-completion-table (&optional buf)
   "Build `tags-completion-table' on demand for a buffer's tags tables.
