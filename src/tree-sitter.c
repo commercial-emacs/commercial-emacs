@@ -297,6 +297,7 @@ ensure_highlighter(Lisp_Object sitter)
 	      TSHighlightError ts_highlight_error =
 		ts_highlighter_add_language
 		(ret,
+		 SSDATA (language),
 		 scope,
 		 NULL,
 		 ts_parser_language (XTREE_SITTER (sitter)->parser),
@@ -305,7 +306,8 @@ ensure_highlighter(Lisp_Object sitter)
 		 "",
 		 strlen (XTREE_SITTER (sitter)->highlights_query),
 		 0,
-		 0);
+		 0,
+		 false);
 	      if (ts_highlight_error != TSHighlightOk)
 		{
 		  suberror = make_fixnum (ts_highlight_error);
