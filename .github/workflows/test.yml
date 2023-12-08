@@ -73,7 +73,7 @@ jobs:
       with:
         repository: commercial-emacs/tree-sitter
         path: tree-sitter
-        ref: v0.20.8alpha2
+        ref: v0.20.10beta2
     - uses: actions-rs/toolchain@v1
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'windows') != true
       with:
