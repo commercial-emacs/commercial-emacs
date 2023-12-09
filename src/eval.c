@@ -3023,7 +3023,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
     {
       if (EQ (XCAR (fun), Qclosure))
 	{
-	  Lisp_Object cdr = XCDR (fun);	/* Drop `closure'.  */
+	  Lisp_Object cdr = XCDR (fun);	/* Drop `closure`.  */
 	  if (! CONSP (cdr))
 	    xsignal1 (Qinvalid_function, fun);
 	  fun = cdr;
@@ -3331,10 +3331,12 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 #ifdef HAVE_GCC_TLS
   if (! NILP (current_thread->obarray))
     {
+      Lisp_Object name = SYMBOL_NAME (symbol);
       eassert (! main_thread_p (current_thread));
-      if (NILP (Fintern_soft (SYMBOL_NAME (symbol), current_thread->obarray)))
+      symbol = Fintern_soft (name, current_thread->obarray);
+      if (NILP (symbol))
 	{
-	  symbol = Fintern (SYMBOL_NAME (symbol), current_thread->obarray);
+	  symbol = Fintern (name, current_thread->obarray);
 	  XSYMBOL (symbol)->u.s.type = xsymbol->u.s.type;
 	  XSYMBOL (symbol)->u.s.trapped_write = xsymbol->u.s.trapped_write;
 	  XSYMBOL (symbol)->u.s.declared_special = xsymbol->u.s.declared_special;
@@ -3343,10 +3345,10 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 	  XSYMBOL (symbol)->u.s.plist = xsymbol->u.s.plist;
 	  XSYMBOL (symbol)->u.s.buffer_local_only = xsymbol->u.s.buffer_local_only;
 	  XSYMBOL (symbol)->u.s.buffer_local_default = xsymbol->u.s.buffer_local_default;
-	  XSYMBOL (symbol)->u.s.c_variable = (lispfwd) { NULL };
+	  XSYMBOL (symbol)->u.s.c_variable = clone_lispfwd (xsymbol->u.s.c_variable);
 	  XSYMBOL (symbol)->u.s.buffer_local_buffer = xsymbol->u.s.buffer_local_buffer;
-	  xsymbol = XSYMBOL (symbol);
 	}
+      xsymbol = XSYMBOL (symbol);
     }
 #endif
 

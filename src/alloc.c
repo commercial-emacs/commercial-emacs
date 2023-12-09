@@ -5453,8 +5453,13 @@ sweep_symbols (struct thread_state *thr)
                   sym->u.s.type = SYMBOL_PLAINVAL;
                 }
               sym->u.s.next = THREAD_FIELD (thr, m_symbol_free_list);
+	      sym->u.s.function = dead_object ();
+	      if (sym->u.s.c_variable.fwdptr && ! main_thread_p (thr))
+		{
+		  free_lispfwd (sym->u.s.c_variable);
+		  sym->u.s.c_variable = (lispfwd) { NULL };
+		}
               THREAD_FIELD (thr, m_symbol_free_list) = sym;
-              THREAD_FIELD (thr, m_symbol_free_list)->u.s.function = dead_object ();
               ++blk_free;
 	      ASAN_POISON_SYMBOL (sym);
             }

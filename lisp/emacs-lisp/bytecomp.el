@@ -4755,8 +4755,7 @@ binding slots have been popped."
         (push (byte-compile-push-binding-init var) init-lexenv)))
     ;; New scope.
     (let ((byte-compile-bound-variables byte-compile-bound-variables)
-          (byte-compile--lexical-environment
-           byte-compile--lexical-environment))
+          (byte-compile--lexical-environment byte-compile--lexical-environment))
       ;; Bind the variables.
       ;; For `let', do it in reverse order, because it makes no
       ;; semantic difference, but it is a lot more efficient since the

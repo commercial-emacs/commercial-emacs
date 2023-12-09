@@ -443,6 +443,12 @@ typedef Lisp_Word Lisp_Object;
 enum CHECK_LISP_OBJECT_TYPE { CHECK_LISP_OBJECT_TYPE = false };
 #endif
 
+/* Eggert in 9287813 claims the more intuitive pointer to a union of
+   `struct Lisp_*fwd` creates alignment issues, and replaces it with a
+   void star, which he then packaged in a struct for the static type
+   checker.  */
+typedef struct { void const *fwdptr; } lispfwd;
+
 /* Defined in this file.  */
 INLINE void set_sub_char_table_contents (Lisp_Object, ptrdiff_t,
 					 Lisp_Object);
@@ -465,6 +471,8 @@ extern AVOID wrong_type_argument (Lisp_Object, Lisp_Object);
 extern Lisp_Object default_value (Lisp_Object symbol);
 extern void defalias (Lisp_Object symbol, Lisp_Object definition);
 extern char *fixnum_to_string (EMACS_INT number, char *buffer, char *end);
+extern lispfwd clone_lispfwd (const lispfwd valpp);
+extern void free_lispfwd (lispfwd valpp);
 
 /* Defined in emacs.c.  */
 extern bool initialized;
@@ -588,12 +596,6 @@ INLINE void
    is always zero.  */
 #define XUNTAG(a, type, ctype) \
   ((ctype *) ((uintptr_t) XLP (a) - (uintptr_t) LISP_WORD_TAG (type)))
-
-/* Eggert in 9287813 claims the more intuitive pointer to a union of
-   `struct Lisp_*fwd` creates alignment issues, and replaces it with a
-   void star, which he then packaged in a struct for the static type
-   checker.  */
-typedef struct { void const *fwdptr; } lispfwd;
 
 /* Interned state of a symbol.  */
 
