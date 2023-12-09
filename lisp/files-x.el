@@ -937,7 +937,7 @@ is the default binding of the variable."
       (connection-local-criteria-for-default-directory ,application))
      (if-let ((result (assq ',variable connection-local-variables-alist)))
          (cdr result)
-       ,variable)))
+       ',variable)))
 
 ;;;###autoload
 (defun path-separator ()
