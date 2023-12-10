@@ -3394,7 +3394,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 
   /* Second, set SYMBOL to the new value.  */
   if (xsymbol->u.s.type == SYMBOL_PER_BUFFER
-	   && specpdl_kind (specpdl_ptr - 1) == SPECPDL_LET_BLD)
+      && specpdl_kind (specpdl_ptr - 1) == SPECPDL_LET_BLD)
     set_default_internal (specpdl_symbol (specpdl_ptr - 1), value, SET_INTERNAL_BIND);
   else
     set_internal (specpdl_symbol (specpdl_ptr - 1), value, Qnil, SET_INTERNAL_BIND);
