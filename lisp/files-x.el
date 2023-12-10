@@ -791,6 +791,7 @@ definitions that aren't listed in VARIABLES."
     (setq variables (nreverse existing-variables)))
   (connection-local-set-profile-variables profile variables))
 
+;;;###autoload
 (defun hack-connection-local-variables (criteria)
   "Read connection-local variables according to CRITERIA.
 Store the connection-local variables in buffer local
