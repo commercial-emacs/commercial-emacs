@@ -1675,7 +1675,7 @@ names, where this is the directory component of the file name.")
   "Sort COMPLETIONS by their position in `minibuffer-history-variable'.
 
 COMPLETIONS are sorted first by `minibuffer-sort-alphbetically',
-then any elements occuring in the minibuffer history list are
+then any elements occurring in the minibuffer history list are
 moved to the front based on the chronological order they occur in
 the history.  If a history variable hasn't been specified for
 this call of `completing-read', COMPLETIONS are sorted only by

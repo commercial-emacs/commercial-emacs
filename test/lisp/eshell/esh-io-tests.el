@@ -328,7 +328,7 @@ stdout originally pointed (the terminal)."
                                "tuodts\nrredts\n"))
 
 (ert-deftest esh-io-test/pipeline/subcommands ()
-  "Chek that all commands in a subcommand are properly piped."
+  "Check that all commands in a subcommand are properly piped."
   (skip-unless (executable-find "rev"))
   (eshell-command-result-equal "{echo foo; echo bar} | rev"
                                "raboof"))

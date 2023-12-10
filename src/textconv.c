@@ -23,7 +23,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    They may then request that the text editor remove or substitute
    that text for something else, for example when providing the
    ability to ``undo'' or ``edit'' previously composed text.  This is
-   most commonly seen in input methods for CJK laguages for X Windows,
+   most commonly seen in input methods for CJK languages for X Windows,
    and is extensively used throughout Android by input methods for all
    kinds of scripts.  */
 
