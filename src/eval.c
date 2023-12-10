@@ -3335,19 +3335,17 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       eassert (! main_thread_p (current_thread));
       symbol = Fintern_soft (name, current_thread->obarray);
       if (NILP (symbol))
-	{
-	  symbol = Fintern (name, current_thread->obarray);
-	  XSYMBOL (symbol)->u.s.type = xsymbol->u.s.type;
-	  XSYMBOL (symbol)->u.s.trapped_write = xsymbol->u.s.trapped_write;
-	  XSYMBOL (symbol)->u.s.declared_special = xsymbol->u.s.declared_special;
-	  XSYMBOL (symbol)->u.s.val = xsymbol->u.s.val;
-	  XSYMBOL (symbol)->u.s.function = xsymbol->u.s.function;
-	  XSYMBOL (symbol)->u.s.plist = xsymbol->u.s.plist;
-	  XSYMBOL (symbol)->u.s.buffer_local_only = xsymbol->u.s.buffer_local_only;
-	  XSYMBOL (symbol)->u.s.buffer_local_default = xsymbol->u.s.buffer_local_default;
-	  XSYMBOL (symbol)->u.s.c_variable = clone_lispfwd (xsymbol->u.s.c_variable);
-	  XSYMBOL (symbol)->u.s.buffer_local_buffer = xsymbol->u.s.buffer_local_buffer;
-	}
+	symbol = Fintern (name, current_thread->obarray);
+      XSYMBOL (symbol)->u.s.type = xsymbol->u.s.type;
+      XSYMBOL (symbol)->u.s.trapped_write = xsymbol->u.s.trapped_write;
+      XSYMBOL (symbol)->u.s.declared_special = xsymbol->u.s.declared_special;
+      XSYMBOL (symbol)->u.s.val = xsymbol->u.s.val;
+      XSYMBOL (symbol)->u.s.function = xsymbol->u.s.function;
+      XSYMBOL (symbol)->u.s.plist = xsymbol->u.s.plist;
+      XSYMBOL (symbol)->u.s.buffer_local_only = xsymbol->u.s.buffer_local_only;
+      XSYMBOL (symbol)->u.s.buffer_local_default = xsymbol->u.s.buffer_local_default;
+      XSYMBOL (symbol)->u.s.c_variable = clone_lispfwd (xsymbol->u.s.c_variable);
+      XSYMBOL (symbol)->u.s.buffer_local_buffer = xsymbol->u.s.buffer_local_buffer;
       xsymbol = XSYMBOL (symbol);
     }
 #endif
@@ -3395,10 +3393,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
   grow_specpdl ();
 
   /* Second, set SYMBOL to the new value.  */
-  if (xsymbol->u.s.type == SYMBOL_PLAINVAL
-      && xsymbol->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
-    SET_SYMBOL_VAL (xsymbol, value);
-  else if (xsymbol->u.s.type == SYMBOL_PER_BUFFER
+  if (xsymbol->u.s.type == SYMBOL_PER_BUFFER
 	   && specpdl_kind (specpdl_ptr - 1) == SPECPDL_LET_BLD)
     set_default_internal (specpdl_symbol (specpdl_ptr - 1), value, SET_INTERNAL_BIND);
   else

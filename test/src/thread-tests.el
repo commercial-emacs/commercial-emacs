@@ -564,7 +564,7 @@ The failure manifests only by being unable to exit the interactive emacs."
   (should-not (thread-last-error)))
 
 (ert-deftest threads-test-catch-throw ()
-  "c41a8ed is supposed to make this work."
+  "051da60 is supposed to make this work."
   (skip-unless (featurep 'threads))
   (let (timed-out)
     (make-thread (lambda () (with-timeout (1 (setq timed-out t))

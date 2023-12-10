@@ -670,13 +670,7 @@ run_thread (void *state)
   eassert (handlerlist == push_handler (Qunbound, CATCHER));
   handlerlist->next = handlerlist->nextfree = NULL;
 
-  internal_condition_case (invoke_thread,
-#ifdef ENABLE_CHECKING
-			   Qerror,
-#else
-			   Qt,
-#endif
-			   record_thread_error);
+  internal_condition_case (invoke_thread, Qt, record_thread_error);
   update_processes_for_thread_death (self);
 
 #ifdef HAVE_GCC_TLS

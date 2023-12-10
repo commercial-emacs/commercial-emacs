@@ -724,14 +724,9 @@ You might need to add: %S"
                                     generalizer)
                                    'arg)))
              generalizers))
-           (tag-exp
-            ;; Minor optimization: since this tag-exp is
-            ;; only used to lookup the method-cache, it
-            ;; doesn't matter if the default value is some
-            ;; constant or nil.
-            `(or ,@(if (macroexp-const-p (car (last tagcodes)))
-                       (butlast tagcodes)
-                     tagcodes)))
+           (cache-key `(or ,@(if (macroexp-const-p (car (last tagcodes)))
+                                 (butlast tagcodes)
+                               tagcodes)))
            (fixedargs '(arg))
            (dispatch-idx dispatch-arg)
            bindings)
@@ -741,10 +736,7 @@ You might need to add: %S"
         (setq dispatch-idx 0))
       (dotimes (i dispatch-idx)
         (push (make-symbol (format "arg%d" (- dispatch-idx i 1))) fixedargs))
-      (let ((lexical-binding t)) ;; for method-cache
-        ;; FIXME: For generic functions with a single method (or with 2 methods,
-        ;; one of which always matches), using a tagcode + hash-table is
-        ;; overkill: better just use a `cl-typep' test.
+      (let ((lexical-binding t)) ; for method-cache
         (funcall
          cl--generic-compiler
          `(lambda (generic dispatches-left methods)
@@ -752,8 +744,7 @@ You might need to add: %S"
               (apply-partially
                (lambda (generic* dispatches-left* methods* ,@fixedargs &rest args)
                  (let ,bindings
-                   (apply (with-memoization
-                              (gethash ,tag-exp method-cache)
+                   (apply (with-memoization (gethash ,cache-key method-cache)
                             (cl--generic-cache-miss
                              generic* ',dispatch-arg dispatches-left* methods*
                              ,(if (cdr typescodes)
