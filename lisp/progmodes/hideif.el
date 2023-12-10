@@ -1794,7 +1794,7 @@ and `+='...)."
                    actual-parms nil)))
 
           (t
-           (error "Interal error: impossible case."))))
+           (error "Internal error: impossible case"))))
 
        (pop actual-parms)
        while actual-parms) ; end cl-loop
