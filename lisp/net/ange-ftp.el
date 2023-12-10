@@ -2850,8 +2850,7 @@ NO-ERROR, if a listing for DIRECTORY cannot be obtained."
 				   (ange-ftp-switches-ok dired-actual-switches))
 			      (and (boundp 'dired-listing-switches)
 				   (ange-ftp-switches-ok
-				    (connection-local-value
-                                     dired-listing-switches)))
+				    dired-listing-switches))
 			      "-al")
 			  t no-error)
 	     (gethash directory ange-ftp-files-hashtable)))))
