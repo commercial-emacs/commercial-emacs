@@ -85,14 +85,15 @@ A list of the form (FRAME-CONFIGURATION POSITION)
   :version "24.3")
 
 (defcustom register-separator nil
-  "Register containing the text to put between collected texts, or nil if none.
+  "Separator between texts collected in registers, or nil if none.
 
 When collecting text with \\[append-to-register] (or \\[prepend-to-register]),
-contents of this register is added to the beginning (or end, respectively)
-of the marked text."
+the separator is added to the beginning (or end, respectively) of the marked
+text."
   :group 'register
   :type '(choice (const :tag "None" nil)
-		 (character :tag "Use register" :value ?+)))
+		 (character :tag "Use character" :value ?+)
+		 (string :tag "Use string" :value "")))
 
 (defcustom register-preview-delay 1
   "If non-nil, time to wait in seconds before popping up register preview window.

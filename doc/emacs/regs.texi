@@ -146,8 +146,7 @@ register.  For example, to get double newlines as text separator
 during the collection process, you can use the following setting.
 
 @example
-(setq register-separator ?+)
-(set-register register-separator "\n\n")
+(setopt register-separator "\n\n")
 @end example
 
 @kindex C-x r i
