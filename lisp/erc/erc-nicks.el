@@ -173,6 +173,10 @@ adding extra characters or padding, for example, with something
 like \"@%-012n\"."
   :type 'string)
 
+(defcustom erc-nicks-track-faces t
+  "Show nick faces in the `track' module's portion of the mode line."
+  :type 'boolean)
+
 (defvar erc-nicks--max-skip-search 3 ; make this an option?
   "Max number of faces to visit when testing `erc-nicks-skip-faces'.")
 
@@ -518,6 +522,8 @@ Abandon search after examining LIMIT faces."
                                 'font-lock-face))
        (nick (erc-server-user-nickname (erc-button--nick-user nick-object)))
        (out (erc-nicks--highlight nick face)))
+    (when erc-nicks-track-faces
+      (erc-nicks--track-nick-face-as-normal out))
     (setf (erc-button--nick-nickname-face nick-object) out))
   nick-object)
 
@@ -561,6 +567,9 @@ Abandon search after examining LIMIT faces."
        erc-nicks--face-table (make-hash-table :test #'equal)))
    (setf (alist-get "Edit face" erc-button--nick-popup-alist nil nil #'equal)
          #'erc-nicks-customize-face)
+   (unless erc-nicks-track-faces
+     (erc-nicks--setup-track-integration)
+     (add-hook 'erc-track-mode #'erc-nicks--setup-track-integration 50 t))
    (advice-add 'widget-create-child-and-convert :filter-args
                #'erc-nicks--redirect-face-widget-link))
   ((kill-local-variable 'erc-nicks--face-table)
@@ -572,6 +581,8 @@ Abandon search after examining LIMIT faces."
    (kill-local-variable 'erc-nicks--downcased-skip-nicks)
    (when (fboundp 'erc-button--phantom-users-mode)
      (erc-button--phantom-users-mode -1))
+   (remove-function (local 'erc-track--face-reject-function)
+                    #'erc-nicks--reject-uninterned-faces)
    (remove-function (local 'erc-button--modify-nick-function)
                     #'erc-nicks--highlight-button)
    (setf (alist-get "Edit face"
@@ -692,6 +703,28 @@ Expect PREFIX to be something like \"ansi-color-\" or \"font-lock-\"."
       (when-let (((string-prefix-p prefix (symbol-name face)))
                  (color (face-foreground face)))
         (push color out)))))
+
+(defun erc-nicks--reject-uninterned-faces (candidate)
+  "Remove own faces from CANDIDATE if it's a combination of faces."
+  (while-let ((next (car-safe candidate))
+              ((facep next))
+              ((not (intern-soft next))))
+    (setq candidate (cdr candidate)))
+  (if (and (consp candidate) (not (cdr candidate))) (car candidate) candidate))
+
+(defun erc-nicks--setup-track-integration ()
+  "Restore traditional \"alternating normal\" face functionality to mode-line."
+  (cl-assert (not erc-nicks-track-faces))
+  (when (bound-and-true-p erc-track-mode)
+    (add-function :override (local 'erc-track--face-reject-function)
+                  #'erc-nicks--reject-uninterned-faces)))
+
+(defun erc-nicks--track-nick-face-as-normal (face)
+  "Add FACE to local hash table maintained by `track' module."
+  (when (bound-and-true-p erc-track--normal-faces)
+    (puthash `(,@(ensure-list face) erc-default-face) t
+             erc-track--normal-faces)
+    (puthash face t erc-track--normal-faces)))
 
 (provide 'erc-nicks)
 

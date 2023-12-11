@@ -535,9 +535,9 @@ REGEXP is the regular expression which matched for this button."
           (move-marker pos (point))))))
   (if nick-p
       (when erc-button-nickname-face
-        (erc-button-add-face from to erc-button-nickname-face))
+        (erc--merge-prop from to 'font-lock-face erc-button-nickname-face))
     (when erc-button-face
-      (erc-button-add-face from to erc-button-face)))
+      (erc--merge-prop from to 'font-lock-face erc-button-face)))
   (add-text-properties
    from to
    (nconc (and erc-button-mouse-face
