@@ -3329,7 +3329,8 @@ specbind (Lisp_Object argsym, Lisp_Object value)
     }
 
 #ifdef HAVE_GCC_TLS
-  if (! NILP (current_thread->obarray))
+  if (! NILP (current_thread->obarray)
+      && XSYMBOL (symbol)->u.s.declared_special)
     {
       Lisp_Object name = SYMBOL_NAME (symbol);
       eassert (! main_thread_p (current_thread));
