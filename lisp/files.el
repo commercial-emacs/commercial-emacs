@@ -3467,7 +3467,7 @@ we don't actually set it to the same mode the buffer already has."
     (and (not done)
 	 (setq mode (hack-local-variables t (not try-locals)))
 	 (not (memq mode modes))	; already tried and failed
-	 (if (not (functionp mode))
+	 (if (not (functionp (alist-get mode major-mode-remap-alist mode)))
 	     (message "Ignoring unknown mode `%s'" mode)
 	   (setq done t)
 	   (set-auto-mode-0 mode keep-mode-if-same)))
@@ -4206,7 +4206,9 @@ major-mode."
 	        (forward-line 1)))))))
     (if (eq handle-mode t)
         ;; Return the final mode: setting that's defined.
-        (car (seq-filter #'fboundp result))
+        (seq-find (lambda (mode)
+                    (fboundp (alist-get mode major-mode-remap-alist mode)))
+                  result)
       result)))
 
 (defun hack-local-variables-apply ()
