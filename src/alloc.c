@@ -113,7 +113,7 @@ INTERVAL (*static_interval_allocator) (void);
 
 #ifdef HAVE_GCC_TLS
 #include <semaphore.h>
-sem_t sem_main_halted, sem_main_resumed, sem_nonmain_halted, sem_nonmain_resumed;
+static sem_t sem_main_halted, sem_main_resumed, sem_nonmain_halted, sem_nonmain_resumed;
 #endif
 Lisp_Object Vmemory_full;
 PER_THREAD EMACS_INT bytes_since_gc;
@@ -4584,25 +4584,6 @@ q_garbage_collect (void)
     || bytes_since_gc >= bytes_between_gc;
 }
 
-#ifdef HAVE_GCC_TLS
-static inline int
-sem_wait_ (sem_t *sem)
-{
-  if (current_thread->cooperative)
-    {
-      /* GIL requires manual yield.  */
-      for (;;) {
-	int val;
-	if (sem_getvalue (sem, &val) == 0 && val)
-	  return sem_init (sem, 0, --val);
-	Fthread_yield ();
-      }
-    }
-  else
-    return sem_wait (sem);
-}
-#endif /* HAVE_GCC_TLS */
-
 void
 maybe_garbage_collect (void)
 {
@@ -4630,12 +4611,12 @@ maybe_garbage_collect (void)
 
 	  if (nonmain_halted == n_running_threads () - 1) // -1 for main
 	    {
-	      sem_wait_ (&sem_main_halted);
+	      sem_wait_ (&sem_main_halted, current_thread);
 	      garbage_collect ();
 	      if (nonmain_halted)
 		{
 		  sem_init (&sem_nonmain_resumed, 0, nonmain_halted);
-		  sem_wait_ (&sem_main_resumed);
+		  sem_wait_ (&sem_main_resumed, current_thread);
 		}
 	      restore_signal_mask (&oldset);
 	    }
@@ -4658,10 +4639,10 @@ maybe_garbage_collect (void)
 	    return; /* til next time */
 
 	  // wait until main gc's
-	  sem_wait_ (&sem_nonmain_resumed);
+	  sem_wait_ (&sem_nonmain_resumed, current_thread);
 
 	  // one step closer to main's release
-	  sem_wait_ (&sem_nonmain_halted);
+	  sem_wait_ (&sem_nonmain_halted, current_thread);
 
 	  if (sem_getvalue (&sem_nonmain_halted, &nonmain_halted) != 0)
 	    sem_post (&sem_main_resumed); /* abort abort abort */
@@ -5567,7 +5548,7 @@ gc_sweep (void)
 /* Come home.  */
 
 void
-update_allocations_for_thread_death (struct thread_state *thr)
+reap_thread_allocations (struct thread_state *thr)
 {
   mem_merge_into (&main_thread->m_mem_root, thr->m_mem_root);
   mem_delete_root (&thr->m_mem_root);

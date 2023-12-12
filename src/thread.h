@@ -19,6 +19,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifndef THREAD_H
 #define THREAD_H
 
+#include <semaphore.h>
 #include "regex-emacs.h"
 
 #ifdef WINDOWSNT
@@ -326,11 +327,15 @@ int thread_select  (select_func *func, int max_fds, fd_set *rfds,
 		    fd_set *wfds, fd_set *efds, struct timespec *timeout,
 		    sigset_t *sigmask);
 
+int sem_wait_ (sem_t *sem, struct thread_state *thr);
+
 void release_global_lock (void);
 void acquire_global_lock (struct thread_state *);
 #ifdef HAVE_GCC_TLS
-extern void update_allocations_for_thread_death (struct thread_state *);
+void reap_threads (void);
+extern void reap_thread_allocations (struct thread_state *);
 #endif
+
 
 INLINE_HEADER_END
 

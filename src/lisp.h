@@ -3349,6 +3349,9 @@ extern void process_quit (void);
 INLINE void
 maybe_quit (void)
 {
+#ifdef HAVE_GCC_TLS
+  reap_threads ();
+#endif
   if (QUITP)
     process_quit ();
   else if (pending_signals)

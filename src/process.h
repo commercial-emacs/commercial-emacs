@@ -301,7 +301,7 @@ extern Lisp_Object network_interface_info (Lisp_Object);
 
 extern Lisp_Object remove_slash_colon (Lisp_Object);
 
-extern void update_processes_for_thread_death (const struct thread_state *);
+extern void reap_thread_processes (const struct thread_state *);
 extern void dissociate_controlling_tty (void);
 
 extern int open_channel_for_module (Lisp_Object);

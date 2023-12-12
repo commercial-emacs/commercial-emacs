@@ -40,6 +40,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "nsterm.h"
 #endif
 
+#ifdef HAVE_GCC_TLS
+static sem_t sem_reapees, sem_reap_begin, sem_reap_end;
+#endif
+
 union aligned_thread_state
 {
   struct thread_state s;
@@ -636,6 +640,55 @@ record_thread_error (Lisp_Object error_form)
   return error_form;
 }
 
+int
+sem_wait_ (sem_t *sem, struct thread_state *thr)
+{
+  if (thr->cooperative)
+    {
+      /* GIL requires manual yield.  */
+      for (;;) {
+	int val;
+	if (sem_getvalue (sem, &val) == 0 && val)
+	  return sem_init (sem, 0, --val);
+	Fthread_yield ();
+      }
+    }
+  else
+    return sem_wait (sem);
+}
+
+#ifdef HAVE_GCC_TLS
+void
+reap_threads (void)
+{
+  if (main_thread_p (current_thread))
+    {
+      int reapees;
+      while (0 == sem_getvalue (&sem_reapees, &reapees) && reapees)
+	{
+	  sem_post (&sem_reap_begin);
+	  sem_wait_ (&sem_reap_end, current_thread);
+	}
+    }
+}
+#endif
+
+static void
+await_reap (struct thread_state *thr)
+{
+  eassert (! main_thread_p (thr));
+#ifdef HAVE_GCC_TLS
+  sem_post (&sem_reapees);
+  sem_wait_ (&sem_reap_begin, thr);
+  sem_wait_ (&sem_reapees, thr);
+#endif
+  reap_thread_processes (thr);
+#ifdef HAVE_GCC_TLS
+  reap_thread_allocations (thr);
+  sem_post (&sem_reap_end);
+#endif
+}
+
 static void *
 run_thread (void *state)
 {
@@ -671,13 +724,8 @@ run_thread (void *state)
   handlerlist->next = handlerlist->nextfree = NULL;
 
   internal_condition_case (invoke_thread, Qt, record_thread_error);
-  update_processes_for_thread_death (self);
 
-#ifdef HAVE_GCC_TLS
-  /* Under preemptive, this needs to be queued until main is ready.  */
-  update_allocations_for_thread_death (self);
-#endif
-
+  xfree (self->thread_name);
   xfree (self->m_specpdl - 1); /* 1- for unreachable dummy entry.  */
   self->m_specpdl = NULL;
   self->m_specpdl_ptr = NULL;
@@ -690,15 +738,13 @@ run_thread (void *state)
       h = next;
     }
 
-  xfree (self->thread_name);
   sys_cond_broadcast (&self->thread_condvar);
 
 #ifdef HAVE_NS
   ns_release_autorelease_pool (pool);
 #endif
 
-  /* Unlink SELF from all_threads.  Avoid doing this before
-     sys_cond_broadcast() lest GC.  */
+  /* Unlink SELF from all_threads.  */
   for (struct thread_state **thr = &all_threads;
        *thr != NULL;
        thr = &(*thr)->next_thread)
@@ -709,6 +755,8 @@ run_thread (void *state)
 	  break;
 	}
     }
+
+  await_reap (self);
 
 #ifdef HAVE_GCC_TLS
   if (self->cooperative)
