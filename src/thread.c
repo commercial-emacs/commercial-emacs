@@ -95,19 +95,19 @@ clear_thread (void *arg)
 }
 
 static void
-restore_thread (struct thread_state *self)
+restore_thread (struct thread_state *thr)
 {
 #ifdef HAVE_GCC_TLS
-  eassume (current_thread == self);
-  if (self->cooperative)
+  eassume (current_thread == thr);
+  if (thr->cooperative)
 #endif
     {
 #ifdef HAVE_GCC_TLS
       struct thread_state *previous_thread = prevailing_thread;
-      prevailing_thread = self;
+      prevailing_thread = thr;
 #else
       struct thread_state *previous_thread = current_thread;
-      current_thread = self;
+      current_thread = thr;
 #endif
       if (previous_thread != current_thread)
 	{
@@ -125,14 +125,13 @@ restore_thread (struct thread_state *self)
 	}
     }
 
-  if (! NILP (current_thread->error_symbol) && handlerlist)
+  if (! NILP (thr->error_symbol)
+      && thr->m_handlerlist)
     {
-      Lisp_Object sym = current_thread->error_symbol,
-	data = current_thread->error_data;
-
-      current_thread->error_symbol = Qnil;
-      current_thread->error_data = Qnil;
-
+      Lisp_Object sym = thr->error_symbol,
+	data = thr->error_data;
+      thr->error_symbol = Qnil;
+      thr->error_data = Qnil;
       Fsignal (sym, data);
     }
 }
@@ -161,9 +160,6 @@ lisp_mutex_restore_lock (lisp_mutex_t *mutex, struct thread_state *locker,
       /* Tromey ignored locker->error_symbol, and so shall we. */
       mutex->owner = locker;
       mutex->count = restore_count;
-      /* must be after setting owner lest Fsignal() in
-	 restore_thread() derails `with-mutex' (as in
-	 threads-test-condvar-wait).  */
       restore_thread (locker);
     }
   return mutex->owner == locker;
@@ -758,7 +754,6 @@ run_thread (void *state)
 	}
     }
   sem_post (&sem_all_threads);
-
   await_reap (self);
 
 #ifdef HAVE_GCC_TLS
