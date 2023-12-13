@@ -42,7 +42,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifdef HAVE_GCC_TLS
 static sem_t sem_reapees, sem_reap_begin, sem_reap_end;
-static sem_t sem_all_threads;
 #endif
 
 union aligned_thread_state
@@ -742,7 +741,6 @@ run_thread (void *state)
 #endif
 
   /* Unlink SELF from all_threads.  */
-  sem_wait_ (&sem_all_threads, self);
   for (struct thread_state **thr = &all_threads;
        *thr != NULL;
        thr = &(*thr)->next_thread)
@@ -753,7 +751,7 @@ run_thread (void *state)
 	  break;
 	}
     }
-  sem_post (&sem_all_threads);
+
   await_reap (self);
 
 #ifdef HAVE_GCC_TLS
@@ -826,7 +824,6 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   init_bc_thread (&new_thread->bc);
   sys_cond_init (&new_thread->thread_condvar);
 
-  sem_wait_ (&sem_all_threads, new_thread);
   new_thread->next_thread = all_threads;
   all_threads = new_thread;
 
@@ -836,10 +833,8 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   if (! sys_thread_create (&thr, run_thread, new_thread))
     {
       all_threads = all_threads->next_thread; /* restore to original.  */
-      sem_post (&sem_all_threads);
       error ("Could not start a new thread");
     }
-  sem_post (&sem_all_threads);
 
   XSETTHREAD (result, new_thread);
   return result;
@@ -1041,7 +1036,6 @@ init_threads (void)
   main_state.s.thread_id = sys_thread_self ();
   main_state.s.cooperative = true;
   init_bc_thread (&main_state.s.bc);
-  sem_post (&sem_all_threads);
 }
 
 void
