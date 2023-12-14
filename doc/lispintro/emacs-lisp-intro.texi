@@ -13245,7 +13245,7 @@ The last expression when there is no fill prefix is
 @smallexample
 @group
 (if (< (point) (point-max))
-    (goto-char start))))
+    (goto-char start))
 @end group
 @end smallexample
 
