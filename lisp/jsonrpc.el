@@ -4,7 +4,7 @@
 
 ;; Author: João Távora <joaotavora@gmail.com>
 ;; Keywords: processes, languages, extensions
-;; Version: 1.0.19
+;; Version: 1.0.18
 ;; Package-Requires: ((emacs "25.2"))
 
 ;; This is a GNU ELPA :core package.  Avoid functionality that is not
@@ -50,7 +50,6 @@
 (defclass jsonrpc-connection ()
   ((name
     :accessor jsonrpc-name
-    :initform "anonymous"
     :initarg :name
     :documentation "A name for the connection")
    (-request-dispatcher
@@ -76,7 +75,6 @@
     :accessor jsonrpc--events-buffer
     :documentation "A buffer pretty-printing the JSONRPC events")
    (-events-buffer-scrollback-size
-    :initform nil
     :initarg :events-buffer-scrollback-size
     :accessor jsonrpc--events-buffer-scrollback-size
     :documentation "Max size of events buffer.  0 disables, nil means infinite.")
@@ -481,7 +479,7 @@ With optional CLEANUP, kill any associated buffers."
   "Encode OBJECT into a JSON string.")
 
 (cl-defun jsonrpc--reply
-    (connection id method &key (result nil result-supplied-p) (error nil error-supplied-p))
+    (connection id &key (result nil result-supplied-p) (error nil error-supplied-p))
   "Reply to CONNECTION's request ID with RESULT or ERROR."
   (apply #'jsonrpc-connection-send connection
          `( :id ,id
@@ -675,19 +673,24 @@ With optional CLEANUP, kill any associated buffers."
                      (apply #'format format args)
                      :warning)))
 
-(defun jsonrpc--log-event (connection message &optional origin subtype)
+(defun jsonrpc--log-event (connection message &optional type)
   "Log a JSONRPC-related event.
 CONNECTION is the current connection.  MESSAGE is a JSON-like
-plist.  ORIGIN is a symbol saying where event originated.
-SUBTYPE tells more about the event."
+plist.  TYPE is a symbol saying if this is a client or server
+originated."
   (let ((max (jsonrpc--events-buffer-scrollback-size connection)))
     (when (or (null max) (cl-plusp max))
       (with-current-buffer (jsonrpc-events-buffer connection)
-        (cl-destructuring-bind (&key _method id error &allow-other-keys) message
+        (cl-destructuring-bind (&key method id error &allow-other-keys) message
           (let* ((inhibit-read-only t)
+                 (subtype (cond ((and method id)       'request)
+                                (method                'notification)
+                                (id                    'reply)
+                                (t                     'message)))
                  (type
-                  (concat (format "%s" (or origin 'internal))
-                          (if origin (format "-%s" (or subtype 'message))))))
+                  (concat (format "%s" (or type 'internal))
+                          (if type
+                              (format "-%s" subtype)))))
             (goto-char (point-max))
             (prog1
                 (let ((msg (format "[%s]%s%s %s:\n%s"
