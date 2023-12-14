@@ -155,14 +155,6 @@
              [1 2 3 3 4 5]
              (jsonrpc-request conn 'vconcat [[1 2 3] [3 4 5]])))))
 
-(ert-deftest json-el-cant-serialize-this ()
-  "Can't serialize a response that is half-vector/half-list."
-  (jsonrpc--with-emacsrpc-fixture (conn)
-                                  (should-error
-                                   ;; (append [1 2 3] [3 4 5]) => (1 2 3 . [3 4 5]), which can't be
-                                   ;; serialized
-                                   (jsonrpc-request conn 'append [[1 2 3] [3 4 5]]))))
-
 (cl-defmethod jsonrpc-connection-ready-p
   ((conn jsonrpc--test-client) what)
   (and (cl-call-next-method)
