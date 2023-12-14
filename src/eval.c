@@ -383,8 +383,8 @@ usage: (if COND THEN ELSE...)  */)
   cond = eval_sub (XCAR (args));
 
   if (!NILP (cond))
-    return eval_sub (Fcar (XCDR (args)));
-  return Fprogn (Fcdr (XCDR (args)));
+    return eval_sub (CAR (XCDR (args)));
+  return Fprogn (CDR (XCDR (args)));
 }
 
 DEFUN ("cond", Fcond, Scond, 0, UNEVALLED, 0,
@@ -404,7 +404,7 @@ usage: (cond CLAUSES...)  */)
   while (CONSP (args))
     {
       Lisp_Object clause = XCAR (args);
-      val = eval_sub (Fcar (clause));
+      val = eval_sub (CAR (clause));
       if (!NILP (val))
 	{
 	  if (!NILP (XCDR (clause)))
@@ -536,7 +536,7 @@ usage: (function ARG)  */)
 	  && (EQ (QCdocumentation, XCAR (tmp))))
 	{ /* Handle the special (:documentation <form>) to build the docstring
 	     dynamically.  */
-	  Lisp_Object docstring = eval_sub (Fcar (XCDR (tmp)));
+	  Lisp_Object docstring = eval_sub (CAR (XCDR (tmp)));
 	  if (SYMBOLP (docstring) && !NILP (docstring))
 	    /* Hack for OClosures: Allow the docstring to be a symbol
              * (the OClosure's type).  */
@@ -929,10 +929,10 @@ usage: (let* VARLIST BODY...)  */)
 	}
       else
 	{
-	  var = Fcar (elt);
-	  if (! NILP (Fcdr (XCDR (elt))))
+	  var = CAR (elt);
+	  if (! NILP (CDR (XCDR (elt))))
 	    signal_error ("`let' bindings can have only one value-form", elt);
-	  val = eval_sub (Fcar (XCDR (elt)));
+	  val = eval_sub (CAR (XCDR (elt)));
 	}
 
       if (! NILP (lexenv)
@@ -970,64 +970,51 @@ All the VALUEFORMs are evalled before any symbols are bound.
 usage: (let VARLIST BODY...)  */)
   (Lisp_Object args)
 {
-  Lisp_Object *temps, tem, lexenv;
-  Lisp_Object elt;
   specpdl_ref count = SPECPDL_INDEX ();
-  ptrdiff_t argnum;
-  USE_SAFE_ALLOCA;
+  Lisp_Object tail = XCAR (args), post_eval = Qnil;
 
-  Lisp_Object varlist = XCAR (args);
-
-  /* Make space to hold the values to give the bound variables.  */
-  EMACS_INT varlist_len = list_length (varlist);
-  SAFE_ALLOCA_LISP (temps, varlist_len);
-  ptrdiff_t nvars = varlist_len;
-
-  /* Compute the values and store them in `temps'.  */
-
-  for (argnum = 0; argnum < nvars && CONSP (varlist); argnum++)
+  CHECK_LIST (tail);
+  FOR_EACH_TAIL (tail) /* first pass makes Vinternal_interpreter_environment */
     {
-      maybe_quit ();
-      elt = XCAR (varlist);
-      varlist = XCDR (varlist);
-      if (SYMBOLP (elt))
-	temps[argnum] = Qnil;
-      else if (! NILP (Fcdr (Fcdr (elt))))
-	signal_error ("`let' bindings can have only one value-form", elt);
+      Lisp_Object var, val, bind = XCAR (tail);
+      if (SYMBOLP (bind))
+	{
+	  var = bind;
+	  val = Qnil;
+	}
+      else if (! NILP (CDR (CDR (bind))))
+	signal_error ("`let' bindings can have only one value-form", bind);
       else
-	temps[argnum] = eval_sub (Fcar (Fcdr (elt)));
+	{
+	  var = CAR (bind);
+	  val = eval_sub (CAR (CDR (bind)));
+	}
+      post_eval = Fcons (Fcons (var, val), post_eval);
     }
-  nvars = argnum;
 
-  lexenv = Vinternal_interpreter_environment;
-
-  varlist = XCAR (args);
-  for (argnum = 0; argnum < nvars && CONSP (varlist); argnum++)
+  Lisp_Object lexenv = Vinternal_interpreter_environment;
+  post_eval = Fnreverse (post_eval);
+  FOR_EACH_TAIL (post_eval) /* second pass */
     {
-      Lisp_Object var;
-
-      elt = XCAR (varlist);
-      varlist = XCDR (varlist);
-      var = SYMBOLP (elt) ? elt : Fcar (elt);
-      tem = temps[argnum];
-
+      Lisp_Object bind = XCAR (post_eval),
+	var = XCAR (bind),
+	val = XCDR (bind);
       if (! NILP (lexenv)
 	  && SYMBOLP (var)
 	  && ! XSYMBOL (var)->u.s.declared_special
 	  && NILP (Fmemq (var, Vinternal_interpreter_environment)))
-	/* Lexically bind VAR .  */
-	lexenv = Fcons (Fcons (var, tem), lexenv);
+	/* Lexically bind VAR.  */
+	lexenv = Fcons (Fcons (var, val), lexenv);
       else
 	/* Dynamically bind VAR.  */
-	specbind (var, tem);
+	specbind (var, val);
     }
 
   if (! EQ (lexenv, Vinternal_interpreter_environment))
     /* Instantiate a new lexical environment.  */
     specbind (Qinternal_interpreter_environment, lexenv);
 
-  elt = Fprogn (XCDR (args));
-  return SAFE_FREE_UNBIND_TO (count, elt);
+  return unbind_to (count, Fprogn (XCDR (args)));
 }
 
 DEFUN ("while", Fwhile, Swhile, 1, UNEVALLED, 0,
@@ -1662,7 +1649,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
   Lisp_Object conditions;
   Lisp_Object string;
   Lisp_Object real_error_symbol
-    = (NILP (error_symbol) ? Fcar (data) : error_symbol);
+    = (NILP (error_symbol) ? CAR (data) : error_symbol);
   Lisp_Object clause = Qnil;
   struct handler *h;
 
@@ -2053,7 +2040,7 @@ then strings and vectors are not accepted.  */)
       Lisp_Object funcar = XCAR (fun);
       if (EQ (funcar, Qautoload))
         {
-          if (!NILP (Fcar (Fcdr (Fcdr (XCDR (fun))))))
+          if (!NILP (CAR (CDR (CDR (XCDR (fun))))))
             return Qt;
         }
       else
@@ -2150,7 +2137,7 @@ un_autoload (Lisp_Object oldqueue)
       if (CONSP (first) && EQ (XCAR (first), make_fixnum (0)))
 	Vfeatures = XCDR (first);
       else
-	Ffset (first, Fcar (Fcdr (Fget (first, Qfunction_history))));
+	Ffset (first, CAR (CDR (Fget (first, Qfunction_history))));
       queue = XCDR (queue);
     }
 }
@@ -2219,7 +2206,7 @@ it defines a macro.  */)
      so don't signal an error if autoloading fails.  */
   Lisp_Object ignore_errors
     = (EQ (kind, Qt) || EQ (kind, Qmacro)) ? Qnil : macro_only;
-  load_with_autoload_queue (Fcar (Fcdr (fundef)), ignore_errors, Qt, Qnil, Qt);
+  load_with_autoload_queue (CAR (CDR (fundef)), ignore_errors, Qt, Qnil, Qt);
 
   if (NILP (funname) || !NILP (ignore_errors))
     return Qnil;
@@ -2229,7 +2216,7 @@ it defines a macro.  */)
 
       if (!NILP (Fequal (fun, fundef)))
 	error ("Autoloading file %s failed to define function %s",
-	       SDATA (Fcar (Fcar (Vload_history))),
+	       SDATA (CAR (CAR (Vload_history))),
 	       SDATA (SYMBOL_NAME (funname)));
       else
 	return fun;
@@ -2376,8 +2363,8 @@ eval_sub (Lisp_Object form)
 
 	  for (i = 0; i < maxargs; i++)
 	    {
-	      argvals[i] = eval_sub (Fcar (args_left));
-	      args_left = Fcdr (args_left);
+	      argvals[i] = eval_sub (CAR (args_left));
+	      args_left = CDR (args_left);
 	    }
 
 	  set_backtrace_args (specpdl_ref_to_ptr (count), argvals, numargs);
@@ -2472,7 +2459,7 @@ eval_sub (Lisp_Object form)
 	  if (!EQ (dynvars, Vmacroexp__dynvars))
 	    specbind (Qmacroexp__dynvars, dynvars);
 
-	  exp = apply1 (Fcdr (fun), original_args);
+	  exp = apply1 (CDR (fun), original_args);
 	  exp = unbind_to (count1, exp);
 	  val = eval_sub (exp);
 	}
@@ -2988,7 +2975,7 @@ apply_lambda (Lisp_Object fun, Lisp_Object args, specpdl_ref count)
 
   for (ptrdiff_t i = 0; i < numargs; i++)
     {
-      tem = Fcar (args_left), args_left = Fcdr (args_left);
+      tem = CAR (args_left), args_left = CDR (args_left);
       tem = eval_sub (tem);
       arg_vector[i] = tem;
     }

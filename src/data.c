@@ -117,7 +117,9 @@ clone_lispfwd (const lispfwd valpp)
       case Lisp_Fwd_Obj:
 	((struct Lisp_Objfwd *) result.fwdptr)->objvar
 	  = xmalloc (sizeof *XOBJFWD (valpp)->objvar);
-	*XOBJFWD (result)->objvar = *XOBJFWD (valpp)->objvar;
+	*XOBJFWD (result)->objvar = CONSP (*XOBJFWD (valpp)->objvar)
+	  ? Fcopy_sequence (*XOBJFWD (valpp)->objvar)
+	  : *XOBJFWD (valpp)->objvar;
 	break;
       default:
 	break;
