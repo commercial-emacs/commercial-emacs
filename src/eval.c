@@ -735,7 +735,7 @@ This is like `defvar' and `defconst' but without affecting the variable's
 value.  */)
   (Lisp_Object symbol, Lisp_Object doc)
 {
-  if ( !XSYMBOL (symbol)->u.s.declared_special
+  if (! XSYMBOL (symbol)->u.s.declared_special
       && lexbound_p (symbol))
     /* This test tries to catch the situation where we do
        (let ((<foo-var> ...)) ...(<foo-function> ...)....)
@@ -969,9 +969,9 @@ eval_let (Lisp_Object args, bool nested_envs)
     }
   CHECK_LIST_END (tail, XCAR (args));
 
-  /* For parallel let (without the star), the resultant environment
-     must incorporate any side effects from evaluating the bindings.
-     Thus, the two passes.  */
+  /* For parallel let (sans star), the resultant environment must
+     incorporate any side effects from evaluating the bindings.  Thus,
+     the two passes.  */
   Lisp_Object prevailing_env = Vinternal_interpreter_environment;
   post_eval = Fnreverse (post_eval);
   FOR_EACH_TAIL (post_eval) /* second pass */
@@ -3324,7 +3324,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       XSYMBOL (symbol)->u.s.plist = xsymbol->u.s.plist;
       XSYMBOL (symbol)->u.s.buffer_local_only = xsymbol->u.s.buffer_local_only;
       XSYMBOL (symbol)->u.s.buffer_local_default = xsymbol->u.s.buffer_local_default;
-      XSYMBOL (symbol)->u.s.c_variable = clone_lispfwd (xsymbol->u.s.c_variable);
+      XSYMBOL (symbol)->u.s.c_variable = xsymbol->u.s.c_variable;
       XSYMBOL (symbol)->u.s.buffer_local_buffer = xsymbol->u.s.buffer_local_buffer;
       xsymbol = XSYMBOL (symbol);
     }

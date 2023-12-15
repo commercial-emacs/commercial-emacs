@@ -471,8 +471,6 @@ extern AVOID wrong_type_argument (Lisp_Object, Lisp_Object);
 extern Lisp_Object default_value (Lisp_Object symbol);
 extern void defalias (Lisp_Object symbol, Lisp_Object definition);
 extern char *fixnum_to_string (EMACS_INT number, char *buffer, char *end);
-extern lispfwd clone_lispfwd (const lispfwd valpp);
-extern void free_lispfwd (lispfwd valpp);
 
 /* Defined in emacs.c.  */
 extern bool initialized;

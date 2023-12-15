@@ -97,56 +97,6 @@ wrong_range (Lisp_Object min, Lisp_Object max, Lisp_Object wrong)
 	    wrong);
 }
 
-lispfwd
-clone_lispfwd (const lispfwd valpp)
-{
-  lispfwd result = valpp;
-  if (result.fwdptr)
-    switch (XFWDTYPE (valpp))
-      {
-      case Lisp_Fwd_Int:
-	((struct Lisp_Intfwd *) result.fwdptr)->intvar
-	  = xmalloc (sizeof *XFIXNUMFWD (valpp)->intvar);
-	*XFIXNUMFWD (result)->intvar = *XFIXNUMFWD (valpp)->intvar;
-	break;
-      case Lisp_Fwd_Bool:
-	((struct Lisp_Boolfwd *) result.fwdptr)->boolvar
-	  = xmalloc (sizeof *XBOOLFWD (valpp)->boolvar);
-	*XBOOLFWD (result)->boolvar = *XBOOLFWD (valpp)->boolvar;
-	break;
-      case Lisp_Fwd_Obj:
-	((struct Lisp_Objfwd *) result.fwdptr)->objvar
-	  = xmalloc (sizeof *XOBJFWD (valpp)->objvar);
-	*XOBJFWD (result)->objvar = CONSP (*XOBJFWD (valpp)->objvar)
-	  ? Fcopy_sequence (*XOBJFWD (valpp)->objvar)
-	  : *XOBJFWD (valpp)->objvar;
-	break;
-      default:
-	break;
-      }
-  return result;
-}
-
-void
-free_lispfwd (lispfwd valpp)
-{
-  if (valpp.fwdptr)
-    switch (XFWDTYPE (valpp))
-      {
-      case Lisp_Fwd_Int:
-	xfree (XFIXNUMFWD (valpp)->intvar);
-	break;
-      case Lisp_Fwd_Bool:
-	xfree (XBOOLFWD (valpp)->boolvar);
-	break;
-      case Lisp_Fwd_Obj:
-	xfree (XOBJFWD (valpp)->objvar);
-	break;
-      default:
-	break;
-      }
-}
-
 /* Update C variable at VALPP with NEWVAL.  BUF only applies to
    forwarded slots (i.e., defvar_per_buffer).
 */
