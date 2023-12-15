@@ -675,7 +675,7 @@ default_toplevel_binding (Lisp_Object symbol)
 
 /* Find SYMBOL's prevailing lexical binding.  This applies only to
    bindings created with interpreted code.  Once compiled, lexical
-   variable names are "basically gone anyway."  */
+   variable names are "basically gone anyway." (wtf 1eb168f) */
 static bool
 lexbound_p (Lisp_Object symbol)
 {

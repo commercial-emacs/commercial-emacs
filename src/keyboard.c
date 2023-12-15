@@ -5727,19 +5727,7 @@ make_lispy_event (struct input_event *event)
 		  && eabs (ydiff) < double_click_fuzz;
 		bool q_same_win = EQ (Fcar (start_pos), Fcar (position));
 		bool q_same_pos = EQ (Fcar (Fcdr (start_pos)), Fcar (Fcdr (position)));
-#if 0
-		/* Monnier (4156359) classified as a drag the
-		   sequence: 1. press, 2. drag out and back that
-		   induces scrolling, 3. release.  This seems flimsy
-		   since step 2 requires both scrolling to occur (to
-		   get Q_SAME_POS false) and a very precise mousing
-		   hand (to keep Q_SAME_COORD true).  Bug#66655
-		*/
-		bool q_monnier_drag = ! q_same_pos && q_same_win;
-		if (! q_same_coord || q_monnier_drag)
-#else
 		if (! q_same_coord)
-#endif
 		  {
 		    click_or_drag_modifier = drag_modifier;
 		    button_down_time = 0;
