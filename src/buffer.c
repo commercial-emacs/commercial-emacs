@@ -172,11 +172,6 @@ bset_buffer_file_coding_system (struct buffer *b, Lisp_Object val)
   b->buffer_file_coding_system_ = val;
 }
 static void
-bset_case_fold_search (struct buffer *b, Lisp_Object val)
-{
-  b->case_fold_search_ = val;
-}
-static void
 bset_ctl_arrow (struct buffer *b, Lisp_Object val)
 {
   b->ctl_arrow_ = val;
@@ -4486,7 +4481,6 @@ init_buffer_once (void)
   XSETFASTINT (BVAR (&buffer_slot_map, mode_line_format), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_slot_map, abbrev_mode), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_slot_map, overwrite_mode), idx); ++idx;
-  XSETFASTINT (BVAR (&buffer_slot_map, case_fold_search), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_slot_map, auto_fill_function), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_slot_map, selective_display), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_slot_map, selective_display_ellipses), idx); ++idx;
@@ -4942,10 +4936,6 @@ Format with `format-mode-line' to produce a string value.  */);
   DEFVAR_PER_BUFFER ("abbrev-mode", &BVAR (current_buffer, abbrev_mode), Qnil,
 		     doc: /*  Non-nil if Abbrev mode is enabled.
 Use the command `abbrev-mode' to change this variable.  */);
-
-  DEFVAR_PER_BUFFER ("case-fold-search", &BVAR (current_buffer, case_fold_search),
-		     Qnil,
-		     doc: /* Non-nil if searches and matches should ignore case.  */);
 
   DEFVAR_PER_BUFFER ("fill-column", &BVAR (current_buffer, fill_column),
 		     Qintegerp,
@@ -5662,6 +5652,13 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
   delete_auto_save_files = 1;
 
   defsubr (&Sbuffer_monospace_p);
+
+  DEFVAR_LISP ("case-fold-search", Vcase_fold_search,
+	       doc: /* Non-nil if searches and matches should ignore case.  */);
+  Vcase_fold_search = Qt;
+  DEFSYM (Qcase_fold_search, "case-fold-search");
+  Fmake_variable_buffer_local (Qcase_fold_search);
+
   defsubr (&Sbuffer_live_p);
   defsubr (&Sbuffer_list);
   defsubr (&Sget_buffer);
