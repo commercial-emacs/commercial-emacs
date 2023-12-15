@@ -906,6 +906,84 @@ DEFUN ("internal-make-var-non-special", Fmake_var_non_special,
   return Qnil;
 }
 
+static void
+let_bind (Lisp_Object prevailing_env, Lisp_Object var, Lisp_Object val, bool *q_pushed)
+{
+  bool q_lexical_binding = ! NILP (prevailing_env); /* flukey indicator */
+  if (q_lexical_binding
+      && SYMBOLP (var)
+      && ! XSYMBOL (var)->u.s.declared_special
+      && NILP (Fmemq (var, prevailing_env)))
+    {
+      /* Lexically bind VAR.  */
+      Lisp_Object newenv
+	= Fcons (Fcons (var, val), Vinternal_interpreter_environment);
+      if (*q_pushed)
+	Vinternal_interpreter_environment = newenv;
+      else
+	{
+	  /* Just push the env previous to the first lexical let
+	     binding.  Nested envs produced by subsequent bindings in
+	     a let* would never be reverted to.  */
+	  *q_pushed = true;
+	  specbind (Qinternal_interpreter_environment, newenv);
+	}
+      eassert (EQ (Vinternal_interpreter_environment, newenv));
+    }
+  else
+    {
+      /* Dynamically bind VAR.  */
+      specbind (var, val);
+      /* If lexical binding was off, it should still be off.  */
+      eassert (q_lexical_binding || NILP (Vinternal_interpreter_environment));
+    }
+}
+
+static Lisp_Object
+eval_let (Lisp_Object args, bool nested_envs)
+{
+  specpdl_ref count = SPECPDL_INDEX ();
+  Lisp_Object tail = XCAR (args), post_eval = Qnil;
+  bool q_pushed = false; /* whether specpdl saved the old env */
+
+  CHECK_LIST (tail);
+  FOR_EACH_TAIL (tail)
+    {
+      Lisp_Object var, val, bind = XCAR (tail);
+      if (SYMBOLP (bind))
+	{
+	  var = bind;
+	  val = Qnil;
+	}
+      else
+	{
+	  var = CAR (bind);
+	  if (! NILP (CDR (XCDR (bind))))
+	    signal_error ("`let' bindings can have only one value-form", bind);
+	  val = eval_sub (CAR (XCDR (bind)));
+	}
+      if (nested_envs)
+	let_bind (Vinternal_interpreter_environment, var, val, &q_pushed);
+      else
+	post_eval = Fcons (Fcons (var, val), post_eval);
+    }
+  CHECK_LIST_END (tail, XCAR (args));
+
+  /* For parallel let (without the star), the resultant environment
+     must incorporate any side effects from evaluating the bindings.
+     Thus, the two passes.  */
+  Lisp_Object prevailing_env = Vinternal_interpreter_environment;
+  post_eval = Fnreverse (post_eval);
+  FOR_EACH_TAIL (post_eval) /* second pass */
+    {
+      Lisp_Object bind = XCAR (post_eval),
+	var = XCAR (bind),
+	val = XCDR (bind);
+      eassert (! nested_envs);
+      let_bind (prevailing_env, var, val, &q_pushed);
+    }
+  return unbind_to (count, Fprogn (XCDR (args)));
+}
 
 DEFUN ("let*", FletX, SletX, 1, UNEVALLED, 0,
        doc: /* Bind variables according to VARLIST then eval BODY.
@@ -916,49 +994,7 @@ Each VALUEFORM can refer to the symbols already bound by this VARLIST.
 usage: (let* VARLIST BODY...)  */)
   (Lisp_Object args)
 {
-  Lisp_Object var, val, elt, lexenv = Vinternal_interpreter_environment;
-  specpdl_ref count = SPECPDL_INDEX ();
-  Lisp_Object varlist = XCAR (args);
-  FOR_EACH_TAIL (varlist)
-    {
-      elt = XCAR (varlist);
-      if (SYMBOLP (elt))
-	{
-	  var = elt;
-	  val = Qnil;
-	}
-      else
-	{
-	  var = CAR (elt);
-	  if (! NILP (CDR (XCDR (elt))))
-	    signal_error ("`let' bindings can have only one value-form", elt);
-	  val = eval_sub (CAR (XCDR (elt)));
-	}
-
-      if (! NILP (lexenv)
-	  && SYMBOLP (var)
-	  && ! XSYMBOL (var)->u.s.declared_special
-	  && NILP (Fmemq (var, Vinternal_interpreter_environment)))
-	{
-	  /* Lexically bind VAR.  */
-	  Lisp_Object newenv
-	    = Fcons (Fcons (var, val), Vinternal_interpreter_environment);
-	  if (EQ (Vinternal_interpreter_environment, lexenv))
-	    /* Save the old lexical environment on the specpdl stack,
-	       but only for the first lexical binding, since we'll never
-	       need to revert to one of the intermediate ones.  */
-	    specbind (Qinternal_interpreter_environment, newenv);
-	  else
-	    Vinternal_interpreter_environment = newenv;
-	}
-      else
-	/* Dynamically bind VAR.  */
-	specbind (var, val);
-    }
-  CHECK_LIST_END (varlist, XCAR (args));
-
-  val = Fprogn (XCDR (args));
-  return unbind_to (count, val);
+  return eval_let (args, true);
 }
 
 DEFUN ("let", Flet, Slet, 1, UNEVALLED, 0,
@@ -970,51 +1006,7 @@ All the VALUEFORMs are evalled before any symbols are bound.
 usage: (let VARLIST BODY...)  */)
   (Lisp_Object args)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
-  Lisp_Object tail = XCAR (args), post_eval = Qnil;
-
-  CHECK_LIST (tail);
-  FOR_EACH_TAIL (tail) /* first pass makes Vinternal_interpreter_environment */
-    {
-      Lisp_Object var, val, bind = XCAR (tail);
-      if (SYMBOLP (bind))
-	{
-	  var = bind;
-	  val = Qnil;
-	}
-      else if (! NILP (CDR (CDR (bind))))
-	signal_error ("`let' bindings can have only one value-form", bind);
-      else
-	{
-	  var = CAR (bind);
-	  val = eval_sub (CAR (CDR (bind)));
-	}
-      post_eval = Fcons (Fcons (var, val), post_eval);
-    }
-
-  Lisp_Object lexenv = Vinternal_interpreter_environment;
-  post_eval = Fnreverse (post_eval);
-  FOR_EACH_TAIL (post_eval) /* second pass */
-    {
-      Lisp_Object bind = XCAR (post_eval),
-	var = XCAR (bind),
-	val = XCDR (bind);
-      if (! NILP (lexenv)
-	  && SYMBOLP (var)
-	  && ! XSYMBOL (var)->u.s.declared_special
-	  && NILP (Fmemq (var, Vinternal_interpreter_environment)))
-	/* Lexically bind VAR.  */
-	lexenv = Fcons (Fcons (var, val), lexenv);
-      else
-	/* Dynamically bind VAR.  */
-	specbind (var, val);
-    }
-
-  if (! EQ (lexenv, Vinternal_interpreter_environment))
-    /* Instantiate a new lexical environment.  */
-    specbind (Qinternal_interpreter_environment, lexenv);
-
-  return unbind_to (count, Fprogn (XCDR (args)));
+  return eval_let (args, false);
 }
 
 DEFUN ("while", Fwhile, Swhile, 1, UNEVALLED, 0,
