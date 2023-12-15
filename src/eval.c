@@ -3326,6 +3326,15 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       XSYMBOL (symbol)->u.s.buffer_local_default = xsymbol->u.s.buffer_local_default;
       XSYMBOL (symbol)->u.s.c_variable = xsymbol->u.s.c_variable;
       XSYMBOL (symbol)->u.s.buffer_local_buffer = xsymbol->u.s.buffer_local_buffer;
+
+      /* effing brutal */
+      lispfwd valpp = XSYMBOL (symbol)->u.s.c_variable;
+      if (valpp.fwdptr && XFWDTYPE (valpp) == Lisp_Fwd_Obj)
+	{
+	  struct Lisp_Objfwd *valp = (struct Lisp_Objfwd *) valpp.fwdptr;
+	  if (valp->objvar == &Vinternal_interpreter_environment)
+	    valp->objvar = &current_thread->interpreter_environment;
+	}
       xsymbol = XSYMBOL (symbol);
     }
 #endif
