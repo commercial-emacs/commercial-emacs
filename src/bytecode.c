@@ -940,7 +940,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	CASE (Bcatch):		/* Obsolete since 25.  */
 	  {
 	    Lisp_Object v1 = POP;
-	    TOP = internal_catch (TOP, eval_sub, v1);
+	    TOP = internal_catch (TOP, eval_form, v1);
 	    NEXT;
 	  }
 

@@ -2111,7 +2111,7 @@ readevalloop_eager_expand_eval (Lisp_Object val, Lisp_Object macroexpand)
 	val = readevalloop_eager_expand_eval (XCAR (subforms), macroexpand);
     }
   else
-      val = eval_sub (call2 (macroexpand, val, Qt));
+      val = eval_form (call2 (macroexpand, val, Qt));
   return val;
 }
 
@@ -2296,7 +2296,7 @@ readevalloop (Lisp_Object readcharfun,
       if (! NILP (macroexpand))
         val = readevalloop_eager_expand_eval (val, macroexpand);
       else
-        val = eval_sub (val);
+        val = eval_form (val);
 
       if (printflag)
 	{

@@ -4149,7 +4149,7 @@ extern AVOID signal_error (const char *, Lisp_Object);
 extern AVOID overflow_error (void);
 extern bool FUNCTIONP (Lisp_Object);
 extern Lisp_Object funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *arg_vector);
-extern Lisp_Object eval_sub (Lisp_Object form);
+extern Lisp_Object eval_form (Lisp_Object form);
 extern Lisp_Object apply1 (Lisp_Object, Lisp_Object);
 extern Lisp_Object internal_catch (Lisp_Object, Lisp_Object (*) (Lisp_Object), Lisp_Object);
 extern Lisp_Object internal_lisp_condition_case (Lisp_Object, Lisp_Object, Lisp_Object);

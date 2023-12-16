@@ -341,7 +341,7 @@ usage: (or CONDITIONS...)  */)
     {
       Lisp_Object arg = XCAR (args);
       args = XCDR (args);
-      val = eval_sub (arg);
+      val = eval_form (arg);
       if (!NILP (val))
 	break;
     }
@@ -362,7 +362,7 @@ usage: (and CONDITIONS...)  */)
     {
       Lisp_Object arg = XCAR (args);
       args = XCDR (args);
-      val = eval_sub (arg);
+      val = eval_form (arg);
       if (NILP (val))
 	break;
     }
@@ -380,10 +380,10 @@ usage: (if COND THEN ELSE...)  */)
 {
   Lisp_Object cond;
 
-  cond = eval_sub (XCAR (args));
+  cond = eval_form (XCAR (args));
 
   if (!NILP (cond))
-    return eval_sub (CAR (XCDR (args)));
+    return eval_form (CAR (XCDR (args)));
   return Fprogn (CDR (XCDR (args)));
 }
 
@@ -404,7 +404,7 @@ usage: (cond CLAUSES...)  */)
   while (CONSP (args))
     {
       Lisp_Object clause = XCAR (args);
-      val = eval_sub (CAR (clause));
+      val = eval_form (CAR (clause));
       if (!NILP (val))
 	{
 	  if (!NILP (XCDR (clause)))
@@ -428,7 +428,7 @@ usage: (progn BODY...)  */)
     {
       Lisp_Object form = XCAR (body);
       body = XCDR (body);
-      val = eval_sub (form);
+      val = eval_form (form);
     }
 
   return val;
@@ -449,7 +449,7 @@ whose values are discarded.
 usage: (prog1 FIRST BODY...)  */)
   (Lisp_Object args)
 {
-  Lisp_Object val = eval_sub (XCAR (args));
+  Lisp_Object val = eval_form (XCAR (args));
   prog_ignore (XCDR (args));
   return val;
 }
@@ -466,7 +466,6 @@ usage: (setq [SYM VAL]...)  */)
   (Lisp_Object args)
 {
   Lisp_Object val = args, tail = args;
-
   for (EMACS_INT nargs = 0; CONSP (tail); nargs += 2)
     {
       Lisp_Object sym = XCAR (tail);
@@ -475,18 +474,16 @@ usage: (setq [SYM VAL]...)  */)
 	xsignal2 (Qwrong_number_of_arguments, Qsetq, make_fixnum (nargs + 1));
       Lisp_Object arg = XCAR (tail);
       tail = XCDR (tail);
-      val = eval_sub (arg);
-      /* Like for eval_sub, we do not check declared_special here since
-	 it's been done when let-binding.  */
+      val = eval_form (arg);
+      /* declared_special already checked when let-binding.  */
       Lisp_Object lex_binding = SYMBOLP (sym)
 	? Fassq (sym, Vinternal_interpreter_environment)
 	: Qnil;
       if (! NILP (lex_binding))
-	XSETCDR (lex_binding, val); /* SYM is lexically bound.  */
+	XSETCDR (lex_binding, val); /* SYM lexically bound.  */
       else
-	Fset (sym, val);	/* SYM is dynamically bound.  */
+	Fset (sym, val); /* SYM dynamically bound.  */
     }
-
   return val;
 }
 
@@ -536,7 +533,7 @@ usage: (function ARG)  */)
 	  && (EQ (QCdocumentation, XCAR (tmp))))
 	{ /* Handle the special (:documentation <form>) to build the docstring
 	     dynamically.  */
-	  Lisp_Object docstring = eval_sub (CAR (XCDR (tmp)));
+	  Lisp_Object docstring = eval_form (CAR (XCDR (tmp)));
 	  if (SYMBOLP (docstring) && !NILP (docstring))
 	    /* Hack for OClosures: Allow the docstring to be a symbol
              * (the OClosure's type).  */
@@ -770,7 +767,7 @@ defvar (Lisp_Object sym, Lisp_Object initvalue, Lisp_Object docstring, bool eval
   Finternal__define_uninitialized_variable (sym, docstring);
 
   if (NILP (tem))
-    Fset_default (sym, eval ? eval_sub (initvalue) : initvalue);
+    Fset_default (sym, eval ? eval_form (initvalue) : initvalue);
   else
     { /* Check if there is really a global binding rather than just a let
 	     binding that shadows the global unboundness of the var.  */
@@ -778,7 +775,7 @@ defvar (Lisp_Object sym, Lisp_Object initvalue, Lisp_Object docstring, bool eval
       if (binding && EQ (specpdl_old_value (binding), Qunbound))
 	{
 	  set_specpdl_old_value (binding,
-	                         eval ? eval_sub (initvalue) : initvalue);
+	                         eval ? eval_form (initvalue) : initvalue);
 	}
     }
   return sym;
@@ -876,7 +873,7 @@ usage: (defconst SYMBOL INITVALUE [DOCSTRING])  */)
 	error ("Too many arguments");
       docstring = XCAR (XCDR (XCDR (args)));
     }
-  tem = eval_sub (XCAR (XCDR (args)));
+  tem = eval_form (XCAR (XCDR (args)));
   return Fdefconst_1 (sym, tem, docstring);
 }
 
@@ -960,7 +957,7 @@ eval_let (Lisp_Object args, bool nested_envs)
 	  var = CAR (bind);
 	  if (! NILP (CDR (XCDR (bind))))
 	    signal_error ("`let' bindings can have only one value-form", bind);
-	  val = eval_sub (CAR (XCDR (bind)));
+	  val = eval_form (CAR (XCDR (bind)));
 	}
       if (nested_envs)
 	let_bind (Vinternal_interpreter_environment, var, val, &q_pushed);
@@ -1023,7 +1020,7 @@ usage: (while TEST BODY...)  */)
 
   test = XCAR (args);
   body = XCDR (args);
-  while (!NILP (eval_sub (test)))
+  while (!NILP (eval_form (test)))
     {
       maybe_quit ();
       prog_ignore (body);
@@ -1162,7 +1159,7 @@ If a throw happens, it specifies the value to return from `catch'.
 usage: (catch TAG BODY...)  */)
   (Lisp_Object args)
 {
-  Lisp_Object tag = eval_sub (XCAR (args));
+  Lisp_Object tag = eval_form (XCAR (args));
   return internal_catch (tag, Fprogn, XCDR (args));
 }
 
@@ -1290,7 +1287,7 @@ usage: (unwind-protect BODYFORM UNWINDFORMS...)  */)
   specpdl_ref count = SPECPDL_INDEX ();
 
   record_unwind_protect (prog_ignore, XCDR (args));
-  val = eval_sub (XCAR (args));
+  val = eval_form (XCAR (args));
   return unbind_to (count, val);
 }
 
@@ -1383,7 +1380,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 	}
     }
 
-  result = eval_sub (bodyform);
+  result = eval_form (bodyform);
  done: ;
   handlerlist = oldhandlerlist;
   Lisp_Object clause = NILP (triggered_clause) ? success_clause : triggered_clause;
@@ -2230,8 +2227,8 @@ node `(elisp)Eval' for details.  */)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   specbind (Qinternal_interpreter_environment,
-	    CONSP (lexical) || NILP (lexical) ? lexical : list_of_t);
-  return unbind_to (count, eval_sub (form));
+	    ! NILP (Flistp (lexical)) ? lexical : list_of_t);
+  return unbind_to (count, eval_form (form));
 }
 
 void
@@ -2251,18 +2248,15 @@ grow_specpdl_allocation (void)
   specpdl_ptr = specpdl_ref_to_ptr (count);
 }
 
-/* Eval a sub-expression of the current expression (i.e. in the same
-   lexical scope).  */
+/* Evaluate FORM within prevailing lexical scope.  */
+
 Lisp_Object
-eval_sub (Lisp_Object form)
+eval_form (Lisp_Object form)
 {
   if (SYMBOLP (form))
     {
-      /* Look up its binding in the lexical environment.
-	 We do not pay attention to the declared_special flag here, since we
-	 already did that when let-binding the variable.  */
-      Lisp_Object lex_binding
-	= Fassq (form, Vinternal_interpreter_environment);
+      /* declared_special already checked when let-binding.  */
+      Lisp_Object lex_binding = Fassq (form, Vinternal_interpreter_environment);
       return !NILP (lex_binding) ? XCDR (lex_binding) : Fsymbol_value (form);
     }
 
@@ -2334,7 +2328,7 @@ eval_sub (Lisp_Object form)
 	    {
 	      Lisp_Object arg = XCAR (args_left);
 	      args_left = XCDR (args_left);
-	      vals[argnum++] = eval_sub (arg);
+	      vals[argnum++] = eval_form (arg);
 	    }
 
 	  set_backtrace_args (specpdl_ref_to_ptr (count), vals, argnum);
@@ -2355,7 +2349,7 @@ eval_sub (Lisp_Object form)
 
 	  for (i = 0; i < maxargs; i++)
 	    {
-	      argvals[i] = eval_sub (CAR (args_left));
+	      argvals[i] = eval_form (CAR (args_left));
 	      args_left = CDR (args_left);
 	    }
 
@@ -2453,7 +2447,7 @@ eval_sub (Lisp_Object form)
 
 	  exp = apply1 (CDR (fun), original_args);
 	  exp = unbind_to (count1, exp);
-	  val = eval_sub (exp);
+	  val = eval_form (exp);
 	}
       else if (EQ (funcar, Qlambda)
 	       || EQ (funcar, Qclosure))
@@ -2968,7 +2962,7 @@ apply_lambda (Lisp_Object fun, Lisp_Object args, specpdl_ref count)
   for (ptrdiff_t i = 0; i < numargs; i++)
     {
       tem = CAR (args_left), args_left = CDR (args_left);
-      tem = eval_sub (tem);
+      tem = eval_form (tem);
       arg_vector[i] = tem;
     }
 
@@ -3909,10 +3903,10 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
   backtrace_eval_unwind (distance);
   record_unwind_protect_int (backtrace_eval_rewind, distance);
 
-  /* Use eval_sub rather than Feval since the main motivation behind
+  /* Use eval_form rather than Feval since the main motivation behind
      backtrace-eval is to be able to get/set the value of lexical variables
      from the debugger.  */
-  return unbind_to (count, eval_sub (exp));
+  return unbind_to (count, eval_form (exp));
 }
 
 DEFUN ("backtrace--locals", Fbacktrace__locals, Sbacktrace__locals, 1, 2, NULL,

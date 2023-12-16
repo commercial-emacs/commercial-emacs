@@ -706,7 +706,7 @@ usage: (or CONDITIONS...)  */)
 @group
   while (CONSP (args))
     @{
-      val = eval_sub (XCAR (args));
+      val = eval_form (XCAR (args));
       if (!NILP (val))
         break;
       args = XCDR (args);
