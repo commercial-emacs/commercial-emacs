@@ -479,9 +479,14 @@ MISC, if non-nil will be appended to the collection."
      (unless (stringp associated)
        (setq associated (cadr associated)))
      (let* ((rtn `(:file ,associated))
-            (inode (and (fboundp 'file-attribute-inode-number)
-                        (file-attribute-inode-number
-                         (file-attributes associated)))))
+            (inode (and
+                    ;; Do not store :inode for remote files - it may
+                    ;; be time-consuming on slow connections or even
+                    ;; fail completely when ssh connection is closed.
+                    (not (file-remote-p associated))
+                    (fboundp 'file-attribute-inode-number)
+                    (file-attribute-inode-number
+                     (file-attributes associated)))))
        (when inode (plist-put rtn :inode inode))
        rtn))
     ((or (pred bufferp) `(:buffer ,_))
@@ -499,6 +504,10 @@ MISC, if non-nil will be appended to the collection."
                      (or (buffer-base-buffer associated)
                          associated)))
          (setq inode (when (and file
+                                ;; Do not store :inode for remote files - it may
+                                ;; be time-consuming on slow connections or even
+                                ;; fail completely when ssh connection is closed.
+                                (not (file-remote-p file))
                                 (fboundp 'file-attribute-inode-number))
                        (file-attribute-inode-number
                         (file-attributes file))))
