@@ -3828,7 +3828,8 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		    break;
 		  }
 	      }
-	      /* gets here first time around when type not PLAINVAL.  */
+	      /* gets here under `make-local-variable' on symbol not
+		 earlier let-bound.  */
 	      FALLTHROUGH;
 	    case SPECPDL_LET_BLD:
 	      {
