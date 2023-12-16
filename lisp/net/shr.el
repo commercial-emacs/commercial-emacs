@@ -1141,7 +1141,9 @@ element is the data blob and the second element is the content-type."
         (when image
           ;; The trailing space can confuse shr-insert into not
           ;; putting any space after inline images.
-	  (setq alt (string-trim alt))
+          ;; ALT may be nil when visiting image URLs in eww
+          ;; (bug#67764).
+	  (setq alt (if alt (string-trim alt) "*"))
 	  ;; When inserting big-ish pictures, put them at the
 	  ;; beginning of the line.
           (when (and (> (current-column) 0)
