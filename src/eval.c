@@ -3782,85 +3782,83 @@ or a lambda expression for macro calls.  */)
   return Fnreverse (list);
 }
 
-/* For backtrace-eval and thread switches, we unwind then rewind the
-   last few elements of specpdl.
+/* For `backtrace-eval', we unwind to a specific frame, evaluate a
+   subexpression, then rewind back.  For thread switches, we unwind
+   the from-thread's let-stack, then rewind the to-thread's
+   (previously unwound) let-stack since symbol data are global.
 
    Values to be rewound are stored directly in existing specpdl
-   elements, much like the mark-and-sweep pointer reversal trick.  */
+   elements, much like Schorr-Waite autophagiac graph marking.  */
 
 static void
 specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		       enum specbind_tag kind_or_above)
 {
   eassert (distance >= 0);
-  for (union specbinding *tmp = pdl; distance > 0; --distance)
+  for (union specbinding *frm = pdl + step; distance > 0; --distance, frm += step)
     {
-      tmp += step;
-      if (tmp->kind >= kind_or_above)
+      if (frm->kind >= kind_or_above)
 	{
-	  switch (tmp->kind)
+	  switch (frm->kind)
 	    {
 	    case SPECPDL_UNWIND:
-	      if (tmp->unwind.func == set_buffer_if_live)
+	      if (frm->unwind.func == set_buffer_if_live)
 		{
-		  Lisp_Object oldarg = tmp->unwind.arg;
-		  tmp->unwind.arg = Fcurrent_buffer ();
+		  Lisp_Object oldarg = frm->unwind.arg;
+		  frm->unwind.arg = Fcurrent_buffer ();
 		  set_buffer_if_live (oldarg);
 		}
 	      break;
 	    case SPECPDL_UNWIND_EXCURSION:
 	      {
-		Lisp_Object marker = tmp->unwind_excursion.marker;
-		Lisp_Object window = tmp->unwind_excursion.window;
-		save_excursion_save (tmp);
+		Lisp_Object marker = frm->unwind_excursion.marker;
+		Lisp_Object window = frm->unwind_excursion.window;
+		save_excursion_save (frm);
 		save_excursion_restore (marker, window);
 	      }
 	      break;
 	    case SPECPDL_LET:
 	      {
-		Lisp_Object sym = specpdl_symbol (tmp);
+		Lisp_Object sym = specpdl_symbol (frm);
 		if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
 		  {
-		    Lisp_Object old_value = specpdl_old_value (tmp);
-		    set_specpdl_old_value (tmp, SYMBOL_VAL (XSYMBOL (sym)));
+		    Lisp_Object old_value = specpdl_old_value (frm);
+		    set_specpdl_old_value (frm, SYMBOL_VAL (XSYMBOL (sym)));
 		    SET_SYMBOL_VAL (XSYMBOL (sym), old_value);
 		    break;
 		  }
 	      }
-	      /* gets here first time through when redirect isn't PLAINVAL.  */
+	      /* gets here first time around when type not PLAINVAL.  */
 	      FALLTHROUGH;
 	    case SPECPDL_LET_BLD:
 	      {
-		Lisp_Object sym = specpdl_symbol (tmp);
-		Lisp_Object old_value = specpdl_old_value (tmp);
-		set_specpdl_old_value (tmp, default_value (sym));
+		Lisp_Object sym = specpdl_symbol (frm);
+		Lisp_Object old_value = specpdl_old_value (frm);
+		set_specpdl_old_value (frm, default_value (sym));
 		set_default_internal (sym, old_value, SET_INTERNAL_THREAD_SWITCH);
 	      }
 	      break;
 	    case SPECPDL_LET_BLV:
 	      {
-		Lisp_Object symbol = specpdl_symbol (tmp);
-		Lisp_Object where = specpdl_buffer (tmp);
-		Lisp_Object old_value = specpdl_old_value (tmp);
+		Lisp_Object symbol = specpdl_symbol (frm);
+		Lisp_Object where = specpdl_buffer (frm);
+		Lisp_Object old_value = specpdl_old_value (frm);
 		eassert (BUFFERP (where));
 
-		/* If this was a local binding, reset the value in the appropriate
-		   buffer, but only if that buffer's binding still exists.  */
-		if (!NILP (Flocal_variable_p (symbol, where)))
+		if (! NILP (Flocal_variable_p (symbol, where)))
 		  {
 		    set_specpdl_old_value
-		      (tmp, find_symbol_value (XSYMBOL (symbol), XBUFFER (where)));
+		      (frm, find_symbol_value (XSYMBOL (symbol), XBUFFER (where)));
 		    set_internal (symbol, old_value, where,
 				  SET_INTERNAL_THREAD_SWITCH);
 		  }
 		else
 		  {
-		    /* FIXME: If the var is not local any more, we failed
-		       to swap the old and new values.  As long as the var remains
-		       non-local, this is fine, but if it ever reverts to being
-		       local we may end up using this entry "in the wrong
-		       direction".  */
-		    tmp->kind = SPECPDL_NOP;
+		    /* SYMBOL no longer being local is fine so long as
+		       it stays non-local.  Otherwise, we'll misuse
+		       this entry "in the wrong direction" (wtf
+		       b8460fc). */
+		    frm->kind = SPECPDL_NOP;
 		  }
 	      }
 	      break;
