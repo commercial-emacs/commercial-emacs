@@ -2249,7 +2249,7 @@ grow_specpdl_allocation (void)
 static inline void
 populate_evaluated_args (Lisp_Object args,
 			 Lisp_Object *evaluated_args,
-			 const unsigned char capacity)
+			 const ptrdiff_t capacity)
 {
   for (ptrdiff_t i = 0; i < capacity; ++i)
     evaluated_args[i] = Qnil;
