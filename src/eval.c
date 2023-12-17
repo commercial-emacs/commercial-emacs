@@ -2246,9 +2246,14 @@ grow_specpdl_allocation (void)
   specpdl_ptr = specpdl_ref_to_ptr (count);
 }
 
-static void
-populate_evaluated_args (Lisp_Object args, Lisp_Object *evaluated_args)
+static inline void
+populate_evaluated_args (Lisp_Object args,
+			 Lisp_Object *evaluated_args,
+			 const unsigned char capacity)
 {
+  for (ptrdiff_t i = 0; i < capacity; ++i)
+    evaluated_args[i] = Qnil;
+
   ptrdiff_t argnum = 0;
   Lisp_Object tail = args;
   FOR_EACH_TAIL_SAFE (tail)
@@ -2264,7 +2269,7 @@ populate_evaluated_args (Lisp_Object args, Lisp_Object *evaluated_args)
 Lisp_Object
 eval_form (Lisp_Object form)
 {
-  const unsigned char max_nargs = 8; /* Sucks I know...  */
+  const unsigned char subr_max_nargs = 8; /* Sucks I know...  */
   Lisp_Object result = form;
   if (SYMBOLP (form))
     {
@@ -2284,21 +2289,13 @@ eval_form (Lisp_Object form)
 	}
 
       Lisp_Object original_fun = XCAR (form);
-      Lisp_Object original_args = XCDR (form);
-      CHECK_LIST (original_args);
-      specpdl_ref count = record_in_backtrace (original_fun, &original_args, UNEVALLED);
+      Lisp_Object args = XCDR (form);
+      CHECK_LIST (args);
+      specpdl_ref count = record_in_backtrace (original_fun, &args, UNEVALLED);
       if (debug_on_next_call)
 	do_debug_on_call (Qt, count);
 
       USE_SAFE_ALLOCA;
-      const ptrdiff_t nargs = list_length (original_args);
-      /* Floor of MAX_NARGS as must accommodate up to XSUBR(fun)->max_args.  */
-      const ptrdiff_t capacity = max (nargs, max_nargs);
-      Lisp_Object *evaluated_args;
-      SAFE_ALLOCA_LISP (evaluated_args, capacity);
-      for (ptrdiff_t i = 0; i < capacity; ++i)
-	evaluated_args[i] = Qnil;
-
       Lisp_Object fun;
     retry:
       /* Optimize for no indirection.  */
@@ -2310,6 +2307,7 @@ eval_form (Lisp_Object form)
 
       if (SUBRP (fun) && ! SUBR_NATIVE_COMPILED_DYNP (fun))
 	{
+	  const ptrdiff_t nargs = list_length (args);
 	  if (nargs < XSUBR (fun)->min_args
 	      || (XSUBR (fun)->max_args >= 0
 		  && XSUBR (fun)->max_args < nargs))
@@ -2319,14 +2317,17 @@ eval_form (Lisp_Object form)
 			make_fixnum (nargs));
 	    }
 	  else if (XSUBR (fun)->max_args == UNEVALLED)
-	    result = (XSUBR (fun)->function.aUNEVALLED) (original_args);
+	    result = (XSUBR (fun)->function.aUNEVALLED) (args);
 	  else
 	    {
-	      populate_evaluated_args (original_args, evaluated_args);
+	      const ptrdiff_t capacity = max (nargs, XSUBR (fun)->max_args);
+	      Lisp_Object *evaluated_args;
+	      SAFE_ALLOCA_LISP (evaluated_args, capacity);
+	      populate_evaluated_args (args, evaluated_args, capacity);
 	      set_backtrace_args (specpdl_ref_to_ptr (count), evaluated_args, nargs);
 
 	      if (XSUBR (fun)->max_args == MANY
-		  || XSUBR (fun)->max_args > max_nargs)
+		  || XSUBR (fun)->max_args > subr_max_nargs)
 		result = XSUBR (fun)->function.aMANY (nargs, evaluated_args);
 	      else
 		switch (XSUBR (fun)->max_args)
@@ -2383,7 +2384,10 @@ eval_form (Lisp_Object form)
 	       || SUBR_NATIVE_COMPILED_DYNP (fun)
 	       || MODULE_FUNCTIONP (fun))
 	{
-	  populate_evaluated_args (original_args, evaluated_args);
+	  const ptrdiff_t nargs = list_length (args);
+	  Lisp_Object *evaluated_args;
+	  SAFE_ALLOCA_LISP (evaluated_args, nargs);
+	  populate_evaluated_args (args, evaluated_args, nargs);
 	  set_backtrace_args (specpdl_ref_to_ptr (count), evaluated_args, nargs);
 	  result = funcall_lambda (fun, nargs, evaluated_args);
 	}
@@ -2430,14 +2434,17 @@ eval_form (Lisp_Object form)
 	  if (! EQ (dynvars, Vmacroexp__dynvars))
 	    specbind (Qmacroexp__dynvars, dynvars);
 
-	  exp = apply1 (CDR (fun), original_args);
+	  exp = apply1 (CDR (fun), args);
 	  exp = unbind_to (count1, exp);
 	  result = eval_form (exp);
 	}
       else if (EQ (XCAR (fun), Qlambda)
 	       || EQ (XCAR (fun), Qclosure))
 	{
-	  populate_evaluated_args (original_args, evaluated_args);
+	  const ptrdiff_t nargs = list_length (args);
+	  Lisp_Object *evaluated_args;
+	  SAFE_ALLOCA_LISP (evaluated_args, nargs);
+	  populate_evaluated_args (args, evaluated_args, nargs);
 	  set_backtrace_args (specpdl_ref_to_ptr (count), evaluated_args, nargs);
 	  result = funcall_lambda (fun, nargs, evaluated_args);
 	}
