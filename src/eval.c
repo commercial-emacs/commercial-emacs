@@ -447,7 +447,7 @@ usage: (setq [SYM VAL]...)  */)
       tail = XCDR (tail);
       val = eval_form (arg);
       Lisp_Object lexbind = SYMBOLP (sym)
-	? Fassq (sym, Vinternal_interpreter_environment)
+	? Fassq (sym, Vlexical_environment)
 	: Qnil;
       if (! NILP (lexbind))
 	XSETCDR (lexbind, val); /* SYM lexically bound.  */
@@ -490,7 +490,7 @@ usage: (function ARG)  */)
   if (!NILP (XCDR (args)))
     xsignal2 (Qwrong_number_of_arguments, Qfunction, Flength (args));
 
-  if (!NILP (Vinternal_interpreter_environment)
+  if (!NILP (Vlexical_environment)
       && CONSP (quoted)
       && EQ (XCAR (quoted), Qlambda))
     { /* This is a lambda expression within a lexical environment;
@@ -512,11 +512,11 @@ usage: (function ARG)  */)
 	  cdr = Fcons (XCAR (cdr), Fcons (docstring, XCDR (XCDR (cdr))));
 	}
       if (NILP (Vinternal_make_interpreted_closure_function))
-        return Fcons (Qclosure, Fcons (Vinternal_interpreter_environment, cdr));
+        return Fcons (Qclosure, Fcons (Vlexical_environment, cdr));
       else
         return call2 (Vinternal_make_interpreted_closure_function,
                       Fcons (Qlambda, cdr),
-                      Vinternal_interpreter_environment);
+                      Vlexical_environment);
     }
   else
     /* Simply quote the argument.  */
@@ -653,7 +653,7 @@ lexbound_p (Lisp_Object symbol)
 	{
 	case SPECPDL_LET_BLD:
 	case SPECPDL_LET:
-	  if (EQ (specpdl_symbol (pdl), Qinternal_interpreter_environment))
+	  if (EQ (specpdl_symbol (pdl), Qlexical_environment))
 	    {
 	      Lisp_Object env = specpdl_old_value (pdl);
 	      if (CONSP (env) && !NILP (Fassq (symbol, env)))
@@ -788,11 +788,11 @@ usage: (defvar SYMBOL &optional INITVALUE DOCSTRING)  */)
 
   if (NILP (tail)) /* a pithy (defvar FOO) */
     {
-      if (! NILP (Vinternal_interpreter_environment)
+      if (! NILP (Vlexical_environment)
 	  && ! XSYMBOL (sym)->u.s.declared_special)
 	/* Make a special variable only within let-block.  */
-	Vinternal_interpreter_environment
-	  = Fcons (sym, Vinternal_interpreter_environment);
+	Vlexical_environment
+	  = Fcons (sym, Vlexical_environment);
       /* Otherwise (defvar FOO) is a no-op.  */
     }
   else
@@ -884,25 +884,25 @@ let_bind (Lisp_Object prevailing_env, Lisp_Object var, Lisp_Object val, bool *q_
     {
       /* Lexically bind VAR.  */
       Lisp_Object newenv
-	= Fcons (Fcons (var, val), Vinternal_interpreter_environment);
+	= Fcons (Fcons (var, val), Vlexical_environment);
       if (*q_pushed)
-	Vinternal_interpreter_environment = newenv;
+	Vlexical_environment = newenv;
       else
 	{
 	  /* Just push the env previous to the first lexical let
 	     binding.  Nested envs produced by subsequent bindings in
 	     a let* would never be reverted to.  */
 	  *q_pushed = true;
-	  specbind (Qinternal_interpreter_environment, newenv);
+	  specbind (Qlexical_environment, newenv);
 	}
-      eassert (EQ (Vinternal_interpreter_environment, newenv));
+      eassert (EQ (Vlexical_environment, newenv));
     }
   else
     {
       /* Dynamically bind VAR.  */
       specbind (var, val);
       /* If lexical binding was off, it should still be off.  */
-      eassert (q_lexical_binding || NILP (Vinternal_interpreter_environment));
+      eassert (q_lexical_binding || NILP (Vlexical_environment));
     }
 }
 
@@ -930,7 +930,7 @@ eval_let (Lisp_Object args, bool nested_envs)
 	  val = eval_form (CAR (XCDR (bind)));
 	}
       if (nested_envs)
-	let_bind (Vinternal_interpreter_environment, var, val, &q_pushed);
+	let_bind (Vlexical_environment, var, val, &q_pushed);
       else
 	post_eval = Fcons (Fcons (var, val), post_eval);
     }
@@ -939,7 +939,7 @@ eval_let (Lisp_Object args, bool nested_envs)
   /* For parallel let (sans star), the resultant environment must
      incorporate any side effects from evaluating the bindings.  Thus,
      the two passes.  */
-  Lisp_Object prevailing_env = Vinternal_interpreter_environment;
+  Lisp_Object prevailing_env = Vlexical_environment;
   post_eval = Fnreverse (post_eval);
   FOR_EACH_TAIL (post_eval) /* second pass */
     {
@@ -1361,10 +1361,10 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
       else
 	{
 	  specpdl_ref count = SPECPDL_INDEX ();
-	  if (! NILP (Vinternal_interpreter_environment))
-	    specbind (Qinternal_interpreter_environment,
+	  if (! NILP (Vlexical_environment))
+	    specbind (Qlexical_environment,
 		      Fcons (Fcons (var, result),
-			     Vinternal_interpreter_environment));
+			     Vlexical_environment));
 	  else
 	    specbind (var, result);
 	  result = unbind_to (count, Fprogn (XCDR (clause)));
@@ -2191,7 +2191,7 @@ node `(elisp)Eval' for details.  */)
   (Lisp_Object form, Lisp_Object lexical)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-  specbind (Qinternal_interpreter_environment,
+  specbind (Qlexical_environment,
 	    ! NILP (Flistp (lexical)) ? lexical : list_of_t);
   return unbind_to (count, eval_form (form));
 }
@@ -2241,7 +2241,7 @@ eval_form (Lisp_Object form)
   Lisp_Object result = form;
   if (SYMBOLP (form))
     {
-      Lisp_Object lexbind = Fassq (form, Vinternal_interpreter_environment);
+      Lisp_Object lexbind = Fassq (form, Vlexical_environment);
       result = ! NILP (lexbind) ? XCDR (lexbind) : Fsymbol_value (form);
     }
   else if (CONSP (form))
@@ -2381,11 +2381,11 @@ eval_form (Lisp_Object form)
 	     aware of how it will be interpreted (with lexical scoping
 	     or not).  */
 	  specbind (Qlexical_binding,
-		    ! NILP (Vinternal_interpreter_environment) ? Qt : Qnil);
+		    ! NILP (Vlexical_environment) ? Qt : Qnil);
 
 	  /* Apprise macro of any defvar declarations in scope. */
 	  Lisp_Object dynvars = Vmacroexp__dynvars;
-	  for (Lisp_Object p = Vinternal_interpreter_environment;
+	  for (Lisp_Object p = Vlexical_environment;
 	       ! NILP (p);
 	       p = XCDR(p))
 	    {
@@ -3004,9 +3004,9 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
   else if (i < nargs)
     xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
 
-  if (!EQ (lexenv, Vinternal_interpreter_environment))
+  if (!EQ (lexenv, Vlexical_environment))
     /* Instantiate a new lexical environment.  */
-    specbind (Qinternal_interpreter_environment, lexenv);
+    specbind (Qlexical_environment, lexenv);
 
   if (CONSP (fun))
     val = Fprogn (XCDR (XCDR (fun)));
@@ -3237,8 +3237,8 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       if (valpp.fwdptr && XFWDTYPE (valpp) == Lisp_Fwd_Obj)
 	{
 	  struct Lisp_Objfwd *valp = (struct Lisp_Objfwd *) valpp.fwdptr;
-	  if (valp->objvar == &Vinternal_interpreter_environment)
-	    valp->objvar = &current_thread->interpreter_environment;
+	  if (valp->objvar == &Vlexical_environment)
+	    valp->objvar = &current_thread->lexical_environment;
 	}
       xsymbol = XSYMBOL (symbol);
     }
@@ -3871,7 +3871,7 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
 	    {
 	      Lisp_Object sym = specpdl_symbol (tmp);
 	      Lisp_Object val = specpdl_old_value (tmp);
-	      if (EQ (sym, Qinternal_interpreter_environment))
+	      if (EQ (sym, Qlexical_environment))
 		{
 		  Lisp_Object env = val;
 		  for (; CONSP (env); env = XCDR (env))
@@ -4125,16 +4125,16 @@ the Lisp backtrace.  */);
 Used to avoid infinite loops if the debugger itself has an error.
 Don't set this unless you're sure that can't happen.  */);
 
-  DEFSYM (Qinternal_interpreter_environment, "internal-interpreter-environment");
-  DEFVAR_LISP ("internal-interpreter-environment",
-	       Vinternal_interpreter_environment,
-	       doc: /* Under dynamic scoping, Vinternal_interpreter_environment is nil.
+  DEFSYM (Qlexical_environment, "lexical-environment");
+  DEFVAR_LISP ("lexical-environment",
+	       Vlexical_environment,
+	       doc: /* Under dynamic scoping, Vlexical_environment is nil.
 Under lexical scoping, it is a list of either (VAR . VAL) bindings or
 bare VAR symbols indicating VAR is dynamically scoped for the
-environment's duration.  The special list (t) denotes an empty lexical
+environment's lifetime.  The special list \\='(t) denotes an empty lexical
 environment.  */);
-  Funintern (Qinternal_interpreter_environment, Qnil); /* Don't surface to user.  */
-  Vinternal_interpreter_environment = Qnil;
+  Funintern (Qlexical_environment, Qnil); /* Don't surface to user.  */
+  Vlexical_environment = Qnil;
 
   DEFVAR_LISP ("internal-make-interpreted-closure-function",
 	       Vinternal_make_interpreted_closure_function,

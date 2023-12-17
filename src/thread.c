@@ -66,7 +66,7 @@ static union aligned_thread_state main_state
       .error_symbol = LISPSYM_INITIALLY (Qnil),
       .error_data = LISPSYM_INITIALLY (Qnil),
       .event_object = LISPSYM_INITIALLY (Qnil),
-      .interpreter_environment = LISPSYM_INITIALLY (Qnil),
+      .lexical_environment = LISPSYM_INITIALLY (Qnil),
     }};
 
 PER_THREAD struct thread_state *current_thread = &main_state.s;
@@ -793,12 +793,12 @@ A non-nil UNCOOPERATIVE halts and catches fire.
     CHECK_STRING (name);
 
   new_thread = ALLOCATE_ZEROED_PSEUDOVECTOR (struct thread_state,
-					     interpreter_environment,
+					     lexical_environment,
 					     PVEC_THREAD);
   new_thread->name = name;
   new_thread->function = function;
   new_thread->obarray = initialize_vector (OBARRAY_SIZE / 10, make_fixnum (0));
-  new_thread->interpreter_environment = Fcopy_sequence (Vinternal_interpreter_environment);
+  new_thread->lexical_environment = Fcopy_sequence (Vlexical_environment);
 #ifdef HAVE_GCC_TLS
   new_thread->cooperative = NILP (uncooperative);
 #else

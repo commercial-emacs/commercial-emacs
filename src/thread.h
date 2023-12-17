@@ -79,7 +79,7 @@ struct thread_state
   Lisp_Object event_object;
 
   /* Reference to per-thread environment for gc marking.  */
-  Lisp_Object interpreter_environment;
+  Lisp_Object lexical_environment;
 
   /* !!! Adjust ALLOCATE_ZEROED_PSEUDOVECTOR for new Lisp fields.  */
 
