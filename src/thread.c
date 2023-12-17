@@ -1029,6 +1029,22 @@ n_running_threads (void)
 }
 
 void
+check_eval_depth (Lisp_Object error_symbol)
+{
+  /* Floor of 100 from 1991 Blandy Initial Revision.  */
+  if (++lisp_eval_depth > max (max_lisp_eval_depth, 100))
+    {
+      Lisp_Object depth = make_fixnum (lisp_eval_depth);
+      /* Avoid recursively triggering this same overflow ex post mortem.  */
+      lisp_eval_depth = 0;
+      if (EQ (error_symbol, Qexcessive_lisp_nesting))
+	xsignal1 (error_symbol, depth);
+      else
+	xsignal0 (error_symbol);
+    }
+}
+
+void
 init_threads (void)
 {
   sys_cond_init (&main_state.s.thread_condvar);

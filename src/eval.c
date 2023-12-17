@@ -249,24 +249,6 @@ init_eval (void)
   when_entered_debugger = -1;
 }
 
-/* Ensure that *M is at least A + B if possible, or is its maximum
-   value otherwise.  */
-
-static void
-max_ensure_room (intmax_t *m, intmax_t a, intmax_t b)
-{
-  intmax_t sum = ckd_add (&sum, a, b) ? INTMAX_MAX : sum;
-  *m = max (*m, sum);
-}
-
-/* Unwind-protect function used by call_debugger.  */
-
-static void
-restore_stack_limits (Lisp_Object data)
-{
-  integer_to_intmax (data, &max_lisp_eval_depth);
-}
-
 /* Call the Lisp debugger, giving it argument ARG.  */
 
 Lisp_Object
@@ -275,16 +257,6 @@ call_debugger (Lisp_Object arg)
   bool debug_while_redisplaying;
   specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object val;
-  intmax_t old_depth = max_lisp_eval_depth;
-
-  /* The previous value of 40 is too small now that the debugger
-     prints using cl-prin1 instead of prin1.  Printing lists nested 8
-     deep (which is the value of print-level used in the debugger)
-     currently requires 77 additional frames.  See bug#31919.  */
-  max_ensure_room (&max_lisp_eval_depth, lisp_eval_depth, 100);
-
-  /* Restore limits after leaving the debugger.  */
-  record_unwind_protect (restore_stack_limits, make_int (old_depth));
 
 #ifdef HAVE_WINDOW_SYSTEM
   cancel_hourglass ();
@@ -1646,8 +1618,6 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
       /* specpdl not overflowed */
       && specpdl_ptr < specpdl_end)
     {
-      /* Edebug restores these variables when it exits.  */
-      max_ensure_room (&max_lisp_eval_depth, lisp_eval_depth, 20);
       call2 (Vsignal_hook_function, error_symbol, data);
     }
 
@@ -1700,7 +1670,6 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
       && NILP (Vinhibit_debugger)
       && ! NILP (Ffboundp (Qdebug_early)))
     {
-      max_ensure_room (&max_lisp_eval_depth, lisp_eval_depth, 100);
       specpdl_ref count = SPECPDL_INDEX ();
       specbind (Qdebugger, Qdebug_early);
       call_debugger (list2 (Qerror, Fcons (error_symbol, data)));
@@ -1868,9 +1837,7 @@ signal_quit_p (Lisp_Object signal)
 static bool
 maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig, Lisp_Object data)
 {
-  Lisp_Object combined_data;
-
-  combined_data = Fcons (sig, data);
+  Lisp_Object combined_data = Fcons (sig, data);
 
   if (
       /* Don't try to run the debugger with interrupts blocked.
@@ -2279,15 +2246,9 @@ eval_form (Lisp_Object form)
     }
   else if (CONSP (form))
     {
+      check_eval_depth (Qexcessive_lisp_nesting);
       maybe_quit ();
       maybe_garbage_collect ();
-      if (++lisp_eval_depth > max_lisp_eval_depth)
-	{
-	  if (max_lisp_eval_depth < 100)
-	    max_lisp_eval_depth = 100;
-	  if (lisp_eval_depth > max_lisp_eval_depth)
-	    xsignal1 (Qexcessive_lisp_nesting, make_fixnum (lisp_eval_depth));
-	}
 
       Lisp_Object original_fun = XCAR (form);
       Lisp_Object args = XCDR (form);
@@ -2841,20 +2802,10 @@ Thus, (funcall \\='cons \\='x \\='y) returns (x . y).
 usage: (funcall FUNCTION &rest ARGUMENTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  specpdl_ref count;
+  specpdl_ref count = record_in_backtrace (args[0], &args[1], nargs - 1);
 
+  check_eval_depth (Qexcessive_lisp_nesting);
   maybe_quit ();
-
-  if (++lisp_eval_depth > max_lisp_eval_depth)
-    {
-      if (max_lisp_eval_depth < 100)
-	max_lisp_eval_depth = 100;
-      if (lisp_eval_depth > max_lisp_eval_depth)
-	xsignal1 (Qexcessive_lisp_nesting, make_fixnum (lisp_eval_depth));
-    }
-
-  count = record_in_backtrace (args[0], &args[1], nargs - 1);
-
   maybe_garbage_collect ();
 
   if (debug_on_next_call)
@@ -2862,13 +2813,12 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
 
   Lisp_Object val = funcall_general (args[0], nargs - 1, args + 1);
 
-  lisp_eval_depth--;
+  --lisp_eval_depth;
   if (backtrace_debug_on_exit (specpdl_ref_to_ptr (count)))
     val = call_debugger (list2 (Qexit, val));
-  specpdl_ptr--;
+  --specpdl_ptr;
   return val;
 }
-
 
 /* Apply a C subroutine SUBR to the NUMARGS evaluated arguments in ARG_VECTOR
    and return the result of evaluation.  */
@@ -4047,13 +3997,7 @@ void
 syms_of_eval (void)
 {
   DEFVAR_INT ("max-lisp-eval-depth", max_lisp_eval_depth,
-	      doc: /* Limit on depth in `eval', `apply' and `funcall' before error.
-
-This limit serves to catch infinite recursions for you before they cause
-actual stack overflow in C, which would be fatal for Emacs.
-You can safely make it considerably larger than its default value,
-if that proves inconveniently small.  However, if you increase it too far,
-Emacs could overflow the real C stack, and crash.  */);
+	      doc: /* Maximum function call depth.  */);
 
   DEFVAR_LISP ("quit-flag", Vquit_flag,
 	       doc: /* Non-nil causes `eval' to signal quit.

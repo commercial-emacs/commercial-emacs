@@ -459,8 +459,7 @@ static json_t *
 lisp_to_json_nonscalar (Lisp_Object lisp,
                         const struct json_configuration *conf)
 {
-  if (++lisp_eval_depth > max_lisp_eval_depth)
-    xsignal0 (Qjson_object_too_deep);
+  check_eval_depth (Qjson_object_too_deep);
   json_t *json = lisp_to_json_nonscalar_1 (lisp, conf);
   --lisp_eval_depth;
   return json;
@@ -825,8 +824,7 @@ json_to_lisp (json_t *json, const struct json_configuration *conf)
 				    json_string_length (json));
     case JSON_ARRAY:
       {
-        if (++lisp_eval_depth > max_lisp_eval_depth)
-          xsignal0 (Qjson_object_too_deep);
+	check_eval_depth (Qjson_object_too_deep);
         size_t size = json_array_size (json);
         if (PTRDIFF_MAX < size)
           overflow_error ();
@@ -864,8 +862,7 @@ json_to_lisp (json_t *json, const struct json_configuration *conf)
       }
     case JSON_OBJECT:
       {
-        if (++lisp_eval_depth > max_lisp_eval_depth)
-          xsignal0 (Qjson_object_too_deep);
+	check_eval_depth (Qjson_object_too_deep);
         Lisp_Object result;
         switch (conf->object_type)
           {
