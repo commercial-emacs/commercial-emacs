@@ -640,33 +640,6 @@ default_toplevel_binding (Lisp_Object symbol)
   return binding;
 }
 
-/* Find SYMBOL's prevailing lexical binding.  This applies only to
-   bindings created with interpreted code.  Once compiled, lexical
-   variable names are "basically gone anyway." (wtf 1eb168f) */
-static bool
-lexbound_p (Lisp_Object symbol)
-{
-  union specbinding *pdl = specpdl_ptr;
-  while (pdl > specpdl)
-    {
-      switch ((--pdl)->kind)
-	{
-	case SPECPDL_LET_BLD:
-	case SPECPDL_LET:
-	  if (EQ (specpdl_symbol (pdl), Qlexical_environment))
-	    {
-	      Lisp_Object env = specpdl_old_value (pdl);
-	      if (CONSP (env) && !NILP (Fassq (symbol, env)))
-	        return true;
-	    }
-	  break;
-	default:
-	  break;
-	}
-    }
-  return false;
-}
-
 DEFUN ("default-toplevel-value", Fdefault_toplevel_value, Sdefault_toplevel_value, 1, 1, 0,
        doc: /* Return SYMBOL's toplevel default value.
 "Toplevel" means outside of any let binding.  */)
@@ -694,6 +667,30 @@ DEFUN ("set-default-toplevel-value", Fset_default_toplevel_value,
   return Qnil;
 }
 
+static bool
+lexbound_p (Lisp_Object symbol)
+{
+  union specbinding *pdl = specpdl_ptr;
+  while (pdl > specpdl)
+    {
+      switch ((--pdl)->kind)
+	{
+	case SPECPDL_LET_BLD:
+	case SPECPDL_LET:
+	  if (EQ (specpdl_symbol (pdl), Qlexical_environment))
+	    {
+	      Lisp_Object env = specpdl_old_value (pdl);
+	      if (CONSP (env) && !NILP (Fassq (symbol, env)))
+	        return true;
+	    }
+	  break;
+	default:
+	  break;
+	}
+    }
+  return false;
+}
+
 DEFUN ("internal--define-uninitialized-variable",
        Finternal__define_uninitialized_variable,
        Sinternal__define_uninitialized_variable, 1, 2, 0,
@@ -704,11 +701,10 @@ value.  */)
 {
   if (! XSYMBOL (symbol)->u.s.declared_special
       && lexbound_p (symbol))
-    /* This test tries to catch the situation where we do
-       (let ((<foo-var> ...)) ...(<foo-function> ...)....)
-       and where the `foo` package only gets loaded when <foo-function>
-       is called, so the outer `let` incorrectly made the binding lexical
-       because the <foo-var> wasn't yet declared as dynamic at that point.  */
+    /* Under (let ((foo-var ...)) (foo-function)), the special
+       variable foo-var was incorrectly bound lexically since the
+       `foo' package didn't get autoloaded until the call to
+       foo-function.  */
     xsignal2 (Qerror,
 	      build_string ("Defining as dynamic an already lexical var"),
 	      symbol);
