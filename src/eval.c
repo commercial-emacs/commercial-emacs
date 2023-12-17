@@ -51,7 +51,6 @@ union specbinding *backtrace_next (union specbinding *) EXTERNALLY_VISIBLE;
 union specbinding *backtrace_top (void) EXTERNALLY_VISIBLE;
 
 static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
-static Lisp_Object apply_lambda (Lisp_Object, Lisp_Object, specpdl_ref);
 static Lisp_Object lambda_arity (Lisp_Object);
 
 static Lisp_Object *
@@ -470,17 +469,16 @@ usage: (setq [SYM VAL]...)  */)
     {
       Lisp_Object sym = XCAR (tail);
       tail = XCDR (tail);
-      if (!CONSP (tail))
+      if (! CONSP (tail))
 	xsignal2 (Qwrong_number_of_arguments, Qsetq, make_fixnum (nargs + 1));
       Lisp_Object arg = XCAR (tail);
       tail = XCDR (tail);
       val = eval_form (arg);
-      /* declared_special already checked when let-binding.  */
-      Lisp_Object lex_binding = SYMBOLP (sym)
+      Lisp_Object lexbind = SYMBOLP (sym)
 	? Fassq (sym, Vinternal_interpreter_environment)
 	: Qnil;
-      if (! NILP (lex_binding))
-	XSETCDR (lex_binding, val); /* SYM lexically bound.  */
+      if (! NILP (lexbind))
+	XSETCDR (lexbind, val); /* SYM lexically bound.  */
       else
 	Fset (sym, val); /* SYM dynamically bound.  */
     }
@@ -2248,220 +2246,215 @@ grow_specpdl_allocation (void)
   specpdl_ptr = specpdl_ref_to_ptr (count);
 }
 
+static void
+populate_evaluated_args (Lisp_Object args, Lisp_Object *evaluated_args)
+{
+  ptrdiff_t argnum = 0;
+  Lisp_Object tail = args;
+  FOR_EACH_TAIL_SAFE (tail)
+    {
+      Lisp_Object arg = XCAR (tail);
+      evaluated_args[argnum++] = eval_form (arg);
+    }
+  CHECK_LIST_END (tail, args);
+}
+
 /* Evaluate FORM within prevailing lexical scope.  */
 
 Lisp_Object
 eval_form (Lisp_Object form)
 {
+  const unsigned char max_nargs = 8; /* Sucks I know...  */
+  Lisp_Object result = form;
   if (SYMBOLP (form))
     {
-      /* declared_special already checked when let-binding.  */
-      Lisp_Object lex_binding = Fassq (form, Vinternal_interpreter_environment);
-      return !NILP (lex_binding) ? XCDR (lex_binding) : Fsymbol_value (form);
+      Lisp_Object lexbind = Fassq (form, Vinternal_interpreter_environment);
+      result = ! NILP (lexbind) ? XCDR (lexbind) : Fsymbol_value (form);
     }
-
-  if (!CONSP (form))
-    return form;
-
-  maybe_quit ();
-
-  maybe_garbage_collect ();
-
-  if (++lisp_eval_depth > max_lisp_eval_depth)
+  else if (CONSP (form))
     {
-      if (max_lisp_eval_depth < 100)
-	max_lisp_eval_depth = 100;
-      if (lisp_eval_depth > max_lisp_eval_depth)
-	xsignal1 (Qexcessive_lisp_nesting, make_fixnum (lisp_eval_depth));
-    }
-
-  Lisp_Object original_fun = XCAR (form);
-  Lisp_Object original_args = XCDR (form);
-  CHECK_LIST (original_args);
-
-  /* This also protects them from gc.  */
-  specpdl_ref count
-    = record_in_backtrace (original_fun, &original_args, UNEVALLED);
-
-  if (debug_on_next_call)
-    do_debug_on_call (Qt, count);
-
-  Lisp_Object fun, val, funcar;
-  /* Declare here, as this array may be accessed by call_debugger near
-     the end of this function.  See Bug#21245.  */
-  Lisp_Object argvals[8];
-
- retry:
-
-  /* Optimize for no indirection.  */
-  fun = original_fun;
-  if (!SYMBOLP (fun))
-    fun = Ffunction (list1 (fun));
-  else if (!NILP (fun) && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
-    fun = indirect_function (fun);
-
-  if (SUBRP (fun) && !SUBR_NATIVE_COMPILED_DYNP (fun))
-    {
-      Lisp_Object args_left = original_args;
-      ptrdiff_t numargs = list_length (args_left);
-
-      if (numargs < XSUBR (fun)->min_args
-	  || (XSUBR (fun)->max_args >= 0
-	      && XSUBR (fun)->max_args < numargs))
-	xsignal2 (Qwrong_number_of_arguments, original_fun,
-		  make_fixnum (numargs));
-
-      else if (XSUBR (fun)->max_args == UNEVALLED)
-	val = (XSUBR (fun)->function.aUNEVALLED) (args_left);
-      else if (XSUBR (fun)->max_args == MANY
-	       || XSUBR (fun)->max_args > 8)
-
+      maybe_quit ();
+      maybe_garbage_collect ();
+      if (++lisp_eval_depth > max_lisp_eval_depth)
 	{
-	  /* Pass a vector of evaluated arguments.  */
-	  Lisp_Object *vals;
-	  ptrdiff_t argnum = 0;
-	  USE_SAFE_ALLOCA;
+	  if (max_lisp_eval_depth < 100)
+	    max_lisp_eval_depth = 100;
+	  if (lisp_eval_depth > max_lisp_eval_depth)
+	    xsignal1 (Qexcessive_lisp_nesting, make_fixnum (lisp_eval_depth));
+	}
 
-	  SAFE_ALLOCA_LISP (vals, numargs);
+      Lisp_Object original_fun = XCAR (form);
+      Lisp_Object original_args = XCDR (form);
+      CHECK_LIST (original_args);
+      specpdl_ref count = record_in_backtrace (original_fun, &original_args, UNEVALLED);
+      if (debug_on_next_call)
+	do_debug_on_call (Qt, count);
 
-	  while (CONSP (args_left) && argnum < numargs)
+      USE_SAFE_ALLOCA;
+      const ptrdiff_t nargs = list_length (original_args);
+      /* Floor of MAX_NARGS as must accommodate up to XSUBR(fun)->max_args.  */
+      const ptrdiff_t capacity = max (nargs, max_nargs);
+      Lisp_Object *evaluated_args;
+      SAFE_ALLOCA_LISP (evaluated_args, capacity);
+      for (ptrdiff_t i = 0; i < capacity; ++i)
+	evaluated_args[i] = Qnil;
+
+      Lisp_Object fun;
+    retry:
+      /* Optimize for no indirection.  */
+      fun = original_fun;
+      if (! SYMBOLP (fun))
+	fun = Ffunction (list1 (fun));
+      else if (! NILP (fun) && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
+	fun = indirect_function (fun);
+
+      if (SUBRP (fun) && ! SUBR_NATIVE_COMPILED_DYNP (fun))
+	{
+	  if (nargs < XSUBR (fun)->min_args
+	      || (XSUBR (fun)->max_args >= 0
+		  && XSUBR (fun)->max_args < nargs))
 	    {
-	      Lisp_Object arg = XCAR (args_left);
-	      args_left = XCDR (args_left);
-	      vals[argnum++] = eval_form (arg);
+	      SAFE_FREE ();
+	      xsignal2 (Qwrong_number_of_arguments, original_fun,
+			make_fixnum (nargs));
 	    }
+	  else if (XSUBR (fun)->max_args == UNEVALLED)
+	    result = (XSUBR (fun)->function.aUNEVALLED) (original_args);
+	  else
+	    {
+	      populate_evaluated_args (original_args, evaluated_args);
+	      set_backtrace_args (specpdl_ref_to_ptr (count), evaluated_args, nargs);
 
-	  set_backtrace_args (specpdl_ref_to_ptr (count), vals, argnum);
-
-	  val = XSUBR (fun)->function.aMANY (argnum, vals);
-
-	  lisp_eval_depth--;
-	  /* Do the debug-on-exit now, while VALS still exists.  */
-	  if (backtrace_debug_on_exit (specpdl_ref_to_ptr (count)))
-	    val = call_debugger (list2 (Qexit, val));
+	      if (XSUBR (fun)->max_args == MANY
+		  || XSUBR (fun)->max_args > max_nargs)
+		result = XSUBR (fun)->function.aMANY (nargs, evaluated_args);
+	      else
+		switch (XSUBR (fun)->max_args)
+		  {
+		  case 0:
+		    result = (XSUBR (fun)->function.a0 ());
+		    break;
+		  case 1:
+		    result = (XSUBR (fun)->function.a1
+			      (evaluated_args[0]));
+		    break;
+		  case 2:
+		    result = (XSUBR (fun)->function.a2
+			      (evaluated_args[0], evaluated_args[1]));
+		    break;
+		  case 3:
+		    result = (XSUBR (fun)->function.a3
+			      (evaluated_args[0], evaluated_args[1], evaluated_args[2]));
+		    break;
+		  case 4:
+		    result = (XSUBR (fun)->function.a4
+			      (evaluated_args[0], evaluated_args[1], evaluated_args[2],
+			       evaluated_args[3]));
+		    break;
+		  case 5:
+		    result = (XSUBR (fun)->function.a5
+			      (evaluated_args[0], evaluated_args[1], evaluated_args[2],
+			       evaluated_args[3], evaluated_args[4]));
+		    break;
+		  case 6:
+		    result = (XSUBR (fun)->function.a6
+			      (evaluated_args[0], evaluated_args[1], evaluated_args[2],
+			       evaluated_args[3], evaluated_args[4], evaluated_args[5]));
+		    break;
+		  case 7:
+		    result = (XSUBR (fun)->function.a7
+			      (evaluated_args[0], evaluated_args[1], evaluated_args[2],
+			       evaluated_args[3], evaluated_args[4], evaluated_args[5],
+			       evaluated_args[6]));
+		    break;
+		  case 8:
+		    result = (XSUBR (fun)->function.a8
+			      (evaluated_args[0], evaluated_args[1], evaluated_args[2],
+			       evaluated_args[3], evaluated_args[4], evaluated_args[5],
+			       evaluated_args[6], evaluated_args[7]));
+		    break;
+		  default:
+		    SAFE_FREE ();
+		    emacs_abort ();
+		  }
+	    }
+	}
+      else if (COMPILEDP (fun)
+	       || SUBR_NATIVE_COMPILED_DYNP (fun)
+	       || MODULE_FUNCTIONP (fun))
+	{
+	  populate_evaluated_args (original_args, evaluated_args);
+	  set_backtrace_args (specpdl_ref_to_ptr (count), evaluated_args, nargs);
+	  result = funcall_lambda (fun, nargs, evaluated_args);
+	}
+      else if (NILP (fun))
+	{
 	  SAFE_FREE ();
-	  specpdl_ptr--;
-	  return val;
+	  xsignal1 (Qvoid_function, original_fun);
 	}
-      else
+      else if (! CONSP (fun))
 	{
-	  int i, maxargs = XSUBR (fun)->max_args;
-
-	  for (i = 0; i < maxargs; i++)
-	    {
-	      argvals[i] = eval_form (CAR (args_left));
-	      args_left = CDR (args_left);
-	    }
-
-	  set_backtrace_args (specpdl_ref_to_ptr (count), argvals, numargs);
-
-	  switch (i)
-	    {
-	    case 0:
-	      val = (XSUBR (fun)->function.a0 ());
-	      break;
-	    case 1:
-	      val = (XSUBR (fun)->function.a1 (argvals[0]));
-	      break;
-	    case 2:
-	      val = (XSUBR (fun)->function.a2 (argvals[0], argvals[1]));
-	      break;
-	    case 3:
-	      val = (XSUBR (fun)->function.a3
-		     (argvals[0], argvals[1], argvals[2]));
-	      break;
-	    case 4:
-	      val = (XSUBR (fun)->function.a4
-		     (argvals[0], argvals[1], argvals[2], argvals[3]));
-	      break;
-	    case 5:
-	      val = (XSUBR (fun)->function.a5
-		     (argvals[0], argvals[1], argvals[2], argvals[3],
-		      argvals[4]));
-	      break;
-	    case 6:
-	      val = (XSUBR (fun)->function.a6
-		     (argvals[0], argvals[1], argvals[2], argvals[3],
-		      argvals[4], argvals[5]));
-	      break;
-	    case 7:
-	      val = (XSUBR (fun)->function.a7
-		     (argvals[0], argvals[1], argvals[2], argvals[3],
-		      argvals[4], argvals[5], argvals[6]));
-	      break;
-
-	    case 8:
-	      val = (XSUBR (fun)->function.a8
-		     (argvals[0], argvals[1], argvals[2], argvals[3],
-		      argvals[4], argvals[5], argvals[6], argvals[7]));
-	      break;
-
-	    default:
-	      /* Someone has created a subr that takes more arguments than
-		 is supported by this code.  We need to either rewrite the
-		 subr to use a different argument protocol, or add more
-		 cases to this switch.  */
-	      emacs_abort ();
-	    }
+	  SAFE_FREE ();
+	  xsignal1 (Qinvalid_function, original_fun);
 	}
-    }
-  else if (COMPILEDP (fun)
-	   || SUBR_NATIVE_COMPILED_DYNP (fun)
-	   || MODULE_FUNCTIONP (fun))
-    return apply_lambda (fun, original_args, count);
-  else
-    {
-      if (NILP (fun))
-	xsignal1 (Qvoid_function, original_fun);
-      if (!CONSP (fun))
-	xsignal1 (Qinvalid_function, original_fun);
-      funcar = XCAR (fun);
-      if (!SYMBOLP (funcar))
-	xsignal1 (Qinvalid_function, original_fun);
-      if (EQ (funcar, Qautoload))
+      else if (! SYMBOLP (XCAR (fun)))
+	{
+	  SAFE_FREE ();
+	  xsignal1 (Qinvalid_function, original_fun);
+	}
+      else if (EQ (XCAR (fun), Qautoload))
 	{
 	  Fautoload_do_load (fun, original_fun, Qnil);
 	  goto retry;
 	}
-      if (EQ (funcar, Qmacro))
+      else if (EQ (XCAR (fun), Qmacro))
 	{
 	  specpdl_ref count1 = SPECPDL_INDEX ();
 	  Lisp_Object exp;
-	  /* Bind lexical-binding during expansion of the macro, so the
-	     macro can know reliably if the code it outputs will be
-	     interpreted using lexical-binding or not.  */
+	  /* Set `lexical-binding' now so ensuing macroexpansion is
+	     aware of how it will be interpreted (with lexical scoping
+	     or not).  */
 	  specbind (Qlexical_binding,
-		    !NILP (Vinternal_interpreter_environment) ? Qt : Qnil);
+		    ! NILP (Vinternal_interpreter_environment) ? Qt : Qnil);
 
-	  /* Make the macro aware of any defvar declarations in scope. */
+	  /* Apprise macro of any defvar declarations in scope. */
 	  Lisp_Object dynvars = Vmacroexp__dynvars;
 	  for (Lisp_Object p = Vinternal_interpreter_environment;
-	       !NILP (p); p = XCDR(p))
+	       ! NILP (p);
+	       p = XCDR(p))
 	    {
-	      Lisp_Object e = XCAR (p);
-	      if (SYMBOLP (e))
-		dynvars = Fcons(e, dynvars);
+	      Lisp_Object defvar = XCAR (p);
+	      if (SYMBOLP (defvar))
+		dynvars = Fcons(defvar, dynvars);
 	    }
-	  if (!EQ (dynvars, Vmacroexp__dynvars))
+	  if (! EQ (dynvars, Vmacroexp__dynvars))
 	    specbind (Qmacroexp__dynvars, dynvars);
 
 	  exp = apply1 (CDR (fun), original_args);
 	  exp = unbind_to (count1, exp);
-	  val = eval_form (exp);
+	  result = eval_form (exp);
 	}
-      else if (EQ (funcar, Qlambda)
-	       || EQ (funcar, Qclosure))
-	return apply_lambda (fun, original_args, count);
+      else if (EQ (XCAR (fun), Qlambda)
+	       || EQ (XCAR (fun), Qclosure))
+	{
+	  populate_evaluated_args (original_args, evaluated_args);
+	  set_backtrace_args (specpdl_ref_to_ptr (count), evaluated_args, nargs);
+	  result = funcall_lambda (fun, nargs, evaluated_args);
+	}
       else
-	xsignal1 (Qinvalid_function, original_fun);
+	{
+	  SAFE_FREE ();
+	  xsignal1 (Qinvalid_function, original_fun);
+	}
+
+      --lisp_eval_depth;
+      if (backtrace_debug_on_exit (specpdl_ref_to_ptr (count)))
+	/* while EVALUATED_ARGS still exists...  */
+	result = call_debugger (list2 (Qexit, result));
+      SAFE_FREE ();
+      --specpdl_ptr;
     }
-
-  lisp_eval_depth--;
-  if (backtrace_debug_on_exit (specpdl_ref_to_ptr (count)))
-    val = call_debugger (list2 (Qexit, val));
-  specpdl_ptr--;
-
-  return val;
+  return result;
 }
 
 DEFUN ("apply", Fapply, Sapply, 1, MANY, 0,
@@ -2946,36 +2939,6 @@ fetch_and_exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
     Ffetch_bytecode (fun);
 
   return exec_byte_code (fun, args_template, nargs, args);
-}
-
-static Lisp_Object
-apply_lambda (Lisp_Object fun, Lisp_Object args, specpdl_ref count)
-{
-  Lisp_Object *arg_vector;
-  Lisp_Object tem;
-  USE_SAFE_ALLOCA;
-
-  ptrdiff_t numargs = list_length (args);
-  SAFE_ALLOCA_LISP (arg_vector, numargs);
-  Lisp_Object args_left = args;
-
-  for (ptrdiff_t i = 0; i < numargs; i++)
-    {
-      tem = CAR (args_left), args_left = CDR (args_left);
-      tem = eval_form (tem);
-      arg_vector[i] = tem;
-    }
-
-  set_backtrace_args (specpdl_ref_to_ptr (count), arg_vector, numargs);
-  tem = funcall_lambda (fun, numargs, arg_vector);
-
-  lisp_eval_depth--;
-  /* Do the debug-on-exit now, while arg_vector still exists.  */
-  if (backtrace_debug_on_exit (specpdl_ref_to_ptr (count)))
-    tem = call_debugger (list2 (Qexit, tem));
-  SAFE_FREE ();
-  specpdl_ptr--;
-  return tem;
 }
 
 /* Apply a Lisp function FUN to the NARGS evaluated arguments in ARG_VECTOR
