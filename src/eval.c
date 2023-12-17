@@ -2259,6 +2259,7 @@ populate_evaluated_args (Lisp_Object args,
   FOR_EACH_TAIL_SAFE (tail)
     {
       Lisp_Object arg = XCAR (tail);
+      eassert (argnum < capacity);
       evaluated_args[argnum++] = eval_form (arg);
     }
   CHECK_LIST_END (tail, args);
