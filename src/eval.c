@@ -2416,12 +2416,7 @@ eval_form (Lisp_Object form)
 	  xsignal1 (Qinvalid_function, original_fun);
 	}
 
-      --lisp_eval_depth;
-      if (backtrace_debug_on_exit (specpdl_ref_to_ptr (count)))
-	/* while EVALUATED_ARGS still exists...  */
-	result = call_debugger (list2 (Qexit, result));
-      SAFE_FREE ();
-      --specpdl_ptr;
+      pop_lisp_frame (specpdl_ref_to_ptr (count), &result, sa_count); /* SAFE_FREEs */
     }
   return result;
 }
@@ -2812,11 +2807,7 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
     do_debug_on_call (Qlambda, count);
 
   Lisp_Object val = funcall_general (args[0], nargs - 1, args + 1);
-
-  --lisp_eval_depth;
-  if (backtrace_debug_on_exit (specpdl_ref_to_ptr (count)))
-    val = call_debugger (list2 (Qexit, val));
-  --specpdl_ptr;
+  pop_lisp_frame (specpdl_ref_to_ptr (count), &val, make_invalid_specpdl_ref ());
   return val;
 }
 

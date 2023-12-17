@@ -1045,6 +1045,17 @@ check_eval_depth (Lisp_Object error_symbol)
 }
 
 void
+pop_lisp_frame (union specbinding *frame, Lisp_Object *val, specpdl_ref sa_count)
+{
+  --lisp_eval_depth;
+  if (backtrace_debug_on_exit (frame))
+    *val = call_debugger (list2 (Qexit, *val));
+  if (specpdl_ref_valid_p (sa_count))
+    safe_free (sa_count);
+  --specpdl_ptr;
+}
+
+void
 init_threads (void)
 {
   sys_cond_init (&main_state.s.thread_condvar);

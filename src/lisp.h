@@ -4256,7 +4256,8 @@ extern void syms_of_module (void);
 /* Defined in thread.c.  */
 extern void mark_threads (void);
 extern void unmark_main_thread (void);
-extern void check_eval_depth (Lisp_Object error_symbol);
+extern void check_eval_depth (Lisp_Object);
+extern void pop_lisp_frame (union specbinding *, Lisp_Object *, specpdl_ref);
 
 /* Defined in editfns.c.  */
 extern void insert1 (Lisp_Object);

@@ -854,7 +854,6 @@ json_to_lisp (json_t *json, const struct json_configuration *conf)
               break;
             }
           default:
-            /* Can't get here.  */
             emacs_abort ();
           }
         --lisp_eval_depth;
@@ -926,14 +925,12 @@ json_to_lisp (json_t *json, const struct json_configuration *conf)
               break;
             }
           default:
-            /* Can't get here.  */
             emacs_abort ();
           }
         --lisp_eval_depth;
         return result;
       }
     }
-  /* Can't get here.  */
   emacs_abort ();
 }
 

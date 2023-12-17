@@ -796,11 +796,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	    else
 	      val = funcall_general (original_fun, call_nargs, call_args);
 
-	    --lisp_eval_depth;
-	    if (backtrace_debug_on_exit (specpdl_ptr - 1))
-	      val = call_debugger (list2 (Qexit, val));
-	    --specpdl_ptr;
-
+	    pop_lisp_frame (specpdl_ptr - 1, &val, make_invalid_specpdl_ref ());
 	    TOP = val;
 	    NEXT;
 	  }
@@ -868,11 +864,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	    if (saved_top)
 	      {
 		Lisp_Object val = TOP;
-
-		--lisp_eval_depth;
-		if (backtrace_debug_on_exit (specpdl_ptr - 1))
-		  val = call_debugger (list2 (Qexit, val));
-		--specpdl_ptr;
+		pop_lisp_frame (specpdl_ptr - 1, &val, make_invalid_specpdl_ref ());
 
 		top = saved_top;
 		pc = bc->fp->saved_pc;
