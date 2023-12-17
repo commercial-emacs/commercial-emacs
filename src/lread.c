@@ -2181,7 +2181,7 @@ readevalloop (Lisp_Object readcharfun,
   specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);
 
   /* Ensure sourcename is absolute, except whilst preloading.  */
-  if (!will_dump_p ()
+  if (! will_dump_p ()
       && ! NILP (sourcename) && ! NILP (Ffile_name_absolute_p (sourcename)))
     sourcename = Fexpand_file_name (sourcename, Qnil);
 

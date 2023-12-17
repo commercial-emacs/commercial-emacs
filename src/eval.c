@@ -2895,10 +2895,8 @@ static Lisp_Object
 funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
 		register Lisp_Object *arg_vector)
 {
-  Lisp_Object val, syms_left, next, lexenv;
+  Lisp_Object val, syms_left, lexenv = Qnil;
   specpdl_ref count = SPECPDL_INDEX ();
-  ptrdiff_t i;
-  bool optional, rest;
 
   if (CONSP (fun))
     {
@@ -2946,28 +2944,27 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
   else
     emacs_abort ();
 
-  i = optional = rest = 0;
+  bool optional = false, rest = false;
+  ptrdiff_t i = 0;
   bool previous_rest = false;
-  for (; CONSP (syms_left); syms_left = XCDR (syms_left))
+  FOR_EACH_TAIL (syms_left)
     {
-      maybe_quit ();
-
-      next = XCAR (syms_left);
-      if (!SYMBOLP (next))
+      Lisp_Object sym = XCAR (syms_left);
+      if (! SYMBOLP (sym))
 	xsignal1 (Qinvalid_function, fun);
 
-      if (EQ (next, Qand_rest))
+      if (EQ (sym, Qand_rest))
         {
           if (rest || previous_rest)
             xsignal1 (Qinvalid_function, fun);
-          rest = 1;
+          rest = true;
 	  previous_rest = true;
         }
-      else if (EQ (next, Qand_optional))
+      else if (EQ (sym, Qand_optional))
         {
           if (optional || rest || previous_rest)
             xsignal1 (Qinvalid_function, fun);
-          optional = 1;
+          optional = true;
         }
       else
 	{
@@ -2979,28 +2976,27 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
 	    }
 	  else if (i < nargs)
 	    arg = arg_vector[i++];
-	  else if (!optional)
+	  else if (! optional)
 	    xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
 	  else
 	    arg = Qnil;
 
-	  /* Bind the argument.  */
-	  if (!NILP (lexenv) && SYMBOLP (next))
-	    /* Lexically bind NEXT by adding it to the lexenv alist.  */
-	    lexenv = Fcons (Fcons (next, arg), lexenv);
+	  if (! NILP (lexenv) && SYMBOLP (sym))
+	    /* Lexically bind SYM.  */
+	    lexenv = Fcons (Fcons (sym, arg), lexenv);
 	  else
-	    /* Dynamically bind NEXT.  */
-	    specbind (next, arg);
+	    /* Dynamically bind SYM.  */
+	    specbind (sym, arg);
 	  previous_rest = false;
 	}
     }
 
-  if (!NILP (syms_left) || previous_rest)
+  if (! NILP (syms_left) || previous_rest)
     xsignal1 (Qinvalid_function, fun);
   else if (i < nargs)
     xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
 
-  if (!EQ (lexenv, Vlexical_environment))
+  if (! EQ (lexenv, Vlexical_environment))
     /* Instantiate a new lexical environment.  */
     specbind (Qlexical_environment, lexenv);
 
@@ -3110,13 +3106,13 @@ lambda_arity (Lisp_Object fun)
   bool optional = false;
   for (; CONSP (syms_left); syms_left = XCDR (syms_left))
     {
-      Lisp_Object next = XCAR (syms_left);
-      if (!SYMBOLP (next))
+      Lisp_Object sym = XCAR (syms_left);
+      if (! SYMBOLP (sym))
 	xsignal1 (Qinvalid_function, fun);
 
-      if (EQ (next, Qand_rest))
+      if (EQ (sym, Qand_rest))
 	return Fcons (make_fixnum (minargs), Qmany);
-      else if (EQ (next, Qand_optional))
+      else if (EQ (sym, Qand_optional))
 	optional = true;
       else
 	{
@@ -3227,15 +3223,6 @@ specbind (Lisp_Object argsym, Lisp_Object value)
       XSYMBOL (symbol)->u.s.buffer_local_default = xsymbol->u.s.buffer_local_default;
       XSYMBOL (symbol)->u.s.c_variable = xsymbol->u.s.c_variable;
       XSYMBOL (symbol)->u.s.buffer_local_buffer = xsymbol->u.s.buffer_local_buffer;
-
-      /* effing brutal */
-      lispfwd valpp = XSYMBOL (symbol)->u.s.c_variable;
-      if (valpp.fwdptr && XFWDTYPE (valpp) == Lisp_Fwd_Obj)
-	{
-	  struct Lisp_Objfwd *valp = (struct Lisp_Objfwd *) valpp.fwdptr;
-	  if (valp->objvar == &Vlexical_environment)
-	    valp->objvar = &current_thread->lexical_environment;
-	}
       xsymbol = XSYMBOL (symbol);
     }
 #endif
