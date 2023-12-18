@@ -169,15 +169,13 @@ backtrace_thread_p (struct thread_state *tstate, union specbinding *pdl)
 union specbinding *
 backtrace_top (void)
 {
-  /* This is so "xbacktrace" doesn't crash in pdumped Emacs if they
-     invoke the command before init_eval_once_for_pdumper initializes
-     specpdl machinery.  See also backtrace_p above.  */
-  if (!specpdl)
-    return NULL;
-
-  union specbinding *pdl = specpdl_ptr - 1;
-  while (backtrace_p (pdl) && pdl->kind != SPECPDL_BACKTRACE)
-    pdl--;
+  union specbinding *pdl = NULL;
+  if (specpdl)
+    {
+      for (pdl = specpdl_ptr - 1;
+	   backtrace_p (pdl) && pdl->kind != SPECPDL_BACKTRACE;
+	   --pdl);
+    }
   return pdl;
 }
 
@@ -587,15 +585,11 @@ signal a `cyclic-variable-indirection' error.  */)
                   ("Overwriting value of `%s' by aliasing to `%s'"),
                   new_alias, base_variable));
 
-  {
-    union specbinding *p;
-
-    for (p = specpdl_ptr; p > specpdl; )
-      if ((--p)->kind >= SPECPDL_LET
-	  && (EQ (new_alias, specpdl_symbol (p))))
-	error ("Don't know how to make a let-bound variable an alias: %s",
-	       SDATA (SYMBOL_NAME (new_alias)));
-  }
+  for (union specbinding *p = specpdl_ptr - 1; p > specpdl; --p)
+    if (p->kind >= SPECPDL_LET
+	&& EQ (new_alias, specpdl_symbol (p)))
+      error ("Don't know how to make a let-bound variable an alias: %s",
+	     SDATA (SYMBOL_NAME (new_alias)));
 
   if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
     notify_variable_watchers (new_alias, base_variable, Qdefvaralias, Qnil);
@@ -3168,10 +3162,10 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
 bool
 locally_unbound_blv_let_bounded (struct Lisp_Symbol *symbol)
 {
-  for (union specbinding *p = specpdl_ptr; p > specpdl; )
-    if ((--p)->kind == SPECPDL_LET_BLD
-	&& XSYMBOL (specpdl_symbol (p)) == symbol
-	&& EQ (specpdl_buffer (p), Fcurrent_buffer ()))
+  for (union specbinding *pdl = specpdl_ptr - 1; pdl > specpdl; --pdl)
+    if (pdl->kind == SPECPDL_LET_BLD
+	&& XSYMBOL (specpdl_symbol (pdl)) == symbol
+	&& EQ (specpdl_buffer (pdl), Fcurrent_buffer ()))
       return true;
   return false;
 }
