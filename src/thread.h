@@ -78,6 +78,9 @@ struct thread_state
   /* Mutex or condvar waited for.  */
   Lisp_Object event_object;
 
+  /* Reference to per-thread environment for gc marking.  */
+  Lisp_Object lexical_environment;
+
   /* !!! Adjust ALLOCATE_ZEROED_PSEUDOVECTOR for new Lisp fields.  */
 
   char const *m_stack_bottom;

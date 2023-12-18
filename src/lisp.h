@@ -3110,7 +3110,7 @@ union specbinding
     } unwind_void;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      Lisp_Object symbol, old_value, buffer;
+      Lisp_Object symbol, value, buffer;
     } let;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;

@@ -74,23 +74,23 @@ specpdl_kind (union specbinding *pdl)
 }
 
 static Lisp_Object *
-specpdl_old_value_addr (union specbinding *pdl)
+specpdl_value_addr (union specbinding *pdl)
 {
   eassert (pdl->kind >= SPECPDL_LET);
-  return &pdl->let.old_value;
+  return &pdl->let.value;
 }
 
 static Lisp_Object
-specpdl_old_value (union specbinding *pdl)
+specpdl_value (union specbinding *pdl)
 {
-  return *specpdl_old_value_addr (pdl);
+  return *specpdl_value_addr (pdl);
 }
 
 static void
-set_specpdl_old_value (union specbinding *pdl, Lisp_Object val)
+set_specpdl_value (union specbinding *pdl, Lisp_Object val)
 {
   eassert (pdl->kind >= SPECPDL_LET);
-  pdl->let.old_value = val;
+  pdl->let.value = val;
 }
 
 static Lisp_Object *
@@ -470,30 +470,25 @@ of unexpected results when a quoted object is modified.
 usage: (quote ARG)  */)
   (Lisp_Object args)
 {
-  if (!NILP (XCDR (args)))
+  if (! NILP (XCDR (args)))
     xsignal2 (Qwrong_number_of_arguments, Qquote, Flength (args));
   return XCAR (args);
 }
 
 DEFUN ("function", Ffunction, Sfunction, 1, UNEVALLED, 0,
-       doc: /* Like `quote', but preferred for objects which are functions.
-In byte compilation, `function' causes its argument to be handled by
-the byte compiler.  Similarly, when expanding macros and expressions,
-ARG can be examined and possibly expanded.  If `quote' is used
-instead, this doesn't happen.
-
+       doc: /* Like `quote', but potentially byte-compiles or macroexpands ARG.
 usage: (function ARG)  */)
   (Lisp_Object args)
 {
   Lisp_Object quoted = XCAR (args);
-
-  if (!NILP (XCDR (args)))
+  if (! NILP (XCDR (args)))
     xsignal2 (Qwrong_number_of_arguments, Qfunction, Flength (args));
 
-  if (!NILP (Vlexical_environment)
+  if (! NILP (Vlexical_environment)
       && CONSP (quoted)
       && EQ (XCAR (quoted), Qlambda))
-    { /* This is a lambda expression within a lexical environment;
+    {
+      /* A lambda expression within a lexical environment;
 	 return an interpreted closure instead of a simple lambda.  */
       Lisp_Object cdr = XCDR (quoted);
       Lisp_Object tmp = cdr;
@@ -501,22 +496,20 @@ usage: (function ARG)  */)
 	  && (tmp = XCDR (tmp), CONSP (tmp))
 	  && (tmp = XCAR (tmp), CONSP (tmp))
 	  && (EQ (QCdocumentation, XCAR (tmp))))
-	{ /* Handle the special (:documentation <form>) to build the docstring
-	     dynamically.  */
+	{
+	  /* Build docstring from (:documentation <form>).  */
 	  Lisp_Object docstring = eval_form (CAR (XCDR (tmp)));
-	  if (SYMBOLP (docstring) && !NILP (docstring))
-	    /* Hack for OClosures: Allow the docstring to be a symbol
-             * (the OClosure's type).  */
+	  if (SYMBOLP (docstring) && ! NILP (docstring))
+	    /* OClosure docstrings are just their types, and thus symbols.  */
 	    docstring = Fsymbol_name (docstring);
 	  CHECK_STRING (docstring);
 	  cdr = Fcons (XCAR (cdr), Fcons (docstring, XCDR (XCDR (cdr))));
 	}
-      if (NILP (Vinternal_make_interpreted_closure_function))
-        return Fcons (Qclosure, Fcons (Vlexical_environment, cdr));
-      else
-        return call2 (Vinternal_make_interpreted_closure_function,
-                      Fcons (Qlambda, cdr),
-                      Vlexical_environment);
+      return ! NILP (Vinternal_make_interpreted_closure_function)
+	? call2 (Vinternal_make_interpreted_closure_function,
+		 Fcons (Qlambda, cdr),
+		 Vlexical_environment)
+	: Fcons (Qclosure, Fcons (Vlexical_environment, cdr));
     }
   else
     /* Simply quote the argument.  */
@@ -647,7 +640,7 @@ DEFUN ("default-toplevel-value", Fdefault_toplevel_value, Sdefault_toplevel_valu
 {
   union specbinding *binding = default_toplevel_binding (symbol);
   Lisp_Object value
-    = binding ? specpdl_old_value (binding) : Fdefault_value (symbol);
+    = binding ? specpdl_value (binding) : Fdefault_value (symbol);
   if (!EQ (value, Qunbound))
     return value;
   xsignal1 (Qvoid_variable, symbol);
@@ -661,7 +654,7 @@ DEFUN ("set-default-toplevel-value", Fset_default_toplevel_value,
 {
   union specbinding *binding = default_toplevel_binding (symbol);
   if (binding)
-    set_specpdl_old_value (binding, value);
+    set_specpdl_value (binding, value);
   else
     Fset_default (symbol, value);
   return Qnil;
@@ -679,7 +672,7 @@ lexbound_p (Lisp_Object symbol)
 	case SPECPDL_LET:
 	  if (EQ (specpdl_symbol (pdl), Qlexical_environment))
 	    {
-	      Lisp_Object env = specpdl_old_value (pdl);
+	      Lisp_Object env = specpdl_value (pdl);
 	      if (CONSP (env) && !NILP (Fassq (symbol, env)))
 	        return true;
 	    }
@@ -738,9 +731,9 @@ defvar (Lisp_Object sym, Lisp_Object initvalue, Lisp_Object docstring, bool eval
     { /* Check if there is really a global binding rather than just a let
 	     binding that shadows the global unboundness of the var.  */
       union specbinding *binding = default_toplevel_binding (sym);
-      if (binding && EQ (specpdl_old_value (binding), Qunbound))
+      if (binding && EQ (specpdl_value (binding), Qunbound))
 	{
-	  set_specpdl_old_value (binding,
+	  set_specpdl_value (binding,
 	                         eval ? eval_form (initvalue) : initvalue);
 	}
     }
@@ -786,9 +779,8 @@ usage: (defvar SYMBOL &optional INITVALUE DOCSTRING)  */)
     {
       if (! NILP (Vlexical_environment)
 	  && ! XSYMBOL (sym)->u.s.declared_special)
-	/* Make a special variable only within let-block.  */
-	Vlexical_environment
-	  = Fcons (sym, Vlexical_environment);
+	/* Make a special variable for duration of environment.  */
+	Vlexical_environment = Fcons (sym, Vlexical_environment);
       /* Otherwise (defvar FOO) is a no-op.  */
     }
   else
@@ -2176,19 +2168,18 @@ it defines a macro.  */)
 static Lisp_Object list_of_t;  /* Never-modified constant containing (t).  */
 
 DEFUN ("eval", Feval, Seval, 1, 2, 0,
-       doc: /* Evaluate FORM and return its value.
-If LEXICAL is `t', evaluate using lexical binding by default.
-This is the recommended value.
-
-If absent or `nil', use dynamic scoping only.
-
-LEXICAL can also represent an actual lexical environment; see the Info
-node `(elisp)Eval' for details.  */)
+       doc: /* Return evaluated FORM.
+For historical consistency, evaluation defaults to dynamic scoping.
+To apply lexical scoping, explicitly set LEXICAL to non-nil.  LEXICAL
+can also specify the lexical environment to apply; please see the Info
+node `(elisp)Eval' for its form.  */)
   (Lisp_Object form, Lisp_Object lexical)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   specbind (Qlexical_environment,
-	    ! NILP (Flistp (lexical)) ? lexical : list_of_t);
+	    ! NILP (Flistp (lexical))
+	    ? lexical /* dynamic if LEXICAL is nil, bespoke otherwise */
+	    : list_of_t /* lexical without bespoke environment */);
   return unbind_to (count, eval_form (form));
 }
 
@@ -2233,7 +2224,7 @@ populate_evaluated_args (Lisp_Object args,
 Lisp_Object
 eval_form (Lisp_Object form)
 {
-  const unsigned char subr_max_nargs = 8; /* Sucks I know...  */
+  static const unsigned char subr_max_nargs = 8; /* !!! tweak switch cases.  */
   Lisp_Object result = form;
   if (SYMBOLP (form))
     {
@@ -3234,12 +3225,12 @@ specbind (Lisp_Object argsym, Lisp_Object value)
     case SYMBOL_PLAINVAL:
       specpdl_ptr->let.kind = SPECPDL_LET;
       specpdl_ptr->let.symbol = symbol;
-      specpdl_ptr->let.old_value = SYMBOL_VAL (xsymbol);
+      specpdl_ptr->let.value = SYMBOL_VAL (xsymbol);
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
       specpdl_ptr->let.kind = SPECPDL_LET_BLV;
       specpdl_ptr->let.symbol = symbol;
-      specpdl_ptr->let.old_value = find_symbol_value (xsymbol, current_buffer);
+      specpdl_ptr->let.value = find_symbol_value (xsymbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       eassert (XBUFFER (xsymbol->u.s.buffer_local_buffer) == current_buffer);
       /* See locally_unbound_blv_let_bounded.  */
@@ -3250,7 +3241,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
     case SYMBOL_KBOARD:
       specpdl_ptr->let.kind = SPECPDL_LET;
       specpdl_ptr->let.symbol = symbol;
-      specpdl_ptr->let.old_value = find_symbol_value (xsymbol, current_buffer);
+      specpdl_ptr->let.value = find_symbol_value (xsymbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       break;
     case SYMBOL_PER_BUFFER:
@@ -3260,7 +3251,7 @@ specbind (Lisp_Object argsym, Lisp_Object value)
 	? SPECPDL_LET_BLD
 	: SPECPDL_LET_BLV;
       specpdl_ptr->let.symbol = symbol;
-      specpdl_ptr->let.old_value = find_symbol_value (xsymbol, current_buffer);
+      specpdl_ptr->let.value = find_symbol_value (xsymbol, current_buffer);
       specpdl_ptr->let.buffer = Fcurrent_buffer ();
       break;
     default:
@@ -3412,9 +3403,9 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
 	  {
 	    /* Simple let binding of non-slot variable.  */
 	    if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
-	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_old_value (this_binding));
+	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_value (this_binding));
 	    else
-	      set_internal (sym, specpdl_old_value (this_binding),
+	      set_internal (sym, specpdl_value (this_binding),
                             Qnil, bindflag);
 	    break;
 	  }
@@ -3423,20 +3414,20 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
       FALLTHROUGH;
     case SPECPDL_LET_BLD:
       set_default_internal (specpdl_symbol (this_binding),
-                            specpdl_old_value (this_binding),
+                            specpdl_value (this_binding),
                             bindflag);
       break;
     case SPECPDL_LET_BLV:
       {
 	Lisp_Object symbol = specpdl_symbol (this_binding);
 	Lisp_Object where = specpdl_buffer (this_binding);
-	Lisp_Object old_value = specpdl_old_value (this_binding);
+	Lisp_Object value = specpdl_value (this_binding);
 	eassert (BUFFERP (where));
 
 	/* If this was a local binding, reset the value in the appropriate
 	   buffer, but only if that buffer's binding still exists.  */
 	if (!NILP (Flocal_variable_p (symbol, where)))
-          set_internal (symbol, old_value, where, bindflag);
+          set_internal (symbol, value, where, bindflag);
       }
       break;
     }
@@ -3719,9 +3710,9 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		Lisp_Object sym = specpdl_symbol (frm);
 		if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
 		  {
-		    Lisp_Object old_value = specpdl_old_value (frm);
-		    set_specpdl_old_value (frm, SYMBOL_VAL (XSYMBOL (sym)));
-		    SET_SYMBOL_VAL (XSYMBOL (sym), old_value);
+		    Lisp_Object value = specpdl_value (frm);
+		    set_specpdl_value (frm, SYMBOL_VAL (XSYMBOL (sym)));
+		    SET_SYMBOL_VAL (XSYMBOL (sym), value);
 		    break;
 		  }
 	      }
@@ -3731,23 +3722,23 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 	    case SPECPDL_LET_BLD:
 	      {
 		Lisp_Object sym = specpdl_symbol (frm);
-		Lisp_Object old_value = specpdl_old_value (frm);
-		set_specpdl_old_value (frm, default_value (sym));
-		set_default_internal (sym, old_value, SET_INTERNAL_THREAD_SWITCH);
+		Lisp_Object value = specpdl_value (frm);
+		set_specpdl_value (frm, default_value (sym));
+		set_default_internal (sym, value, SET_INTERNAL_THREAD_SWITCH);
 	      }
 	      break;
 	    case SPECPDL_LET_BLV:
 	      {
 		Lisp_Object symbol = specpdl_symbol (frm);
 		Lisp_Object where = specpdl_buffer (frm);
-		Lisp_Object old_value = specpdl_old_value (frm);
+		Lisp_Object value = specpdl_value (frm);
 		eassert (BUFFERP (where));
 
 		if (! NILP (Flocal_variable_p (symbol, where)))
 		  {
-		    set_specpdl_old_value
+		    set_specpdl_value
 		      (frm, find_symbol_value (XSYMBOL (symbol), XBUFFER (where)));
-		    set_internal (symbol, old_value, where,
+		    set_internal (symbol, value, where,
 				  SET_INTERNAL_THREAD_SWITCH);
 		  }
 		else
@@ -3831,11 +3822,11 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
     error ("Activation frame not found!");
 
   /* The specpdl entries normally contain the symbol being bound along with its
-     `old_value', so it can be restored.  The new value to which it is bound is
+     `value', so it can be restored.  The new value to which it is bound is
      available in one of two places: either in the current value of the
-     variable (if it hasn't been rebound yet) or in the `old_value' slot of the
+     variable (if it hasn't been rebound yet) or in the `value' slot of the
      next specpdl entry for it.
-     `backtrace_eval_unwind' happens to swap the role of `old_value'
+     `backtrace_eval_unwind' happens to swap the role of `value'
      and "new value", so we abuse it here, to fetch the new value.
      It's ugly (we'd rather not modify global data) and a bit inefficient,
      but it does the job for now.  */
@@ -3853,7 +3844,7 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
 	  case SPECPDL_LET_BLV:
 	    {
 	      Lisp_Object sym = specpdl_symbol (tmp);
-	      Lisp_Object val = specpdl_old_value (tmp);
+	      Lisp_Object val = specpdl_value (tmp);
 	      if (EQ (sym, Qlexical_environment))
 		{
 		  Lisp_Object env = val;
@@ -3928,7 +3919,7 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 	  FALLTHROUGH;
 	case SPECPDL_LET:
 	  mark_object (specpdl_symbol_addr (pdl));
-	  mark_object (specpdl_old_value_addr (pdl));
+	  mark_object (specpdl_value_addr (pdl));
 	  break;
 
 	case SPECPDL_UNWIND_PTR:
