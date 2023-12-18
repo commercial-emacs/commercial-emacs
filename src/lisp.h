@@ -3067,7 +3067,8 @@ enum specbind_tag {
 #endif
   SPECPDL_LET,			/* A plain and simple dynamic let-binding.  */
   SPECPDL_LET_BLV,		/* Let of blv when `local-variable-p' true.  */
-  SPECPDL_LET_BLD		/* Let of blv when `local-variable-p' false.  */
+  SPECPDL_LET_BLD,		/* Let of blv when `local-variable-p' false.  */
+  SPECPDL_LEXICAL_ENVIRONMENT   /* What else would this be.  */
 };
 
 union specbinding
@@ -3119,6 +3120,10 @@ union specbinding
       Lisp_Object *args;
       ptrdiff_t nargs;
     } bt;
+    struct {
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;
+      Lisp_Object value;
+    } lexical_environment;
   };
 
 /* We use 64-bit platforms as a proxy for ones with ABIs that treat

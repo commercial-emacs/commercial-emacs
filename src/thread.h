@@ -107,7 +107,8 @@ struct thread_state
   union specbinding *m_specpdl_end;
 #define specpdl_end (current_thread->m_specpdl_end)
 
-  /* Top of specpdl.  */
+  /* Top of specpdl.  Tromey (68b3248) called this entry "unused."  We
+     assume he meant an entry allocated but not yet binding.  */
   union specbinding *m_specpdl_ptr;
 #define specpdl_ptr (current_thread->m_specpdl_ptr)
 

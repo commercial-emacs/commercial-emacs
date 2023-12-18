@@ -616,18 +616,18 @@ static union specbinding *
 default_toplevel_binding (Lisp_Object symbol)
 {
   union specbinding *binding = NULL;
-  union specbinding *pdl = specpdl_ptr;
-  while (pdl > specpdl)
+  eassert (! EQ (symbol, Qlexical_binding));
+  for (union specbinding *pdl = specpdl_ptr - 1; pdl > specpdl; --pdl)
     {
-      switch ((--pdl)->kind)
+      switch (pdl->kind)
 	{
 	case SPECPDL_LET_BLD:
 	case SPECPDL_LET:
 	  if (EQ (specpdl_symbol (pdl), symbol))
 	    binding = pdl;
 	  break;
-
-	default: break;
+	default:
+	  break;
 	}
     }
   return binding;
@@ -663,17 +663,17 @@ DEFUN ("set-default-toplevel-value", Fset_default_toplevel_value,
 static bool
 lexbound_p (Lisp_Object symbol)
 {
-  union specbinding *pdl = specpdl_ptr;
-  while (pdl > specpdl)
+  eassert (! EQ (symbol, Qlexical_binding));
+  for (union specbinding *pdl = specpdl_ptr - 1; pdl > specpdl; --pdl)
     {
-      switch ((--pdl)->kind)
+      switch (pdl->kind)
 	{
 	case SPECPDL_LET_BLD:
 	case SPECPDL_LET:
 	  if (EQ (specpdl_symbol (pdl), Qlexical_environment))
 	    {
 	      Lisp_Object env = specpdl_value (pdl);
-	      if (CONSP (env) && !NILP (Fassq (symbol, env)))
+	      if (CONSP (env) && ! NILP (Fassq (symbol, env)))
 	        return true;
 	    }
 	  break;
@@ -716,11 +716,8 @@ value.  */)
 static Lisp_Object
 defvar (Lisp_Object sym, Lisp_Object initvalue, Lisp_Object docstring, bool eval)
 {
-  Lisp_Object tem;
-
   CHECK_SYMBOL (sym);
-
-  tem = Fdefault_boundp (sym);
+  Lisp_Object tem = Fdefault_boundp (sym);
 
   /* Do it before evaluating the initial value, for self-references.  */
   Finternal__define_uninitialized_variable (sym, docstring);
@@ -728,14 +725,13 @@ defvar (Lisp_Object sym, Lisp_Object initvalue, Lisp_Object docstring, bool eval
   if (NILP (tem))
     Fset_default (sym, eval ? eval_form (initvalue) : initvalue);
   else
-    { /* Check if there is really a global binding rather than just a let
-	     binding that shadows the global unboundness of the var.  */
+    {
+      /* Check if there is really a global binding rather than just a let
+	 binding that shadows the global unboundness of the var.  */
       union specbinding *binding = default_toplevel_binding (sym);
       if (binding && EQ (specpdl_value (binding), Qunbound))
-	{
-	  set_specpdl_value (binding,
-	                         eval ? eval_form (initvalue) : initvalue);
-	}
+	set_specpdl_value (binding,
+			   eval ? eval_form (initvalue) : initvalue);
     }
   return sym;
 }
@@ -3356,84 +3352,6 @@ record_unwind_protect_module (enum specbind_tag kind, void *ptr)
 }
 
 static void
-do_one_unbind (union specbinding *this_binding, bool unwinding,
-               enum Set_Internal_Bind bindflag)
-{
-  eassert (unwinding || this_binding->kind >= SPECPDL_LET);
-  switch (this_binding->kind)
-    {
-    case SPECPDL_UNWIND:
-      lisp_eval_depth = this_binding->unwind.eval_depth;
-      this_binding->unwind.func (this_binding->unwind.arg);
-      break;
-    case SPECPDL_UNWIND_ARRAY:
-      xfree (this_binding->unwind_array.array);
-      break;
-    case SPECPDL_UNWIND_PTR:
-      this_binding->unwind_ptr.func (this_binding->unwind_ptr.arg);
-      break;
-    case SPECPDL_UNWIND_INT:
-      this_binding->unwind_int.func (this_binding->unwind_int.arg);
-      break;
-    case SPECPDL_UNWIND_INTMAX:
-      this_binding->unwind_intmax.func (this_binding->unwind_intmax.arg);
-      break;
-    case SPECPDL_UNWIND_VOID:
-      this_binding->unwind_void.func ();
-      break;
-    case SPECPDL_UNWIND_EXCURSION:
-      save_excursion_restore (this_binding->unwind_excursion.marker,
-			      this_binding->unwind_excursion.window);
-      break;
-    case SPECPDL_BACKTRACE:
-    case SPECPDL_NOP:
-      break;
-#ifdef HAVE_MODULES
-    case SPECPDL_MODULE_RUNTIME:
-      finalize_runtime_unwind (this_binding->unwind_ptr.arg);
-      break;
-    case SPECPDL_MODULE_ENVIRONMENT:
-      finalize_environment_unwind (this_binding->unwind_ptr.arg);
-      break;
-#endif
-    case SPECPDL_LET:
-      {
-	Lisp_Object sym = specpdl_symbol (this_binding);
-	if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
-	  {
-	    /* Simple let binding of non-slot variable.  */
-	    if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
-	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_value (this_binding));
-	    else
-	      set_internal (sym, specpdl_value (this_binding),
-                            Qnil, bindflag);
-	    break;
-	  }
-      }
-      /* gets here first time through when redirect isn't PLAINVAL.  */
-      FALLTHROUGH;
-    case SPECPDL_LET_BLD:
-      set_default_internal (specpdl_symbol (this_binding),
-                            specpdl_value (this_binding),
-                            bindflag);
-      break;
-    case SPECPDL_LET_BLV:
-      {
-	Lisp_Object symbol = specpdl_symbol (this_binding);
-	Lisp_Object where = specpdl_buffer (this_binding);
-	Lisp_Object value = specpdl_value (this_binding);
-	eassert (BUFFERP (where));
-
-	/* If this was a local binding, reset the value in the appropriate
-	   buffer, but only if that buffer's binding still exists.  */
-	if (!NILP (Flocal_variable_p (symbol, where)))
-          set_internal (symbol, value, where, bindflag);
-      }
-      break;
-    }
-}
-
-static void
 do_nothing (void)
 {}
 
@@ -3482,33 +3400,94 @@ set_unwind_protect_ptr (specpdl_ref count, void (*func) (void *), void *arg)
   p->unwind_ptr.mark = NULL;
 }
 
-/* Pop and execute entries from the unwind-protect stack until the
-   depth COUNT is reached.  Return VALUE.  */
+/* Pop entries from unwind-protect stack inclusive of depth COUNT.
+   Return VALUE.  */
 
 Lisp_Object
 unbind_to (specpdl_ref count, Lisp_Object value)
 {
-  Lisp_Object quitf = Vquit_flag;
-
+  const Lisp_Object restore_quit_flag = Vquit_flag;
   Vquit_flag = Qnil;
 
-  while (specpdl_ptr != specpdl_ref_to_ptr (count))
-    {
-      /* Copy the binding, and decrement specpdl_ptr, before we do
-	 the work to unbind it.  We decrement first
-	 so that an error in unbinding won't try to unbind
-	 the same entry again, and we copy the binding first
-	 in case more bindings are made during some of the code we run.  */
-
-      union specbinding this_binding;
-      this_binding = *--specpdl_ptr;
-
-      do_one_unbind (&this_binding, true, SET_INTERNAL_UNBIND);
-    }
-
-  if (NILP (Vquit_flag) && !NILP (quitf))
-    Vquit_flag = quitf;
-
+  /* The COUNT-th entry becomes the new SPECPDL_PTR (stack top), and
+     thus according to Tromey's confusing lingo becomes "unused," and
+     we assume, unbind-ed.  However in e160922 he glossed over the
+     degenerate case of SPECPDL_PTR already pointing to the COUNT-th.  */
+  for (const union specbinding *until = specpdl_ref_to_ptr (count);
+       specpdl_ptr != until; )
+    switch ((--specpdl_ptr)->kind)
+      {
+      case SPECPDL_UNWIND:
+	lisp_eval_depth = specpdl_ptr->unwind.eval_depth;
+	specpdl_ptr->unwind.func (specpdl_ptr->unwind.arg);
+	break;
+      case SPECPDL_UNWIND_ARRAY:
+	xfree (specpdl_ptr->unwind_array.array);
+	break;
+      case SPECPDL_UNWIND_PTR:
+	specpdl_ptr->unwind_ptr.func (specpdl_ptr->unwind_ptr.arg);
+	break;
+      case SPECPDL_UNWIND_INT:
+	specpdl_ptr->unwind_int.func (specpdl_ptr->unwind_int.arg);
+	break;
+      case SPECPDL_UNWIND_INTMAX:
+	specpdl_ptr->unwind_intmax.func (specpdl_ptr->unwind_intmax.arg);
+	break;
+      case SPECPDL_UNWIND_VOID:
+	specpdl_ptr->unwind_void.func ();
+	break;
+      case SPECPDL_UNWIND_EXCURSION:
+	save_excursion_restore (specpdl_ptr->unwind_excursion.marker,
+				specpdl_ptr->unwind_excursion.window);
+	break;
+      case SPECPDL_BACKTRACE:
+      case SPECPDL_NOP:
+	break;
+#ifdef HAVE_MODULES
+      case SPECPDL_MODULE_RUNTIME:
+	finalize_runtime_unwind (specpdl_ptr->unwind_ptr.arg);
+	break;
+      case SPECPDL_MODULE_ENVIRONMENT:
+	finalize_environment_unwind (specpdl_ptr->unwind_ptr.arg);
+	break;
+#endif
+      case SPECPDL_LET:
+	{
+	  Lisp_Object sym = specpdl_symbol (specpdl_ptr);
+	  if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
+	    {
+	      /* Simple let binding of non-slot variable.  */
+	      if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
+		SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_value (specpdl_ptr));
+	      else
+		set_internal (sym, specpdl_value (specpdl_ptr),
+			      Qnil, SET_INTERNAL_UNBIND);
+	      break;
+	    }
+	}
+	/* gets here under `make-local-variable' on symbol not earlier
+	   let-bound.  */
+	FALLTHROUGH;
+      case SPECPDL_LET_BLD:
+	set_default_internal (specpdl_symbol (specpdl_ptr),
+			      specpdl_value (specpdl_ptr),
+			      SET_INTERNAL_UNBIND);
+	break;
+      case SPECPDL_LET_BLV:
+	{
+	  Lisp_Object symbol = specpdl_symbol (specpdl_ptr);
+	  Lisp_Object value = specpdl_value (specpdl_ptr);
+	  Lisp_Object where = specpdl_buffer (specpdl_ptr);
+	  eassert (BUFFERP (where));
+	  if (! NILP (Flocal_variable_p (symbol, where)))
+	    set_internal (symbol, value, where, SET_INTERNAL_UNBIND);
+	}
+	break;
+      default:
+	break;
+      }
+  if (NILP (Vquit_flag))
+    Vquit_flag = restore_quit_flag;
   return value;
 }
 
@@ -3683,35 +3662,35 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		       enum specbind_tag kind_or_above)
 {
   eassert (distance >= 0);
-  for (union specbinding *frm = pdl + step; distance > 0; --distance, frm += step)
+  for (union specbinding *bind = pdl + step; distance > 0; --distance, bind += step)
     {
-      if (frm->kind >= kind_or_above)
+      if (bind->kind >= kind_or_above)
 	{
-	  switch (frm->kind)
+	  switch (bind->kind)
 	    {
 	    case SPECPDL_UNWIND:
-	      if (frm->unwind.func == set_buffer_if_live)
+	      if (bind->unwind.func == set_buffer_if_live)
 		{
-		  Lisp_Object oldarg = frm->unwind.arg;
-		  frm->unwind.arg = Fcurrent_buffer ();
+		  Lisp_Object oldarg = bind->unwind.arg;
+		  bind->unwind.arg = Fcurrent_buffer ();
 		  set_buffer_if_live (oldarg);
 		}
 	      break;
 	    case SPECPDL_UNWIND_EXCURSION:
 	      {
-		Lisp_Object marker = frm->unwind_excursion.marker;
-		Lisp_Object window = frm->unwind_excursion.window;
-		save_excursion_save (frm);
+		Lisp_Object marker = bind->unwind_excursion.marker;
+		Lisp_Object window = bind->unwind_excursion.window;
+		save_excursion_save (bind);
 		save_excursion_restore (marker, window);
 	      }
 	      break;
 	    case SPECPDL_LET:
 	      {
-		Lisp_Object sym = specpdl_symbol (frm);
+		Lisp_Object sym = specpdl_symbol (bind);
 		if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
 		  {
-		    Lisp_Object value = specpdl_value (frm);
-		    set_specpdl_value (frm, SYMBOL_VAL (XSYMBOL (sym)));
+		    Lisp_Object value = specpdl_value (bind);
+		    set_specpdl_value (bind, SYMBOL_VAL (XSYMBOL (sym)));
 		    SET_SYMBOL_VAL (XSYMBOL (sym), value);
 		    break;
 		  }
@@ -3721,23 +3700,23 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 	      FALLTHROUGH;
 	    case SPECPDL_LET_BLD:
 	      {
-		Lisp_Object sym = specpdl_symbol (frm);
-		Lisp_Object value = specpdl_value (frm);
-		set_specpdl_value (frm, default_value (sym));
+		Lisp_Object sym = specpdl_symbol (bind);
+		Lisp_Object value = specpdl_value (bind);
+		set_specpdl_value (bind, default_value (sym));
 		set_default_internal (sym, value, SET_INTERNAL_THREAD_SWITCH);
 	      }
 	      break;
 	    case SPECPDL_LET_BLV:
 	      {
-		Lisp_Object symbol = specpdl_symbol (frm);
-		Lisp_Object where = specpdl_buffer (frm);
-		Lisp_Object value = specpdl_value (frm);
+		Lisp_Object symbol = specpdl_symbol (bind);
+		Lisp_Object where = specpdl_buffer (bind);
+		Lisp_Object value = specpdl_value (bind);
 		eassert (BUFFERP (where));
 
 		if (! NILP (Flocal_variable_p (symbol, where)))
 		  {
 		    set_specpdl_value
-		      (frm, find_symbol_value (XSYMBOL (symbol), XBUFFER (where)));
+		      (bind, find_symbol_value (XSYMBOL (symbol), XBUFFER (where)));
 		    set_internal (symbol, value, where,
 				  SET_INTERNAL_THREAD_SWITCH);
 		  }
@@ -3747,7 +3726,7 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		       it stays non-local.  Otherwise, we'll misuse
 		       this entry "in the wrong direction" (wtf
 		       b8460fc). */
-		    frm->kind = SPECPDL_NOP;
+		    bind->kind = SPECPDL_NOP;
 		  }
 	      }
 	      break;
@@ -3873,28 +3852,23 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
   return result;
 }
 
-
 void
 mark_specpdl (union specbinding *first, union specbinding *ptr)
 {
-  union specbinding *pdl;
-  for (pdl = first; pdl != ptr; pdl++)
+  for (union specbinding *pdl = first; pdl != ptr; ++pdl)
     {
       switch (pdl->kind)
         {
 	case SPECPDL_UNWIND:
 	  mark_object (specpdl_arg_addr (pdl));
 	  break;
-
 	case SPECPDL_UNWIND_ARRAY:
 	  mark_objects (pdl->unwind_array.array, pdl->unwind_array.nelts);
 	  break;
-
 	case SPECPDL_UNWIND_EXCURSION:
 	  mark_object (&pdl->unwind_excursion.marker);
 	  mark_object (&pdl->unwind_excursion.window);
 	  break;
-
 	case SPECPDL_BACKTRACE:
 	  {
 	    ptrdiff_t nargs = backtrace_nargs (pdl);
@@ -3904,7 +3878,6 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 	    mark_objects (backtrace_args (pdl), nargs);
 	  }
 	  break;
-
 #ifdef HAVE_MODULES
         case SPECPDL_MODULE_RUNTIME:
           break;
@@ -3912,7 +3885,6 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
           mark_module_environment (pdl->unwind_ptr.arg);
           break;
 #endif
-
 	case SPECPDL_LET_BLD:
 	case SPECPDL_LET_BLV:
 	  mark_object (specpdl_buffer_addr (pdl));
@@ -3921,23 +3893,18 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 	  mark_object (specpdl_symbol_addr (pdl));
 	  mark_object (specpdl_value_addr (pdl));
 	  break;
-
 	case SPECPDL_UNWIND_PTR:
 	  if (pdl->unwind_ptr.mark)
 	    pdl->unwind_ptr.mark (pdl->unwind_ptr.arg);
 	  break;
-
 	case SPECPDL_UNWIND_INT:
 	case SPECPDL_UNWIND_INTMAX:
         case SPECPDL_UNWIND_VOID:
 	case SPECPDL_NOP:
 	  break;
-
-	/* While other loops that scan the specpdl use "default: break;"
-	   for simplicity, here we explicitly list all cases and abort
-	   if we find an unexpected value, as a sanity check.  */
 	default:
 	  emacs_abort ();
+	  break;
 	}
     }
 }
@@ -3946,10 +3913,8 @@ void
 get_backtrace (Lisp_Object array)
 {
   union specbinding *pdl = backtrace_top ();
-  ptrdiff_t i = 0, asize = ASIZE (array);
-
   /* Copy the backtrace contents into working memory.  */
-  for (; i < asize; i++)
+  for (ptrdiff_t i = 0, asize = ASIZE (array); i < asize; ++i)
     {
       if (backtrace_p (pdl))
 	{
