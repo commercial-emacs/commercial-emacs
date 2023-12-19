@@ -6602,7 +6602,7 @@ side-effect of memorizing only.  Examples in `cperl-style-examples'."
 	  (and win (setq fr2 (window-frame win)))
 	  (if (or (not fr2) (eq fr1 fr2))
 	      (pop-to-buffer buf)
-	    (special-display-popup-frame buf) ; Make it visible
+	    (display-buffer-pop-up-frame buf nil) ; Make it visible
 	    (select-window win))
 	  (goto-char pos)		; Needed (?!).
 	  ;; Resize
