@@ -1035,6 +1035,9 @@ URIs are now prefixed with "https://" instead.
 *** 'bug-reference-mode' now supports 'thing-at-point'.
 Now, calling '(thing-at-point 'url)' when point is on a bug reference
 will return the URL for that bug.
+*** Specific timestamp format for rcirc log files
+Now, the timestamp format in rcirc chat buffers can differ from the
+timestamp format in the log files.
 
 ** Customize
 
