@@ -3395,9 +3395,10 @@ set_unwind_protect_ptr (specpdl_ref count, void (*func) (void *), void *arg)
 }
 
 /* Pop entries from unwind-protect stack until specpdl_ptr reaches the
-   specbinding at depth COUNT.  It's confusing because the incoming
-   specpdl_ptr is one past the most recent specbinding, and is not
-   itself unbind-able.  Return VALUE.  */
+   specbinding at depth COUNT.  Pointer decrementing gets confusing
+   because specpdl_ptr is one past the last operative specbinding
+   (specpdl_ptr points to the "on-deck" batter) and is not itself
+   unbind-able.  Return VALUE.  */
 
 Lisp_Object
 unbind_to (specpdl_ref count, Lisp_Object value)
