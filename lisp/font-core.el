@@ -123,12 +123,11 @@ supplant all of the above."
 	    (push (list 'face 'font-lock-face) char-property-alias-alist))))
     (setq-local char-property-alias-alist
                 (copy-tree char-property-alias-alist))
-    (let ((elt (assq 'face char-property-alias-alist)))
-      (when elt
-	(setcdr elt (remq 'font-lock-face (cdr elt)))
-	(unless (cdr elt)
-	  (setq char-property-alias-alist
-		(delq elt char-property-alias-alist))))))
+    (when-let ((elt (assq 'face char-property-alias-alist)))
+      (setcdr elt (remq 'font-lock-face (cdr elt)))
+      (unless (cdr elt)
+	(setq char-property-alias-alist
+	      (delq elt char-property-alias-alist)))))
 
   (funcall font-lock-function font-lock-mode)
 

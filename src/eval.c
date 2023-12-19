@@ -3394,8 +3394,10 @@ set_unwind_protect_ptr (specpdl_ref count, void (*func) (void *), void *arg)
   p->unwind_ptr.mark = NULL;
 }
 
-/* Pop entries from unwind-protect stack inclusive of depth COUNT.
-   Return VALUE.  */
+/* Pop entries from unwind-protect stack until specpdl_ptr reaches the
+   specbinding at depth COUNT.  It's confusing because the incoming
+   specpdl_ptr is one past the most recent specbinding, and is not
+   itself unbind-able.  Return VALUE.  */
 
 Lisp_Object
 unbind_to (specpdl_ref count, Lisp_Object value)
@@ -3403,83 +3405,83 @@ unbind_to (specpdl_ref count, Lisp_Object value)
   const Lisp_Object restore_quit_flag = Vquit_flag;
   Vquit_flag = Qnil;
 
-  /* The COUNT-th entry becomes the new SPECPDL_PTR (stack top), and
-     thus according to Tromey's confusing lingo becomes "unused," and
-     we assume, unbind-ed.  However in e160922 he glossed over the
-     degenerate case of SPECPDL_PTR already pointing to the COUNT-th.  */
-  for (const union specbinding *until = specpdl_ref_to_ptr (count);
-       specpdl_ptr != until; )
-    switch ((--specpdl_ptr)->kind)
-      {
-      case SPECPDL_UNWIND:
-	lisp_eval_depth = specpdl_ptr->unwind.eval_depth;
-	specpdl_ptr->unwind.func (specpdl_ptr->unwind.arg);
-	break;
-      case SPECPDL_UNWIND_ARRAY:
-	xfree (specpdl_ptr->unwind_array.array);
-	break;
-      case SPECPDL_UNWIND_PTR:
-	specpdl_ptr->unwind_ptr.func (specpdl_ptr->unwind_ptr.arg);
-	break;
-      case SPECPDL_UNWIND_INT:
-	specpdl_ptr->unwind_int.func (specpdl_ptr->unwind_int.arg);
-	break;
-      case SPECPDL_UNWIND_INTMAX:
-	specpdl_ptr->unwind_intmax.func (specpdl_ptr->unwind_intmax.arg);
-	break;
-      case SPECPDL_UNWIND_VOID:
-	specpdl_ptr->unwind_void.func ();
-	break;
-      case SPECPDL_UNWIND_EXCURSION:
-	save_excursion_restore (specpdl_ptr->unwind_excursion.marker,
-				specpdl_ptr->unwind_excursion.window);
-	break;
-      case SPECPDL_BACKTRACE:
-      case SPECPDL_NOP:
-	break;
+  while (specpdl_ptr != specpdl_ref_to_ptr (count))
+    {
+      eassert (specpdl_ptr > specpdl_ref_to_ptr (count));
+      switch ((--specpdl_ptr)->kind)
+	{
+	case SPECPDL_UNWIND:
+	  lisp_eval_depth = specpdl_ptr->unwind.eval_depth;
+	  specpdl_ptr->unwind.func (specpdl_ptr->unwind.arg);
+	  break;
+	case SPECPDL_UNWIND_ARRAY:
+	  xfree (specpdl_ptr->unwind_array.array);
+	  break;
+	case SPECPDL_UNWIND_PTR:
+	  specpdl_ptr->unwind_ptr.func (specpdl_ptr->unwind_ptr.arg);
+	  break;
+	case SPECPDL_UNWIND_INT:
+	  specpdl_ptr->unwind_int.func (specpdl_ptr->unwind_int.arg);
+	  break;
+	case SPECPDL_UNWIND_INTMAX:
+	  specpdl_ptr->unwind_intmax.func (specpdl_ptr->unwind_intmax.arg);
+	  break;
+	case SPECPDL_UNWIND_VOID:
+	  specpdl_ptr->unwind_void.func ();
+	  break;
+	case SPECPDL_UNWIND_EXCURSION:
+	  save_excursion_restore (specpdl_ptr->unwind_excursion.marker,
+				  specpdl_ptr->unwind_excursion.window);
+	  break;
+	case SPECPDL_BACKTRACE:
+	case SPECPDL_NOP:
+	  break;
 #ifdef HAVE_MODULES
-      case SPECPDL_MODULE_RUNTIME:
-	finalize_runtime_unwind (specpdl_ptr->unwind_ptr.arg);
-	break;
-      case SPECPDL_MODULE_ENVIRONMENT:
-	finalize_environment_unwind (specpdl_ptr->unwind_ptr.arg);
-	break;
+	case SPECPDL_MODULE_RUNTIME:
+	  finalize_runtime_unwind (specpdl_ptr->unwind_ptr.arg);
+	  break;
+	case SPECPDL_MODULE_ENVIRONMENT:
+	  finalize_environment_unwind (specpdl_ptr->unwind_ptr.arg);
+	  break;
 #endif
-      case SPECPDL_LET:
-	{
-	  Lisp_Object sym = specpdl_symbol (specpdl_ptr);
-	  if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
-	    {
-	      /* Simple let binding of non-slot variable.  */
-	      if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
-		SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_value (specpdl_ptr));
-	      else
-		set_internal (sym, specpdl_value (specpdl_ptr),
-			      Qnil, SET_INTERNAL_UNBIND);
-	      break;
-	    }
+	case SPECPDL_LET:
+	  {
+	    Lisp_Object sym = specpdl_symbol (specpdl_ptr);
+	    if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
+	      {
+		/* Simple let binding of non-slot variable.  */
+		if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
+		  SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_value (specpdl_ptr));
+		else
+		  set_internal (sym, specpdl_value (specpdl_ptr),
+				Qnil, SET_INTERNAL_UNBIND);
+		break;
+	      }
+	  }
+	  /* gets here under `make-local-variable' on symbol not earlier
+	     let-bound.  */
+	  FALLTHROUGH;
+	case SPECPDL_LET_BLD:
+	  set_default_internal (specpdl_symbol (specpdl_ptr),
+				specpdl_value (specpdl_ptr),
+				SET_INTERNAL_UNBIND);
+	  break;
+	case SPECPDL_LET_BLV:
+	  {
+	    Lisp_Object symbol = specpdl_symbol (specpdl_ptr);
+	    Lisp_Object value = specpdl_value (specpdl_ptr);
+	    Lisp_Object where = specpdl_buffer (specpdl_ptr);
+	    eassert (BUFFERP (where));
+	    if (! NILP (Flocal_variable_p (symbol, where)))
+	      set_internal (symbol, value, where, SET_INTERNAL_UNBIND);
+	  }
+	  break;
+	default:
+	  break;
 	}
-	/* gets here under `make-local-variable' on symbol not earlier
-	   let-bound.  */
-	FALLTHROUGH;
-      case SPECPDL_LET_BLD:
-	set_default_internal (specpdl_symbol (specpdl_ptr),
-			      specpdl_value (specpdl_ptr),
-			      SET_INTERNAL_UNBIND);
-	break;
-      case SPECPDL_LET_BLV:
-	{
-	  Lisp_Object symbol = specpdl_symbol (specpdl_ptr);
-	  Lisp_Object value = specpdl_value (specpdl_ptr);
-	  Lisp_Object where = specpdl_buffer (specpdl_ptr);
-	  eassert (BUFFERP (where));
-	  if (! NILP (Flocal_variable_p (symbol, where)))
-	    set_internal (symbol, value, where, SET_INTERNAL_UNBIND);
-	}
-	break;
-      default:
-	break;
-      }
+    }
+  eassert (specpdl_ptr == specpdl_ref_to_ptr (count));
+
   if (NILP (Vquit_flag))
     Vquit_flag = restore_quit_flag;
   return value;
@@ -3523,13 +3525,11 @@ get_backtrace_starting_at (Lisp_Object base)
 static union specbinding *
 get_backtrace_frame (Lisp_Object nframes, Lisp_Object base)
 {
-  register EMACS_INT i;
-
   CHECK_FIXNAT (nframes);
   union specbinding *pdl = get_backtrace_starting_at (base);
 
   /* Find the frame requested.  */
-  for (i = XFIXNAT (nframes); i > 0 && backtrace_p (pdl); i--)
+  for (EMACS_INT i = XFIXNAT (nframes); i > 0 && backtrace_p (pdl); i--)
     pdl = backtrace_next (pdl);
 
   return pdl;
