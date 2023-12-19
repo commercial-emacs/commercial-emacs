@@ -654,30 +654,6 @@ DEFUN ("set-default-toplevel-value", Fset_default_toplevel_value,
   return Qnil;
 }
 
-static bool
-lexbound_p (Lisp_Object symbol)
-{
-  eassert (! EQ (symbol, Qlexical_binding));
-  for (union specbinding *pdl = specpdl_ptr - 1; pdl > specpdl; --pdl)
-    {
-      switch (pdl->kind)
-	{
-	case SPECPDL_LET_BLD:
-	case SPECPDL_LET:
-	  if (EQ (specpdl_symbol (pdl), Qlexical_environment))
-	    {
-	      Lisp_Object env = specpdl_value (pdl);
-	      if (CONSP (env) && ! NILP (Fassq (symbol, env)))
-	        return true;
-	    }
-	  break;
-	default:
-	  break;
-	}
-    }
-  return false;
-}
-
 DEFUN ("internal--define-uninitialized-variable",
        Finternal__define_uninitialized_variable,
        Sinternal__define_uninitialized_variable, 1, 2, 0,
@@ -686,16 +662,6 @@ This is like `defvar' and `defconst' but without affecting the variable's
 value.  */)
   (Lisp_Object symbol, Lisp_Object doc)
 {
-  if (! XSYMBOL (symbol)->u.s.declared_special
-      && lexbound_p (symbol))
-    /* Under (let ((foo-var ...)) (foo-function)), the special
-       variable foo-var was incorrectly bound lexically since the
-       `foo' package didn't get autoloaded until the call to
-       foo-function.  */
-    xsignal2 (Qerror,
-	      build_string ("Defining as dynamic an already lexical var"),
-	      symbol);
-
   XSYMBOL (symbol)->u.s.declared_special = true;
   if (! NILP (doc))
     {
@@ -3481,8 +3447,8 @@ unbind_to (specpdl_ref count, Lisp_Object value)
 	  break;
 	}
     }
-  eassert (specpdl_ptr == specpdl_ref_to_ptr (count));
 
+  eassert (specpdl_ptr == specpdl_ref_to_ptr (count));
   if (NILP (Vquit_flag))
     Vquit_flag = restore_quit_flag;
   return value;
