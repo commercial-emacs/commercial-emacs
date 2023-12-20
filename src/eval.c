@@ -3755,7 +3755,8 @@ NFRAMES and BASE are as `backtrace-frame'.  */)
   backtrace_eval_unwind (distance);
   for (union specbinding *bind = exit; bind > enter; --bind)
     {
-      // bullshit?  applying bindings in reverse?
+      /* Traverses frame backwards, but also cons's backwards
+	 resulting in a forwards-ordered union of bindings */
       switch (bind->kind)
 	{
 	case SPECPDL_LET:
