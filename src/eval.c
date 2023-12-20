@@ -3417,12 +3417,8 @@ unbind_to (specpdl_ref count, Lisp_Object value)
 	    Lisp_Object sym = specpdl_symbol (specpdl_ptr);
 	    if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
 	      {
-		/* Simple let binding of non-slot variable.  */
-		if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
-		  SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_value (specpdl_ptr));
-		else
-		  set_internal (sym, specpdl_value (specpdl_ptr),
-				Qnil, SET_INTERNAL_UNBIND);
+		set_internal (sym, specpdl_value (specpdl_ptr),
+			      Qnil, SET_INTERNAL_UNBIND);
 		break;
 	      }
 	  }
