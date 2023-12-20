@@ -1137,13 +1137,13 @@ Print $ assuming it is a list font (font-spec, font-entity, or font-object).
 end
 
 define xbacktrace
-  set $bt = backtrace_top ()
-  while backtrace_p ($bt)
-    set $fun = backtrace_function ($bt)
+  set $bt = xbacktrace_top ()
+  while xbacktrace_valid_p ($bt)
+    set $fun = xbacktrace_function ($bt)
     xgettype $fun
     if $type == Lisp_Symbol
       xprintsym $fun
-      printf " (0x%x)\n", backtrace_args ($bt)
+      printf " (0x%x)\n", xbacktrace_args ($bt)
     else
       xgetptr $fun
       printf "0x%x ", $ptr
@@ -1160,11 +1160,11 @@ define xbacktrace
       end
       echo \n
     end
-    set $bt = backtrace_next ($bt)
+    set $bt = xbacktrace_next ($bt)
   end
 end
 document xbacktrace
-  Print a backtrace of Lisp function calls from backtrace_list.
+  Print a backtrace of Lisp function calls from xbacktrace_list.
   Set a breakpoint at Fsignal and call this to see from where
   an error was signaled.
 end
@@ -1198,8 +1198,8 @@ end
 
 # Show Lisp backtrace after normal backtrace.
 define hookpost-backtrace
-  set $bt = backtrace_top ()
-  if backtrace_p ($bt)
+  set $bt = xbacktrace_top ()
+  if xbacktrace_valid_p ($bt)
     echo \n
     echo Lisp Backtrace:\n
     xbacktrace

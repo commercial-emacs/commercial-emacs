@@ -44,11 +44,11 @@ Lisp_Object Vautoload_queue;
 Lisp_Object Vrun_hooks;
 
 /* These would ordinarily be static, but they need to be visible to GDB.  */
-bool backtrace_p (union specbinding *) EXTERNALLY_VISIBLE;
-Lisp_Object *backtrace_args (union specbinding *) EXTERNALLY_VISIBLE;
-Lisp_Object backtrace_function (union specbinding *) EXTERNALLY_VISIBLE;
-union specbinding *backtrace_next (union specbinding *) EXTERNALLY_VISIBLE;
-union specbinding *backtrace_top (void) EXTERNALLY_VISIBLE;
+bool xbacktrace_valid_p (union specbinding *) EXTERNALLY_VISIBLE;
+Lisp_Object *xbacktrace_args (union specbinding *) EXTERNALLY_VISIBLE;
+Lisp_Object xbacktrace_function (union specbinding *) EXTERNALLY_VISIBLE;
+union specbinding *xbacktrace_next (union specbinding *) EXTERNALLY_VISIBLE;
+union specbinding *xbacktrace_top (void) EXTERNALLY_VISIBLE;
 
 static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
 static Lisp_Object lambda_arity (Lisp_Object);
@@ -119,10 +119,16 @@ backtrace_function_addr (union specbinding *pdl)
   return &pdl->bt.function;
 }
 
-Lisp_Object
+static Lisp_Object
 backtrace_function (union specbinding *pdl)
 {
   return *backtrace_function_addr (pdl);
+}
+
+Lisp_Object
+xbacktrace_function (union specbinding *pdl)
+{
+  return backtrace_function (pdl);
 }
 
 static ptrdiff_t
@@ -132,14 +138,18 @@ backtrace_nargs (union specbinding *pdl)
   return pdl->bt.nargs;
 }
 
-Lisp_Object *
+static Lisp_Object *
 backtrace_args (union specbinding *pdl)
 {
   eassert (pdl->kind == SPECPDL_BACKTRACE);
   return pdl->bt.args;
 }
 
-/* Functions to modify slots of backtrace records.  */
+Lisp_Object *
+xbacktrace_args (union specbinding *pdl)
+{
+  return backtrace_args (pdl);
+}
 
 static void
 set_backtrace_args (union specbinding *pdl, Lisp_Object *args, ptrdiff_t nargs)
@@ -150,63 +160,53 @@ set_backtrace_args (union specbinding *pdl, Lisp_Object *args, ptrdiff_t nargs)
 }
 
 static void
-set_backtrace_debug_on_exit (union specbinding *pdl, bool doe)
+set_backtrace_debug_on_exit (union specbinding *pdl, bool q_debug)
 {
   eassert (pdl->kind == SPECPDL_BACKTRACE);
-  pdl->bt.debug_on_exit = doe;
+  pdl->bt.debug_on_exit = q_debug;
 }
 
-/* Helper functions to scan the backtrace.  */
+static bool
+backtrace_valid_p (const struct thread_state *thr, union specbinding *pdl)
+{
+  return thr->m_specpdl && pdl >= thr->m_specpdl;
+}
 
 bool
-backtrace_p (union specbinding *pdl)
-{ return specpdl ? pdl >= specpdl : false; }
-
-static bool
-backtrace_thread_p (struct thread_state *tstate, union specbinding *pdl)
-{ return pdl >= tstate->m_specpdl; }
-
-union specbinding *
-backtrace_top (void)
+xbacktrace_valid_p (union specbinding *pdl)
 {
-  union specbinding *pdl = NULL;
-  if (specpdl)
-    {
-      for (pdl = specpdl_ptr - 1;
-	   backtrace_p (pdl) && pdl->kind != SPECPDL_BACKTRACE;
-	   --pdl);
-    }
-  return pdl;
+  return backtrace_valid_p (current_thread, pdl);
 }
 
 static union specbinding *
-backtrace_thread_top (struct thread_state *tstate)
+backtrace_top (const struct thread_state *thr)
 {
-  union specbinding *pdl = tstate->m_specpdl_ptr - 1;
-  while (backtrace_thread_p (tstate, pdl) && pdl->kind != SPECPDL_BACKTRACE)
-    pdl--;
+  union specbinding *pdl = thr->m_specpdl ? thr->m_specpdl_ptr : NULL;
+  if (pdl)
+    while (backtrace_valid_p (thr, --pdl) && pdl->kind != SPECPDL_BACKTRACE);
   return pdl;
 }
 
 union specbinding *
-backtrace_next (union specbinding *pdl)
+xbacktrace_top (void)
 {
-  pdl--;
-  while (backtrace_p (pdl) && pdl->kind != SPECPDL_BACKTRACE)
-    pdl--;
+  return backtrace_top (current_thread);
+}
+
+static union specbinding *
+backtrace_next (const struct thread_state *thr, union specbinding *pdl)
+{
+  while (backtrace_valid_p (thr, --pdl) && pdl->kind != SPECPDL_BACKTRACE);
   return pdl;
+}
+
+union specbinding *
+xbacktrace_next (union specbinding *pdl)
+{
+  return backtrace_next (current_thread, pdl);
 }
 
 static void init_eval_once_for_pdumper (void);
-
-static union specbinding *
-backtrace_thread_next (struct thread_state *tstate, union specbinding *pdl)
-{
-  pdl--;
-  while (backtrace_thread_p (tstate, pdl) && pdl->kind != SPECPDL_BACKTRACE)
-    pdl--;
-  return pdl;
-}
 
 void
 init_eval_once (void)
@@ -241,7 +241,7 @@ init_eval (void)
     handlerlist_sentinel->next = NULL;
   }
   Vquit_flag = Qnil;
-  debug_on_next_call = 0;
+  debug_on_next_call = false;
   lisp_eval_depth = 0;
   /* This is less than the initial value of num_nonmacro_input_events.  */
   when_entered_debugger = -1;
@@ -260,7 +260,7 @@ call_debugger (Lisp_Object arg)
   cancel_hourglass ();
 #endif
 
-  debug_on_next_call = 0;
+  debug_on_next_call = false;
   when_entered_debugger = num_nonmacro_input_events;
 
   /* Resetting redisplaying_p to 0 makes sure that debug output is
@@ -291,11 +291,10 @@ call_debugger (Lisp_Object arg)
 void
 do_debug_on_call (Lisp_Object code, specpdl_ref count)
 {
-  debug_on_next_call = 0;
+  debug_on_next_call = false;
   set_backtrace_debug_on_exit (specpdl_ref_to_ptr (count), true);
   call_debugger (list1 (code));
 }
-
 
 DEFUN ("or", For, Sor, 0, UNEVALLED, 0,
        doc: /* Eval args until one of them yields non-nil, then return that value.
@@ -1570,9 +1569,11 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
   /* Skip frames for `signal' itself and 'error.  */
   if (! NILP (error_symbol)) /* Not memory full */
     {
-      union specbinding *pdl = backtrace_next (backtrace_top ());
-      if (backtrace_p (pdl) && EQ (backtrace_function (pdl), Qerror))
-	pdl = backtrace_next (pdl);
+      union specbinding *pdl
+	= backtrace_next (current_thread, backtrace_top (current_thread));
+      if (backtrace_valid_p (current_thread, pdl)
+	  && EQ (backtrace_function (pdl), Qerror))
+	pdl = backtrace_next (current_thread, pdl);
     }
 
   for (h = handlerlist; h; h = h->next)
@@ -3464,14 +3465,13 @@ context where binding is lexical by default.  */)
    return XSYMBOL (symbol)->u.s.declared_special ? Qt : Qnil;
 }
 
-
 static union specbinding *
 get_backtrace_starting_at (Lisp_Object base)
 {
-  union specbinding *pdl = backtrace_top ();
-
-  if (!NILP (base))
-    { /* Skip up to `base'.  */
+  union specbinding *pdl = specpdl ? backtrace_top (current_thread) : NULL;
+  if (pdl && ! NILP (base))
+    {
+      /* Skip up to BASE */
       int offset = 0;
       if (CONSP (base) && FIXNUMP (XCAR (base)))
         {
@@ -3479,60 +3479,57 @@ get_backtrace_starting_at (Lisp_Object base)
           base = XCDR (base);
         }
       base = Findirect_function (base, Qt);
-      while (backtrace_p (pdl)
-             && !EQ (base, Findirect_function (backtrace_function (pdl), Qt)))
-        pdl = backtrace_next (pdl);
-      while (backtrace_p (pdl) && offset-- > 0)
-        pdl = backtrace_next (pdl);
+      while (backtrace_valid_p (current_thread, pdl)
+             && ! EQ (base, Findirect_function (backtrace_function (pdl), Qt)))
+        pdl = backtrace_next (current_thread, pdl);
+      while (backtrace_valid_p (current_thread, pdl) && offset-- > 0)
+        pdl = backtrace_next (current_thread, pdl);
     }
-
   return pdl;
 }
 
 static union specbinding *
-get_backtrace_frame (Lisp_Object nframes, Lisp_Object base)
+get_backtrace_frame (Lisp_Object base, ptrdiff_t nframes)
 {
-  CHECK_FIXNAT (nframes);
-  union specbinding *pdl = get_backtrace_starting_at (base);
-
-  /* Find the frame requested.  */
-  for (EMACS_INT i = XFIXNAT (nframes); i > 0 && backtrace_p (pdl); i--)
-    pdl = backtrace_next (pdl);
-
+  union specbinding *pdl = specpdl ? get_backtrace_starting_at (base) : NULL;
+  if (pdl)
+    for (ptrdiff_t i = 0;
+	 i < nframes && backtrace_valid_p (current_thread, pdl);
+	 ++i)
+      pdl = backtrace_next (current_thread, pdl);
   return pdl;
 }
 
 static Lisp_Object
 backtrace_frame_apply (Lisp_Object function, union specbinding *pdl)
 {
-  if (!backtrace_p (pdl))
-    return Qnil;
-
-  Lisp_Object flags = Qnil;
-  if (backtrace_debug_on_exit (pdl))
-    flags = list2 (QCdebug_on_exit, Qt);
-
-  if (backtrace_nargs (pdl) == UNEVALLED)
-    return call4 (function, Qnil, backtrace_function (pdl), *backtrace_args (pdl), flags);
-  else
+  Lisp_Object result = Qnil;
+  if (backtrace_valid_p (current_thread, pdl))
     {
-      Lisp_Object tem = Flist (backtrace_nargs (pdl), backtrace_args (pdl));
-      return call4 (function, Qt, backtrace_function (pdl), tem, flags);
+      Lisp_Object flags = backtrace_debug_on_exit (pdl)
+	? list2 (QCdebug_on_exit, Qt)
+	: Qnil;
+      bool unevalled = (backtrace_nargs (pdl) == UNEVALLED);
+      result = call4 (function,
+		      unevalled ? Qnil : Qt,
+		      backtrace_function (pdl),
+		      unevalled ? *backtrace_args (pdl) : Flist (backtrace_nargs (pdl),
+								 backtrace_args (pdl)),
+		      flags);
     }
+  return result;
 }
 
 DEFUN ("backtrace-debug", Fbacktrace_debug, Sbacktrace_debug, 2, 3, 0,
-       doc: /* Set the debug-on-exit flag of eval frame LEVEL levels down to FLAG.
-LEVEL and BASE specify the activation frame to use, as in `backtrace-frame'.
-The debugger is entered when that frame exits, if the flag is non-nil.  */)
+       doc: /* Debug on exit the frame LEVEL levels from top.
+LEVEL and BASE are as `backtrace-frame'.  Turns off debugging
+if FLAG is nil.  */)
   (Lisp_Object level, Lisp_Object flag, Lisp_Object base)
 {
-  CHECK_FIXNUM (level);
-  union specbinding *pdl = get_backtrace_frame (level, base);
-
-  if (backtrace_p (pdl))
-    set_backtrace_debug_on_exit (pdl, !NILP (flag));
-
+  CHECK_FIXNAT (level);
+  union specbinding *pdl = get_backtrace_frame (base, XFIXNAT (level));
+  if (backtrace_valid_p (current_thread, pdl))
+    set_backtrace_debug_on_exit (pdl, ! NILP (flag));
   return flag;
 }
 
@@ -3551,17 +3548,15 @@ returns nil.  */)
      (Lisp_Object function, Lisp_Object base)
 {
   union specbinding *pdl = get_backtrace_starting_at (base);
-
-  while (backtrace_p (pdl))
+  while (backtrace_valid_p (current_thread, pdl))
     {
       ptrdiff_t i = pdl - specpdl;
       backtrace_frame_apply (function, pdl);
       /* Beware! PDL is no longer valid here because FUNCTION might
          have caused grow_specpdl to reallocate pdlvec.  We must use
          the saved index, cf. Bug#27258.  */
-      pdl = backtrace_next (&specpdl[i]);
+      pdl = backtrace_next (current_thread, specpdl + i);
     }
-
   return Qnil;
 }
 
@@ -3571,7 +3566,7 @@ DEFUN ("backtrace-frame--internal", Fbacktrace_frame_internal,
 Return the result of FUNCTION, or nil if no matching frame could be found. */)
      (Lisp_Object function, Lisp_Object nframes, Lisp_Object base)
 {
-  return backtrace_frame_apply (function, get_backtrace_frame (nframes, base));
+  return backtrace_frame_apply (function, get_backtrace_frame (base, XFIXNAT (nframes)));
 }
 
 DEFUN ("backtrace--frames-from-thread", Fbacktrace_frames_from_thread,
@@ -3590,10 +3585,10 @@ or a lambda expression for macro calls.  */)
   CHECK_THREAD (thread);
   tstate = XTHREAD (thread);
 
-  union specbinding *pdl = backtrace_thread_top (tstate);
+  union specbinding *pdl = backtrace_top (tstate);
   Lisp_Object list = Qnil;
 
-  while (backtrace_thread_p (tstate, pdl))
+  while (backtrace_valid_p (tstate, pdl))
     {
       Lisp_Object frame;
       if (backtrace_nargs (pdl) == UNEVALLED)
@@ -3605,7 +3600,7 @@ or a lambda expression for macro calls.  */)
 	  frame = Fcons (Qt, Fcons (backtrace_function (pdl), tem));
 	}
       list = Fcons (frame, list);
-      pdl = backtrace_thread_next (tstate, pdl);
+      pdl = backtrace_next (tstate, pdl);
     }
   return Fnreverse (list);
 }
@@ -3727,12 +3722,13 @@ DEFUN ("backtrace-eval", Fbacktrace_eval, Sbacktrace_eval, 2, 3, NULL,
 NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  */)
      (Lisp_Object exp, Lisp_Object nframes, Lisp_Object base)
 {
-  union specbinding *pdl = get_backtrace_frame (nframes, base);
+  CHECK_FIXNAT (nframes);
+  union specbinding *pdl = get_backtrace_frame (base, XFIXNAT (nframes));
   specpdl_ref count = SPECPDL_INDEX ();
   ptrdiff_t distance = specpdl_ptr - pdl;
   eassert (distance >= 0);
 
-  if (!backtrace_p (pdl))
+  if (! backtrace_valid_p (current_thread, pdl))
     error ("Activation frame not found!");
 
   backtrace_eval_unwind (distance);
@@ -3745,71 +3741,48 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
 }
 
 DEFUN ("backtrace--locals", Fbacktrace__locals, Sbacktrace__locals, 1, 2, NULL,
-       doc: /* Return names and values of local variables of a stack frame.
-NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  */)
+       doc: /* Return alist of (variable . value) within a particular frame.
+NFRAMES and BASE are as `backtrace-frame'.  */)
   (Lisp_Object nframes, Lisp_Object base)
 {
-  union specbinding *frame = get_backtrace_frame (nframes, base);
-  union specbinding *prevframe
-    = get_backtrace_frame (make_fixnum (XFIXNAT (nframes) - 1), base);
-  ptrdiff_t distance = specpdl_ptr - frame;
   Lisp_Object result = Qnil;
-  eassert (distance >= 0);
+  CHECK_FIXNAT (nframes);
+  // nexting decrements ptr, goes back in time
+  union specbinding *exit = get_backtrace_frame (base, XFIXNAT (nframes) - 1),
+    *enter = backtrace_next (current_thread, exit);
+  const ptrdiff_t distance = specpdl_ptr - enter;
 
-  if (! backtrace_p (prevframe))
-    error ("Activation frame not found!");
-  if (! backtrace_p (frame))
-    error ("Activation frame not found!");
-
-  /* The specpdl entries normally contain the symbol being bound along with its
-     `value', so it can be restored.  The new value to which it is bound is
-     available in one of two places: either in the current value of the
-     variable (if it hasn't been rebound yet) or in the `value' slot of the
-     next specpdl entry for it.
-     `backtrace_eval_unwind' happens to swap the role of `value'
-     and "new value", so we abuse it here, to fetch the new value.
-     It's ugly (we'd rather not modify global data) and a bit inefficient,
-     but it does the job for now.  */
   backtrace_eval_unwind (distance);
-
-  /* Grab values.  */
-  {
-    union specbinding *tmp = prevframe;
-    for (; tmp > frame; tmp--)
-      {
-	switch (tmp->kind)
+  for (union specbinding *bind = exit; bind > enter; --bind)
+    {
+      // bullshit?  applying bindings in reverse?
+      switch (bind->kind)
+	{
+	case SPECPDL_LET:
+	case SPECPDL_LET_BLD:
+	case SPECPDL_LET_BLV:
 	  {
-	  case SPECPDL_LET:
-	  case SPECPDL_LET_BLD:
-	  case SPECPDL_LET_BLV:
-	    {
-	      Lisp_Object sym = specpdl_symbol (tmp);
-	      Lisp_Object val = specpdl_value (tmp);
-	      if (EQ (sym, Qlexical_environment))
-		{
-		  Lisp_Object env = val;
-		  for (; CONSP (env); env = XCDR (env))
-		    {
-		      Lisp_Object binding = XCAR (env);
-		      if (CONSP (binding))
-			result = Fcons (Fcons (XCAR (binding),
-					       XCDR (binding)),
-					result);
-		    }
-		}
-	      else
-		result = Fcons (Fcons (sym, val), result);
-	    }
-	    break;
-
-	  default: break;
+	    Lisp_Object sym = specpdl_symbol (bind);
+	    if (EQ (sym, Qlexical_environment))
+	      {
+		Lisp_Object tail = specpdl_value (bind);
+		FOR_EACH_TAIL_SAFE (tail)
+		  {
+		    Lisp_Object binding = XCAR (tail);
+		    if (CONSP (binding))
+		      result = Fcons (binding, result);
+		  }
+		CHECK_LIST_END (tail, specpdl_value (bind));
+	      }
+	    else
+	      result = Fcons (Fcons (sym, specpdl_value (bind)), result);
 	  }
-      }
-  }
-
-  /* Restore values from specpdl to original place.  */
+	  break;
+	default:
+	  break;
+	}
+    }
   backtrace_eval_rewind (distance);
-
   return result;
 }
 
@@ -3873,14 +3846,14 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
 void
 get_backtrace (Lisp_Object array)
 {
-  union specbinding *pdl = backtrace_top ();
+  union specbinding *pdl = backtrace_top (current_thread);
   /* Copy the backtrace contents into working memory.  */
   for (ptrdiff_t i = 0, asize = ASIZE (array); i < asize; ++i)
     {
-      if (backtrace_p (pdl))
+      if (backtrace_valid_p (current_thread, pdl))
 	{
 	  ASET (array, i, backtrace_function (pdl));
-	  pdl = backtrace_next (pdl);
+	  pdl = backtrace_next (current_thread, pdl);
 	}
       else
 	ASET (array, i, Qnil);
@@ -3889,8 +3862,8 @@ get_backtrace (Lisp_Object array)
 
 Lisp_Object backtrace_top_function (void)
 {
-  union specbinding *pdl = backtrace_top ();
-  return (backtrace_p (pdl) ? backtrace_function (pdl) : Qnil);
+  union specbinding *pdl = backtrace_top (current_thread);
+  return backtrace_valid_p (current_thread, pdl) ? backtrace_function (pdl) : Qnil;
 }
 
 void

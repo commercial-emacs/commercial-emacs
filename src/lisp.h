@@ -3233,15 +3233,14 @@ backtrace_debug_on_exit (union specbinding *pdl)
 
 void grow_specpdl_allocation (void);
 
-/* Grow the specpdl stack by one entry.
-   The caller should have already initialized the entry.
-   Signal an error on stack overflow.
+/* Eggert in 5e301d7 kinda did a shitty thing by insisting on
+   pre-allocating the next specpdl entry at the top of the stack to
+   ensure the last operative entry is safely unwound in an OOM, a
+   condition he understandably never tests.
 
-   Make sure that there is always one unused entry past the top of the
-   stack, so that the just-initialized entry is safely unwound if
-   memory exhausted and an error is signaled here.  Also, allocate a
-   never-used entry just before the bottom of the stack; sometimes its
-   address is taken.  */
+   A top-of-stack specpdl_ptr that is not yet operative makes the
+   pointer arithmetic that much more confusing.
+*/
 INLINE void
 grow_specpdl (void)
 {
