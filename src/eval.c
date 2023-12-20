@@ -2943,9 +2943,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
     xsignal1 (Qinvalid_function, fun);
   else if (i < nargs)
     xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
-
-  if (! EQ (lexenv, Vlexical_environment))
-    /* Instantiate a new lexical environment.  */
+  else
     specbind (Qlexical_environment, lexenv);
 
   if (CONSP (fun))
