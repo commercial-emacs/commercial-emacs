@@ -35,13 +35,19 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    if the file being autoloaded is not fully loaded.
    They are recorded by being consed onto the front of Vautoload_queue:
    (FUN . ODEF) for a defun, (0 . OFEATURES) for a provide.  */
-
 Lisp_Object Vautoload_queue;
 
 /* This holds either the symbol `run-hooks' or nil.
    It is nil at an early stage of startup, and when Emacs
    is shutting down.  */
 Lisp_Object Vrun_hooks;
+
+/* Under dynamic scoping, Vlexical_environment is nil.  To distinguish
+   it from an empty lexically scoped environment, the latter takes on
+   the special list '(t).  Vlexical_environment contains a mix of (VAR
+   . VAL) bindings and bare VAR symbols, the latter rendering VAR
+   dynamically scoped for the environment's lifetime.  */
+Lisp_Object Vlexical_environment;
 
 /* These would ordinarily be static, but they need to be visible to GDB.  */
 bool xbacktrace_valid_p (union specbinding *) EXTERNALLY_VISIBLE;
@@ -76,21 +82,28 @@ specpdl_kind (union specbinding *pdl)
 static Lisp_Object *
 specpdl_value_addr (union specbinding *pdl)
 {
-  eassert (pdl->kind >= SPECPDL_LET);
-  return &pdl->let.value;
+  Lisp_Object *result = NULL;
+  switch (pdl->kind)
+    {
+    case SPECPDL_LET:
+    case SPECPDL_LET_BLD:
+    case SPECPDL_LET_BLV:
+      result = &pdl->let.value;
+      break;
+    case SPECPDL_LEXICAL_ENVIRONMENT:
+      result = &pdl->lexical_environment.value;
+      break;
+    default:
+      emacs_abort ();
+      break;
+    }
+  return result;
 }
 
 static Lisp_Object
 specpdl_value (union specbinding *pdl)
 {
   return *specpdl_value_addr (pdl);
-}
-
-static void
-set_specpdl_value (union specbinding *pdl, Lisp_Object val)
-{
-  eassert (pdl->kind >= SPECPDL_LET);
-  pdl->let.value = val;
 }
 
 static Lisp_Object *
@@ -609,7 +622,6 @@ static union specbinding *
 default_toplevel_binding (Lisp_Object symbol)
 {
   union specbinding *binding = NULL;
-  eassert (! EQ (symbol, Qlexical_environment));
   for (union specbinding *pdl = specpdl_ptr - 1; pdl > specpdl; --pdl)
     {
       switch (pdl->kind)
@@ -647,7 +659,7 @@ DEFUN ("set-default-toplevel-value", Fset_default_toplevel_value,
 {
   union specbinding *binding = default_toplevel_binding (symbol);
   if (binding)
-    set_specpdl_value (binding, value);
+    binding->let.value = value;
   else
     Fset_default (symbol, value);
   return Qnil;
@@ -689,8 +701,7 @@ defvar (Lisp_Object sym, Lisp_Object initvalue, Lisp_Object docstring, bool eval
 	 binding that shadows the global unboundness of the var.  */
       union specbinding *binding = default_toplevel_binding (sym);
       if (binding && EQ (specpdl_value (binding), Qunbound))
-	set_specpdl_value (binding,
-			   eval ? eval_form (initvalue) : initvalue);
+	binding->let.value = eval ? eval_form (initvalue) : initvalue;
     }
   return sym;
 }
@@ -826,19 +837,15 @@ let_bind (Lisp_Object prevailing_env, Lisp_Object var, Lisp_Object val, bool *q_
       && NILP (Fmemq (var, prevailing_env)))
     {
       /* Lexically bind VAR.  */
-      Lisp_Object newenv
-	= Fcons (Fcons (var, val), Vlexical_environment);
-      if (*q_pushed)
-	Vlexical_environment = newenv;
-      else
+      if (! *q_pushed)
 	{
 	  /* Just push the env previous to the first lexical let
 	     binding.  Nested envs produced by subsequent bindings in
 	     a let* would never be reverted to.  */
 	  *q_pushed = true;
-	  specbind (Qlexical_environment, newenv);
+	  record_lexical_environment ();
 	}
-      eassert (EQ (Vlexical_environment, newenv));
+      Vlexical_environment = Fcons (Fcons (var, val), Vlexical_environment);
     }
   else
     {
@@ -1305,9 +1312,11 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 	{
 	  specpdl_ref count = SPECPDL_INDEX ();
 	  if (! NILP (Vlexical_environment))
-	    specbind (Qlexical_environment,
-		      Fcons (Fcons (var, result),
-			     Vlexical_environment));
+	    {
+	      record_lexical_environment ();
+	      Vlexical_environment
+		= Fcons (Fcons (var, result), Vlexical_environment);
+	    }
 	  else
 	    specbind (var, result);
 	  result = unbind_to (count, Fprogn (XCDR (clause)));
@@ -2133,10 +2142,11 @@ node `(elisp)Eval' for its form.  */)
   (Lisp_Object form, Lisp_Object lexical)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-  specbind (Qlexical_environment,
-	    ! NILP (Flistp (lexical))
-	    ? lexical /* dynamic if LEXICAL is nil, bespoke otherwise */
-	    : list_of_t /* lexical without bespoke environment */);
+  record_lexical_environment ();
+  Vlexical_environment = ! NILP (Flistp (lexical))
+    ? lexical /* dynamic if LEXICAL is nil, bespoke otherwise */
+    : list_of_t /* No bespoke environment but still lexical.  */
+    ;
   return unbind_to (count, eval_form (form));
 }
 
@@ -2867,13 +2877,33 @@ fetch_and_exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
    or a module function.  */
 
 static Lisp_Object
-funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
-		register Lisp_Object *arg_vector)
+funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 {
-  Lisp_Object val, syms_left, lexenv = Qnil;
   specpdl_ref count = SPECPDL_INDEX ();
+  Lisp_Object args, lexenv;
+  ptrdiff_t args_template = -1;
 
-  if (CONSP (fun))
+  if (COMPILEDP (fun))
+    {
+      Lisp_Object first_slot = AREF (fun, COMPILED_ARGLIST);
+      eassert (! CONSP (fun));
+      if (FIXNUMP (first_slot))
+	{
+	  /* An integer first slot denotes the number of lexically
+	     scoped arguments.  Defer all argument binding to the
+	     bytecode interpreter.  */
+	  args_template = XFIXNUM (first_slot);
+	  goto funcall_lambda_return;
+	}
+      else
+	{
+	  /* Otherwise the slot represents a formal arglist of
+	     dynamically scoped variables.  */
+	  args = first_slot;
+	  lexenv = Qnil;
+	}
+    }
+  else if (CONSP (fun))
     {
       if (EQ (XCAR (fun), Qclosure))
 	{
@@ -2885,25 +2915,11 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
 	}
       else
 	lexenv = Qnil;
-      syms_left = XCDR (fun);
-      if (CONSP (syms_left))
-	syms_left = XCAR (syms_left);
+      args = XCDR (fun);
+      if (CONSP (args))
+	args = XCAR (args);
       else
 	xsignal1 (Qinvalid_function, fun);
-    }
-  else if (COMPILEDP (fun))
-    {
-      syms_left = AREF (fun, COMPILED_ARGLIST);
-      /* Bytecode objects using lexical binding have an integral
-	 ARGLIST slot value: pass the arguments to the byte-code
-	 engine directly.  */
-      if (FIXNUMP (syms_left))
-	return fetch_and_exec_byte_code (fun, XFIXNUM (syms_left),
-					 nargs, arg_vector);
-      /* Otherwise the bytecode object uses dynamic binding and the
-	 ARGLIST slot contains a standard formal argument list whose
-	 variables are bound dynamically below.  */
-      lexenv = Qnil;
     }
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (fun))
@@ -2912,19 +2928,20 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
 #ifdef HAVE_NATIVE_COMP
   else if (SUBR_NATIVE_COMPILED_DYNP (fun))
     {
-      syms_left = XSUBR (fun)->lambda_list;
+      args = XSUBR (fun)->lambda_list;
       lexenv = Qnil;
     }
 #endif
   else
     emacs_abort ();
 
-  bool optional = false, rest = false;
+  bool optional = false,
+    rest = false,
+    previous_rest = false;
   ptrdiff_t i = 0;
-  bool previous_rest = false;
-  FOR_EACH_TAIL (syms_left)
+  FOR_EACH_TAIL (args)
     {
-      Lisp_Object sym = XCAR (syms_left);
+      Lisp_Object sym = XCAR (args);
       if (! SYMBOLP (sym))
 	xsignal1 (Qinvalid_function, fun);
 
@@ -2966,28 +2983,29 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
 	}
     }
 
-  if (! NILP (syms_left) || previous_rest)
+  if (! NILP (args) || previous_rest)
     xsignal1 (Qinvalid_function, fun);
   else if (i < nargs)
     xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
-
-  if (! EQ (lexenv, Vlexical_environment))
-    /* Instantiate a new lexical environment.  */
-    specbind (Qlexical_environment, lexenv);
-
-  if (CONSP (fun))
-    val = Fprogn (XCDR (XCDR (fun)));
-  else if (SUBR_NATIVE_COMPILEDP (fun))
+  else if (! EQ (lexenv, Vlexical_environment))
     {
-      eassert (SUBR_NATIVE_COMPILED_DYNP (fun));
-      /* No need to use funcall_subr as we have zero arguments by
-	 construction.  */
-      val = XSUBR (fun)->function.a0 ();
+      record_lexical_environment ();
+      Vlexical_environment = lexenv;
     }
-  else
-    val = fetch_and_exec_byte_code (fun, 0, 0, NULL);
 
-  return unbind_to (count, val);
+  eassert (! SUBR_NATIVE_COMPILEDP (fun)
+	   || SUBR_NATIVE_COMPILED_DYNP (fun));
+ funcall_lambda_return:
+  return unbind_to (count,
+		    CONSP (fun)
+		    ? Fprogn (XCDR (XCDR (fun)))
+		    : SUBR_NATIVE_COMPILEDP (fun)
+		    /* save call to funcall_subr since 0 args by construction */
+		    ? XSUBR (fun)->function.a0 ()
+		    : args_template < 0
+		    ? fetch_and_exec_byte_code (fun, 0, 0, NULL)
+		    : fetch_and_exec_byte_code (fun, args_template,
+						nargs, arg_vector));
 }
 
 DEFUN ("func-arity", Ffunc_arity, Sfunc_arity, 1, 1, 0,
@@ -3332,10 +3350,18 @@ record_unwind_protect_void (void (*function) (void))
 void
 record_unwind_protect_module (enum specbind_tag kind, void *ptr)
 {
-  specpdl_ptr->kind = kind;
+  specpdl_ptr->unwind_ptr.kind = kind;
   specpdl_ptr->unwind_ptr.func = NULL;
   specpdl_ptr->unwind_ptr.arg = ptr;
   specpdl_ptr->unwind_ptr.mark = NULL;
+  grow_specpdl ();
+}
+
+void
+record_lexical_environment (void)
+{
+  specpdl_ptr->lexical_environment.kind = SPECPDL_LEXICAL_ENVIRONMENT;
+  specpdl_ptr->lexical_environment.value = Vlexical_environment;
   grow_specpdl ();
 }
 
@@ -3391,7 +3417,7 @@ set_unwind_protect_ptr (specpdl_ref count, void (*func) (void *), void *arg)
 /* Pop entries from unwind-protect stack until specpdl_ptr reaches the
    specbinding at depth COUNT.  Pointer decrementing gets confusing
    because specpdl_ptr is one past the last operative specbinding
-   (specpdl_ptr points to the "on-deck" batter) and is not itself
+   (specpdl_ptr points to the "on deck" batter) and is not itself
    unbind-able.  Return VALUE.  */
 
 Lisp_Object
@@ -3439,6 +3465,9 @@ unbind_to (specpdl_ref count, Lisp_Object value)
 	  finalize_environment_unwind (specpdl_ptr->unwind_ptr.arg);
 	  break;
 #endif
+	case SPECPDL_LEXICAL_ENVIRONMENT:
+	  Vlexical_environment = specpdl_value (specpdl_ptr);
+	  break;
 	case SPECPDL_LET:
 	  {
 	    Lisp_Object sym = specpdl_symbol (specpdl_ptr);
@@ -3491,10 +3520,11 @@ context where binding is lexical by default.  */)
 static union specbinding *
 get_backtrace_starting_at (Lisp_Object base)
 {
-  union specbinding *pdl = specpdl ? backtrace_top (current_thread) : NULL;
-  if (pdl && ! NILP (base))
+  union specbinding *pdl = backtrace_top (current_thread);
+
+  if (! NILP (base))
     {
-      /* Skip up to BASE */
+      /* Skip up to BASE.  */
       int offset = 0;
       if (CONSP (base) && FIXNUMP (XCAR (base)))
         {
@@ -3663,13 +3693,20 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		save_excursion_restore (marker, window);
 	      }
 	      break;
+	    case SPECPDL_LEXICAL_ENVIRONMENT:
+	      {
+		const Lisp_Object value = specpdl_value (bind);
+		bind->lexical_environment.value = Vlexical_environment;
+		Vlexical_binding = value;
+		break;
+	      }
 	    case SPECPDL_LET:
 	      {
 		Lisp_Object sym = specpdl_symbol (bind);
 		if (XSYMBOL (sym)->u.s.type == SYMBOL_PLAINVAL)
 		  {
 		    Lisp_Object value = specpdl_value (bind);
-		    set_specpdl_value (bind, SYMBOL_VAL (XSYMBOL (sym)));
+		    bind->let.value = SYMBOL_VAL (XSYMBOL (sym));
 		    SET_SYMBOL_VAL (XSYMBOL (sym), value);
 		    break;
 		  }
@@ -3681,7 +3718,7 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 	      {
 		Lisp_Object sym = specpdl_symbol (bind);
 		Lisp_Object value = specpdl_value (bind);
-		set_specpdl_value (bind, default_value (sym));
+		bind->let.value = default_value (sym);
 		set_default_internal (sym, value, SET_INTERNAL_THREAD_SWITCH);
 	      }
 	      break;
@@ -3694,8 +3731,8 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 
 		if (! NILP (Flocal_variable_p (symbol, where)))
 		  {
-		    set_specpdl_value
-		      (bind, find_symbol_value (XSYMBOL (symbol), XBUFFER (where)));
+		    bind->let.value
+		      = find_symbol_value (XSYMBOL (symbol), XBUFFER (where));
 		    set_internal (symbol, value, where,
 				  SET_INTERNAL_THREAD_SWITCH);
 		  }
@@ -3742,7 +3779,7 @@ backtrace_eval_unwind (int distance)
 
 DEFUN ("backtrace-eval", Fbacktrace_eval, Sbacktrace_eval, 2, 3, NULL,
        doc: /* Evaluate EXP in the context of some activation frame.
-NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  */)
+NFRAMES and BASE are as `backtrace-frame'.  */)
      (Lisp_Object exp, Lisp_Object nframes, Lisp_Object base)
 {
   CHECK_FIXNAT (nframes);
@@ -3770,41 +3807,41 @@ NFRAMES and BASE are as `backtrace-frame'.  */)
 {
   Lisp_Object result = Qnil;
   CHECK_FIXNAT (nframes);
-  // nexting decrements ptr, goes back in time
   union specbinding *exit = get_backtrace_frame (base, XFIXNAT (nframes) - 1),
+    /* next'ing decrements pdl ptr, goes back in time.  */
     *enter = backtrace_next (current_thread, exit);
   const ptrdiff_t distance = specpdl_ptr - enter;
 
+  /* Bookend with unwind-rewind to and back from ENTER.  */
   backtrace_eval_unwind (distance);
   for (union specbinding *bind = exit; bind > enter; --bind)
     {
-      /* Traverses frame backwards, but also cons's backwards
+      /* Traverses frame backwards, but also conses backwards
 	 resulting in a forwards-ordered union of bindings */
       switch (bind->kind)
-	{
-	case SPECPDL_LET:
-	case SPECPDL_LET_BLD:
-	case SPECPDL_LET_BLV:
-	  {
-	    Lisp_Object sym = specpdl_symbol (bind);
-	    if (EQ (sym, Qlexical_environment))
-	      {
-		Lisp_Object tail = specpdl_value (bind);
-		FOR_EACH_TAIL_SAFE (tail)
-		  {
-		    Lisp_Object binding = XCAR (tail);
-		    if (CONSP (binding))
-		      result = Fcons (binding, result);
-		  }
-		CHECK_LIST_END (tail, specpdl_value (bind));
-	      }
-	    else
-	      result = Fcons (Fcons (sym, specpdl_value (bind)), result);
-	  }
-	  break;
-	default:
-	  break;
-	}
+        {
+        case SPECPDL_LEXICAL_ENVIRONMENT:
+          {
+            Lisp_Object tail = specpdl_value (bind);
+            FOR_EACH_TAIL_SAFE (tail)
+              {
+                Lisp_Object binding = XCAR (tail);
+                if (CONSP (binding))
+                  result = Fcons (binding, result);
+              }
+            CHECK_LIST_END (tail, specpdl_value (bind));
+          }
+          break;
+        case SPECPDL_LET:
+        case SPECPDL_LET_BLD:
+        case SPECPDL_LET_BLV:
+          result = Fcons (Fcons (specpdl_symbol (bind),
+				 specpdl_value (bind)),
+			  result);
+          break;
+        default:
+          break;
+        }
     }
   backtrace_eval_rewind (distance);
   return result;
@@ -3843,6 +3880,9 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
           mark_module_environment (pdl->unwind_ptr.arg);
           break;
 #endif
+	case SPECPDL_LEXICAL_ENVIRONMENT:
+	  mark_object (specpdl_value_addr (pdl));
+	  break;
 	case SPECPDL_LET_BLD:
 	case SPECPDL_LET_BLV:
 	  mark_object (specpdl_buffer_addr (pdl));
@@ -4022,27 +4062,19 @@ the Lisp backtrace.  */);
 Used to avoid infinite loops if the debugger itself has an error.
 Don't set this unless you're sure that can't happen.  */);
 
-  DEFSYM (Qlexical_environment, "lexical-environment");
-  DEFVAR_LISP ("lexical-environment",
-	       Vlexical_environment,
-	       doc: /* Under dynamic scoping, Vlexical_environment is nil.
-Under lexical scoping, it is a list of either (VAR . VAL) bindings or
-bare VAR symbols indicating VAR is dynamically scoped for the
-environment's lifetime.  The special list \\='(t) denotes an empty lexical
-environment.  */);
-  Funintern (Qlexical_environment, Qnil); /* Don't surface to user.  */
-  Vlexical_environment = Qnil;
-
   DEFVAR_LISP ("internal-make-interpreted-closure-function",
 	       Vinternal_make_interpreted_closure_function,
 	       doc: /* Function to filter the env when constructing a closure.  */);
   Vinternal_make_interpreted_closure_function = Qnil;
 
-  Vrun_hooks = intern_c_string ("run-hooks");
-  staticpro (&Vrun_hooks);
-
   staticpro (&Vautoload_queue);
   Vautoload_queue = Qnil;
+
+  staticpro (&Vrun_hooks);
+  Vrun_hooks = intern_c_string ("run-hooks");
+
+  staticpro (&Vlexical_environment);
+  Vlexical_environment = Qnil;
 
   staticpro (&Qcatch_all_memory_full);
   /* Make sure Qcatch_all_memory_full is a unique object.  We could

@@ -3013,10 +3013,10 @@ enum specbind_tag {
   SPECPDL_MODULE_RUNTIME,       /* A live module runtime.  */
   SPECPDL_MODULE_ENVIRONMENT,   /* A live module environment.  */
 #endif
+  SPECPDL_LEXICAL_ENVIRONMENT,  /* What else would this be.  */
   SPECPDL_LET,			/* A plain and simple dynamic let-binding.  */
   SPECPDL_LET_BLV,		/* Let of blv when `local-variable-p' true.  */
-  SPECPDL_LET_BLD,		/* Let of blv when `local-variable-p' false.  */
-  SPECPDL_LEXICAL_ENVIRONMENT   /* What else would this be.  */
+  SPECPDL_LET_BLD		/* Let of blv when `local-variable-p' false.  */
 };
 
 union specbinding
@@ -4072,6 +4072,7 @@ extern void mark_lread (void);
 /* Defined in eval.c.  */
 extern Lisp_Object Vautoload_queue;
 extern Lisp_Object Vrun_hooks;
+extern Lisp_Object Vlexical_environment;
 extern Lisp_Object inhibit_lisp_code;
 extern bool signal_quit_p (Lisp_Object);
 
@@ -4127,6 +4128,7 @@ extern void record_unwind_protect_void (void (*) (void));
 extern void record_unwind_protect_excursion (void);
 extern void record_unwind_protect_nothing (void);
 extern void record_unwind_protect_module (enum specbind_tag, void *);
+extern void record_lexical_environment (void);
 extern void clear_unwind_protect (specpdl_ref);
 extern void set_unwind_protect (specpdl_ref, void (*) (Lisp_Object),
 				Lisp_Object);

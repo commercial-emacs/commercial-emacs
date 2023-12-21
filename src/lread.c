@@ -2164,13 +2164,12 @@ readevalloop (Lisp_Object readcharfun,
   record_unwind_protect_int (readevalloop_1, load_convert_to_unibyte);
   load_convert_to_unibyte = ! NILP (unibyte);
 
-  /* If lexical binding is active (either because it was specified in
-     the file's header, or via a buffer-local variable), create an empty
-     lexical environment, otherwise, turn off lexical binding.  */
-  Lisp_Object lexical_p = find_symbol_value (XSYMBOL (Qlexical_binding), current_buffer);
-  specbind (Qlexical_environment,
-	    ! NILP (lexical_p) && ! EQ (lexical_p, Qunbound)
-	    ? list1 (Qt) : Qnil);
+  Lisp_Object lexical_p = find_symbol_value (XSYMBOL (Qlexical_binding),
+					     current_buffer);
+  record_lexical_environment ();
+  Vlexical_environment = ! NILP (lexical_p) && ! EQ (lexical_p, Qunbound)
+    ? list1 (Qt) : Qnil;
+
   specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);
 
   /* Ensure sourcename is absolute, except whilst preloading.  */
