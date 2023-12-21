@@ -319,6 +319,11 @@ If non-nil, `recentf-open-files' will show labels for keys that can be
 used as shortcuts to open the Nth file."
   :group 'recentf
   :type 'boolean)
+
+(defcustom recentf-verbose t
+  "Non-nil means to show debugging messages related to the recentf machinery."
+  :group 'recentf
+  :type 'boolean)
 
 ;;; Utilities
 ;;
@@ -1324,7 +1329,10 @@ Write data into the file specified by `recentf-save-file'."
                 (format ";; coding: %s\n" recentf-save-file-coding-system)
                 ";; End:\n")
         (write-region (point-min) (point-max)
-                      (expand-file-name recentf-save-file))
+                      (expand-file-name recentf-save-file)
+                      nil
+                      recentf-verbose
+                      )
         (when recentf-save-file-modes
           (set-file-modes recentf-save-file recentf-save-file-modes))
         nil)
