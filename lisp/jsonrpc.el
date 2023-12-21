@@ -4,7 +4,7 @@
 
 ;; Author: João Távora <joaotavora@gmail.com>
 ;; Keywords: processes, languages, extensions
-;; Version: 1.0.21
+;; Version: 1.0.20
 ;; Package-Requires: ((emacs "25.2"))
 
 ;; This is a GNU ELPA :core package.  Avoid functionality that is not
@@ -67,9 +67,9 @@
     :accessor jsonrpc-last-error
     :documentation "Last JSONRPC error message received from endpoint.")
    (-request-continuations
-    :initform nil
+    :initform (make-hash-table)
     :accessor jsonrpc--request-continuations
-    :documentation "An alist of request IDs to continuation lambdas.")
+    :documentation "A hash table of request ID to continuation lambdas.")
    (-events-buffer
     :initform nil
     :accessor jsonrpc--events-buffer
@@ -150,7 +150,7 @@ immediately."
 
 (defun jsonrpc-forget-pending-continuations (connection)
   "Stop waiting for responses from the current JSONRPC CONNECTION."
-  (setf (jsonrpc--request-continuations connection) nil))
+  (clrhash (jsonrpc--request-continuations connection)))
 
 (defvar jsonrpc-inhibit-debug-on-error nil
   "Inhibit `debug-on-error' when answering requests.
@@ -160,8 +160,8 @@ error and replying to the endpoint with an JSONRPC-error.  This
 variable can be set around calls like `jsonrpc-request' to
 circumvent that.")
 
-(defun jsonrpc-connection-receive (conn message)
-  "Process MESSAGE just received from CONN.
+(defun jsonrpc-connection-receive (connection message)
+  "Process MESSAGE just received from CONNECTION.
 This function will destructure MESSAGE and call the appropriate
 dispatcher in CONNECTION."
   (cl-destructuring-bind (&key method id error params result &allow-other-keys
@@ -506,19 +506,17 @@ With optional CLEANUP, kill any associated buffers."
         (let ((inhibit-read-only t))
           (insert "\n----------b---y---e---b---y---e----------\n")))
       ;; Cancel outstanding timers
-      (mapc (lambda (_id _success _error timer)
-              (when timer (cancel-timer timer)))
-            (jsonrpc--request-continuations connection))
-      (maphash (lambda (_ triplet)
-                 (pcase-let ((`(,_ ,timer ,_) triplet))
-                   (when timer (cancel-timer timer))))
-               (jsonrpc--deferred-actions connection))
+      (maphash (lambda (_id triplet)
+                 (pcase-let ((`(,_success ,_error ,timeout) triplet))
+                   (when timeout (cancel-timer timeout))))
+               (jsonrpc--request-continuations connection))
       (process-put proc 'jsonrpc-sentinel-cleanup-started t)
       (unwind-protect
           ;; Call all outstanding error handlers
-          (mapc (lambda (_id _success error _timer)
-                  (funcall error '(:code -1 :message "Server died")))
-                (jsonrpc--request-continuations connection))
+          (maphash (lambda (_id triplet)
+                     (pcase-let ((`(,_success ,error ,_timeout) triplet))
+                       (funcall error '(:code -1 :message "Server died"))))
+                   (jsonrpc--request-continuations connection))
         (jsonrpc--message "Server exited with status %s" (process-exit-status proc))
         (delete-process proc)
         (when-let (p (slot-value connection '-autoport-inferior)) (delete-process p))
@@ -823,9 +821,6 @@ CONNECT-ARGS are passed as additional arguments to
                (when np (delete-process np))
                (error "[jsonrpc] Could not start and/or connect")))))))
 
-(defun jsonrpc-continuation-count (conn)
-  "Number of outstanding continuations for CONN."
-  (length (jsonrpc--request-continuations conn)))
 
 (provide 'jsonrpc)
 ;;; jsonrpc.el ends here

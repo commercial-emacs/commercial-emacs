@@ -128,8 +128,6 @@
 
 ;;; Code:
 
-(require 'cl-print)
-
 (defgroup trace nil
   "Tracing facility for Emacs Lisp functions."
   :prefix "trace-"
@@ -170,13 +168,13 @@ and CONTEXT is a string describing the dynamic context (e.g. values of
 some global variables)."
   (let ((print-circle t)
         (print-escape-newlines t))
-    (format "%s%s%d -> %s%s\n"
+    (format "%s%s%d -> %S%s\n"
             (mapconcat #'char-to-string (make-string (max 0 (1- level)) ?|) " ")
             (if (> level 1) " " "")
             level
             ;; FIXME: Make it so we can click the function name to jump to its
             ;; definition and/or untrace it.
-            (cl-prin1-to-string (cons function args))
+            (cons function args)
             context)))
 
 (defun trace-exit-message (function level value context)
@@ -186,13 +184,13 @@ and CONTEXT is a string describing the dynamic context (e.g. values of
 some global variables)."
   (let ((print-circle t)
         (print-escape-newlines t))
-    (format "%s%s%d <- %s: %s%s\n"
+    (format "%s%s%d <- %s: %S%s\n"
             (mapconcat 'char-to-string (make-string (1- level) ?|) " ")
             (if (> level 1) " " "")
             level
             function
             ;; Do this so we'll see strings:
-            (cl-prin1-to-string value)
+            value
             context)))
 
 (defvar trace--timer nil)

@@ -2130,7 +2130,8 @@ Uses THING, FACE, DEFS and PREPEND."
   "Compose Eglot's mode-line."
   (let* ((server (eglot-current-server))
          (nick (and server (eglot-project-nickname server)))
-         (pending (and server (jsonrpc-continuation-count server)))
+         (pending (and server (hash-table-count
+                               (jsonrpc--request-continuations server))))
          (last-error (and server (jsonrpc-last-error server))))
     (append
      `(,(propertize
