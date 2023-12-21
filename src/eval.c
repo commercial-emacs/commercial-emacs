@@ -609,7 +609,7 @@ static union specbinding *
 default_toplevel_binding (Lisp_Object symbol)
 {
   union specbinding *binding = NULL;
-  eassert (! EQ (symbol, Qlexical_binding));
+  eassert (! EQ (symbol, Qlexical_environment));
   for (union specbinding *pdl = specpdl_ptr - 1; pdl > specpdl; --pdl)
     {
       switch (pdl->kind)

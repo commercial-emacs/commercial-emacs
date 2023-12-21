@@ -903,9 +903,6 @@ DEFUN ("get-file-char", Fget_file_char, Sget_file_char, 0, 0, 0,
   return make_fixnum (readbyte_from_stdio ());
 }
 
-
-
-
 /* Return true if the lisp code read using READCHARFUN defines a non-nil
    `lexical-binding' file variable.  After returning, the stream is
    positioned following the first line, if it is a comment or #! line,
@@ -1381,14 +1378,11 @@ Return t if the file exists and loads successfully.  */)
     Vloads_in_progress = Fcons (found, Vloads_in_progress);
   }
 
-  /* All loads are by default dynamic, unless the file itself specifies
-     otherwise using a file-variable in the first line.  This is bound here
-     so that it takes effect whether or not we use
-     Vload_source_file_function.  */
+  /* Default to dynamic scoping now so Vload_source_file_function can
+     override.  */
   specbind (Qlexical_binding, Qnil);
 
-  Lisp_Object found_eff =
-    is_native_elisp
+  Lisp_Object found_eff = is_native_elisp
     ? compute_found_effective (found)
     : found;
 
@@ -1549,7 +1543,7 @@ Return t if the file exists and loads successfully.  */)
   else
     {
       if (lisp_file_lexically_bound_p (Qget_file_char))
-        Fset (Qlexical_binding, Qt);
+	set_internal (Qlexical_binding, Qt, Qnil, SET_INTERNAL_SET);
 
       if (! version || version >= 22)
         readevalloop (Qget_file_char, &input, hist_file_name,
@@ -2135,7 +2129,6 @@ readevalloop (Lisp_Object readcharfun,
   specpdl_ref count = SPECPDL_INDEX ();
   struct buffer *b = 0;
   bool continue_reading_p;
-  Lisp_Object lex_bound;
   /* True if reading an entire buffer.  */
   bool whole_buffer = 0;
   /* True on the first time around.  */
@@ -2174,9 +2167,9 @@ readevalloop (Lisp_Object readcharfun,
   /* If lexical binding is active (either because it was specified in
      the file's header, or via a buffer-local variable), create an empty
      lexical environment, otherwise, turn off lexical binding.  */
-  lex_bound = find_symbol_value (XSYMBOL (Qlexical_binding), NULL);
+  Lisp_Object lexical_p = find_symbol_value (XSYMBOL (Qlexical_binding), current_buffer);
   specbind (Qlexical_environment,
-	    ! NILP (lex_bound) && ! EQ (lex_bound, Qunbound)
+	    ! NILP (lexical_p) && ! EQ (lexical_p, Qunbound)
 	    ? list1 (Qt) : Qnil);
   specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);
 
