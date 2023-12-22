@@ -88,7 +88,7 @@ FN is a deferred request from BUF, to be sent not later than TIMER as ID.")
     :accessor jsonrpc--next-request-id
     :documentation "Next number used for a request"))
   :documentation "Base class representing a JSONRPC connection.
-The following initargs are accepted:
+The following keyword argument initargs are accepted:
 
 :NAME (mandatory), a string naming the connection
 
@@ -102,7 +102,33 @@ RESULT) or signal an error of type `jsonrpc-error'.
 :NOTIFICATION-DISPATCHER (optional), a function of three
 arguments (CONN METHOD PARAMS) for handling JSONRPC
 notifications.  CONN, METHOD and PARAMS are the same as in
-:REQUEST-DISPATCHER.")
+:REQUEST-DISPATCHER.
+
+:EVENTS-BUFFER-CONFIG is a plist.  Its `:size' stipulates the
+size of the log buffer (0 disables, nil means infinite).  The
+`:format' property is a symbol for choosing the log entry format.")
+
+(cl-defmethod initialize-instance :after
+  ((c jsonrpc-connection) ((&key (events-buffer-scrollback-size
+                                  nil
+                                  e-b-s-s-supplied-p)
+                                 &allow-other-keys)
+                           t))
+  (when e-b-s-s-supplied-p
+    (warn
+     "`:events-buffer-scrollback-size' deprecated. Use `events-buffer-config'.")
+    (with-slots ((plist -events-buffer-config)) c
+      (setf plist (copy-sequence plist)
+            plist (plist-put plist :size events-buffer-scrollback-size)))))
+
+(cl-defmethod slot-missing ((_c jsonrpc-connection)
+                            (_n (eql :events-buffer-scrollback-size))
+                            (_op (eql oset))
+                            _)
+  ;; Yuck!  But this just coerces EIEIO to backward-compatibly accept
+  ;; the :e-b-s-s initarg that is no longer associated with a slot
+  ;; #pineForCLOS..
+  )
 
 ;;; API mandatory
 (cl-defgeneric jsonrpc-connection-send (conn &key id method params result error)
@@ -493,8 +519,10 @@ With optional CLEANUP, kill any associated buffers."
 (defun jsonrpc--call-deferred (connection)
   "Call CONNECTION's deferred actions, who may again defer themselves."
   (when-let ((actions (hash-table-values (jsonrpc--deferred-actions connection))))
-    (jsonrpc--debug connection `(:maybe-run-deferred
-                                 ,(mapcar (apply-partially #'nth 2) actions)))
+    (jsonrpc--run-event-hook
+     connection 'internal
+     :log-text (format "re-attempting deffered requests %s"
+                       (mapcar (apply-partially #'nth 2) actions)))
     (mapc #'funcall (mapcar #'car actions))))
 
 (defun jsonrpc--process-sentinel (proc change)
@@ -665,10 +693,11 @@ With optional CLEANUP, kill any associated buffers."
 
 (defun jsonrpc--debug (server format &rest args)
   "Debug message for SERVER with FORMAT and ARGS."
-  (jsonrpc--log-event
-   server (if (stringp format)
-              `(:message ,(apply #'format format args))
-            format)))
+  (with-current-buffer (jsonrpc-events-buffer server)
+    (jsonrpc--log-event
+     server 'internal
+     :log-text (apply #'format format args)
+     :type 'debug)))
 
 (defun jsonrpc--warn (format &rest args)
   "Warning message with FORMAT and ARGS."
@@ -738,7 +767,9 @@ PREFIX to CONN's events buffer."
                   do (with-current-buffer (jsonrpc-events-buffer conn)
                        (goto-char (point-max))
                        (let ((inhibit-read-only t))
-                         (insert (format "%s %s\n" prefix line))))
+                         (insert
+                          (propertize (format "%s %s\n" prefix line)
+                                      'face 'shadow))))
                   until (eobp)))
        nil t))
     (current-buffer)))
