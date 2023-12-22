@@ -2765,21 +2765,21 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
   if (numargs >= subr->min_args)
     {
       /* Conforming call to finite-arity subr.  */
-      ptrdiff_t maxargs = subr->max_args;
-      if (numargs <= maxargs && maxargs <= 8)
+      if (numargs <= subr->max_args
+	  && subr->max_args <= 8)
 	{
 	  Lisp_Object argbuf[8];
 	  Lisp_Object *a;
-	  if (numargs < maxargs)
+	  if (numargs < subr->max_args)
 	    {
-	      eassume (maxargs <= ARRAYELTS (argbuf));
+	      eassume (subr->max_args <= ARRAYELTS (argbuf));
 	      a = argbuf;
 	      memcpy (a, args, numargs * word_size);
-	      memclear (a + numargs, (maxargs - numargs) * word_size);
+	      memclear (a + numargs, (subr->max_args - numargs) * word_size);
 	    }
 	  else
 	    a = args;
-	  switch (maxargs)
+	  switch (subr->max_args)
 	    {
 	    case 0:
 	      return subr->function.a0 ();
@@ -2801,12 +2801,14 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
 	    case 8:
 	      return subr->function.a8 (a[0], a[1], a[2], a[3], a[4], a[5],
 					a[6], a[7]);
+	    default:
+	      emacs_abort (); 	/* Can't happen. */
 	    }
-	  eassume (false);	/* In case the compiler is too stupid.  */
 	}
 
       /* Call to n-adic subr.  */
-      if (maxargs == MANY || maxargs > 8)
+      if (subr->max_args == MANY
+	  || subr->max_args > 8)
 	return subr->function.aMANY (numargs, args);
     }
 
