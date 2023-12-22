@@ -7495,7 +7495,6 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   int bit_depth, color_type, interlace_type;
   png_byte channels;
   png_uint_32 row_bytes;
-  bool transparent_p;
   struct png_memory_storage tbr;  /* Data to be read */
   ptrdiff_t nbytes;
   Emacs_Pix_Container ximg, mask_img = NULL;
@@ -7621,25 +7620,6 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0))
     goto error;
 
-  /* If image contains simply transparency data, we prefer to
-     construct a clipping mask.  */
-  transparent_p = false;
-# ifdef PNG_tRNS_SUPPORTED
-  png_bytep trans_alpha;
-  int num_trans;
-  if (png_get_tRNS (png_ptr, info_ptr, &trans_alpha, &num_trans, NULL))
-    {
-      transparent_p = true;
-      if (trans_alpha)
-	for (int i = 0; i < num_trans; i++)
-	  if (0 < trans_alpha[i] && trans_alpha[i] < 255)
-	    {
-	      transparent_p = false;
-	      break;
-	    }
-    }
-# endif
-
   /* This function is easier to write if we only have to handle
      one data format: RGB or RGBA with 8 bits per channel.  Let's
      transform other formats into that format.  */
@@ -7656,39 +7636,6 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   if (color_type == PNG_COLOR_TYPE_GRAY
       || color_type == PNG_COLOR_TYPE_GRAY_ALPHA)
     png_set_gray_to_rgb (png_ptr);
-
-  /* Handle alpha channel by combining the image with a background
-     color.  Do this only if a real alpha channel is supplied.  For
-     simple transparency, we prefer a clipping mask.  */
-  if (!transparent_p)
-    {
-      Lisp_Object specified_bg
-	= image_spec_value (img->spec, QCbackground, NULL);
-      Emacs_Color color;
-
-      /* If the user specified a color, try to use it; if not, use the
-	 current frame background, ignoring any default background
-	 color set by the image.  */
-      if (STRINGP (specified_bg)
-	  ? FRAME_TERMINAL (f)->defined_color_hook (f,
-                                                    SSDATA (specified_bg),
-                                                    &color,
-                                                    false,
-                                                    false)
-	  : (FRAME_TERMINAL (f)->query_frame_background_color (f, &color),
-             true))
-	/* The user specified `:background', use that.  */
-	{
-	  int shift = bit_depth == 16 ? 0 : 8;
-	  png_color_16 bg = { 0 };
-	  bg.red = color.red >> shift;
-	  bg.green = color.green >> shift;
-	  bg.blue = color.blue >> shift;
-
-	  png_set_background (png_ptr, &bg,
-			      PNG_BACKGROUND_GAMMA_SCREEN, 0, 1.0);
-	}
-    }
 
   png_set_interlace_handling (png_ptr);
   png_read_update_info (png_ptr, info_ptr);
@@ -7725,7 +7672,6 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   /* Create an image and pixmap serving as mask if the PNG image
      contains an alpha channel.  */
   if (channels == 4
-      && transparent_p
       && !image_create_x_image_and_pixmap (f, img, width, height, 1,
 					   &mask_img, 1))
     {
@@ -7768,7 +7714,7 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
 	  if (channels == 4)
 	    {
 	      if (mask_img)
-		PUT_PIXEL (mask_img, x, y, *p > 0 ? PIX_MASK_DRAW : PIX_MASK_RETAIN);
+		PUT_PIXEL (mask_img, x, y, *p > 0 ? *p : PIX_MASK_RETAIN);
 	      ++p;
 	    }
 	}
@@ -9882,36 +9828,20 @@ webp_load (struct frame *f, struct image *img)
     }
 
   /* Create the x image and pixmap.  */
-  Emacs_Pix_Container ximg;
+  Emacs_Pix_Container ximg, mask_img = NULL;
   if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, false))
     goto webp_error2;
 
-  /* Find the background to use if the WebP image contains an alpha
-     channel.  */
-  Emacs_Color bg_color;
-  if (features.has_alpha)
+  if (features.has_alpha
+      && !image_create_x_image_and_pixmap (f, img, width, height, 1,
+					   &mask_img, true))
     {
-      Lisp_Object specified_bg
-	= image_spec_value (img->spec, QCbackground, NULL);
-
-      /* If the user specified a color, try to use it; if not, use the
-	 current frame background, ignoring any default background
-	 color set by the image.  */
-      if (STRINGP (specified_bg))
-	FRAME_TERMINAL (f)->defined_color_hook (f,
-						SSDATA (specified_bg),
-						&bg_color,
-						false,
-						false);
-      else
-	FRAME_TERMINAL (f)->query_frame_background_color (f, &bg_color);
-      bg_color.red   >>= 8;
-      bg_color.green >>= 8;
-      bg_color.blue  >>= 8;
+      image_destroy_x_image (ximg);
+      image_clear_image_1 (f, img, CLEAR_IMAGE_PIXMAP);
+      goto webp_error2;
     }
 
-  /* Fill the X image from WebP data.  */
-
+  /* Fill the X image and mask from WebP data.  */
   init_color_table ();
 
   img->corners[TOP_CORNER] = 0;
@@ -9926,24 +9856,16 @@ webp_load (struct frame *f, struct image *img)
     {
       for (int x = 0; x < width; ++x)
 	{
-	  int r, g, b;
-	  /* The WebP alpha channel allows 256 levels of partial
-	     transparency.  Blend it with the background manually.  */
+	  int r = *p++ << 8;
+	  int g = *p++ << 8;
+	  int b = *p++ << 8;
+	  PUT_PIXEL (ximg, x, y, lookup_rgb_color (f, r, g, b));
 	  if (features.has_alpha || anim)
 	    {
-	      float a = (float) p[3] / UINT8_MAX;
-	      r = (int)(a * p[0] + (1 - a) * bg_color.red)   << 8;
-	      g = (int)(a * p[1] + (1 - a) * bg_color.green) << 8;
-	      b = (int)(a * p[2] + (1 - a) * bg_color.blue)  << 8;
-	      p += 4;
+	      if (mask_img)
+		PUT_PIXEL (mask_img, x, y, *p > 0 ? *p : PIX_MASK_RETAIN);
+	      ++p;
 	    }
-	  else
-	    {
-	      r = *p++ << 8;
-	      g = *p++ << 8;
-	      b = *p++ << 8;
-	    }
-	  PUT_PIXEL (ximg, x, y, lookup_rgb_color (f, r, g, b));
 	}
     }
 
@@ -9955,6 +9877,16 @@ webp_load (struct frame *f, struct image *img)
 
   /* Put ximg into the image.  */
   image_put_x_image (f, img, ximg, 0);
+
+    /* Same for the mask.  */
+  if (mask_img)
+    {
+      /* Fill in the background_transparent field while we have the
+	 mask handy.  Casting avoids a GCC warning.  */
+      image_background_transparent (img, f, (Emacs_Pix_Context)mask_img);
+
+      image_put_x_image (f, img, mask_img, 1);
+    }
 
   img->width = width;
   img->height = height;
@@ -11455,16 +11387,13 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
     /* The wrapper sets the foreground color, width and height, and
        viewBox must contain the dimensions of the original image.  It
        also draws a rectangle over the whole space, set to the
-       background color, before including the original image.  This
-       acts to set the background color, instead of leaving it
-       transparent.  */
+       background color, before including the original image. */
     const char *wrapper =
       "<svg xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
       "xmlns:xi=\"http://www.w3.org/2001/XInclude\" "
       "style=\"color: #%06X; fill: currentColor;\" "
       "width=\"%d\" height=\"%d\" preserveAspectRatio=\"none\" "
       "viewBox=\"0 0 %f %f\">"
-      "<rect width=\"100%%\" height=\"100%%\" fill=\"#%06X\"/>"
       "<xi:include href=\"data:image/svg+xml;base64,%s\"></xi:include>"
       "</svg>";
 
@@ -11500,7 +11429,6 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
     if (buffer_size <= snprintf (wrapped_contents, buffer_size, wrapper,
 				 foreground & 0xFFFFFF, width, height,
 				 viewbox_width, viewbox_height,
-				 background & 0xFFFFFF,
 				 SSDATA (encoded_contents)))
       goto rsvg_error;
 
@@ -11581,12 +11509,20 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 
   {
     /* Try to create a x pixmap to hold the svg pixmap.  */
-    Emacs_Pix_Container ximg;
+    Emacs_Pix_Container ximg, mask_img = NULL;
     if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0))
       {
 	g_object_unref (pixbuf);
 	return false;
       }
+
+  if (!image_create_x_image_and_pixmap (f, img, width, height, 1,
+					   &mask_img, true))
+    {
+      image_destroy_x_image (ximg);
+      image_clear_image_1 (f, img, CLEAR_IMAGE_PIXMAP);
+      return false;
+    }
 
     init_color_table ();
 
@@ -11603,9 +11539,13 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 	    int blue    = *pixels++;
 
             /* Skip opacity.  */
-	    pixels++;
+	    int opacity = *pixels++;
 
 	    PUT_PIXEL (ximg, x, y, lookup_rgb_color (f, red << 8, green << 8, blue << 8));
+
+		if (mask_img)
+			PUT_PIXEL (mask_img, x, y, opacity > 0 ? opacity : PIX_MASK_RETAIN);
+
 	  }
 
 	pixels += rowstride - 4 * width;
@@ -11628,6 +11568,16 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
 
     /* Put ximg into the image.  */
     image_put_x_image (f, img, ximg, 0);
+
+    /* Same for the mask.  */
+    if (mask_img)
+      {
+	/* Fill in the background_transparent field while we have the
+	   mask handy.  Casting avoids a GCC warning.  */
+	image_background_transparent (img, f, (Emacs_Pix_Context)mask_img);
+
+	image_put_x_image (f, img, mask_img, 1);
+      }
   }
 
   eassume (err == NULL);
