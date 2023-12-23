@@ -1946,7 +1946,7 @@ show_help_echo (Lisp_Object help, Lisp_Object window, Lisp_Object object,
   if (!NILP (help) && !STRINGP (help))
     {
       if (FUNCTIONP (help))
-	help = safe_call (4, help, window, object, pos);
+	help = safe_calln (help, window, object, pos);
       else
 	help = safe_eval (help);
 
@@ -4282,7 +4282,7 @@ trigger_timer (Lisp_Object timer)
     {
       Lisp_Object funcall = XCAR (pending_funcalls);
       pending_funcalls = XCDR (pending_funcalls);
-      safe_call2 (Qapply, XCAR (funcall), XCDR (funcall));
+      safe_calln (Qapply, XCAR (funcall), XCDR (funcall));
     }
   call1 (Qtimer_event_handler, timer);
   timers_run++;
