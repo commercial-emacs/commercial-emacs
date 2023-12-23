@@ -115,8 +115,8 @@ restore_thread (struct thread_state *thr)
 	  if (previous_thread != NULL)
 	    specpdl_unwind (previous_thread->m_specpdl_ptr,
 			    previous_thread->m_specpdl_ptr - previous_thread->m_specpdl,
-			    SPECPDL_LEXICAL_ENVIRONMENT);
-	  specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, SPECPDL_LEXICAL_ENVIRONMENT);
+			    SPECPDL_LET);
+	  specpdl_rewind (specpdl_ptr, specpdl_ptr - specpdl, SPECPDL_LET);
 	  /* Contortion here because set_buffer_internal immediately
 	     returns if argument is current_buffer.  */
 	  struct buffer *b = current_buffer;

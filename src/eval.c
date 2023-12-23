@@ -1101,77 +1101,57 @@ internal_catch (Lisp_Object tag,
   struct handler *c = push_handler (tag, CATCHER);
 
   /* Call FUNC.  */
-  if (! sys_setjmp (c->jmp))
-    {
-      Lisp_Object val = func (arg);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
-      return val;
-    }
-  else
+  if (sys_setjmp (c->jmp))
     {
       Lisp_Object val = handlerlist->val;
       clobbered_eassert (handlerlist == c);
       handlerlist = handlerlist->next;
       return val;
     }
+  else
+    {
+      Lisp_Object val = func (arg);
+      eassert (handlerlist == c);
+      handlerlist = c->next;
+      return val;
+    }
 }
 
-/* Unwind the specbind, catch, and handler stacks back to CATCH, and
-   jump to that CATCH, returning VALUE as the value of that catch.
+/* Unwind the specbind, catch, and handler stacks back to CATCH, then
+   jump to CATCH returning VALUE.
 
-   This is the guts of Fthrow and Fsignal; they differ only in the way
-   they choose the catch tag to throw to.  A catch tag for a
-   condition-case form has a TAG of Qnil.
-
-   Before each catch is discarded, unbind all special bindings and
-   execute all unwind-protect clauses made above that catch.  Unwind
-   the handler stack as we go, so that the proper handlers are in
-   effect for each unwind-protect clause we run.  At the end, restore
-   some static info saved in CATCH, and longjmp to the location
-   specified there.
-
-   This is used for correct unwinding in Fthrow and Fsignal.  */
+   This is the guts of Fthrow and Fsignal; they differ only in TYPE.
+*/
 
 static AVOID
 unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
                  Lisp_Object value)
 {
-  bool last_time;
-
   eassert (catch->next);
-
-  /* Save the value in the tag.  */
   catch->nonlocal_exit = type;
   catch->val = value;
 
-  /* Restore certain special C variables.  */
+  /* Restore C variables.  */
   set_poll_suppress_count (catch->poll_suppress_count);
   unblock_input_to (catch->interrupt_input_blocked);
 
 #ifdef HAVE_X_WINDOWS
-  /* Restore the X error handler stack.  This is important because
-     otherwise a display disconnect won't unwind the stack of error
-     traps to the right depth.  */
   x_unwind_errors_to (catch->x_error_handler_depth);
 #endif
 
   do
     {
-      /* Unwind the specpdl stack, and then restore the proper set of
-	 handlers.  */
+      /* Unwind to next recorded frame... */
       unbind_to (handlerlist->pdlcount, Qnil);
-      last_time = handlerlist == catch;
-      if (! last_time)
-	handlerlist = handlerlist->next;
+      if (handlerlist == catch)
+	break;
+      /* ... then restore corresponding handlers. */
+      handlerlist = handlerlist->next;
     }
-  while (! last_time);
-
-  eassert (handlerlist == catch);
+  while (true);
 
   lisp_eval_depth = catch->f_lisp_eval_depth;
   set_act_rec (current_thread, catch->act_rec);
-
   sys_longjmp (catch->jmp, 1);
 }
 
@@ -1449,20 +1429,20 @@ internal_catch_all (Lisp_Object (*function) (void *), void *argument,
   if (c == NULL)
     return Qcatch_all_memory_full;
 
-  if (sys_setjmp (c->jmp) == 0)
-    {
-      Lisp_Object val = function (argument);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
-      return val;
-    }
-  else
+  if (sys_setjmp (c->jmp))
     {
       eassert (handlerlist == c);
       enum nonlocal_exit type = c->nonlocal_exit;
       Lisp_Object val = c->val;
       handlerlist = c->next;
       return handler (type, val);
+    }
+  else
+    {
+      Lisp_Object val = function (argument);
+      eassert (handlerlist == c);
+      handlerlist = c->next;
+      return val;
     }
 }
 
@@ -1504,7 +1484,6 @@ push_handler_nosignal (Lisp_Object tag_ch_val, enum handlertype handlertype)
   handlerlist = c;
   return c;
 }
-
 
 static Lisp_Object signal_or_quit (Lisp_Object, Lisp_Object, bool);
 static Lisp_Object find_handler_clause (Lisp_Object, Lisp_Object);
@@ -2332,8 +2311,8 @@ eval_form (Lisp_Object form)
 	  specpdl_ref count1 = SPECPDL_INDEX ();
 	  Lisp_Object exp;
 	  /* Set `lexical-binding' now so ensuing macroexpansion is
-	     aware of how it will be interpreted (with lexical scoping
-	     or not).  */
+	     aware of how it will be interpreted, i.e., with lexical
+	     scoping or not.  */
 	  specbind (Qlexical_binding,
 		    ! NILP (Vlexical_environment) ? Qt : Qnil);
 
@@ -3693,13 +3672,6 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		save_excursion_restore (marker, window);
 	      }
 	      break;
-	    case SPECPDL_LEXICAL_ENVIRONMENT:
-	      {
-		const Lisp_Object value = specpdl_value (bind);
-		bind->lexical_environment.value = Vlexical_environment;
-		Vlexical_binding = value;
-		break;
-	      }
 	    case SPECPDL_LET:
 	      {
 		Lisp_Object sym = specpdl_symbol (bind);
