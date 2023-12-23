@@ -222,7 +222,9 @@ All commands in `lisp-mode-shared-map' are inherited by this map."
 (declare-function comp-write-bytecode-file "comp")
 
 (defun emacs-lisp-native-compile ()
-  "Native-compile synchronously the current file (if it has changed)."
+  "Native-compile the current buffer's file (if it has changed).
+This invokes a synchronous native-compilation of the file that is
+visited by the current buffer."
   (interactive nil emacs-lisp-mode)
   (emacs-lisp--before-compile-buffer)
   (let* ((byte+native-compile t)
@@ -232,12 +234,14 @@ All commands in `lisp-mode-shared-map' are inherited by this map."
       (comp-write-bytecode-file eln))))
 
 (defun emacs-lisp-native-compile-and-load ()
-  "Native-compile synchronously the current file (if it has changed).
-Load the compiled code when finished.
+  "Native-compile the current buffer's file (if it has changed), then load it.
+This invokes a synchronous native-compilation of the file that is
+visited by the current buffer, then loads the compiled native code
+when the compilation is finished.
 
 Use `emacs-lisp-byte-compile-and-load' in combination with
 `native-comp-jit-compilation' set to t to achieve asynchronous
-native compilation."
+native compilation of the current buffer's file."
   (interactive nil emacs-lisp-mode)
   (when-let ((byte-file (emacs-lisp-native-compile)))
     (load (file-name-sans-extension byte-file))))
