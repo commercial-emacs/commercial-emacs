@@ -2591,28 +2591,6 @@ dsafe_eval (Lisp_Object sexpr)
   return dsafe_calln (true, Qeval, sexpr, Qt);
 }
 
-Lisp_Object
-safe_eval (Lisp_Object sexpr)
-{
-  return safe__call1 (false, Qeval, sexpr);
-}
-
-static Lisp_Object
-safe__eval (bool inhibit_quit, Lisp_Object sexpr)
-{
-  return safe__call1 (inhibit_quit, Qeval, sexpr);
-}
-
-/* Call function FN with two arguments ARG1 and ARG2.
-   Return the result, or nil if something went wrong.  */
-
-Lisp_Object
-safe_call2 (Lisp_Object fn, Lisp_Object arg1, Lisp_Object arg2)
-{
-  return safe_call (3, fn, arg1, arg2);
-}
-
-
 /* Initialize IT for displaying current_buffer in window W, starting
    at character position CHARPOS.  CHARPOS < 0 means that no buffer
    position is specified which is useful when the iterator is assigned
@@ -15754,8 +15732,11 @@ run_window_scroll_functions (Lisp_Object window, struct text_pos startp)
 
   if (!NILP (Vwindow_scroll_functions))
     {
-      safe_run_hooks_2
-	(Qwindow_scroll_functions, window, make_fixnum (CHARPOS (startp)));
+      specpdl_ref count = SPECPDL_INDEX ();
+      specbind (Qinhibit_quit, Qt);
+      run_hook_with_args_2 (Qwindow_scroll_functions, window,
+			    make_fixnum (CHARPOS (startp)));
+      unbind_to (count, Qnil);
       SET_TEXT_POS_FROM_MARKER (startp, w->start);
       /* In case the hook functions switch buffers.  */
       set_buffer_internal (XBUFFER (w->contents));

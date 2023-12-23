@@ -1098,7 +1098,7 @@ static void
 load_warn_unescaped_character_literals (Lisp_Object file)
 {
   Lisp_Object warning =
-    safe_call (1, intern ("byte-run--unescaped-character-literals-warning"));
+    safe_calln (intern ("byte-run--unescaped-character-literals-warning"));
   if (! NILP (warning))
     {
       AUTO_STRING (format, "Loading `%s': %s");
@@ -2420,7 +2420,7 @@ with its charpos as (CHARPOS . ATOM).  */)
   specbind (Qlread_unescaped_character_literals, Qnil);
   retval = read_internal_start (buffer, Qnil, Qnil, true);
 
-  warning = safe_call (1, intern ("byte-run--unescaped-character-literals-warning"));
+  warning = safe_calln (intern ("byte-run--unescaped-character-literals-warning"));
   if (! NILP (warning))
     call2 (intern ("byte-compile-warn"), build_string ("%s"), warning);
 
