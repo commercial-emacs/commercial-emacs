@@ -2541,8 +2541,8 @@ Returns the buffer for the given server or channel."
           (when erc-log-p
             (get-buffer-create (concat "*ERC-DEBUG: " server "*"))))
 
-    (erc-determine-parameters server port nick full-name user passwd)
     (erc--initialize-markers old-point continued-session)
+    (erc-determine-parameters server port nick full-name user passwd)
     (save-excursion (run-mode-hooks)
                     (dolist (mod (car delayed-modules)) (funcall mod +1))
                     (dolist (var (cdr delayed-modules)) (set var nil)))
@@ -2851,12 +2851,15 @@ PARAMETERS should be a sequence of keywords and values, per
 
 (defun erc-open-socks-tls-stream (name buffer host service &rest parameters)
   "Connect to an IRC server via SOCKS proxy over TLS.
-Bind `erc-server-connect-function' to this function around calls
-to `erc-tls'.  See `erc-open-network-stream' for the meaning of
-NAME and BUFFER.  HOST should be a \".onion\" URL, SERVICE a TLS
-port number, and PARAMETERS a sequence of key/value pairs, per
-`open-network-stream'.  See Info node `(erc) SOCKS' for more
-info."
+Defer to the `socks' and `gnutls' libraries to make the actual
+connection and perform TLS negotiation.  Expect SERVICE to be a
+TLS port number and that the plist PARAMETERS contains a
+`:client-certificate' pair when necessary.  Otherwise, assume the
+arguments NAME, BUFFER, and HOST to be acceptable to
+`open-network-stream' and that users know to check out
+`erc-server-connect-function' and Info node `(erc) SOCKS' for
+more info, including an important example of how to \"wrap\" this
+function with SOCKS credentials."
   (require 'gnutls)
   (require 'socks)
   (let ((proc (socks-open-network-stream name buffer host service))
@@ -2875,6 +2878,15 @@ message instead, to make debugging easier."
       (apply #'error args)
     (apply #'message args)
     (beep)))
+
+(defvar erc--warnings-buffer-name nil
+  "Name of possibly existing alternate warnings buffer for unit tests.")
+
+(defun erc--lwarn (type level format-string &rest args)
+  "Issue a warning of TYPE and LEVEL with FORMAT-STRING and ARGS."
+  (let ((message (substitute-command-keys
+                  (apply #'format-message format-string args))))
+    (display-warning type message level erc--warnings-buffer-name)))
 
 ;;; Debugging the protocol
 
@@ -4147,12 +4159,16 @@ If no USER argument is specified, list the contents of `erc-ignore-list'."
 Called with position indicating boundary of interval to be excised.")
 
 (defun erc-cmd-CLEAR ()
-  "Clear the window content."
-  (let ((inhibit-read-only t))
-    (run-hook-with-args 'erc--pre-clear-functions (1- erc-insert-marker))
-    ;; Ostensibly, `line-beginning-position' is for use in lisp code.
-    (delete-region (point-min) (min (line-beginning-position)
-                                    (1- erc-insert-marker))))
+  "Clear messages in current buffer after informing active modules.
+Expect modules to perform housekeeping tasks to withstand the
+disruption.  When called from lisp code, only clear messages up
+to but not including the one occupying the current line."
+  (with-silent-modifications
+    (let ((max (if (>= (point) erc-insert-marker)
+                   (1- erc-insert-marker)
+                 (or (erc--get-inserted-msg-bounds 'beg) (pos-bol)))))
+      (run-hook-with-args 'erc--pre-clear-functions max)
+      (delete-region (point-min) max)))
   t)
 (put 'erc-cmd-CLEAR 'process-not-needed t)
 
@@ -4383,11 +4399,22 @@ the one with host foo would win."
       (plist-get (car sorted) :secret))))
 
 (defun erc-auth-source-search (&rest plist)
-  "Call `auth-source-search', possibly with keyword params in PLIST."
+  "Call `auth-source-search', possibly with keyword params in PLIST.
+If the search signals an error before returning, `warn' the user
+and ask whether to continue connecting anyway."
   ;; These exist as separate helpers in case folks should find them
   ;; useful.  If that's you, please request that they be exported.
-  (apply #'erc--auth-source-search
-         (apply #'erc--auth-source-determine-params-merge plist)))
+  (condition-case err
+      (apply #'erc--auth-source-search
+             (apply #'erc--auth-source-determine-params-merge plist))
+    (error
+     (erc--lwarn '(erc auth-source) :error
+                 "Problem querying `auth-source': %S. See %S for more."
+                 (error-message-string err)
+                 '(info "(erc) auth-source Troubleshooting"))
+     (when (or noninteractive
+               (not (y-or-n-p "Ignore auth-source error and continue? ")))
+       (signal (car err) (cdr err))))))
 
 (defun erc-server-join-channel (server channel &optional secret)
   "Join CHANNEL, optionally with SECRET.
@@ -5028,6 +5055,8 @@ connection or, with -A, all applicable connections.
 
 (put 'erc-cmd-RECONNECT 'process-not-needed t)
 
+;; FIXME use less speculative error message or lose `condition-case',
+;; since most connection failures don't signal anything.
 (defun erc-cmd-SERVER (server)
   "Connect to SERVER, leaving existing connection intact."
   (erc-log (format "cmd: SERVER: %s" server))
@@ -6524,8 +6553,14 @@ See also `erc-display-message'."
 (defun erc-process-ctcp-reply (proc parsed nick login host msg)
   "Process MSG as a CTCP reply."
   (let* ((type (car (split-string msg)))
-         (hook (intern (concat "erc-ctcp-reply-" type "-hook"))))
-    (if (boundp hook)
+         (hook (intern-soft (concat "erc-ctcp-reply-" type "-hook")))
+         ;; Help `erc-display-message' by ensuring subsequent
+         ;; insertions retain the necessary props.
+         (cmd (erc--get-eq-comparable-cmd (erc-response.command parsed)))
+         (erc--msg-prop-overrides `((erc--ctcp . ,(and hook (intern type)))
+                                    (erc--cmd . ,cmd)
+                                    ,@erc--msg-prop-overrides)))
+    (if (and hook (boundp hook))
         (run-hook-with-args-until-success
          hook proc nick login host
          (car (erc-response.command-args parsed)) msg)
