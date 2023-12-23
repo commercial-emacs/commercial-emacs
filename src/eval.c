@@ -3672,6 +3672,13 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		save_excursion_restore (marker, window);
 	      }
 	      break;
+	    case SPECPDL_LEXICAL_ENVIRONMENT:
+	      {
+		Lisp_Object value = specpdl_value (bind);
+		bind->lexical_environment.value = Vlexical_environment;
+		Vlexical_environment = value;
+	      }
+	      break;
 	    case SPECPDL_LET:
 	      {
 		Lisp_Object sym = specpdl_symbol (bind);
