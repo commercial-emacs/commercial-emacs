@@ -865,7 +865,6 @@ are subsets of LEXVARS and DYNVARS, respectively."
                                       (nreverse cconv-freevars-alist))))
     (cl-destructuring-bind (cconv-body . cconv-fv)
         (cl-first cconv-freevars-alist)
-      (cl-assert (equal body cconv-body) t)
       (cons (nreverse cconv-fv)
             (seq-keep (lambda (var) (car (memq var dynvars)))
                       (delete-dups cconv--dynbindings))))))
