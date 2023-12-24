@@ -3328,6 +3328,7 @@ void staticpro (Lisp_Object const *);
 enum { NSTATICS = (1 << 11) };
 extern Lisp_Object const *staticvec[NSTATICS];
 extern int staticidx;
+extern bool q_per_thread[NSTATICS];
 
 /* Forward declarations for prototypes.  */
 struct window;
@@ -4072,7 +4073,7 @@ extern void mark_lread (void);
 /* Defined in eval.c.  */
 extern Lisp_Object Vautoload_queue;
 extern Lisp_Object Vrun_hooks;
-extern Lisp_Object Vlexical_environment;
+extern PER_THREAD Lisp_Object Vlexical_environment;
 extern Lisp_Object inhibit_lisp_code;
 extern bool signal_quit_p (Lisp_Object);
 

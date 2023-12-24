@@ -47,7 +47,7 @@ Lisp_Object Vrun_hooks;
    the special list '(t).  Vlexical_environment contains a mix of (VAR
    . VAL) bindings and bare VAR symbols, the latter rendering VAR
    dynamically scoped for the environment's lifetime.  */
-Lisp_Object Vlexical_environment;
+PER_THREAD Lisp_Object Vlexical_environment;
 
 /* These would ordinarily be static, but they need to be visible to GDB.  */
 bool xbacktrace_valid_p (union specbinding *) EXTERNALLY_VISIBLE;
@@ -243,21 +243,27 @@ void
 init_eval (void)
 {
   specpdl_ptr = specpdl;
-  { /* Put a dummy catcher at top-level so that handlerlist is never NULL.
-       This is important since handlerlist->nextfree holds the freelist
-       which would otherwise leak every time we unwind back to top-level.   */
-    handlerlist_sentinel = xzalloc (sizeof (struct handler));
-    handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
-    struct handler *c = push_handler (Qunbound, CATCHER);
-    eassert (c == handlerlist_sentinel);
-    handlerlist_sentinel->nextfree = NULL;
-    handlerlist_sentinel->next = NULL;
-  }
+  /* Put a dummy catcher at top-level so that handlerlist is never NULL.
+     This is important since handlerlist->nextfree holds the freelist
+     which would otherwise leak every time we unwind back to top-level.   */
+  handlerlist_sentinel = xzalloc (sizeof (struct handler));
+  handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
+  struct handler *c = push_handler (Qunbound, CATCHER);
+  eassert (c == handlerlist_sentinel);
+  handlerlist_sentinel->nextfree = NULL;
+  handlerlist_sentinel->next = NULL;
   Vquit_flag = Qnil;
   debug_on_next_call = false;
   lisp_eval_depth = 0;
-  /* This is less than the initial value of num_nonmacro_input_events.  */
   when_entered_debugger = -1;
+  for (int i = 0; i < staticidx; ++i)
+    {
+      if (! staticvec[i])
+	{
+	  staticvec[i] = &Vlexical_environment;
+	  break;
+	}
+    }
 }
 
 /* Call the Lisp debugger, giving it argument ARG.  */
@@ -4058,6 +4064,7 @@ Don't set this unless you're sure that can't happen.  */);
   staticpro (&Vrun_hooks);
   Vrun_hooks = intern_c_string ("run-hooks");
 
+  q_per_thread[staticidx] = true;
   staticpro (&Vlexical_environment);
   Vlexical_environment = Qnil;
 

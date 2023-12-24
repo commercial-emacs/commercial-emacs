@@ -1251,42 +1251,22 @@ main (int argc, char **argv)
 	break;
       skip_args++;
     }
-#ifdef HAVE_PDUMPER
-  bool attempt_load_pdump = false;
-#endif
 
-  /* Look for this argument first, before any heap allocation, so we
-     can set heap flags properly if we're going to unexec.  */
-  if (! initialized && temacs)
+  if (temacs)
     {
 #ifdef HAVE_PDUMPER
       if (strcmp (temacs, "pdump") == 0 ||
-          strcmp (temacs, "pbootstrap") == 0)
-        gflags.will_dump_with_pdumper_ = true;
-#endif
-#if defined HAVE_PDUMPER
+	  strcmp (temacs, "pbootstrap") == 0)
+	gflags.will_dump_with_pdumper_ = true;
       if (strcmp (temacs, "bootstrap") == 0 ||
-          strcmp (temacs, "pbootstrap") == 0)
-        gflags.will_bootstrap_ = true;
+	  strcmp (temacs, "pbootstrap") == 0)
+	gflags.will_bootstrap_ = true;
       gflags.will_dump_ =  will_dump_with_pdumper_p ();
       if (will_dump_p ())
-        dump_mode = temacs;
+	dump_mode = temacs;
 #endif
       if (! dump_mode)
-        fatal ("Invalid temacs mode '%s'", temacs);
-    }
-  else if (temacs)
-    {
-      fatal ("--temacs not supported for unexeced emacs");
-    }
-  else
-    {
-      eassert (! temacs);
-      eassert (! initialized);
-#ifdef HAVE_PDUMPER
-      if (! initialized)
-	attempt_load_pdump = true;
-#endif
+	fatal ("Invalid temacs mode '%s'", temacs);
     }
 
 #ifdef WINDOWSNT
@@ -1333,9 +1313,11 @@ main (int argc, char **argv)
 #endif
 
 #ifdef HAVE_PDUMPER
-  if (attempt_load_pdump)
-    initial_emacs_executable = load_pdump (argc, argv);
-  /* Now INITIALIZED should be true.  */
+  if (! temacs)
+    {
+      initial_emacs_executable = load_pdump (argc, argv);
+      eassert (initialized);
+    }
 #else
   ptrdiff_t bufsize;
   initial_emacs_executable = find_emacs_executable (argv[0], &bufsize);

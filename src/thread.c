@@ -720,7 +720,13 @@ run_thread (void *state)
   eassert (handlerlist == push_handler (Qunbound, CATCHER));
   handlerlist->next = handlerlist->nextfree = NULL;
 
-  internal_condition_case (invoke_thread, Qt, record_thread_error);
+  internal_condition_case (invoke_thread,
+#ifdef ENABLE_CHECKING
+			   Qerror,
+#else
+			   Qt,
+#endif
+			   record_thread_error);
 
   xfree (self->thread_name);
   xfree (self->m_specpdl - 1); /* 1- for unreachable dummy entry.  */
