@@ -56,7 +56,7 @@ static union aligned_thread_state main_state
   = {{
       .header.size = PVECHEADERSIZE (PVEC_THREAD,
 				     PSEUDOVECSIZE (struct thread_state,
-						    event_object),
+						    THREAD_LAST_LISP_FIELD),
 				     VECSIZE (struct thread_state)),
       .m_last_thing_searched = LISPSYM_INITIALLY (Qnil),
       .name = LISPSYM_INITIALLY (Qnil),
@@ -799,12 +799,12 @@ A non-nil UNCOOPERATIVE halts and catches fire.
     CHECK_STRING (name);
 
   new_thread = ALLOCATE_ZEROED_PSEUDOVECTOR (struct thread_state,
-					     lexical_environment,
+					     THREAD_LAST_LISP_FIELD,
 					     PVEC_THREAD);
   new_thread->name = name;
   new_thread->function = function;
   new_thread->obarray = initialize_vector (OBARRAY_SIZE / 10, make_fixnum (0));
-  new_thread->lexical_environment = Fcopy_sequence (current_thread->lexical_environment);
+  new_thread->lexical_environment = current_thread->lexical_environment;
 #ifdef HAVE_GCC_TLS
   new_thread->cooperative = NILP (uncooperative);
 #else

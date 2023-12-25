@@ -853,17 +853,13 @@ are subsets of LEXVARS and DYNVARS, respectively."
             `#'(lambda () ,form)))
          (analysis-env (mapcar (lambda (v) (list v nil nil nil nil)) lexvars))
          (cconv--dynbound-variables dynvars)
-         (body* (cddr (cadr fun)))
-         (body (if (eq :documentation (car-safe (car body*)))
-                   (cdr body*)
-                 body*))
          byte-compile-lexical-variables
          cconv--dynbindings
          cconv-freevars-alist
          cconv-var-classification
          (cconv-freevars-alist (progn (cconv-analyze-form fun analysis-env)
                                       (nreverse cconv-freevars-alist))))
-    (cl-destructuring-bind (cconv-body . cconv-fv)
+    (cl-destructuring-bind (_cconv-body . cconv-fv)
         (cl-first cconv-freevars-alist)
       (cons (nreverse cconv-fv)
             (seq-keep (lambda (var) (car (memq var dynvars)))

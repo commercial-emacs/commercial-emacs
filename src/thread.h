@@ -85,8 +85,7 @@ struct thread_state
      latter rendering VAR dynamically scoped for the environment's
      lifetime.  */
   Lisp_Object lexical_environment;
-
-  /* !!! Adjust ALLOCATE_ZEROED_PSEUDOVECTOR for new Lisp fields.  */
+#define THREAD_LAST_LISP_FIELD lexical_environment
 
   char const *m_stack_bottom;
 #define stack_bottom (current_thread->m_stack_bottom)
