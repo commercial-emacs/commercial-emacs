@@ -804,7 +804,7 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   new_thread->name = name;
   new_thread->function = function;
   new_thread->obarray = initialize_vector (OBARRAY_SIZE / 10, make_fixnum (0));
-  new_thread->lexical_environment = Fcopy_sequence (Vlexical_environment);
+  new_thread->lexical_environment = Fcopy_sequence (current_thread->lexical_environment);
 #ifdef HAVE_GCC_TLS
   new_thread->cooperative = NILP (uncooperative);
 #else

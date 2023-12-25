@@ -42,13 +42,6 @@ Lisp_Object Vautoload_queue;
    is shutting down.  */
 Lisp_Object Vrun_hooks;
 
-/* Under dynamic scoping, Vlexical_environment is nil.  To distinguish
-   it from an empty lexically scoped environment, the latter takes on
-   the special list '(t).  Vlexical_environment contains a mix of (VAR
-   . VAL) bindings and bare VAR symbols, the latter rendering VAR
-   dynamically scoped for the environment's lifetime.  */
-PER_THREAD Lisp_Object Vlexical_environment;
-
 /* These would ordinarily be static, but they need to be visible to GDB.  */
 bool xbacktrace_valid_p (union specbinding *) EXTERNALLY_VISIBLE;
 Lisp_Object *xbacktrace_args (union specbinding *) EXTERNALLY_VISIBLE;
@@ -256,14 +249,6 @@ init_eval (void)
   debug_on_next_call = false;
   lisp_eval_depth = 0;
   when_entered_debugger = -1;
-  for (int i = 0; i < staticidx; ++i)
-    {
-      if (! staticvec[i])
-	{
-	  staticvec[i] = &Vlexical_environment;
-	  break;
-	}
-    }
 }
 
 /* Call the Lisp debugger, giving it argument ARG.  */
@@ -463,7 +448,7 @@ usage: (setq [SYM VAL]...)  */)
       tail = XCDR (tail);
       val = eval_form (arg);
       Lisp_Object lexbind = SYMBOLP (sym)
-	? Fassq (sym, Vlexical_environment)
+	? Fassq (sym, current_thread->lexical_environment)
 	: Qnil;
       if (! NILP (lexbind))
 	XSETCDR (lexbind, val); /* SYM lexically bound.  */
@@ -500,7 +485,7 @@ usage: (function ARG)  */)
   if (! NILP (XCDR (args)))
     xsignal2 (Qwrong_number_of_arguments, Qfunction, Flength (args));
 
-  if (! NILP (Vlexical_environment)
+  if (! NILP (current_thread->lexical_environment)
       && CONSP (quoted)
       && EQ (XCAR (quoted), Qlambda))
     {
@@ -524,8 +509,8 @@ usage: (function ARG)  */)
       return ! NILP (Vinternal_make_interpreted_closure_function)
 	? call2 (Vinternal_make_interpreted_closure_function,
 		 Fcons (Qlambda, cdr),
-		 Vlexical_environment)
-	: Fcons (Qclosure, Fcons (Vlexical_environment, cdr));
+		 current_thread->lexical_environment)
+	: Fcons (Qclosure, Fcons (current_thread->lexical_environment, cdr));
     }
   else
     /* Simply quote the argument.  */
@@ -755,10 +740,10 @@ usage: (defvar SYMBOL &optional INITVALUE DOCSTRING)  */)
 
   if (NILP (tail)) /* a pithy (defvar FOO) */
     {
-      if (! NILP (Vlexical_environment)
+      if (! NILP (current_thread->lexical_environment)
 	  && ! XSYMBOL (sym)->u.s.declared_special)
 	/* Make a special variable for duration of environment.  */
-	Vlexical_environment = Fcons (sym, Vlexical_environment);
+	current_thread->lexical_environment = Fcons (sym, current_thread->lexical_environment);
       /* Otherwise (defvar FOO) is a no-op.  */
     }
   else
@@ -857,14 +842,14 @@ let_bind (Lisp_Object prevailing_env, Lisp_Object var, Lisp_Object val, bool *q_
 	  *q_pushed = true;
 	  record_lexical_environment ();
 	}
-      Vlexical_environment = Fcons (Fcons (var, val), Vlexical_environment);
+      current_thread->lexical_environment = Fcons (Fcons (var, val), current_thread->lexical_environment);
     }
   else
     {
       /* Dynamically bind VAR.  */
       specbind (var, val);
       /* If lexical binding was off, it should still be off.  */
-      eassert (q_lexical_binding || NILP (Vlexical_environment));
+      eassert (q_lexical_binding || NILP (current_thread->lexical_environment));
     }
 }
 
@@ -892,7 +877,7 @@ eval_let (Lisp_Object args, bool nested_envs)
 	  val = eval_form (CAR (XCDR (bind)));
 	}
       if (nested_envs)
-	let_bind (Vlexical_environment, var, val, &q_pushed);
+	let_bind (current_thread->lexical_environment, var, val, &q_pushed);
       else
 	post_eval = Fcons (Fcons (var, val), post_eval);
     }
@@ -901,7 +886,7 @@ eval_let (Lisp_Object args, bool nested_envs)
   /* For parallel let (sans star), the resultant environment must
      incorporate any side effects from evaluating the bindings.  Thus,
      the two passes.  */
-  Lisp_Object prevailing_env = Vlexical_environment;
+  Lisp_Object prevailing_env = current_thread->lexical_environment;
   post_eval = Fnreverse (post_eval);
   FOR_EACH_TAIL (post_eval) /* second pass */
     {
@@ -1303,11 +1288,11 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
       else
 	{
 	  specpdl_ref count = SPECPDL_INDEX ();
-	  if (! NILP (Vlexical_environment))
+	  if (! NILP (current_thread->lexical_environment))
 	    {
 	      record_lexical_environment ();
-	      Vlexical_environment
-		= Fcons (Fcons (var, result), Vlexical_environment);
+	      current_thread->lexical_environment
+		= Fcons (Fcons (var, result), current_thread->lexical_environment);
 	    }
 	  else
 	    specbind (var, result);
@@ -2134,7 +2119,7 @@ node `(elisp)Eval' for its form.  */)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   record_lexical_environment ();
-  Vlexical_environment = ! NILP (Flistp (lexical))
+  current_thread->lexical_environment = ! NILP (Flistp (lexical))
     ? lexical /* dynamic if LEXICAL is nil, bespoke otherwise */
     : list_of_t /* No bespoke environment but still lexical.  */
     ;
@@ -2186,7 +2171,7 @@ eval_form (Lisp_Object form)
   Lisp_Object result = form;
   if (SYMBOLP (form))
     {
-      Lisp_Object lexbind = Fassq (form, Vlexical_environment);
+      Lisp_Object lexbind = Fassq (form, current_thread->lexical_environment);
       result = ! NILP (lexbind) ? XCDR (lexbind) : Fsymbol_value (form);
     }
   else if (CONSP (form))
@@ -2326,11 +2311,11 @@ eval_form (Lisp_Object form)
 	     aware of how it will be interpreted, i.e., with lexical
 	     scoping or not.  */
 	  specbind (Qlexical_binding,
-		    ! NILP (Vlexical_environment) ? Qt : Qnil);
+		    ! NILP (current_thread->lexical_environment) ? Qt : Qnil);
 
 	  /* Apprise macro of any defvar declarations in scope. */
 	  Lisp_Object dynvars = Vmacroexp__dynvars;
-	  for (Lisp_Object p = Vlexical_environment;
+	  for (Lisp_Object p = current_thread->lexical_environment;
 	       ! NILP (p);
 	       p = XCDR(p))
 	    {
@@ -2978,10 +2963,10 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
     xsignal1 (Qinvalid_function, fun);
   else if (i < nargs)
     xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
-  else if (! EQ (lexenv, Vlexical_environment))
+  else if (! EQ (lexenv, current_thread->lexical_environment))
     {
       record_lexical_environment ();
-      Vlexical_environment = lexenv;
+      current_thread->lexical_environment = lexenv;
     }
 
   eassert (! SUBR_NATIVE_COMPILEDP (fun)
@@ -3352,7 +3337,7 @@ void
 record_lexical_environment (void)
 {
   specpdl_ptr->lexical_environment.kind = SPECPDL_LEXICAL_ENVIRONMENT;
-  specpdl_ptr->lexical_environment.value = Vlexical_environment;
+  specpdl_ptr->lexical_environment.value = current_thread->lexical_environment;
   grow_specpdl ();
 }
 
@@ -3457,7 +3442,7 @@ unbind_to (specpdl_ref count, Lisp_Object value)
 	  break;
 #endif
 	case SPECPDL_LEXICAL_ENVIRONMENT:
-	  Vlexical_environment = specpdl_value (specpdl_ptr);
+	  current_thread->lexical_environment = specpdl_value (specpdl_ptr);
 	  break;
 	case SPECPDL_LET:
 	  {
@@ -3687,8 +3672,8 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 	    case SPECPDL_LEXICAL_ENVIRONMENT:
 	      {
 		Lisp_Object value = specpdl_value (bind);
-		bind->lexical_environment.value = Vlexical_environment;
-		Vlexical_environment = value;
+		bind->lexical_environment.value = current_thread->lexical_environment;
+		current_thread->lexical_environment = value;
 	      }
 	      break;
 	    case SPECPDL_LET:
@@ -4063,10 +4048,6 @@ Don't set this unless you're sure that can't happen.  */);
 
   staticpro (&Vrun_hooks);
   Vrun_hooks = intern_c_string ("run-hooks");
-
-  q_per_thread[staticidx] = true;
-  staticpro (&Vlexical_environment);
-  Vlexical_environment = Qnil;
 
   staticpro (&Qcatch_all_memory_full);
   /* Make sure Qcatch_all_memory_full is a unique object.  We could

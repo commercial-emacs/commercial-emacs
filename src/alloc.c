@@ -170,7 +170,6 @@ deadp (Lisp_Object x)
 }
 
 Lisp_Object const *staticvec[NSTATICS];
-bool q_per_thread[NSTATICS];
 
 /* Index of next unused slot in staticvec.  */
 

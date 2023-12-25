@@ -78,7 +78,12 @@ struct thread_state
   /* Mutex or condvar waited for.  */
   Lisp_Object event_object;
 
-  /* Reference to per-thread environment for gc marking.  */
+  /* Under dynamic scoping, lexical_environment is nil.  To
+     distinguish it from an empty lexically scoped environment, the
+     latter takes on the special list '(t).  lexical_environment
+     contains a mix of (VAR . VAL) bindings and bare VAR symbols, the
+     latter rendering VAR dynamically scoped for the environment's
+     lifetime.  */
   Lisp_Object lexical_environment;
 
   /* !!! Adjust ALLOCATE_ZEROED_PSEUDOVECTOR for new Lisp fields.  */

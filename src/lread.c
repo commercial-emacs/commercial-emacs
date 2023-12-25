@@ -2167,7 +2167,7 @@ readevalloop (Lisp_Object readcharfun,
   Lisp_Object lexical_p = find_symbol_value (XSYMBOL (Qlexical_binding),
 					     current_buffer);
   record_lexical_environment ();
-  Vlexical_environment = ! NILP (lexical_p) && ! EQ (lexical_p, Qunbound)
+  current_thread->lexical_environment = ! NILP (lexical_p) && ! EQ (lexical_p, Qunbound)
     ? list1 (Qt) : Qnil;
 
   specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);

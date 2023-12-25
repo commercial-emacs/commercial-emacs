@@ -1592,12 +1592,9 @@ dump_roots (struct dump_context *ctx)
 
   for (int i = 0; i < staticidx; ++i)
     {
-      if (! q_per_thread[i])
-	{
-	  Fputhash (dump_off_to_lisp (emacs_offset (staticvec[i])),
-		    Qt, ctx->staticpro_table);
-	  dump_emacs_reloc_to_lv (ctx, staticvec[i]);
-	}
+      Fputhash (dump_off_to_lisp (emacs_offset (staticvec[i])),
+		Qt, ctx->staticpro_table);
+      dump_emacs_reloc_to_lv (ctx, staticvec[i]);
     }
 }
 
@@ -4017,8 +4014,7 @@ DEFUN ("dump-emacs-portable",
      but we have to manually save the list of GC roots itself.  */
   dump_metadata_for_pdumper (ctx);
   for (int i = 0; i < staticidx; ++i)
-    if (! q_per_thread[i])
-      dump_emacs_reloc_to_emacs_ptr_raw (ctx, &staticvec[i], staticvec[i]);
+    dump_emacs_reloc_to_emacs_ptr_raw (ctx, &staticvec[i], staticvec[i]);
   dump_emacs_reloc_immediate_int (ctx, &staticidx, staticidx);
 
   /* Dump until while we keep finding objects to dump.  We add new
