@@ -20,15 +20,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        gearing: [standard]
-        include:
-          - os: ubuntu-latest
-            gearing: alt-x
-          - os: ubuntu-latest
-            gearing: multithread
-          - os: ubuntu-latest
-            gearing: native-comp
+        os: [ubuntu-latest]
+        gearing: [multithread]
     steps:
     - run: |
         git config --global core.autocrlf false
@@ -94,7 +87,7 @@ jobs:
       run: |
         ./autogen.sh
         ./configure $([ `uname` = 'Linux' ] && echo WERROR_CFLAGS=\'-Werror\') --prefix=$HOME/.local --enable-multithreading
-        make -j4 -C src
+        make -j4 check
     - name: make-native-comp
       if: matrix.gearing == 'native-comp'
       run: |
