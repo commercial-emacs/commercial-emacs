@@ -700,11 +700,6 @@ await_reap (struct thread_state *thr)
 static void *
 run_thread (void *state)
 {
-#ifdef HAVE_NS
-  /* Alan Third anticipating calls to Objective C code.  */
-  void *pool = ns_alloc_autorelease_pool ();
-#endif
-
   struct thread_state *self = state;
   union { char c; GCALIGNED_UNION_MEMBER } stack_pos;
 
@@ -753,10 +748,6 @@ run_thread (void *state)
     }
 
   sys_cond_broadcast (&self->thread_condvar);
-
-#ifdef HAVE_NS
-  ns_release_autorelease_pool (pool);
-#endif
 
   await_reap (self);
 
