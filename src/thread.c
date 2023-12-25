@@ -680,6 +680,17 @@ await_reap (struct thread_state *thr)
   sem_wait_ (&sem_reapees, thr);
 #endif
   reap_thread_processes (thr);
+  /* Unlink THR from all_threads.  */
+  for (struct thread_state **pp = &all_threads;
+       *pp != NULL;
+       pp = &(*pp)->next_thread)
+    {
+      if (*pp == thr)
+	{
+	  *pp = (*pp)->next_thread;
+	  break;
+	}
+    }
 #ifdef HAVE_GCC_TLS
   reap_thread_allocations (thr);
   sem_post (&sem_reap_end);
@@ -746,18 +757,6 @@ run_thread (void *state)
 #ifdef HAVE_NS
   ns_release_autorelease_pool (pool);
 #endif
-
-  /* Unlink SELF from all_threads.  */
-  for (struct thread_state **thr = &all_threads;
-       *thr != NULL;
-       thr = &(*thr)->next_thread)
-    {
-      if (*thr == self)
-	{
-	  *thr = (*thr)->next_thread;
-	  break;
-	}
-    }
 
   await_reap (self);
 
