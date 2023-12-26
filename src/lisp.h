@@ -3484,11 +3484,23 @@ record_in_backtrace (Lisp_Object function, Lisp_Object *args, ptrdiff_t nargs)
 }
 
 enum exception_type
-{
-  CATCHER,
-  CONDITION_CASE,
-  OMNIBUS,
-};
+  {
+    CATCHER,              /* handler.WHAT is catch tag */
+    CONDITION_CASE,       /* handler.WHAT is Qt if catching all errors,
+			     Qerror if invoking debugger for all errors,
+			     or a list of error symbols.  */
+    OMNIBUS,
+    HANDLER_BIND,         /* handler.WHAT is a list of error symbols.
+			     handler.VAL is a cons of the handler's
+			     ordinal within the `handler-bind' clauses
+			     and its function.  To recall our position
+			     in the exception stack during the ensuing
+			     function call, we push a HANDLER_BIND_SKIP
+			     meta-handler.  */
+    HANDLER_BIND_SKIP     /* The handler.WHAT is the number of levels
+			     from the stack top to get beyond the parent
+			     HANDLER_BIND.  */
+  };
 
 enum nonlocal_exit
 {
@@ -3510,10 +3522,10 @@ enum nonlocal_exit
 struct handler
 {
   enum exception_type type;
-  Lisp_Object what; /* tag for catch, error symbols for condition-case */
+  Lisp_Object what; /* see exception_type enum for meaning */
 
   enum nonlocal_exit nonlocal_exit;
-  Lisp_Object val;
+  Lisp_Object val; /* see exception_type enum for meaning */
 
   /* For restoring bytecode interpreter state.  */
   Lisp_Object *bytecode_top;

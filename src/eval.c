@@ -1321,6 +1321,42 @@ usage: (condition-case VAR BODYFORM &rest HANDLERS)  */)
   return internal_lisp_condition_case (var, bodyform, clauses);
 }
 
+DEFUN ("handler-bind-1", Fhandler_bind_1, Shandler_bind_1, 1, MANY, 0,
+       doc: /* Run BODYFUN with bespoke error handlers.
+If an error matching one of CONDITIONS (a list of symbols) is raised
+during BODYFUN (a function with no arguments), call the associated HANDLER
+with the error as its argument.  HANDLER should either transfer the control
+via a non-local exit, or return normally (possibly allowing another
+handler to run).
+
+usage: (handler-bind BODYFUN [CONDITIONS HANDLER]...)  */)
+  (ptrdiff_t nargs, Lisp_Object *args)
+{
+  eassert (nargs >= 1);
+  Lisp_Object bodyfun = args[0];
+  int count = 0;
+  if (nargs % 2 == 0)
+    error ("Trailing CONDITIONS withount HANDLER in `handler-bind'");
+  for (ptrdiff_t i = nargs - 2; i > 0; i -= 2)
+    {
+      Lisp_Object conditions = args[i], handler = args[i + 1];
+      if (!NILP (conditions))
+	{
+	  if (!CONSP (conditions))
+	    conditions = Fcons (conditions, Qnil);
+	  struct handler *c = push_exception (conditions, HANDLER_BIND);
+	  c->val = Fcons (make_fixnum (count++), handler);
+	}
+    }
+  Lisp_Object ret = call0 (bodyfun);
+  while (count--)
+    pop_exception ();
+  return ret;
+}
+
+/* Like Fcondition_case, but the args are separate
+   rather than passed in a list.  Used by Fbyte_code.  */
+
 Lisp_Object
 internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 			      Lisp_Object clauses)
@@ -1588,20 +1624,12 @@ pop_exception (void)
   return exception_stack_pop (current_thread);
 }
 
-/* WHAT is ridiculously overloaded.  It could be,
-
-   1. a list of catch tags
-   2. a list of condition-case error symbols
-   3. Qt, for catching all exceptions
-   4. Qerror, as Qt but invoke debugger.
-*/
-
 struct handler *
 push_exception (Lisp_Object what, enum exception_type type)
 {
   struct handler *top = exception_stack_push (current_thread);
   top->type = type;
-  top->what = what;
+  top->what = what; /* ridiculously overloaded.  See exception_type enum. */
   top->val = Qnil;
   top->f_lisp_eval_depth = lisp_eval_depth;
   top->pdlcount = SPECPDL_INDEX ();
@@ -1671,19 +1699,28 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
   }
 
   struct handler *handler = NULL;
-  for (size_t count = exception_stack_count (current_thread);
-       count > 0 && handler == NULL;
-       --count)
+  for (int height = exception_stack_count (current_thread);
+       height > 0 && handler == NULL;
+       --height)
     {
-      struct handler *h = current_thread->exception_stack_bottom + count - 1;
-      if (h->type == OMNIBUS)
-	handler = h;
-      else if (h->type == CONDITION_CASE)
+      struct handler *h = current_thread->exception_stack_bottom + height - 1;
+      switch (h->type)
 	{
-	  if (EQ (h->what, Qt) || EQ (h->what, Qerror))
-	    handler = h;
-	  else if (CONSP (h->what))
+	case CATCHER:
+	  break;
+	case OMNIBUS:
+	  handler = h;
+	  break;
+	case CONDITION_CASE:
+	case HANDLER_BIND:
+	  if (!CONSP (h->what))
 	    {
+	      /* An atomic H->WHAT means apply H unconditionally.  */
+	      handler = h;
+	    }
+	  else
+	    {
+	      /* H->WHAT is a list of conditions.  Is one amongst ERRSYMS? */
 	      Lisp_Object errsyms = Fget (error_symbol, Qerror_conditions);
 	      Lisp_Object tail = h->what;
 	      FOR_EACH_TAIL_SAFE (tail)
@@ -1696,6 +1733,33 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
 		    }
 		}
 	    }
+
+	  if (h->type == HANDLER_BIND && handler)
+	    {
+	      /* Recall HANDLER->VAL is (ordinal . function) */
+	      specpdl_ref count = SPECPDL_INDEX ();
+	      Lisp_Object error	= NILP (error_symbol) /* apparently means oom */
+		? data
+		: (SYMBOLP (error_symbol) || !NILP (data))
+		? Fcons (error_symbol, data)
+		: error_symbol;
+	      const int from_top = exception_stack_count (current_thread) - height;
+	      /* +1 for HANDLER_BIND_SKIP itself */
+	      push_exception (make_fixnum (from_top
+					   + XFIXNUM (XCAR (handler->val))
+					   + 1),
+			      HANDLER_BIND_SKIP);
+	      call1 (XCDR (handler->val), error); /* e.g. call debugger */
+	      unbind_to (count, Qnil);
+	      handler = NULL;
+	      pop_exception ();
+	    }
+	  break;
+	case HANDLER_BIND_SKIP:
+	  height -= XFIXNUM (h->what);
+	  break;
+	default:
+	  abort ();
 	}
     }
 
@@ -4067,6 +4131,7 @@ Don't set this unless you're sure that can't happen.  */);
   defsubr (&Sthrow);
   defsubr (&Sunwind_protect);
   defsubr (&Scondition_case);
+  defsubr (&Shandler_bind_1);
   DEFSYM (QCsuccess, ":success");
   defsubr (&Ssignal);
   defsubr (&Scommandp);

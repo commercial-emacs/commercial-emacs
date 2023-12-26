@@ -1979,9 +1979,35 @@ It has been obsolete since Emacs 26.1.  Use the group 'text' instead.
 ** Tree-sitter changes
 
 +++
-*** Indirect buffers can have their own parser list.
-Before, indirect buffers share their base buffer’s parser list and
-parsers.  Now they can have their own parser list.
+** New special form 'handler-bind'.
+Provides a functionality similar to `condition-case` except it runs the
+handler code without unwinding the stack, such that we can record the
+backtrace and other dynamic state at the point of the error.
+See the Info node "(elisp) Handling Errors".
+
++++
+** New 'pop-up-frames' action alist entry for 'display-buffer'.
+This has the same effect as the variable of the same name and takes
+precedence over the variable when present.
+
+** New function 'merge-ordered-lists'.
+Mostly used internally to do a kind of topological sort of
+inheritance hierarchies.
+
+** New API for 'derived-mode-p' and control of the graph of major modes.
+
+*** 'derived-mode-p' now takes the list of modes as a single argument.
+The same holds for 'provided-mode-derived-p'.
+The old calling convention where multiple modes are passed as
+separate arguments is deprecated.
+
+*** New functions to access the graph of major modes.
+While 'define-derived-mode' still only supports single inheritance,
+modes can declare additional parents (for tests like 'derived-mode-p')
+with 'derived-mode-add-parents'.
+Accessing the 'derived-mode-parent' property directly is now
+deprecated in favor of the new functions 'derived-mode-set-parent'
+and 'derived-mode-all-parents'.
 
 +++
 *** New variable 'treesit-language-remap-alist'.
