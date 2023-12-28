@@ -1531,7 +1531,7 @@ This docstring appeases checkdoc, that's all."
           (apply
            #'make-instance class
            :name readable-name
-           :events-buffer-scrollback-size eglot-events-buffer-size
+           :events-buffer-config eglot-events-buffer-config
            :notification-dispatcher (funcall spread #'eglot-handle-notification)
            :request-dispatcher (funcall spread #'eglot-handle-request)
            :on-shutdown #'eglot--on-shutdown
