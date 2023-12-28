@@ -407,7 +407,7 @@ module_global_reference_p (emacs_value v, ptrdiff_t *n)
      reference that's identical to some global reference.  */
   for (ptrdiff_t i = 0; i < HASH_TABLE_SIZE (h); ++i)
     {
-      if (!EQ (HASH_KEY (h, i), Qunbound)
+      if (!hash_unused_entry_key_p (HASH_KEY (h, i))
           && &XMODULE_GLOBAL_REFERENCE (HASH_VALUE (h, i))->value == v)
         return true;
     }
