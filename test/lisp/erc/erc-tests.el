@@ -22,7 +22,10 @@
 ;;; Code:
 
 (require 'ert-x)
-(require 'erc)
+(eval-and-compile
+  (let ((load-path (cons (ert-resource-directory) load-path)))
+    (require 'erc-tests-common)))
+
 (require 'erc-ring)
 
 (ert-deftest erc--read-time-period ()
@@ -113,7 +116,7 @@
 
 (ert-deftest erc-with-server-buffer ()
   (setq erc-away 1)
-  (erc-tests--set-fake-server-process "sleep" "1")
+  (erc-tests-common-init-server-proc "sleep" "1")
 
   (let (mockingp calls)
     (advice-add 'buffer-local-value :after
@@ -155,34 +158,22 @@
                     (when (cl-evenp c) (push c out)))))
     (should (equal out '(?f ?d ?b)))))
 
-(defun erc-tests--send-prep ()
-  ;; Caller should probably shadow `erc-insert-modify-hook' or
-  ;; populate user tables for erc-button.
-  (erc-mode)
-  (erc--initialize-markers (point) nil)
-  (should (= (point) erc-input-marker)))
-
-(defun erc-tests--set-fake-server-process (&rest args)
-  (setq erc-server-process
-        (apply #'start-process (car args) (current-buffer) args))
-  (set-process-query-on-exit-flag erc-server-process nil))
-
 (ert-deftest erc-hide-prompt ()
   (let ((erc-hide-prompt erc-hide-prompt)
         ;;
         erc-kill-channel-hook erc-kill-server-hook erc-kill-buffer-hook)
 
     (with-current-buffer (get-buffer-create "ServNet")
-      (erc-tests--send-prep)
+      (erc-tests-common-prep-for-insertion)
       (goto-char erc-insert-marker)
       (should (looking-at-p (regexp-quote erc-prompt)))
-      (erc-tests--set-fake-server-process "sleep" "1")
+      (erc-tests-common-init-server-proc "sleep" "1")
       (set-process-sentinel erc-server-process #'ignore)
       (setq erc-network 'ServNet)
       (set-process-query-on-exit-flag erc-server-process nil))
 
     (with-current-buffer (get-buffer-create "#chan")
-      (erc-tests--send-prep)
+      (erc-tests-common-prep-for-insertion)
       (goto-char erc-insert-marker)
       (should (looking-at-p (regexp-quote erc-prompt)))
       (setq erc-server-process (buffer-local-value 'erc-server-process
@@ -190,7 +181,7 @@
             erc--target (erc--target-from-string "#chan")))
 
     (with-current-buffer (get-buffer-create "bob")
-      (erc-tests--send-prep)
+      (erc-tests-common-prep-for-insertion)
       (goto-char erc-insert-marker)
       (should (looking-at-p (regexp-quote erc-prompt)))
       (setq erc-server-process (buffer-local-value 'erc-server-process
@@ -318,10 +309,10 @@
 
     (ert-info ("Server buffer")
       (with-current-buffer (get-buffer-create "ServNet")
-        (erc-tests--send-prep)
+        (erc-tests-common-prep-for-insertion)
         (goto-char erc-insert-marker)
         (should (looking-at-p "ServNet 3>"))
-        (erc-tests--set-fake-server-process "sleep" "1")
+        (erc-tests-common-init-server-proc "sleep" "1")
         (set-process-sentinel erc-server-process #'ignore)
         (setq erc-network 'ServNet
               erc-server-current-nick "tester"
@@ -353,7 +344,7 @@
 
     (ert-info ("Channel buffer")
       (with-current-buffer (get-buffer-create "#chan")
-        (erc-tests--send-prep)
+        (erc-tests-common-prep-for-insertion)
         (goto-char erc-insert-marker)
         (should (looking-at-p "#chan 9>"))
         (goto-char erc-input-marker)
@@ -546,7 +537,7 @@
 
 (ert-deftest erc-setup-buffer--custom-action ()
   (erc-mode)
-  (erc-tests--set-fake-server-process "sleep" "1")
+  (erc-tests-common-init-server-proc "sleep" "1")
   (setq erc--server-last-reconnect-count 0)
   (let ((owin (selected-window))
         (obuf (window-buffer))
@@ -677,7 +668,7 @@
 
 (ert-deftest erc--parsed-prefix ()
   (erc-mode)
-  (erc-tests--set-fake-server-process "sleep" "1")
+  (erc-tests-common-init-server-proc "sleep" "1")
   (setq erc--isupport-params (make-hash-table))
 
   ;; Uses fallback values when no PREFIX parameter yet received, thus
@@ -755,7 +746,7 @@
         erc-server-users (make-hash-table :test #'equal)
         erc--isupport-params (make-hash-table)
         erc--target (erc--target-from-string "#test"))
-  (erc-tests--set-fake-server-process "sleep" "1")
+  (erc-tests-common-init-server-proc "sleep" "1")
 
   (let ((orig-handle-fn (symbol-function 'erc--handle-channel-mode))
         calls)
@@ -844,7 +835,7 @@
         erc-server-parameters
         '(("CHANMODES" . "eIbq,k,flj,CFLMPQRSTcgimnprstuz")))
 
-  (erc-tests--set-fake-server-process "sleep" "1")
+  (erc-tests-common-init-server-proc "sleep" "1")
 
   (cl-letf (((symbol-function 'erc-update-mode-line) #'ignore))
     (erc--update-channel-modes "+bltk" "fool!*@*" "3" "h2"))
@@ -885,10 +876,11 @@
   (should (equal (erc--channel-modes 0) "klt  "))) ; 2 spaces
 
 (ert-deftest erc--channel-modes/graphic-p ()
-  :tags '(:unstable)
+  :tags `(:unstable ,@(and (getenv "ERC_TESTS_GRAPHICAL")
+                           '(:erc--graphical)))
   (unless (display-graphic-p) (ert-skip "See non-/graphic-p variant"))
 
-  (erc-tests--set-fake-server-process "sleep" "1")
+  (erc-tests-common-init-server-proc "sleep" "1")
   (setq erc--isupport-params (make-hash-table)
         erc--target (erc--target-from-string "#test")
         erc-server-parameters
@@ -1198,7 +1190,7 @@
 (ert-deftest erc-ring-previous-command ()
   (with-current-buffer (get-buffer-create "*#fake*")
     (erc-mode)
-    (erc-tests--send-prep)
+    (erc-tests-common-prep-for-insertion)
     (setq erc-server-current-nick "tester")
     (setq-local erc-last-input-time 0)
     (should-not (local-variable-if-set-p 'erc-send-completed-hook))
@@ -1379,29 +1371,8 @@
     (should (equal '("" "" "") (split-string "\n\n" p)))
     (should (equal '("" "" "") (split-string "\n\r" p)))))
 
-(defun erc-tests--with-process-input-spy (test)
-  (with-current-buffer (get-buffer-create "FakeNet")
-    (let* ((erc--input-review-functions
-            (remove #'erc-add-to-input-ring erc--input-review-functions))
-           (erc-pre-send-functions
-            (remove #'erc-add-to-input-ring erc-pre-send-functions)) ; for now
-           (inhibit-message noninteractive)
-           (erc-server-current-nick "tester")
-           (erc-last-input-time 0)
-           erc-accidental-paste-threshold-seconds
-           erc-send-modify-hook
-           ;;
-           calls)
-      (cl-letf (((symbol-function 'erc-process-input-line)
-                 (lambda (&rest r) (push r calls)))
-                ((symbol-function 'erc-server-buffer)
-                 (lambda () (current-buffer))))
-        (erc-tests--send-prep)
-        (funcall test (lambda () (pop calls)))))
-    (when noninteractive (kill-buffer))))
-
 (ert-deftest erc--check-prompt-input-functions ()
-  (erc-tests--with-process-input-spy
+  (erc-tests-common-with-process-input-spy
    (lambda (next)
 
      (ert-info ("Errors when point not in prompt area") ; actually just dings
@@ -1436,9 +1407,9 @@
 ;; These also indirectly tests `erc-send-input'
 
 (ert-deftest erc-send-current-line ()
-  (erc-tests--with-process-input-spy
+  (erc-tests-common-with-process-input-spy
    (lambda (next)
-     (erc-tests--set-fake-server-process "sleep" "1")
+     (erc-tests-common-init-server-proc "sleep" "1")
      (should (= 0 erc-last-input-time))
 
      (ert-info ("Simple command")
@@ -1517,9 +1488,9 @@
   '("Stripping" "Padding"))
 
 (ert-deftest erc--check-prompt-input-for-multiline-blanks ()
-  (erc-tests--with-process-input-spy
+  (erc-tests-common-with-process-input-spy
    (lambda (next)
-     (erc-tests--set-fake-server-process "sleep" "10")
+     (erc-tests-common-init-server-proc "sleep" "10")
      (should-not erc-send-whitespace-lines)
      (should erc-warn-about-blank-lines)
 
@@ -1598,9 +1569,9 @@
                        rv ))))))
 
 (ert-deftest erc-send-whitespace-lines ()
-  (erc-tests--with-process-input-spy
+  (erc-tests-common-with-process-input-spy
    (lambda (next)
-     (erc-tests--set-fake-server-process "sleep" "1")
+     (erc-tests-common-init-server-proc "sleep" "1")
      (setq-local erc-send-whitespace-lines t)
 
      (ert-info ("Multiline hunk with blank line correctly split")
@@ -1695,7 +1666,7 @@
         (erc-default-recipients '("#chan"))
         calls)
     (with-temp-buffer
-      (erc-tests--set-fake-server-process "sleep" "1")
+      (erc-tests-common-init-server-proc "sleep" "1")
       (cl-letf (((symbol-function 'erc-cmd-MSG)
                  (lambda (line)
                    (push line calls)
@@ -1753,54 +1724,18 @@
 
           (should-not calls))))))
 
-(ert-deftest erc--get-inserted-msg-bounds ()
-  (erc-mode)
-  (erc--initialize-markers (point) nil)
-  (let ((parsed (make-erc-response :unparsed ":bob PRIVMSG #chan :hi"
-                                   :sender "bob"
-                                   :command "PRIVMSG"
-                                   :command-args (list "#chan" "hi")
-                                   :contents "hi"))
-        (erc--msg-prop-overrides '((erc--ts . 0))))
-    (erc-display-message parsed nil (current-buffer)
-                         (erc-format-privmessage "bob" "hi" nil t)))
-  (goto-char 3)
-  (should (looking-at "<bob> hi"))
-  (goto-char 11)
-  (should (looking-back "<bob> hi"))
+(ert-deftest erc--get-inserted-msg-beg/basic ()
+  (erc-tests-common-assert-get-inserted-msg/basic
+   (lambda (arg) (should (= 3 (erc--get-inserted-msg-beg arg))))))
 
-  (ert-info ("Parameter `only' being `beg'")
-    (dolist (i (number-sequence 3 11))
-      (goto-char i)
-      (ert-info ((format "At %d (%c)" i (char-after i)))
-        (should (= 3 (erc--get-inserted-msg-bounds 'beg)))))
+(ert-deftest erc--get-inserted-msg-end/basic ()
+  (erc-tests-common-assert-get-inserted-msg/basic
+   (lambda (arg) (should (= 11 (erc--get-inserted-msg-end arg))))))
 
-    (ert-info ("Parameter `point'")
-      (dolist (i (number-sequence 3 11))
-        (ert-info ((format "At %d (%c)" i (char-after i)))
-          (should (= 3 (erc--get-inserted-msg-bounds 'beg i)))))))
-
-  (ert-info ("Parameter `only' being `end'")
-    (dolist (i (number-sequence 3 11))
-      (goto-char i)
-      (ert-info ((format "At %d (%c)" i (char-after i)))
-        (should (= 11 (erc--get-inserted-msg-bounds 'end)))))
-
-    (ert-info ("Parameter `point'")
-      (dolist (i (number-sequence 3 11))
-        (ert-info ((format "At %d (%c)" i (char-after i)))
-          (should (= 11 (erc--get-inserted-msg-bounds 'end i)))))))
-
-  (ert-info ("Parameter `only' being nil")
-    (dolist (i (number-sequence 3 11))
-      (goto-char i)
-      (ert-info ((format "At %d (%c)" i (char-after i)))
-        (should (equal '(3 . 11) (erc--get-inserted-msg-bounds nil)))))
-
-    (ert-info ("Parameter `point'")
-      (dolist (i (number-sequence 3 11))
-        (ert-info ((format "At %d (%c)" i (char-after i)))
-          (should (equal '(3 . 11) (erc--get-inserted-msg-bounds nil i))))))))
+(ert-deftest erc--get-inserted-msg-bounds/basic ()
+  (erc-tests-common-assert-get-inserted-msg/basic
+   (lambda (arg)
+     (should (equal '(3 . 11) (erc--get-inserted-msg-bounds arg))))))
 
 (ert-deftest erc--delete-inserted-message ()
   (erc-mode)
@@ -2564,8 +2499,8 @@
     (should (equal (erc--format-speaker-input-message "oh my") expect))))
 
 (ert-deftest erc--route-insertion ()
-  (erc-tests--send-prep)
-  (erc-tests--set-fake-server-process "sleep" "1")
+  (erc-tests-common-prep-for-insertion)
+  (erc-tests-common-init-server-proc "sleep" "1")
   (setq erc-networks--id (erc-networks--id-create 'foonet))
 
   (let* ((erc-modules) ; for `erc--open-target'
@@ -2951,30 +2886,6 @@
                          (erc-server-connect-function
                           erc-open-network-stream))))))))
 
-(defun erc-tests--make-server-buf (name)
-  (with-current-buffer (get-buffer-create name)
-    (erc-mode)
-    (setq erc-server-process (start-process "sleep" (current-buffer)
-                                            "sleep" "1")
-          erc-session-server (concat "irc." name ".org")
-          erc-session-port 6667
-          erc-network (intern name))
-    (set-process-query-on-exit-flag erc-server-process nil)
-    (current-buffer)))
-
-(defun erc-tests--make-client-buf (server name)
-  (unless (bufferp server)
-    (setq server (get-buffer server)))
-  (with-current-buffer (get-buffer-create name)
-    (erc-mode)
-    (setq erc--target (erc--target-from-string name))
-    (dolist (v '(erc-server-process
-                 erc-session-server
-                 erc-session-port
-                 erc-network))
-      (set v (buffer-local-value v server)))
-    (current-buffer)))
-
 (ert-deftest erc-handle-irc-url ()
   (let* (calls
          rvbuf
@@ -2988,10 +2899,10 @@
     (cl-letf (((symbol-function 'erc-cmd-JOIN)
                (lambda (&rest r) (push r calls))))
 
-      (with-current-buffer (erc-tests--make-server-buf "foonet")
+      (with-current-buffer (erc-tests-common-make-server-buf "foonet")
         (setq rvbuf (current-buffer)))
-      (erc-tests--make-server-buf "barnet")
-      (erc-tests--make-server-buf "baznet")
+      (erc-tests-common-make-server-buf "barnet")
+      (erc-tests-common-make-server-buf "baznet")
 
       (ert-info ("Unknown network")
         (erc-handle-irc-url "irc.foonet.org" 6667 "#chan" nil nil "irc")
@@ -3015,7 +2926,8 @@
         (should-not calls))
 
       (ert-info ("Known network, existing chan with key")
-        (erc-tests--make-client-buf "foonet" "#chan")
+        (save-excursion
+          (with-current-buffer "foonet" (erc--open-target "#chan")))
         (erc-handle-irc-url "irc.foonet.org" nil "#chan?sec" nil nil "irc")
         (should (equal '("#chan" "sec") (pop calls)))
         (should-not calls))
@@ -3028,7 +2940,7 @@
       (ert-info ("Unknown network, connect, chan")
         (with-current-buffer "foonet"
           (should-not (local-variable-p 'erc-after-connect)))
-        (setq rvbuf (lambda () (erc-tests--make-server-buf "gnu")))
+        (setq rvbuf (lambda () (erc-tests-common-make-server-buf "gnu")))
         (erc-handle-irc-url "irc.gnu.org" nil "#spam" nil nil "irc")
         (should (equal '("irc" :server "irc.gnu.org") (pop calls)))
         (should-not calls)
@@ -3040,10 +2952,7 @@
         (should-not calls))))
 
   (when noninteractive
-    (kill-buffer "foonet")
-    (kill-buffer "barnet")
-    (kill-buffer "baznet")
-    (kill-buffer "#chan")))
+    (erc-tests-common-kill-buffers)))
 
 (ert-deftest erc-channel-user ()
   ;; Traditional and alternate constructor swapped for compatibility.
@@ -3134,31 +3043,7 @@
   (should (eq (erc--normalize-module-symbol 'nickserv) 'services)))
 
 (defun erc-tests--assert-printed-in-subprocess (code expected)
-  (let* ((package (if-let* ((found (getenv "ERC_PACKAGE_NAME"))
-                            ((string-prefix-p "erc-" found)))
-                      (intern found)
-                    'erc))
-         ;; This is for integrations testing with managed configs
-         ;; ("starter kits") that use a different package manager.
-         (init (and-let* ((found (getenv "ERC_TESTS_INIT"))
-                          (files (split-string found ",")))
-                 (mapcan (lambda (f) (list "-l" f)) files)))
-         (prog
-          `(progn
-             ,@(and (not init) (featurep 'compat)
-                    `((require 'package)
-                      (let ((package-load-list '((compat t) (,package t))))
-                        (package-initialize))))
-             (require 'erc)
-             (cl-assert (equal erc-version ,erc-version) t)
-             ,code))
-         (proc (apply #'start-process
-                      (symbol-name (ert-test-name (ert-running-test)))
-                      (current-buffer)
-                      (concat invocation-directory invocation-name)
-                      `("-batch" ,@(or init '("-Q"))
-                        "-eval" ,(format "%S" prog)))))
-    (set-process-query-on-exit-flag proc t)
+  (let ((proc (erc-tests-common-create-subprocess code '("-batch") nil)))
     (while (accept-process-output proc 10))
     (goto-char (point-min))
     (unless (equal (read (current-buffer)) expected)
@@ -3506,38 +3391,11 @@ connection."
                       (put 'erc-mname-enable 'definition-name 'mname)
                       (put 'erc-mname-disable 'definition-name 'mname))))))
 
-(defun erc-tests--string-to-propertized-parts (string)
-  "Return a sequence of `propertize' forms for generating STRING.
-Expect maintainers manipulating template catalogs to use this
-with `pp-eval-last-sexp' or similar to convert back and forth
-between literal strings."
-  `(concat
-    ,@(mapcar
-       (pcase-lambda (`(,beg ,end ,plist))
-         ;; At the time of writing, `propertize' produces a string
-         ;; with the order of the input plist reversed.
-         `(propertize ,(substring-no-properties string beg end)
-                      ,@(let (out)
-                          (while-let ((plist)
-                                      (k (pop plist))
-                                      (v (pop plist)))
-                            (push (if (or (consp v) (symbolp v)) `',v v) out)
-                            (push `',k out))
-                          out)))
-       (object-intervals string))))
-
-(defun erc-tests-pp-propertized-parts (arg)
-  "Convert literal string before point into a `propertize'd form.
-For simplicity, assume string evaluates to itself."
-  (interactive "P")
-  (let ((sexp (erc-tests--string-to-propertized-parts (pp-last-sexp))))
-    (if arg (insert (pp-to-string sexp)) (pp-eval-expression sexp))))
-
-(ert-deftest erc-tests--string-to-propertized-parts ()
+(ert-deftest erc-tests-common-string-to-propertized-parts ()
   :tags '(:unstable) ; only run this locally
   (unless (>= emacs-major-version 28) (ert-skip "Missing `object-intervals'"))
 
-  (should (equal (erc-tests--string-to-propertized-parts
+  (should (equal (erc-tests-common-string-to-propertized-parts
                   #("abc"
                     0 1 (face default foo 1)
                     1 3 (face (default italic) bar "2")))
