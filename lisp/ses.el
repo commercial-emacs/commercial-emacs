@@ -67,7 +67,7 @@
 
 (require 'unsafep)
 (require 'macroexp)
-(eval-when-compile (require 'cl-lib))
+(eval-and-compile (require 'cl-lib))
 
 
 ;;----------------------------------------------------------------------------
