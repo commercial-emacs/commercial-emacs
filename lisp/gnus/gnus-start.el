@@ -1575,13 +1575,12 @@ Theoretically, in the timed-out case, we'll do this just twice."
        "gnus-time-out-thread: race on dead %s" (thread-name thread)))))
 
 (defun gnus-run-method (label thread-group &rest fns)
-  "THREAD-GROUP is string useful for naming working buffer and threads.
-Errors need to be trapped for a clean exit.
-Else we get unblocked but permanently yielded threads."
+  "THREAD-GROUP is string useful for naming working buffer and threads."
   (let* ((run-name (concat thread-group "-" label))
          (working (get-buffer-create (format " *%s*" run-name)))
          (gnus-add-timestamp-to-message 'log))
-    ;; once context switch occurs handlerlist in eval.c(throw) is lost
+    ;; Once context switch occurs exception_stack is lost (Fthrow).
+    ;; Revert to toplevel on any error else thread gets orphaned.
     (unwind-protect
         (condition-case err
             (with-current-buffer working

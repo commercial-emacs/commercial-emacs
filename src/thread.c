@@ -125,8 +125,7 @@ restore_thread (struct thread_state *thr)
 	}
     }
 
-  if (! NILP (thr->error_symbol)
-      && thr->m_handlerlist)
+  if (! NILP (thr->error_symbol) && thr->exception_stack_top)
     {
       Lisp_Object sym = thr->error_symbol,
 	data = thr->error_data;
@@ -540,10 +539,12 @@ mark_one_thread (struct thread_state *thread)
 
   mark_memory (thread->m_stack_bottom, stack_top);
 
-  for (struct handler *handler = thread->m_handlerlist;
-       handler; handler = handler->next)
+  for (size_t count = exception_stack_count (current_thread);
+       count > 0;
+       --count)
     {
-      mark_object (&handler->tag_or_ch);
+      struct handler *handler = current_thread->exception_stack_bottom + count - 1;
+      mark_object (&handler->what);
       mark_object (&handler->val);
     }
 
@@ -718,14 +719,6 @@ run_thread (void *state)
 #endif
     acquire_global_lock (self); // sets current_thread
 
-  /* Obfuscatively ensuring a top-level catch probably by Tromey
-     (omnibus merge commit 39372e1).  */
-  struct handler *dummy = xzalloc (sizeof (struct handler));
-  handlerlist = handlerlist_sentinel = dummy;
-  handlerlist->nextfree = dummy;
-  eassert (handlerlist == push_handler (Qunbound, CATCHER));
-  handlerlist->next = handlerlist->nextfree = NULL;
-
   internal_condition_case (invoke_thread,
 #ifdef ENABLE_CHECKING
 			   Qerror,
@@ -740,12 +733,9 @@ run_thread (void *state)
   self->m_specpdl_ptr = NULL;
   self->m_specpdl_end = NULL;
 
-  for (struct handler *h = handlerlist_sentinel; h != NULL; )
-    {
-      struct handler *next = h->nextfree;
-      xfree (h);
-      h = next;
-    }
+  xfree (self->exception_stack_bottom);
+  self->exception_stack_top = self->exception_stack_bottom = NULL;
+  self->exception_stack_capacity = 0;
 
   sys_cond_broadcast (&self->thread_condvar);
 
@@ -1049,6 +1039,49 @@ pop_lisp_frame (union specbinding *frame, Lisp_Object *val, specpdl_ref sa_count
   if (specpdl_ref_valid_p (sa_count))
     safe_free (sa_count);
   --specpdl_ptr;
+}
+
+size_t
+exception_stack_count (struct thread_state *thr)
+{
+  return thr->exception_stack_top
+    ? 1 + thr->exception_stack_top - thr->exception_stack_bottom
+    : 0;
+}
+
+struct handler *
+exception_stack_push (struct thread_state *thr)
+{
+  const size_t count = exception_stack_count (thr);
+  eassert (count <= thr->exception_stack_capacity);
+  if (count >= thr->exception_stack_capacity)
+    {
+      eassert (thr->exception_stack_top == thr->exception_stack_bottom + count - 1);
+      thr->exception_stack_capacity += 16;
+      thr->exception_stack_bottom
+	= (struct handler *) xrealloc (thr->exception_stack_bottom,
+				       thr->exception_stack_capacity
+				       * sizeof (*current_thread->exception_stack_bottom));
+      memset (thr->exception_stack_bottom + count, 0,
+	      16 * sizeof (*current_thread->exception_stack_bottom));
+      thr->exception_stack_top = thr->exception_stack_bottom + count - 1;
+    }
+  return thr->exception_stack_top
+    ? ++thr->exception_stack_top
+    : (thr->exception_stack_top = thr->exception_stack_bottom,
+       thr->exception_stack_top);
+}
+
+struct handler *
+exception_stack_pop (struct thread_state *thr)
+{
+  struct handler *popped = thr->exception_stack_top;
+  eassert (popped);
+  if (popped == thr->exception_stack_bottom)
+    thr->exception_stack_top = NULL;
+  else if (popped > thr->exception_stack_bottom)
+    --thr->exception_stack_top;
+  return popped;
 }
 
 void

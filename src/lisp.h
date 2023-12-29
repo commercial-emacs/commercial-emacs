@@ -2994,9 +2994,9 @@ enum
      dynamic let-bindings, unwind-protects, and backtraces.  Commit
      2f592f9 unified specpdl with the erstwhile backtrace stack.
 
-   - The handler stack, implemented as a doubly-linked list, stores
-     active catch tags and condition-case handlers.  It is allocated
-     via xmalloc and never freed.  */
+   - The exception stack unifies handling of throw/catch and
+     condition-case/signal.
+*/
 
 enum specbind_tag {
   SPECPDL_UNWIND,		/* An unwind_protect function on Lisp_Object.  */
@@ -3212,31 +3212,12 @@ record_in_backtrace (Lisp_Object function, Lisp_Object *args, ptrdiff_t nargs)
   return count;
 }
 
-/* This structure helps implement the `catch/throw' and `condition-case/signal'
-   control structures.  A struct handler contains all the information needed to
-   restore the state of the interpreter after a non-local jump.
-
-   Handler structures are chained together in a doubly linked list; the `next'
-   member points to the next outer catchtag and the `nextfree' member points in
-   the other direction to the next inner element (which is typically the next
-   free element since we mostly use it on the deepest handler).
-
-   A call like (throw TAG VAL) searches for a catchtag whose `tag_or_ch'
-   member is TAG, and then unbinds to it.  The `val' member is used to
-   hold VAL while the stack is unwound; `val' is returned as the value
-   of the catch form.  If there is a handler of type CATCHER_ALL, it will
-   be treated as a handler for all invocations of `signal' and `throw';
-   in this case `val' will be set to (ERROR-SYMBOL . DATA) or (TAG . VAL),
-   respectively.  During stack unwinding, `nonlocal_exit' is set to
-   specify the type of nonlocal exit that caused the stack unwinding.
-
-   All the other members are concerned with restoring the interpreter
-   state.
-
-   Members are volatile if their values need to survive _longjmp when
-   a 'struct handler' is a local variable.  */
-
-enum handlertype { CATCHER, CONDITION_CASE, CATCHER_ALL };
+enum exception_type
+{
+  CATCHER,
+  CONDITION_CASE,
+  OMNIBUS,
+};
 
 enum nonlocal_exit
 {
@@ -3244,28 +3225,31 @@ enum nonlocal_exit
   NONLOCAL_EXIT_THROW,
 };
 
+/* A struct handler keeps the necessary data for restoring
+   state after catch/throw and condition-case/signal.  The
+   TYPE member indicates which of the two.
+
+   A third exception_type OMNIBUS catches both `throw' and `signal'.
+   The NONLOCAL_EXIT member indicates which of the two.  The resulting
+   value is respectively (TAG . VAL) or (ERROR-SYMBOL . DATA).
+
+   Members are volatile if their values need to survive _longjmp when
+   the 'struct handler' is a local variable.  */
+
 struct handler
 {
-  enum handlertype type;
-  Lisp_Object tag_or_ch;
+  enum exception_type type;
+  Lisp_Object what; /* tag for catch, error symbols for condition-case */
 
-  /* The next two are set by unwind_to_catch.  */
   enum nonlocal_exit nonlocal_exit;
   Lisp_Object val;
 
-  struct handler *next;
-  struct handler *nextfree;
-
-  /* The bytecode interpreter can have several handlers active at the same
-     time, so when we longjmp to one of them, it needs to know which handler
-     this was and what was the corresponding internal state.  This is stored
-     here, and when we longjmp we make sure that handlerlist points to the
-     proper handler.  */
+  /* For restoring bytecode interpreter state.  */
   Lisp_Object *bytecode_top;
   int bytecode_dest;
 
-  /* Most global vars are reset to their value via the specpdl mechanism,
-     but a few others are handled by storing their value here.  */
+  /* For restoring certain variables which aren't otherwise handled by
+     the specpdl mechanism.  */
   sys_jmp_buf jmp;
   EMACS_INT f_lisp_eval_depth;
   specpdl_ref pdlcount;
@@ -4112,9 +4096,8 @@ extern Lisp_Object internal_condition_case_n
     (Lisp_Object (*) (ptrdiff_t, Lisp_Object *), ptrdiff_t, Lisp_Object *,
      Lisp_Object, Lisp_Object (*) (Lisp_Object, ptrdiff_t, Lisp_Object *));
 extern Lisp_Object internal_catch_all (Lisp_Object (*) (void *), void *, Lisp_Object (*) (enum nonlocal_exit, Lisp_Object));
-extern struct handler *push_handler (Lisp_Object, enum handlertype)
+extern struct handler *push_exception (Lisp_Object, enum exception_type)
   ATTRIBUTE_RETURNS_NONNULL;
-extern struct handler *push_handler_nosignal (Lisp_Object, enum handlertype);
 extern void specbind (Lisp_Object, Lisp_Object);
 extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);
 extern void record_unwind_protect_array (Lisp_Object *, ptrdiff_t);

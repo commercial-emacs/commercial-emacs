@@ -205,7 +205,7 @@ static void module_non_local_exit_signal_1 (emacs_env *,
 static void module_non_local_exit_throw_1 (emacs_env *,
 					   Lisp_Object, Lisp_Object);
 static void module_out_of_memory (emacs_env *);
-static void module_reset_handlerlist (struct handler **);
+static void module_pop_exception_stack (struct handler **);
 static bool value_storage_contains_p (const struct emacs_value_storage *,
                                       emacs_value, ptrdiff_t *);
 
@@ -270,14 +270,14 @@ module_decode_utf_8 (const char *str, ptrdiff_t len)
   if (module_non_local_exit_check (env) != emacs_funcall_exit_return)	\
     return retval;							\
   struct handler *internal_handler =                                    \
-    push_handler_nosignal (Qt, CATCHER_ALL);                            \
+    push_exception (Qt, OMNIBUS);					\
   if (!internal_handler)                                                \
     {									\
       module_out_of_memory (env);					\
       return retval;							\
     }									\
   struct handler *internal_cleanup                                      \
-    __attribute__ ((cleanup (module_reset_handlerlist)))                \
+  __attribute__ ((cleanup (module_pop_exception_stack)))		\
     = internal_handler;                                                 \
   if (sys_setjmp (internal_cleanup->jmp))                               \
     {									\
@@ -1496,16 +1496,13 @@ finalize_runtime_unwind (void *raw_ert)
 
 /* Non-local exit handling.  */
 
-/* Must be called after setting up a handler immediately before
-   returning from the function.  See the comments in lisp.h and the
-   code in eval.c for details.  The macros below arrange for this
-   function to be called automatically.  PHANDLERLIST points to a word
-   containing the handler list, for sanity checking.  */
+/* gcc cleanup attribute resets exception stack after internal_handler
+   passes out of scope.  */
 static void
-module_reset_handlerlist (struct handler **phandlerlist)
+module_pop_exception_stack (struct handler **extant_top)
 {
-  eassert (handlerlist == *phandlerlist);
-  handlerlist = handlerlist->next;
+  eassert (current_thread->exception_stack_top == *extant_top);
+  exception_stack_pop (current_thread);
 }
 
 /* Called on `signal' and `throw'.  DATA is a pair

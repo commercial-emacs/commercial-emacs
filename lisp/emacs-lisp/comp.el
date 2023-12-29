@@ -1431,7 +1431,7 @@ Return value is the fall-through block name."
            (handler-bb (comp-bb-maybe-add (comp-label-to-addr label-num)
                                           (1+ (comp-sp))))
            (pop-bb (make--comp-block-lap nil (comp-sp) (comp-new-block-sym))))
-      (comp-emit (list 'push-handler
+      (comp-emit (list 'push-exception
                        handler-type
                        (comp-slot+1)
                        (comp-block-name pop-bb)
@@ -1440,7 +1440,6 @@ Return value is the fall-through block name."
       ;; Emit the basic block to pop the handler if we got the non local.
       (puthash (comp-block-name pop-bb) pop-bb (comp-func-blocks comp-func))
       (setf (comp-limplify-curr-block comp-pass) pop-bb)
-      (comp-emit `(fetch-handler ,(comp-slot+1)))
       (comp-emit `(jump ,(comp-block-name handler-bb)))
       (comp-mark-curr-bb-closed))))
 
@@ -1627,8 +1626,6 @@ and the annotation emission."
       (byte-unbind
        (comp-emit (comp-call 'helper_unbind_n
                              (make-comp-mvar :constant arg))))
-      (byte-pophandler
-       (comp-emit '(pop-handler)))
       (byte-pushconditioncase
        (comp-emit-handler (cddr insn) 'condition-case))
       (byte-pushcatch
@@ -2572,7 +2569,7 @@ blocks."
                 (cond-jump-narg-leq
                  (comp--edge-make :src bb :dst (gethash second blocks))
                  (comp--edge-make :src bb :dst (gethash third blocks)))
-                (push-handler
+                (push-exception
                  (comp--edge-make :src bb :dst (gethash third blocks))
                  (comp--edge-make :src bb :dst (gethash forth blocks)))
                 (return)
@@ -2699,11 +2696,8 @@ blocks."
              ;; Return t if a SLOT-N was assigned within BB.
              (cl-loop for insn in (comp-block-insns bb)
                       for op = (car insn)
-                      when (or (and (comp--assign-op-p op)
-                                    (eql slot-n (comp-mvar-slot (cadr insn))))
-                               ;; fetch-handler is after a non local
-                               ;; therefore clobbers all frame!!!
-                               (eq op 'fetch-handler))
+                      when (and (comp--assign-op-p op)
+                                (eql slot-n (comp-mvar-slot (cadr insn))))
                         return t)))
 
     (cl-loop for i from (- (comp-func-vframe-size comp-func))
@@ -2769,9 +2763,6 @@ PRE-LAMBDA and POST-LAMBDA are called in pre or post-order if non-nil."
         (let ((mvar (comp-vec-aref frame slot-n)))
           (setf (cddr insn) (cl-nsubst-if mvar #'targetp (cddr insn))))
         (new-lvalue))
-       (`(fetch-handler . ,_)
-        ;; Clobber all no matter what!
-        (setf (comp-vec-aref frame slot-n) (make-comp-ssa-mvar :slot slot-n)))
        (`(phi ,n)
         (when (equal n slot-n)
           (new-lvalue)))

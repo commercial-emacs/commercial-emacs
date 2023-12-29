@@ -59,7 +59,7 @@
   ;; REPEAT-DELAY as gridwidth
   integral-multiple
   ;; Timers should be associated with struct thread_state since
-  ;; throw-catch handlerlists are thread-specific, but Vtimer_list
+  ;; exception_stack is thread-specific, but Vtimer_list
   ;; preceded that realization.
   thread)
 

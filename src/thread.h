@@ -90,17 +90,18 @@ struct thread_state
   char const *m_stack_bottom;
 #define stack_bottom (current_thread->m_stack_bottom)
 
+  /* No current_thread macro, maybe too common a variable name?  */
   void const *stack_top;
 
-  struct catchtag *m_catchlist;
-#define catchlist (current_thread->m_catchlist)
+  /* We're deprecating current_thread macros.  */
+  size_t exception_stack_capacity;
 
-  /* Handlers pushed by Fcondition_case and internal_condition_case.  */
-  struct handler *m_handlerlist;
-#define handlerlist (current_thread->m_handlerlist)
+  /* The exception stack is a contiguous array of `struct handler`s.
+     This is the first or bottommost element.  */
+  struct handler *exception_stack_bottom;
 
-  struct handler *m_handlerlist_sentinel;
-#define handlerlist_sentinel (current_thread->m_handlerlist_sentinel)
+  /* The exception stack top.  */
+  struct handler *exception_stack_top;
 
   /* Bottom of specpdl, not to be confused with m_stack_bottom which
      references the C stack.  */
@@ -344,6 +345,9 @@ void reap_threads (void);
 extern void reap_thread_allocations (struct thread_state *);
 #endif
 
+size_t exception_stack_count (struct thread_state *thr);
+struct handler *exception_stack_push (struct thread_state *thr);
+struct handler *exception_stack_pop (struct thread_state *thr);
 
 INLINE_HEADER_END
 

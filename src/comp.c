@@ -601,12 +601,11 @@ typedef struct {
   gcc_jit_struct *handler_s;
   gcc_jit_field *handler_jmp_field;
   gcc_jit_field *handler_val_field;
-  gcc_jit_field *handler_next_field;
   gcc_jit_type *handler_ptr_type;
   gcc_jit_lvalue *loc_handler;
   /* struct thread_state.  */
   gcc_jit_struct *thread_state_s;
-  gcc_jit_field *m_handlerlist;
+  gcc_jit_field *exception_stack_top;
   gcc_jit_type *thread_state_ptr_type;
   gcc_jit_rvalue *current_thread_ref;
   /* Other globals.  */
@@ -695,7 +694,7 @@ static void *helper_link_table[] =
   { wrong_type_argument,
     helper_PSEUDOVECTOR_TYPEP_XUNTAG,
     pure_write_error,
-    push_handler,
+    push_exception,
     record_unwind_protect_excursion,
     helper_unbind_n,
     helper_save_restriction,
@@ -2106,21 +2105,21 @@ emit_setjmp (gcc_jit_rvalue *buf)
 #endif
 }
 
-/* Register an handler for a non local exit.  */
+/* Register a handler for a non local exit.  */
 
 static void
-emit_limple_push_handler (gcc_jit_rvalue *handler, gcc_jit_rvalue *handler_type,
-			  gcc_jit_block *handler_bb, gcc_jit_block *guarded_bb,
-			  Lisp_Object clobbered_mvar)
+emit_limple_push_exception (gcc_jit_rvalue *handler, gcc_jit_rvalue *handler_type,
+			    gcc_jit_block *handler_bb, gcc_jit_block *guarded_bb,
+			    Lisp_Object clobbered_mvar)
 {
-   /* struct handler *c = push_handler (POP, type);  */
+   /* struct handler *c = push_exception (POP, type);  */
 
   gcc_jit_rvalue *args[] = { handler, handler_type };
   gcc_jit_block_add_assignment (
     comp.block,
     NULL,
     comp.loc_handler,
-    emit_call (intern_c_string ("push_handler"),
+    emit_call (intern_c_string ("push_exception"),
 	       comp.handler_ptr_type, 2, args, false));
 
   args[0] =
@@ -2131,8 +2130,7 @@ emit_limple_push_handler (gcc_jit_rvalue *handler, gcc_jit_rvalue *handler_type,
 	  comp.handler_jmp_field),
 	NULL);
 
-  gcc_jit_rvalue *res;
-  res = emit_setjmp (args[0]);
+  gcc_jit_rvalue *res = emit_setjmp (args[0]);
   emit_cond_jump (res, handler_bb, guarded_bb);
 }
 
@@ -2196,7 +2194,7 @@ emit_limple_insn (Lisp_Object insn)
     {
       /* Nothing to do for phis or assumes in the backend.  */
     }
-  else if (EQ (op, Qpush_handler))
+  else if (EQ (op, Qpush_exception))
     {
       /* (push-handler condition-case #s(comp-mvar 0 3 t (arith-error) cons nil) 1 bb_2 bb_1) */
       int h_num UNINIT;
@@ -2214,62 +2212,8 @@ emit_limple_insn (Lisp_Object insn)
 					     h_num);
       gcc_jit_block *handler_bb = retrive_block (arg[2]);
       gcc_jit_block *guarded_bb = retrive_block (arg[3]);
-      emit_limple_push_handler (handler, handler_type, handler_bb, guarded_bb,
-				arg[0]);
-    }
-  else if (EQ (op, Qpop_handler))
-    {
-      /*
-	C: current_thread->m_handlerlist =
-	     current_thread->m_handlerlist->next;
-      */
-      gcc_jit_lvalue *m_handlerlist =
-	gcc_jit_rvalue_dereference_field (
-	  gcc_jit_lvalue_as_rvalue (
-	    gcc_jit_rvalue_dereference (comp.current_thread_ref, NULL)),
-	  NULL,
-	  comp.m_handlerlist);
-
-      gcc_jit_block_add_assignment (
-	comp.block,
-	NULL,
-	m_handlerlist,
-	gcc_jit_lvalue_as_rvalue (
-	  gcc_jit_rvalue_dereference_field (
-	    gcc_jit_lvalue_as_rvalue (m_handlerlist),
-	    NULL,
-	    comp.handler_next_field)));
-
-    }
-  else if (EQ (op, Qfetch_handler))
-    {
-      gcc_jit_lvalue *m_handlerlist =
-	gcc_jit_rvalue_dereference_field (
-	  gcc_jit_lvalue_as_rvalue (
-	    gcc_jit_rvalue_dereference (comp.current_thread_ref, NULL)),
-	  NULL,
-	  comp.m_handlerlist);
-      gcc_jit_block_add_assignment (comp.block,
-				    NULL,
-				    comp.loc_handler,
-				    gcc_jit_lvalue_as_rvalue (m_handlerlist));
-
-      gcc_jit_block_add_assignment (
-	comp.block,
-	NULL,
-	m_handlerlist,
-	gcc_jit_lvalue_as_rvalue (
-	  gcc_jit_rvalue_dereference_field (
-	    gcc_jit_lvalue_as_rvalue (comp.loc_handler),
-	    NULL,
-	    comp.handler_next_field)));
-      emit_frame_assignment (
-	arg[0],
-	gcc_jit_lvalue_as_rvalue (
-	  gcc_jit_rvalue_dereference_field (
-	    gcc_jit_lvalue_as_rvalue (comp.loc_handler),
-	    NULL,
-	    comp.handler_val_field)));
+      emit_limple_push_exception (handler, handler_type, handler_bb, guarded_bb,
+				  arg[0]);
     }
   else if (EQ (op, Qcall))
     {
@@ -2815,7 +2759,7 @@ declare_runtime_imported_funcs (void)
 
   args[0] = comp.lisp_obj_type;
   args[1] = comp.int_type;
-  ADD_IMPORTED (push_handler, comp.handler_ptr_type, 2, args);
+  ADD_IMPORTED (push_exception, comp.handler_ptr_type, 2, args);
 
   ADD_IMPORTED (record_unwind_protect_excursion, comp.void_type, 0, NULL);
 
@@ -3128,7 +3072,7 @@ define_handler_struct (void)
 					comp.char_type,
 					offsetof (struct handler, jmp)
 					- offsetof (struct handler, next)
-					- sizeof (((struct handler *) 0)->next)),
+					- sizeof (((struct handler *) 0)->parent)),
 	"pad1"),
       comp.handler_jmp_field,
       gcc_jit_context_new_field (
@@ -3151,14 +3095,14 @@ define_handler_struct (void)
 static void
 define_thread_state_struct (void)
 {
-  /* Partially opaque definition for `thread_state'.
-     Because we need to access just m_handlerlist hopefully this is requires
-     less manutention then the full deifnition.	 */
+  /* Partially opaque definition for thread_state.  We just need
+     exception_stack_top so hopefully this requires less maintenance
+     than the full definition.  */
 
-  comp.m_handlerlist = gcc_jit_context_new_field (comp.ctxt,
-						  NULL,
-						  comp.handler_ptr_type,
-						  "m_handlerlist");
+  comp.exception_stack_top = gcc_jit_context_new_field (comp.ctxt,
+							NULL,
+							comp.handler_ptr_type,
+							"exception_stack_top");
   gcc_jit_field *fields[] =
     { gcc_jit_context_new_field (
 	comp.ctxt,
@@ -3167,9 +3111,9 @@ define_thread_state_struct (void)
 					NULL,
 					comp.char_type,
 					offsetof (struct thread_state,
-						  m_handlerlist)),
+						  exception_stack_top)),
 	"pad0"),
-      comp.m_handlerlist,
+      comp.exception_stack_top,
       gcc_jit_context_new_field (
 	comp.ctxt,
 	NULL,
@@ -3178,9 +3122,8 @@ define_thread_state_struct (void)
 	  NULL,
 	  comp.char_type,
 	  sizeof (struct thread_state)
-	  - offsetof (struct thread_state,
-		      m_handlerlist)
-	  - sizeof (((struct thread_state *) 0)->m_handlerlist)),
+	  - offsetof (struct thread_state, exception_stack_top)
+	  - sizeof (((struct thread_state *) 0)->exception_stack_top)),
 	"pad1") };
 
   comp.thread_state_s =
@@ -5419,9 +5362,7 @@ natively-compiled one.  */);
   DEFSYM (Qinc_args, "inc-args");
   DEFSYM (Qcond_jump_narg_leq, "cond-jump-narg-leq");
   /* Others.  */
-  DEFSYM (Qpush_handler, "push-handler");
-  DEFSYM (Qpop_handler, "pop-handler");
-  DEFSYM (Qfetch_handler, "fetch-handler");
+  DEFSYM (Qpush_exception, "push-exception");
   DEFSYM (Qcondition_case, "condition-case");
   /* call operands.  */
   DEFSYM (Qcatcher, "catcher");

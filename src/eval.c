@@ -236,15 +236,11 @@ void
 init_eval (void)
 {
   specpdl_ptr = specpdl;
-  /* Put a dummy catcher at top-level so that handlerlist is never NULL.
-     This is important since handlerlist->nextfree holds the freelist
-     which would otherwise leak every time we unwind back to top-level.   */
-  handlerlist_sentinel = xzalloc (sizeof (struct handler));
-  handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
-  struct handler *c = push_handler (Qunbound, CATCHER);
-  eassert (c == handlerlist_sentinel);
-  handlerlist_sentinel->nextfree = NULL;
-  handlerlist_sentinel->next = NULL;
+  current_thread->exception_stack_capacity = 16;
+  current_thread->exception_stack_bottom = (struct handler *) xmalloc
+    (current_thread->exception_stack_capacity
+     * sizeof (*current_thread->exception_stack_bottom));
+  current_thread->exception_stack_top = NULL;
   Vquit_flag = Qnil;
   debug_on_next_call = false;
   lisp_eval_depth = 0;
@@ -1086,36 +1082,30 @@ usage: (catch TAG BODY...)  */)
 
 #define clobbered_eassert(E) verify (sizeof (E) != 0)
 
-/* Set up catch on TAG, then call C function FUNC on argument ARG.
-   FUNC should return a Lisp_Object.
-   This is how catches are done from within C code.  */
+/* Install catch on TAG, then call FUNC on argument ARG.  */
 
 Lisp_Object
-internal_catch (Lisp_Object tag,
-		Lisp_Object (*func) (Lisp_Object), Lisp_Object arg)
+internal_catch (Lisp_Object tag, Lisp_Object (*func) (Lisp_Object),
+		Lisp_Object arg)
 {
-  /* Add to the "catchlist" chain.  */
-  struct handler *c = push_handler (tag, CATCHER);
-
-  /* Call FUNC.  */
+  struct handler *c = push_exception (tag, CATCHER);
   if (sys_setjmp (c->jmp))
     {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
+      Lisp_Object val = current_thread->exception_stack_top->val;
+      clobbered_eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return val;
     }
   else
     {
       Lisp_Object val = func (arg);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
+      eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return val;
     }
 }
 
-/* Unwind the specbind, catch, and handler stacks back to CATCH, then
-   jump to CATCH returning VALUE.
+/* Unwind exception stack to CATCH, then jmp to CATCH returning VALUE.
 
    This is the guts of Fthrow and Fsignal; they differ only in TYPE.
 */
@@ -1124,7 +1114,6 @@ static AVOID
 unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
                  Lisp_Object value)
 {
-  eassert (catch->next);
   catch->nonlocal_exit = type;
   catch->val = value;
 
@@ -1139,11 +1128,11 @@ unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
   do
     {
       /* Unwind to next recorded frame... */
-      unbind_to (handlerlist->pdlcount, Qnil);
-      if (handlerlist == catch)
+      unbind_to (current_thread->exception_stack_top->pdlcount, Qnil);
+      if (current_thread->exception_stack_top == catch)
 	break;
       /* ... then restore corresponding handlers. */
-      handlerlist = handlerlist->next;
+      exception_stack_pop (current_thread);
     }
   while (true);
 
@@ -1158,19 +1147,19 @@ Both TAG and VALUE are evalled.  */
        attributes: noreturn)
   (register Lisp_Object tag, Lisp_Object value)
 {
-  struct handler *c;
-
-  if (!NILP (tag))
-    for (c = handlerlist; c; c = c->next)
+  if (! NILP (tag))
+    for (size_t count = exception_stack_count (current_thread);
+	 count > 0;
+	 --count)
       {
-	if (c->type == CATCHER_ALL)
+	struct handler *c = current_thread->exception_stack_bottom + count - 1;
+	if (c->type == OMNIBUS)
           unwind_to_catch (c, NONLOCAL_EXIT_THROW, Fcons (tag, value));
-        if (c->type == CATCHER && EQ (c->tag_or_ch, tag))
+        if (c->type == CATCHER && EQ (c->what, tag))
 	  unwind_to_catch (c, NONLOCAL_EXIT_THROW, value);
       }
   xsignal2 (Qno_catch, tag, value);
 }
-
 
 DEFUN ("unwind-protect", Funwind_protect, Sunwind_protect, 1, UNEVALLED, 0,
        doc: /* Do BODYFORM, protecting with UNWINDFORMS.
@@ -1250,36 +1239,40 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
       if (CONSP (clause) && EQ (XCAR (clause), QCsuccess))
 	success_clause = clause;
       else
-	/* Reverse since push_handler() reverses again.  */
+	/* Reverse since push_exception() reverses again.  */
 	rev = Fcons (clause, rev);
     }
 
-  struct handler *oldhandlerlist = handlerlist;
+  const size_t before_count = exception_stack_count (current_thread);
   for (Lisp_Object tail = rev; CONSP (tail); tail = XCDR (tail))
     {
       Lisp_Object clause = XCAR (tail);
-      Lisp_Object condition = CONSP (clause) ? XCAR (clause) : Qnil;
-      if (! CONSP (condition))
-	condition = list1 (condition);
-      struct handler *c = push_handler (condition, CONDITION_CASE);
+      Lisp_Object errsyms = CONSP (clause) ? XCAR (clause) : Qnil;
+      struct handler *c = push_exception (CONSP (errsyms) ? errsyms : list1 (errsyms),
+					  CONDITION_CASE);
       if (sys_setjmp (c->jmp))
 	{
-	  result = handlerlist->val;
-	  /* The jmped to clause index is however many outer catches
-	     back to oldhandlerlist.  */
+	  /* eval_form errored.  The index of the triggered clause in
+	     REV is however many stack entries back to
+	     BEFORE_COUNT (minus one for RESULT).  */
+	  result = current_thread->exception_stack_top->val;
 	  Lisp_Object tail = rev;
-	  for (struct handler *h = handlerlist->next;
-	       h != oldhandlerlist;
-	       h = h->next)
+	  for (size_t count = exception_stack_count (current_thread) - 1;
+	       count > before_count;
+	       --count)
 	    tail = XCDR (tail);
 	  triggered_clause = XCAR (tail);
 	  goto done;
 	}
     }
 
-  result = eval_form (bodyform);
+  result = eval_form (bodyform); /* an err jmps to sys_setjmp above */
  done: ;
-  handlerlist = oldhandlerlist;
+  for (size_t count = exception_stack_count (current_thread);
+       count > before_count;
+       --count)
+    exception_stack_pop (current_thread);
+  eassert (before_count == exception_stack_count (current_thread));
   Lisp_Object clause = NILP (triggered_clause) ? success_clause : triggered_clause;
   if (! NILP (clause))
     {
@@ -1301,33 +1294,30 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
     }
   return result;
 }
-/* Call the function BFUN with no arguments, catching errors within it
-   according to HANDLERS.  If there is an error, call HFUN with
-   one argument which is the data that describes the error:
-   (SIGNALNAME . DATA)
-
-   HANDLERS can be a list of conditions to catch.
-   If HANDLERS is Qt, catch all errors.
-   If HANDLERS is Qerror, catch all errors
-   but allow the debugger to run if that is enabled.  */
+/* Call no-argument BFUN and handle any error CONDITIONS by calling
+   HFUN which takes one argument (SIGNALNAME . DATA).  CONDITIONS is
+   list of error symbols with special interpretations for Qt the catch-all
+   condition, and Qerror the catch-all condition invoking the
+   debugger.  */
 
 Lisp_Object
-internal_condition_case (Lisp_Object (*bfun) (void), Lisp_Object handlers,
+internal_condition_case (Lisp_Object (*bfun) (void),
+			 Lisp_Object conditions,
 			 Lisp_Object (*hfun) (Lisp_Object))
 {
-  struct handler *c = push_handler (handlers, CONDITION_CASE);
+  struct handler *c = push_exception (conditions, CONDITION_CASE);
   if (sys_setjmp (c->jmp))
     {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
+      Lisp_Object val = current_thread->exception_stack_top->val;
+      clobbered_eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return hfun (val);
     }
   else
     {
       Lisp_Object val = bfun ();
-      eassert (handlerlist == c);
-      handlerlist = c->next;
+      eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return val;
     }
 }
@@ -1339,19 +1329,19 @@ internal_condition_case_1 (Lisp_Object (*bfun) (Lisp_Object), Lisp_Object arg,
 			   Lisp_Object handlers,
 			   Lisp_Object (*hfun) (Lisp_Object))
 {
-  struct handler *c = push_handler (handlers, CONDITION_CASE);
+  struct handler *c = push_exception (handlers, CONDITION_CASE);
   if (sys_setjmp (c->jmp))
     {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
+      Lisp_Object val = current_thread->exception_stack_top->val;
+      clobbered_eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return hfun (val);
     }
   else
     {
       Lisp_Object val = bfun (arg);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
+      eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return val;
     }
 }
@@ -1366,19 +1356,19 @@ internal_condition_case_2 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object),
 			   Lisp_Object handlers,
 			   Lisp_Object (*hfun) (Lisp_Object))
 {
-  struct handler *c = push_handler (handlers, CONDITION_CASE);
+  struct handler *c = push_exception (handlers, CONDITION_CASE);
   if (sys_setjmp (c->jmp))
     {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
+      Lisp_Object val = current_thread->exception_stack_top->val;
+      clobbered_eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return hfun (val);
     }
   else
     {
       Lisp_Object val = bfun (arg1, arg2);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
+      eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return val;
     }
 }
@@ -1395,19 +1385,19 @@ internal_condition_case_n (Lisp_Object (*bfun) (ptrdiff_t, Lisp_Object *),
 						ptrdiff_t nargs,
 						Lisp_Object *args))
 {
-  struct handler *c = push_handler (handlers, CONDITION_CASE);
+  struct handler *c = push_exception (handlers, CONDITION_CASE);
   if (sys_setjmp (c->jmp))
     {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
+      Lisp_Object val = current_thread->exception_stack_top->val;
+      clobbered_eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return hfun (val, nargs, args);
     }
   else
     {
       Lisp_Object val = bfun (nargs, args);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
+      eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return val;
     }
 }
@@ -1422,64 +1412,51 @@ Lisp_Object
 internal_catch_all (Lisp_Object (*function) (void *), void *argument,
                     Lisp_Object (*handler) (enum nonlocal_exit, Lisp_Object))
 {
-  struct handler *c = push_handler_nosignal (Qt, CATCHER_ALL);
-  if (c == NULL)
+  struct handler *c = push_exception (Qt, OMNIBUS);
+  if (! c)
     return Qcatch_all_memory_full;
 
   if (sys_setjmp (c->jmp))
     {
-      eassert (handlerlist == c);
+      eassert (current_thread->exception_stack_top == c);
       enum nonlocal_exit type = c->nonlocal_exit;
       Lisp_Object val = c->val;
-      handlerlist = c->next;
+      exception_stack_pop (current_thread);
       return handler (type, val);
     }
   else
     {
       Lisp_Object val = function (argument);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
+      eassert (current_thread->exception_stack_top == c);
+      exception_stack_pop (current_thread);
       return val;
     }
 }
 
-struct handler *
-push_handler (Lisp_Object tag_ch_val, enum handlertype handlertype)
-{
-  struct handler *c = push_handler_nosignal (tag_ch_val, handlertype);
-  if (!c)
-    memory_full (sizeof *c);
-  return c;
-}
+/* WHAT is ridiculously overloaded.  It could be,
+
+   1. a list of catch tags
+   2. a list of condition-case error symbols
+   3. Qt, for catching all exceptions
+   4. Qerror, as Qt but invoke debugger.
+*/
 
 struct handler *
-push_handler_nosignal (Lisp_Object tag_ch_val, enum handlertype handlertype)
+push_exception (Lisp_Object what, enum exception_type type)
 {
-  struct handler *CACHEABLE c = handlerlist->nextfree;
-  if (!c)
-    {
-      c = malloc (sizeof *c);
-      if (!c)
-	return c;
-      if (profiler_memory_running)
-	malloc_probe (sizeof *c);
-      c->nextfree = NULL;
-      handlerlist->nextfree = c;
-    }
-  c->type = handlertype;
-  c->tag_or_ch = tag_ch_val;
-  c->val = Qnil;
-  c->next = handlerlist;
-  c->f_lisp_eval_depth = lisp_eval_depth;
-  c->pdlcount = SPECPDL_INDEX ();
-  c->act_rec = get_act_rec (current_thread);
-  c->poll_suppress_count = poll_suppress_count;
-  c->interrupt_input_blocked = interrupt_input_blocked;
+  struct handler *top = exception_stack_push (current_thread);
+  top->type = type;
+  top->what = what;
+  top->val = Qnil;
+  top->f_lisp_eval_depth = lisp_eval_depth;
+  top->pdlcount = SPECPDL_INDEX ();
+  top->act_rec = get_act_rec (current_thread);
+  top->poll_suppress_count = poll_suppress_count;
+  top->interrupt_input_blocked = interrupt_input_blocked;
 #ifdef HAVE_X_WINDOWS
-  c->x_error_handler_depth = x_error_message_count;
+  top->x_error_handler_depth = x_error_message_count;
 #endif
-  handlerlist = c;
-  return c;
+  return top;
 }
 
 static Lisp_Object signal_or_quit (Lisp_Object, Lisp_Object, bool);
@@ -1561,14 +1538,16 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
 	pdl = backtrace_next (current_thread, pdl);
     }
 
-  for (h = handlerlist; h; h = h->next)
+
+  for (size_t count = exception_stack_count (current_thread);
+       count > 0 && NILP (clause);
+       --count)
     {
-      if (h->type == CATCHER_ALL)
+      h = current_thread->exception_stack_bottom + count - 1;
+      if (h->type == OMNIBUS)
 	clause = Qt;
       else if (h->type == CONDITION_CASE)
-	clause = find_handler_clause (h->tag_or_ch, conditions);
-      if (! NILP (clause))
-	break;
+	clause = find_handler_clause (h->what, conditions);
     }
 
   bool debugger_called = false;
@@ -1580,7 +1559,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
 	  || (CONSP (clause) && !NILP (Fmemq (Qdebug, clause)))
 	  /* Special handler that means "print a message and run debugger
 	     if requested".  */
-	  || EQ (h->tag_or_ch, Qerror)))
+	  || EQ (h->what, Qerror)))
     {
       debugger_called
 	= maybe_call_debugger (conditions, error_symbol, data);
@@ -1595,7 +1574,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
      to not interfere with ERT or other packages that install custom
      debuggers.  */
   if (! debugger_called && ! NILP (error_symbol)
-      && (NILP (clause) || EQ (h->tag_or_ch, Qerror))
+      && (NILP (clause) || EQ (h->what, Qerror))
       && noninteractive && backtrace_on_error_noninteractive
       && NILP (Vinhibit_debugger)
       && ! NILP (Ffboundp (Qdebug_early)))
@@ -1612,10 +1591,8 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
 	= (NILP (error_symbol) ? data : Fcons (error_symbol, data));
       unwind_to_catch (h, NONLOCAL_EXIT_SIGNAL, unwind_data);
     }
-  else if (handlerlist != handlerlist_sentinel)
+  else if (current_thread->exception_stack_top)
     {
-      /* FIXME: If no top-level catcher, we'll infloop back here.
-	 Should institute catch-all handler and never get here.  */
       Fthrow (Qtop_level, Qt);
     }
 

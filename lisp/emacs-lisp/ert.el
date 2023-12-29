@@ -863,7 +863,10 @@ Returns the result and stores it in ERT-TEST's `most-recent-result' slot."
                        :result
                        (make-ert-test-aborted-with-non-local-exit)
                        :exit-continuation (lambda ()
-                                            (cl-return-from error nil))))
+                                            (condition-case err
+                                                (cl-return-from error nil)
+                                              (error (message "wtf happened %S"
+                                                              (error-message-string err)))))))
                 (should-form-accu (list)))
             (unwind-protect
                 (let ((ert--should-execution-observer

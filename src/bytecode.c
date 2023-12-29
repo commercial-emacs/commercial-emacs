@@ -526,7 +526,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
   while (true)
     {
       int op;
-      enum handlertype type;
+      enum exception_type type;
 
       if (BYTE_CODE_SAFE && !valid_sp (bc, top))
 	emacs_abort ();
@@ -936,14 +936,13 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  type = CONDITION_CASE;
 	pushhandler:
 	  {
-	    struct handler *c = push_handler (POP, type);
+	    struct handler *c = push_exception (POP, type);
 	    c->bytecode_dest = FETCH2;
 	    c->bytecode_top = top;
 
 	    if (sys_setjmp (c->jmp))
 	      {
-		struct handler *c = handlerlist;
-		handlerlist = c->next;
+		struct handler *c = exception_stack_pop (current_thread);
 		top = c->bytecode_top;
 		op = c->bytecode_dest;
 		struct bc_frame *fp = bc->fp;
@@ -968,7 +967,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  }
 
 	CASE (Bpophandler):	/* New in 24.4.  */
-	  handlerlist = handlerlist->next;
+	  exception_stack_pop (current_thread);
 	  NEXT;
 
 	CASE (Bunwind_protect):	/* FIXME: avoid closure for lexbind.  */
