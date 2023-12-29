@@ -800,6 +800,12 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   new_thread->m_specpdl_ptr = new_thread->m_specpdl;
   new_thread->m_specpdl_end = new_thread->m_specpdl + init_pdl;
 
+  new_thread->exception_stack_capacity = 16;
+  new_thread->exception_stack_bottom = (struct handler *) xmalloc
+    (new_thread->exception_stack_capacity
+     * sizeof (*new_thread->exception_stack_bottom));
+  new_thread->exception_stack_top = NULL;
+
   new_thread->m_interval_block_index = BLOCK_NINTERVALS;
   new_thread->m_float_block_index = BLOCK_NFLOATS;
   new_thread->m_cons_block_index = BLOCK_NCONS;
@@ -1058,13 +1064,19 @@ exception_stack_push (struct thread_state *thr)
     {
       eassert (thr->exception_stack_top == thr->exception_stack_bottom + count - 1);
       thr->exception_stack_capacity += 16;
+#ifdef ENABLE_CHECKING
+      Lisp_Object obottom = thr->exception_stack_bottom->what,
+	otop = thr->exception_stack_top->what;
+#endif
       thr->exception_stack_bottom
 	= (struct handler *) xrealloc (thr->exception_stack_bottom,
 				       thr->exception_stack_capacity
-				       * sizeof (*current_thread->exception_stack_bottom));
+				       * sizeof (*thr->exception_stack_bottom));
       memset (thr->exception_stack_bottom + count, 0,
-	      16 * sizeof (*current_thread->exception_stack_bottom));
+	      16 * sizeof (*thr->exception_stack_bottom));
       thr->exception_stack_top = thr->exception_stack_bottom + count - 1;
+      eassert (EQ (thr->exception_stack_bottom->what, obottom));
+      eassert (EQ (thr->exception_stack_top->what, otop));
     }
   return thr->exception_stack_top
     ? ++thr->exception_stack_top

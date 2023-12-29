@@ -1076,12 +1076,6 @@ usage: (catch TAG BODY...)  */)
   return internal_catch (tag, Fprogn, XCDR (args));
 }
 
-/* Assert that E is true, but do not evaluate E.  Use this instead of
-   eassert (E) when E contains variables that might be clobbered by a
-   longjmp.  */
-
-#define clobbered_eassert(E) verify (sizeof (E) != 0)
-
 /* Install catch on TAG, then call FUNC on argument ARG.  */
 
 Lisp_Object
@@ -1089,17 +1083,23 @@ internal_catch (Lisp_Object tag, Lisp_Object (*func) (Lisp_Object),
 		Lisp_Object arg)
 {
   struct handler *c = push_exception (tag, CATCHER);
+#ifdef ENABLE_CHECKING
+  size_t ocount = exception_stack_count (current_thread);
+  Lisp_Object owhat = c->what;
+#endif
   if (sys_setjmp (c->jmp))
     {
       Lisp_Object val = current_thread->exception_stack_top->val;
-      clobbered_eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return val;
     }
   else
     {
       Lisp_Object val = func (arg);
-      eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return val;
     }
@@ -1294,6 +1294,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
     }
   return result;
 }
+
 /* Call no-argument BFUN and handle any error CONDITIONS by calling
    HFUN which takes one argument (SIGNALNAME . DATA).  CONDITIONS is
    list of error symbols with special interpretations for Qt the catch-all
@@ -1306,17 +1307,23 @@ internal_condition_case (Lisp_Object (*bfun) (void),
 			 Lisp_Object (*hfun) (Lisp_Object))
 {
   struct handler *c = push_exception (conditions, CONDITION_CASE);
+#ifdef ENABLE_CHECKING
+  size_t ocount = exception_stack_count (current_thread);
+  Lisp_Object owhat = c->what;
+#endif
   if (sys_setjmp (c->jmp))
     {
       Lisp_Object val = current_thread->exception_stack_top->val;
-      clobbered_eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return hfun (val);
     }
   else
     {
       Lisp_Object val = bfun ();
-      eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return val;
     }
@@ -1330,17 +1337,23 @@ internal_condition_case_1 (Lisp_Object (*bfun) (Lisp_Object), Lisp_Object arg,
 			   Lisp_Object (*hfun) (Lisp_Object))
 {
   struct handler *c = push_exception (handlers, CONDITION_CASE);
+#ifdef ENABLE_CHECKING
+  size_t ocount = exception_stack_count (current_thread);
+  Lisp_Object owhat = c->what;
+#endif
   if (sys_setjmp (c->jmp))
     {
       Lisp_Object val = current_thread->exception_stack_top->val;
-      clobbered_eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return hfun (val);
     }
   else
     {
       Lisp_Object val = bfun (arg);
-      eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return val;
     }
@@ -1357,17 +1370,23 @@ internal_condition_case_2 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object),
 			   Lisp_Object (*hfun) (Lisp_Object))
 {
   struct handler *c = push_exception (handlers, CONDITION_CASE);
+#ifdef ENABLE_CHECKING
+  size_t ocount = exception_stack_count (current_thread);
+  Lisp_Object owhat = c->what;
+#endif
   if (sys_setjmp (c->jmp))
     {
       Lisp_Object val = current_thread->exception_stack_top->val;
-      clobbered_eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return hfun (val);
     }
   else
     {
       Lisp_Object val = bfun (arg1, arg2);
-      eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return val;
     }
@@ -1386,17 +1405,23 @@ internal_condition_case_n (Lisp_Object (*bfun) (ptrdiff_t, Lisp_Object *),
 						Lisp_Object *args))
 {
   struct handler *c = push_exception (handlers, CONDITION_CASE);
+#ifdef ENABLE_CHECKING
+  size_t ocount = exception_stack_count (current_thread);
+  Lisp_Object owhat = c->what;
+#endif
   if (sys_setjmp (c->jmp))
     {
       Lisp_Object val = current_thread->exception_stack_top->val;
-      clobbered_eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return hfun (val, nargs, args);
     }
   else
     {
       Lisp_Object val = bfun (nargs, args);
-      eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return val;
     }
@@ -1415,19 +1440,24 @@ internal_catch_all (Lisp_Object (*function) (void *), void *argument,
   struct handler *c = push_exception (Qt, OMNIBUS);
   if (! c)
     return Qcatch_all_memory_full;
-
+#ifdef ENABLE_CHECKING
+  size_t ocount = exception_stack_count (current_thread);
+  Lisp_Object owhat = c->what;
+#endif
   if (sys_setjmp (c->jmp))
     {
-      eassert (current_thread->exception_stack_top == c);
-      enum nonlocal_exit type = c->nonlocal_exit;
-      Lisp_Object val = c->val;
+      enum nonlocal_exit type = current_thread->exception_stack_top->nonlocal_exit;
+      Lisp_Object val = current_thread->exception_stack_top->val;
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return handler (type, val);
     }
   else
     {
       Lisp_Object val = function (argument);
-      eassert (current_thread->exception_stack_top == c);
+      eassert (ocount == exception_stack_count (current_thread));
+      eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
       return val;
     }
