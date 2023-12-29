@@ -3049,10 +3049,6 @@ define_handler_struct (void)
 						      NULL,
 						      comp.lisp_obj_type,
 						      "val");
-  comp.handler_next_field = gcc_jit_context_new_field (comp.ctxt,
-						       NULL,
-						       comp.handler_ptr_type,
-						       "next");
   gcc_jit_field *fields[] =
     { gcc_jit_context_new_field (
 	comp.ctxt,
@@ -3063,17 +3059,6 @@ define_handler_struct (void)
 					offsetof (struct handler, val)),
 	"pad0"),
       comp.handler_val_field,
-      comp.handler_next_field,
-      gcc_jit_context_new_field (
-	comp.ctxt,
-	NULL,
-	gcc_jit_context_new_array_type (comp.ctxt,
-					NULL,
-					comp.char_type,
-					offsetof (struct handler, jmp)
-					- offsetof (struct handler, next)
-					- sizeof (((struct handler *) 0)->parent)),
-	"pad1"),
       comp.handler_jmp_field,
       gcc_jit_context_new_field (
 	comp.ctxt,
@@ -3084,7 +3069,7 @@ define_handler_struct (void)
 					sizeof (struct handler)
 					- offsetof (struct handler, jmp)
 					- sizeof (((struct handler *) 0)->jmp)),
-	"pad2") };
+	"pad1") };
   gcc_jit_struct_set_fields (comp.handler_s,
 			     NULL,
 			     ARRAYELTS (fields),
