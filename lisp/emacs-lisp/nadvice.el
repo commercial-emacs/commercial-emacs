@@ -539,6 +539,16 @@ Contrary to `remove-function', this also works when SYMBOL is a macro
 or an autoload and it preserves `fboundp'.
 Instead of the actual function to remove, FUNCTION can also be the `name'
 of the piece of advice."
+  (interactive
+   (let ((symbol (intern (completing-read
+                           "Advised Function: "
+                           obarray
+                           (lambda (sym) (advice--p (advice--symbol-function sym)))
+                           t nil nil
+                           (when-let (def (function-called-at-point)) (symbol-name def)))))
+          advice)
+     (advice-mapc (lambda (f _) (push (cons (prin1-to-string f) f) advice)) symbol)
+     (list symbol (cdr (assoc-string (completing-read "Advice: " advice) advice)))))
   (let ((f (symbol-function symbol)))
     (remove-function (cond ;This is `advice--symbol-function' but as a "place".
                       ((get symbol 'advice--pending)
