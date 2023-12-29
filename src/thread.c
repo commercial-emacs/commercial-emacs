@@ -1067,6 +1067,8 @@ exception_stack_push (struct thread_state *thr)
 #ifdef ENABLE_CHECKING
       Lisp_Object obottom = thr->exception_stack_bottom->what,
 	otop = thr->exception_stack_top->what;
+#else
+      Lisp_Object obottom, otop;
 #endif
       thr->exception_stack_bottom
 	= (struct handler *) xrealloc (thr->exception_stack_bottom,

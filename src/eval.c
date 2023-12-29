@@ -1088,7 +1088,7 @@ internal_catch (Lisp_Object tag, Lisp_Object (*func) (Lisp_Object),
   Lisp_Object owhat = c->what;
 #else
   size_t ocount = 0;
-  Lisp_Object owhat = Qnil;
+  Lisp_Object owhat;
 #endif
   if (sys_setjmp (c->jmp))
     {
@@ -1315,7 +1315,7 @@ internal_condition_case (Lisp_Object (*bfun) (void),
   Lisp_Object owhat = c->what;
 #else
   size_t ocount = 0;
-  Lisp_Object owhat = Qnil;
+  Lisp_Object owhat;
 #endif
   if (sys_setjmp (c->jmp))
     {
@@ -1348,7 +1348,7 @@ internal_condition_case_1 (Lisp_Object (*bfun) (Lisp_Object), Lisp_Object arg,
   Lisp_Object owhat = c->what;
 #else
   size_t ocount = 0;
-  Lisp_Object owhat = Qnil;
+  Lisp_Object owhat;
 #endif
   if (sys_setjmp (c->jmp))
     {
@@ -1384,7 +1384,7 @@ internal_condition_case_2 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object),
   Lisp_Object owhat = c->what;
 #else
   size_t ocount = 0;
-  Lisp_Object owhat = Qnil;
+  Lisp_Object owhat;
 #endif
   if (sys_setjmp (c->jmp))
     {
@@ -1422,7 +1422,7 @@ internal_condition_case_n (Lisp_Object (*bfun) (ptrdiff_t, Lisp_Object *),
   Lisp_Object owhat = c->what;
 #else
   size_t ocount = 0;
-  Lisp_Object owhat = Qnil;
+  Lisp_Object owhat;
 #endif
   if (sys_setjmp (c->jmp))
     {
@@ -1460,7 +1460,7 @@ internal_catch_all (Lisp_Object (*function) (void *), void *argument,
   Lisp_Object owhat = c->what;
 #else
   size_t ocount = 0;
-  Lisp_Object owhat = Qnil;
+  Lisp_Object owhat;
 #endif
   if (sys_setjmp (c->jmp))
     {
