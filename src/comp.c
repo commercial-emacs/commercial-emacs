@@ -3079,6 +3079,8 @@ define_handler_struct (void)
 static void
 define_thread_state_struct (void)
 {
+  gcc_jit_field *fields[] = {};
+
   comp.thread_state_s =
     gcc_jit_context_new_struct_type (comp.ctxt,
 				     NULL,
