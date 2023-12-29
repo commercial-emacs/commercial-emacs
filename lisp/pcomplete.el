@@ -902,16 +902,14 @@ this is `comint-dynamic-complete-functions'."
                      (and dir-ignore (string-match dir-ignore file))
                    (and file-ignore (string-match file-ignore file))))))))
          (reg-pred (if regexp (lambda (file) (string-match regexp file))))
-         ;; `completion-file-name-table' calls `file-exists-p' when
-         ;; the predicate is nil.
-         ;; So likewise, defer to PREDICATE if it's there, else take
-         ;; ourselves to be responsible for calling `file-exists-p'.
-         (pred (if (or ign-pred reg-pred)
-                   (lambda (f)
-                     (and (or (null reg-pred)  (funcall reg-pred f))
-                          (or (null ign-pred)  (funcall ign-pred f))
-                          (funcall (or predicate #'file-exists-p) f)))
-                 predicate)))
+         (pred (cond
+                ((and (not ign-pred) (not reg-pred)) predicate)
+                ((and (not ign-pred) (not predicate)) reg-pred)
+                ((and (not reg-pred) (not predicate)) ign-pred)
+                (t (lambda (f)
+                     (and (or (null reg-pred) (funcall reg-pred f))
+                          (or (null ign-pred) (funcall ign-pred f))
+                          (funcall (or predicate #'file-exists-p) f)))))))
     (lambda (s p a)
       (if (and (eq a 'metadata) pcomplete-compare-entry-function)
           `(metadata (cycle-sort-function
