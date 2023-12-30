@@ -1397,31 +1397,29 @@ Elisp plists (@pxref{JSONRPC objects in Elisp}).
 The Eglot generic function machinery will automatically destructure
 the incoming message, so these two properties can simply be added to
 the new method's lambda list as @code{&key} arguments.  Also, the
-@code{eglot-uri-to-path} and @code{eglot-range-region} may be used to
-easily parse the LSP @code{:uri} and @code{:start ... :end ...}
+@code{eglot--uri-to-path} and @code{eglot--range-region} may be used
+to easily parse the LSP @code{:uri} and @code{:start ... :end ...}
 objects to obtain Emacs objects for file names and positions.
 
 The remainder of the implementation consists of standard Elisp
 techniques to loop over arrays, manage buffers and overlays.
 
 @lisp
-(defvar-local eglot-clangd-inactive-region-overlays '())
-
 (cl-defmethod eglot-handle-notification
   (_server (_method (eql textDocument/inactiveRegions))
            &key regions textDocument &allow-other-keys)
-  (if-let* ((path (expand-file-name (eglot-uri-to-path
+  (if-let* ((path (expand-file-name (eglot--uri-to-path
                                      (cl-getf textDocument :uri))))
             (buffer (find-buffer-visiting path)))
       (with-current-buffer buffer
-        (mapc #'delete-overlay eglot-clangd-inactive-region-overlays)
+        (remove-overlays nil nil 'inactive--code t)
         (cl-loop
          for r across regions
-         for (beg . end) = (eglot-range-region r)
+         for (beg . end) = (eglot--range-region r)
          for ov = (make-overlay beg end)
          do
          (overlay-put ov 'face 'shadow)
-         (push ov eglot-clangd-inactive-region-overlays)))))
+         (overlay-put ov 'inactive--code t)))))
 @end lisp
 
 @end itemize
