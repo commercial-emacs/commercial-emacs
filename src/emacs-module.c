@@ -1278,10 +1278,7 @@ module_non_local_exit_throw_1 (emacs_env *env, Lisp_Object tag,
 static void
 module_out_of_memory (emacs_env *env)
 {
-  /* TODO: Reimplement this so it works even if memory-signal-data has
-     been modified.  */
-  module_non_local_exit_signal_1 (env, XCAR (Vmemory_signal_data),
-				  XCDR (Vmemory_signal_data));
+  module_non_local_exit_signal_1 (env, Qerror, Qnil);
 }
 
 

@@ -3003,7 +3003,7 @@ memory_full (size_t nbytes)
 	}
     }
 
-  xsignal (Qnil, Vmemory_signal_data);
+  Fthrow (Qtop_level, Qt);
 }
 
 /* Return P "made whole" as a Lisp_Cons if P's mem_block M
@@ -6035,16 +6035,6 @@ If this portion is smaller than `gc-cons-threshold', this is ignored.  */);
 	       doc: /* Hook run after garbage collection has finished.  */);
   Vpost_gc_hook = Qnil;
   DEFSYM (Qpost_gc_hook, "post-gc-hook");
-
-  DEFVAR_LISP ("memory-signal-data", Vmemory_signal_data,
-	       doc: /* Precomputed `signal' argument for memory-full error.  */);
-  /* We build this in advance because if we wait until we need it, we might
-     not be able to allocate the memory to hold it.  */
-  Vmemory_signal_data
-    = pure_list (Qerror,
-		 build_pure_c_string ("Memory exhausted--use"
-				      " M-x save-some-buffers then"
-				      " exit and restart Emacs"));
 
   DEFSYM (Qmemory_info, "memory-info");
   DEFSYM (Qconses, "conses");

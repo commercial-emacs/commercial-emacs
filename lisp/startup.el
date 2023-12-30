@@ -1559,12 +1559,6 @@ please check its value")
               (daemonp))
     (tty-run-terminal-initialization (selected-frame) nil t))
 
-  ;; Update the out-of-memory error message based on user's key bindings
-  ;; for save-some-buffers.
-  (setq memory-signal-data
-	(list 'error
-	      (substitute-command-keys "Memory exhausted--use \\[save-some-buffers] then exit and restart Emacs")))
-
   ;; Reevaluate `user-emacs-directory-warning' before processing
   ;; '--eval' arguments, so that the user could override the default
   ;; value in the '--eval' forms.

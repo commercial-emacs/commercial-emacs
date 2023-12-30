@@ -1507,7 +1507,7 @@ push_exception (Lisp_Object what, enum exception_type type)
   return top;
 }
 
-static Lisp_Object signal_or_quit (Lisp_Object, Lisp_Object, bool);
+static Lisp_Object signal_or_quit (Lisp_Object, Lisp_Object);
 static Lisp_Object find_handler_clause (Lisp_Object, Lisp_Object);
 static bool maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig,
 				 Lisp_Object data);
@@ -1533,60 +1533,37 @@ See also the function `condition-case'.  */
        attributes: noreturn)
   (Lisp_Object error_symbol, Lisp_Object data)
 {
-  /* If nonsensical arguments, throw "peculiar error".  */
-  if (NILP (error_symbol) && NILP (data))
-    error_symbol = Qerror;
-  signal_or_quit (error_symbol, data, false);
+  signal_or_quit (error_symbol, data);
   eassume (false);
 }
 
-/* Quit, in response to a keyboard quit request.  */
+/* Keyboard quit request.  */
+
 Lisp_Object
 quit (void)
 {
-  return signal_or_quit (Qquit, Qnil, true);
+  return signal_or_quit (Qquit, Qnil);
 }
 
-/* Signal an error, or quit.  ERROR_SYMBOL and DATA are as with Fsignal.
-   If KEYBOARD_QUIT, this is a quit; ERROR_SYMBOL should be
-   Qquit and DATA should be Qnil, and this function may return.
-   Otherwise this function is like Fsignal and does not return.  */
-
 static Lisp_Object
-signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
+signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
 {
-  /* When memory is full, ERROR-SYMBOL is nil,
-     and DATA is (REAL-ERROR-SYMBOL . REAL-DATA).
-     That is a special case--don't do this in other situations.  */
-  Lisp_Object conditions;
-  Lisp_Object string;
-  Lisp_Object real_error_symbol
-    = (NILP (error_symbol) ? CAR (data) : error_symbol);
-  Lisp_Object clause = Qnil;
-  struct handler *h;
-
-  /* This hook is used by edebug.  */
+  /* Edebug hook if specpdl not overflowed.  */
   if (! NILP (Vsignal_hook_function)
-      && ! NILP (error_symbol)
-      /* specpdl not overflowed */
       && specpdl_ptr < specpdl_end)
-    {
-      call2 (Vsignal_hook_function, error_symbol, data);
-    }
+    call2 (Vsignal_hook_function, error_symbol, data);
 
-  conditions = Fget (real_error_symbol, Qerror_conditions);
+  /* Skip frames for `signal' itself and Qerror.  */
+  {
+    union specbinding *pdl
+      = backtrace_next (current_thread, backtrace_top (current_thread));
+    if (backtrace_valid_p (current_thread, pdl)
+	&& EQ (backtrace_function (pdl), Qerror))
+      pdl = backtrace_next (current_thread, pdl);
+  }
 
-  /* Skip frames for `signal' itself and 'error.  */
-  if (! NILP (error_symbol)) /* Not memory full */
-    {
-      union specbinding *pdl
-	= backtrace_next (current_thread, backtrace_top (current_thread));
-      if (backtrace_valid_p (current_thread, pdl)
-	  && EQ (backtrace_function (pdl), Qerror))
-	pdl = backtrace_next (current_thread, pdl);
-    }
-
-
+  struct handler *h;
+  Lisp_Object clause = Qnil;
   for (size_t count = exception_stack_count (current_thread);
        count > 0 && NILP (clause);
        --count)
@@ -1595,38 +1572,29 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
       if (h->type == OMNIBUS)
 	clause = Qt;
       else if (h->type == CONDITION_CASE)
-	clause = find_handler_clause (h->what, conditions);
+	clause = find_handler_clause (h->what, Fget (error_symbol,
+						     Qerror_conditions));
     }
 
-  bool debugger_called = false;
-  if (! NILP (error_symbol) /* Not memory full.  */
-      && (! NILP (Vdebug_on_signal)
-	  /* If no handler is present now, try to run the debugger.  */
-	  || NILP (clause)
-	  /* A 'debug symbol disables its suppression.  */
-	  || (CONSP (clause) && !NILP (Fmemq (Qdebug, clause)))
-	  /* Special handler that means "print a message and run debugger
-	     if requested".  */
-	  || EQ (h->what, Qerror)))
+  if ((! NILP (Vdebug_on_signal)
+       || NILP (clause)
+       /* Clause containing special 'debug symbol */
+       || (CONSP (clause) && ! NILP (Fmemq (Qdebug, clause)))
+       /* Special symbol invoking debugger */
+       || EQ (h->what, Qerror))
+      && maybe_call_debugger (Fget (error_symbol, Qerror_conditions),
+			      error_symbol, data))
     {
-      debugger_called
-	= maybe_call_debugger (conditions, error_symbol, data);
-      /* We can't return values to code which signaled an error, but we
-	 can continue code which has signaled a quit.  */
-      if (keyboard_quit && debugger_called && EQ (real_error_symbol, Qquit))
+      if (EQ (error_symbol, Qquit))
 	return Qnil;
     }
-
-  /* If we're in batch mode, print a backtrace unconditionally to help
-     with debugging.  Make sure to use `debug-early' unconditionally
-     to not interfere with ERT or other packages that install custom
-     debuggers.  */
-  if (! debugger_called && ! NILP (error_symbol)
-      && (NILP (clause) || EQ (h->what, Qerror))
-      && noninteractive && backtrace_on_error_noninteractive
-      && NILP (Vinhibit_debugger)
-      && ! NILP (Ffboundp (Qdebug_early)))
+  else if ((NILP (clause) || EQ (h->what, Qerror))
+	   && noninteractive
+	   && backtrace_on_error_noninteractive
+	   && NILP (Vinhibit_debugger)
+	   && ! NILP (Ffboundp (Qdebug_early)))
     {
+      /* `debug-early' does not interfere with ERT or customized debuggers */
       specpdl_ref count = SPECPDL_INDEX ();
       specbind (Qdebugger, Qdebug_early);
       call_debugger (list2 (Qerror, Fcons (error_symbol, data)));
@@ -1634,21 +1602,10 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
     }
 
   if (! NILP (clause))
-    {
-      Lisp_Object unwind_data
-	= (NILP (error_symbol) ? data : Fcons (error_symbol, data));
-      unwind_to_catch (h, NONLOCAL_EXIT_SIGNAL, unwind_data);
-    }
-  else if (current_thread->exception_stack_top)
-    {
-      Fthrow (Qtop_level, Qt);
-    }
+    unwind_to_catch (h, NONLOCAL_EXIT_SIGNAL, Fcons (error_symbol, data));
 
-  if (! NILP (error_symbol))
-    data = Fcons (error_symbol, data);
-
-  string = Ferror_message_string (data);
-  fatal ("%s", SDATA (string));
+  Fthrow (Qtop_level, Qt);
+  eassume (false);
 }
 
 /* Like xsignal, but takes 0, 1, 2, or 3 args instead of a list.  */
@@ -1784,11 +1741,7 @@ signal_quit_p (Lisp_Object signal)
 	&& !NILP (Fmemq (Qquit, list)));
 }
 
-/* Call the debugger if calling it is currently enabled for CONDITIONS.
-   SIG and DATA describe the signal.  There are two ways to pass them:
-    = SIG is the error symbol, and DATA is the rest of the data.
-    = SIG is nil, and DATA is (SYMBOL . REST-OF-DATA).
-      This is for memory-full errors only.  */
+/* Call the debugger if calling it is currently enabled for CONDITIONS.  */
 static bool
 maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig, Lisp_Object data)
 {
