@@ -550,6 +550,15 @@ ns_relocate (const char *epath)
 
 
 void
+ns_init_pool (void)
+/* Initialize the 'outerpool' autorelease pool.  This should be called
+   from main before any Objective C code is run.  */
+{
+  outerpool = [[NSAutoreleasePool alloc] init];
+}
+
+
+void
 ns_init_locale (void)
 /* macOS doesn't set any environment variables for the locale when run
    from the GUI. Get the locale from the OS and set LANG.  */
@@ -5256,8 +5265,11 @@ ns_initialize_display_info (struct ns_display_info *dpyinfo)
     NSScreen *screen = [NSScreen mainScreen];
     NSWindowDepth depth = [screen depth];
 
-    dpyinfo->resx = 72.27; /* used 75.0, but this makes pt == pixel, expected */
-    dpyinfo->resy = 72.27;
+    NSDictionary *dict = [screen deviceDescription];
+    NSSize res = [[dict objectForKey:@"NSDeviceResolution"] sizeValue];
+    dpyinfo->resx = res.width;
+    dpyinfo->resy = res.height;
+
     dpyinfo->color_p = ![NSDeviceWhiteColorSpace isEqualToString:
                                                   NSColorSpaceFromDepth (depth)]
                 && ![NSCalibratedWhiteColorSpace isEqualToString:
