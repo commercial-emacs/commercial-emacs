@@ -382,6 +382,11 @@ section of the Emacs manual or the file BUGS.\n"
 /* True if handling a fatal error already.  */
 bool fatal_error_in_progress;
 
+#ifdef HAVE_NS
+/* NS autorelease pool, for memory management.  */
+static void *ns_pool;
+#endif
+
 #if !HAVE_SETLOCALE
 static char *
 setlocale (int cat, char const *locale)
@@ -1307,11 +1312,6 @@ main (int argc, char **argv)
   w32_init_main_thread ();
 #endif
 
-#ifdef HAVE_NS
-  /* Initialize the Obj C autorelease pool.  */
-  ns_init_pool ();
-#endif
-
 #ifdef HAVE_PDUMPER
   if (! temacs)
     {
@@ -1575,6 +1575,7 @@ main (int argc, char **argv)
   if (! (lc_all && strcmp (lc_all, "C") == 0))
     {
       #ifdef HAVE_NS
+        ns_pool = ns_alloc_autorelease_pool ();
         ns_init_locale ();
       #endif
       setlocale (LC_ALL, "");
@@ -2893,6 +2894,10 @@ killed.  */
 
   shut_down_emacs (0, (STRINGP (arg) && ! feof (stdin)) ? arg : Qnil);
 
+#ifdef HAVE_NS
+  ns_release_autorelease_pool (ns_pool);
+#endif
+
   /* If we have an auto-save list file,
      kill it because we are exiting Emacs deliberately (not crashing).
      Do it after shut_down_emacs, which does an auto-save.  */
@@ -3125,6 +3130,9 @@ decode_env_path (const char *evarname, const char *defalt, bool empty)
 {
   const char *path, *p;
   Lisp_Object lpath, element, tem;
+#ifdef NS_SELF_CONTAINED
+  void *autorelease = NULL;
+#endif
   /* Default is to use "." for empty path elements.
      But if argument EMPTY is true, use nil instead.  */
   Lisp_Object empty_element = empty ? Qnil : build_string (".");
@@ -3152,6 +3160,8 @@ decode_env_path (const char *evarname, const char *defalt, bool empty)
   if (! path)
     {
 #ifdef NS_SELF_CONTAINED
+      /* ns_relocate needs a valid autorelease pool around it.  */
+      autorelease = ns_alloc_autorelease_pool ();
       path = ns_relocate (defalt);
 #else
       path = defalt;
@@ -3255,6 +3265,10 @@ decode_env_path (const char *evarname, const char *defalt, bool empty)
 	break;
     }
 
+#ifdef NS_SELF_CONTAINED
+  if (autorelease)
+    ns_release_autorelease_pool (autorelease);
+#endif
   return Fnreverse (lpath);
 }
 

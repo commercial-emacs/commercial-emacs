@@ -1180,7 +1180,6 @@ extern void  ns_retain_object (void *obj);
 extern void *ns_alloc_autorelease_pool (void);
 extern void ns_release_autorelease_pool (void *);
 extern const char *ns_get_defaults_value (const char *key);
-extern void ns_init_pool (void);
 extern void ns_init_locale (void);
 
 /* in nsmenu */
