@@ -4,7 +4,7 @@
 
 ;; Author: Carsten Dominik <carsten.dominik@gmail.com>,
 ;;         Ulf Stegemann <ulf at zeitform dot de>
-;; Keywords: outlines, calendar, wp
+;; Keywords: outlines, calendar, text
 ;; URL: https://orgmode.org
 ;;
 ;; This file is NOT part of GNU Emacs.

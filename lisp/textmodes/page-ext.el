@@ -4,7 +4,7 @@
 
 ;; Author: Robert J. Chassell <bob@gnu.org>
 ;; (according to ack.texi)
-;; Keywords: wp data
+;; Keywords: text data
 
 ;; This file is NOT part of GNU Emacs.
 

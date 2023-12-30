@@ -4,7 +4,7 @@
 ;; Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
-;; Keywords: wp
+;; Keywords: text
 ;; Package: emacs
 
 ;; This file is NOT part of GNU Emacs.

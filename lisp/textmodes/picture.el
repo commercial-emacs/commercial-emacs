@@ -4,7 +4,7 @@
 
 ;; Author: K. Shane Hartman
 ;; Maintainer: emacs-devel@gnu.org
-;; Keywords: convenience wp
+;; Keywords: convenience text
 
 ;; This file is NOT part of GNU Emacs.
 

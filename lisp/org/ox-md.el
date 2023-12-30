@@ -4,7 +4,7 @@
 
 ;; Author: Nicolas Goaziou <n.goaziou@gmail.com>
 ;; Maintainer: Nicolas Goaziou <mail@nicolasgoaziou.fr>
-;; Keywords: org, wp, markdown
+;; Keywords: org, text, markdown
 
 ;; This file is NOT part of GNU Emacs.
 
