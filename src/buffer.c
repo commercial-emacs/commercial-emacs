@@ -4562,7 +4562,6 @@ init_buffer_once (void)
   bset_tab_line_format (&buffer_slot_defaults, Qnil);
   bset_abbrev_mode (&buffer_slot_defaults, Qnil);
   bset_overwrite_mode (&buffer_slot_defaults, Qnil);
-  bset_case_fold_search (&buffer_slot_defaults, Qt);
   bset_auto_fill_function (&buffer_slot_defaults, Qnil);
   bset_selective_display (&buffer_slot_defaults, Qnil);
   bset_selective_display_ellipses (&buffer_slot_defaults, Qt);
