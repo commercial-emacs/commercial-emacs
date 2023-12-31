@@ -1915,17 +1915,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_fileio ();
       /* Before syms_of_coding to initialize Vgc_cons_threshold.  */
       syms_of_alloc ();
-
-#define DEFVOO_LISP(lname, vname, doc)				\
-      static struct Lisp_Objfwd const o_fwd			\
-	= {Lisp_Fwd_Obj, &globals.f_##vname};			\
-      defvar_lisp (&o_fwd, lname);
-
-      DEFVOO_LISP ("memory--protect-p", Vmemory__protect_p,
-		   doc: /* How does mprotect work?  */);
-      Vmemory__protect_p = Qnil;
       syms_of_mgc ();
-#undef DEFVOO_LISP
 
       /* May call Ffuncall and so GC, thus the latter should be initialized.  */
       init_print_once ();

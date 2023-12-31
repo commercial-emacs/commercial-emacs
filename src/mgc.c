@@ -673,6 +673,10 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
 void
 syms_of_mgc (void)
 {
+  DEFVAR_LISP ("memory--protect-p", Vmemory__protect_p,
+	       doc: /* How does mprotect work?  */);
+  Vmemory__protect_p = Qnil;
+
   defsubr (&Smgc_cons);
   defsubr (&Smgc_vector);
   defsubr (&Smgc_make_vector);

@@ -1508,7 +1508,6 @@ push_exception (Lisp_Object what, enum exception_type type)
 }
 
 static Lisp_Object signal_or_quit (Lisp_Object, Lisp_Object);
-static Lisp_Object find_handler_clause (Lisp_Object, Lisp_Object);
 static bool maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig,
 				 Lisp_Object data);
 
@@ -1562,33 +1561,48 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
       pdl = backtrace_next (current_thread, pdl);
   }
 
-  struct handler *h;
-  Lisp_Object clause = Qnil;
+  struct handler *handler = NULL;
   for (size_t count = exception_stack_count (current_thread);
-       count > 0 && NILP (clause);
+       count > 0 && handler == NULL;
        --count)
     {
-      h = current_thread->exception_stack_bottom + count - 1;
+      struct handler *h = current_thread->exception_stack_bottom + count - 1;
       if (h->type == OMNIBUS)
-	clause = Qt;
+	handler = h;
       else if (h->type == CONDITION_CASE)
-	clause = find_handler_clause (h->what, Fget (error_symbol,
-						     Qerror_conditions));
+	{
+	  if (EQ (h->what, Qt) || EQ (h->what, Qerror))
+	    handler = h;
+	  else if (CONSP (h->what))
+	    {
+	      Lisp_Object errsyms = Fget (error_symbol, Qerror_conditions);
+	      Lisp_Object tail = h->what;
+	      FOR_EACH_TAIL_SAFE (tail)
+		{
+		  Lisp_Object errsym = XCAR (tail);
+		  if (! NILP (Fmemq (errsym, errsyms)) || EQ (errsym, Qt))
+		    {
+		      handler = h;
+		      break;
+		    }
+		}
+	    }
+	}
     }
 
   if ((! NILP (Vdebug_on_signal)
-       || NILP (clause)
+       || ! handler
        /* Clause containing special 'debug symbol */
-       || (CONSP (clause) && ! NILP (Fmemq (Qdebug, clause)))
+       || (CONSP (handler->what) && ! NILP (Fmemq (Qdebug, handler->what)))
        /* Special symbol invoking debugger */
-       || EQ (h->what, Qerror))
+       || EQ (handler->what, Qerror))
       && maybe_call_debugger (Fget (error_symbol, Qerror_conditions),
 			      error_symbol, data))
     {
       if (EQ (error_symbol, Qquit))
 	return Qnil;
     }
-  else if ((NILP (clause) || EQ (h->what, Qerror))
+  else if ((! handler || EQ (handler->what, Qerror))
 	   && noninteractive
 	   && backtrace_on_error_noninteractive
 	   && NILP (Vinhibit_debugger)
@@ -1601,8 +1615,8 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
       unbind_to (count, Qnil);
     }
 
-  if (! NILP (clause))
-    unwind_to_catch (h, NONLOCAL_EXIT_SIGNAL, Fcons (error_symbol, data));
+  if (handler)
+    unwind_to_catch (handler, NONLOCAL_EXIT_SIGNAL, Fcons (error_symbol, data));
 
   Fthrow (Qtop_level, Qt);
   eassume (false);
@@ -1767,33 +1781,6 @@ maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig, Lisp_Object data)
 
   return 0;
 }
-
-static Lisp_Object
-find_handler_clause (Lisp_Object handlers, Lisp_Object conditions)
-{
-  register Lisp_Object h;
-
-  /* t is used by handlers for all conditions, set up by C code.  */
-  if (EQ (handlers, Qt))
-    return Qt;
-
-  /* error is used similarly, but means print an error message
-     and run the debugger if that is enabled.  */
-  if (EQ (handlers, Qerror))
-    return Qt;
-
-  for (h = handlers; CONSP (h); h = XCDR (h))
-    {
-      Lisp_Object handler = XCAR (h);
-      if (!NILP (Fmemq (handler, conditions))
-          /* t is also used as a catch-all by Lisp code.  */
-          || EQ (handler, Qt))
-	return handlers;
-    }
-
-  return Qnil;
-}
-
 
 /* Format and return a string; called like vprintf.  */
 Lisp_Object
