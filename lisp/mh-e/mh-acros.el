@@ -73,26 +73,6 @@ Otherwise, create macro NAME with ARG-LIST and BODY."
 ;;; Miscellaneous
 
 ;;;###mh-autoload
-(defmacro mh-make-local-hook (hook)
-  "Make HOOK local if needed.
-XEmacs and versions of GNU Emacs before 21.1 require
-`make-local-hook' to be called."
-  (declare (obsolete nil "29.1"))
-  (when (and (fboundp 'make-local-hook)
-             (not (get 'make-local-hook 'byte-obsolete-info)))
-    `(make-local-hook ,hook)))
-
-;;;###mh-autoload
-(defmacro mh-mark-active-p (check-transient-mark-mode-flag)
-  "If CHECK-TRANSIENT-MARK-MODE-FLAG is non-nil then check if
-variable `transient-mark-mode' is active."
-  (declare (obsolete nil "29.1"))
-  (cond ((not check-transient-mark-mode-flag)
-         'mark-active)
-        (t
-         '(and transient-mark-mode mark-active))))
-
-;;;###mh-autoload
 (defmacro with-mh-folder-updating (save-modification-flag &rest body)
   "Format is (with-mh-folder-updating (SAVE-MODIFICATION-FLAG) &body BODY).
 Execute BODY, which can modify the folder buffer without having to
