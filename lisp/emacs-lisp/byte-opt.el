@@ -1476,7 +1476,7 @@ See Info node `(elisp) Integer Basics'."
 (put 'let* 'byte-optimizer #'byte-optimize-letX)
 (defun byte-optimize-letX (form)
   (pcase form
-    ;; No bindings.
+    ;; Bindings list is empty.
     (`(,_ () . ,body)
      `(progn . ,body))
 
@@ -1486,7 +1486,7 @@ See Info node `(elisp) Integer Basics'."
          `(progn ,@(mapcar #'cadr bindings) ,const)
        `(,head ,(butlast bindings) ,(cadar (last bindings)) ,const)))
 
-    ;; Body is last variable.
+    ;; Body does nothing but return the last variable in bindings.
     (`(,head ,(and bindings
                    (let last-var (caar (last bindings))))
              ,(and last-var             ; non-linear pattern
