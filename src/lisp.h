@@ -3605,7 +3605,6 @@ extern void syms_of_syntax (void);
 
 /* Defined in fns.c.  */
 enum { NEXT_ALMOST_PRIME_LIMIT = 11 };
-extern ptrdiff_t list_length (Lisp_Object);
 extern EMACS_INT next_almost_prime (EMACS_INT) ATTRIBUTE_CONST;
 extern Lisp_Object larger_vector (Lisp_Object, ptrdiff_t, ptrdiff_t);
 extern bool sweep_weak_table (struct Lisp_Hash_Table *, bool);
@@ -3803,11 +3802,29 @@ mark_automatic_object (Lisp_Object obj)
 }
 
 extern void with_flushed_stack (void (*func) (void *arg), void *arg);
-extern void maybe_garbage_collect (void);
 extern bool garbage_collect (void);
 extern Lisp_Object zero_vector;
 extern Lisp_Object Vmemory_full;
 extern PER_THREAD EMACS_INT bytes_since_gc;
+extern EMACS_INT bytes_between_gc;
+
+INLINE bool
+q_garbage_collect (void)
+{
+  return ! NILP (Vmemory_full)
+    || bytes_since_gc >= bytes_between_gc;
+}
+
+#ifdef HAVE_GCC_TLS
+extern void maybe_garbage_collect (void);
+#else
+INLINE void
+maybe_garbage_collect (void)
+{
+  if (q_garbage_collect ())
+    garbage_collect ();
+}
+#endif
 
 extern Lisp_Object list1 (Lisp_Object);
 extern Lisp_Object list2 (Lisp_Object, Lisp_Object);
@@ -4193,8 +4210,6 @@ extern void syms_of_module (void);
 /* Defined in thread.c.  */
 extern void mark_threads (void);
 extern void unmark_main_thread (void);
-extern void check_eval_depth (Lisp_Object);
-extern void pop_lisp_frame (union specbinding *, Lisp_Object *, specpdl_ref);
 
 /* Defined in editfns.c.  */
 extern void insert1 (Lisp_Object);
@@ -5090,6 +5105,43 @@ struct for_each_tail_internal
   for ((list_var) = (head_var);						\
        (CONSP (list_var) && ((value_var) = XCDR (XCAR (list_var)), true)); \
        (list_var) = XCDR (list_var))
+
+INLINE ptrdiff_t
+list_length (Lisp_Object list)
+{
+  intptr_t i = 0;
+  FOR_EACH_TAIL (list)
+    ++i;
+  CHECK_LIST_END (list, list);
+  return i;
+}
+
+INLINE void
+check_eval_depth (Lisp_Object error_symbol)
+{
+  /* Floor of 100 from 1991 Blandy Initial Revision.  */
+  if (++lisp_eval_depth > max (max_lisp_eval_depth, 100))
+    {
+      Lisp_Object depth = make_fixnum (lisp_eval_depth);
+      /* Avoid recursively triggering this same overflow ex post mortem.  */
+      lisp_eval_depth = 0;
+      if (EQ (error_symbol, Qexcessive_lisp_nesting))
+	xsignal1 (error_symbol, depth);
+      else
+	xsignal0 (error_symbol);
+    }
+}
+
+INLINE void
+pop_lisp_frame (union specbinding *frame, Lisp_Object *val, specpdl_ref sa_count)
+{
+  --lisp_eval_depth;
+  if (backtrace_debug_on_exit (frame))
+    *val = call_debugger (list2 (Qexit, *val));
+  if (specpdl_ref_valid_p (sa_count))
+    safe_free (sa_count);
+  --specpdl_ptr;
+}
 
 /* Simplified version of 'define-error' that works with pure
    objects.  */

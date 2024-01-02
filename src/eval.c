@@ -2136,7 +2136,16 @@ eval_form (Lisp_Object form)
   Lisp_Object result = form;
   if (SYMBOLP (form))
     {
-      Lisp_Object lexbind = Fassq (form, current_thread->lexical_environment);
+      // avoid Fassq overhead
+      Lisp_Object lexbind = Qnil, tail = current_thread->lexical_environment;
+      FOR_EACH_TAIL (tail)
+	{
+	  if (CONSP (XCAR (tail)) && EQ (XCAR (XCAR (tail)), form))
+	    {
+	      lexbind = XCAR (tail);
+	      break;
+	    }
+	}
       result = ! NILP (lexbind) ? XCDR (lexbind) : Fsymbol_value (form);
     }
   else if (CONSP (form))
@@ -2937,7 +2946,9 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
   eassert (! SUBR_NATIVE_COMPILEDP (fun)
 	   || SUBR_NATIVE_COMPILED_DYNP (fun));
  funcall_lambda_return:
-  return unbind_to (count,
+#define UNBIND_TO(COUNT, VALUE) \
+  ((specpdl_ptr == specpdl_ref_to_ptr (COUNT)) ? VALUE : unbind_to (COUNT, VALUE));
+  return UNBIND_TO (count,
 		    CONSP (fun)
 		    ? Fprogn (XCDR (XCDR (fun)))
 		    : SUBR_NATIVE_COMPILEDP (fun)
@@ -2947,6 +2958,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 		    ? fetch_and_exec_byte_code (fun, 0, 0, NULL)
 		    : fetch_and_exec_byte_code (fun, args_template,
 						nargs, arg_vector));
+#undef UNBIND_TO
 }
 
 DEFUN ("func-arity", Ffunc_arity, Sfunc_arity, 1, 1, 0,

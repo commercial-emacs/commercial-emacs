@@ -105,21 +105,6 @@ See Info node `(elisp)Random Numbers' for more details.  */)
   return make_ufixnum (get_random ());
 }
 
-/* Random data-structure functions.  */
-
-/* Return LIST's length.  Signal an error if LIST is not a proper list.  */
-
-ptrdiff_t
-list_length (Lisp_Object list)
-{
-  intptr_t i = 0;
-  FOR_EACH_TAIL (list)
-    i++;
-  CHECK_LIST_END (list, list);
-  return i;
-}
-
-
 DEFUN ("length", Flength, Slength, 1, 1, 0,
        doc: /* Return the length of vector, list or string SEQUENCE.
 A byte-code function object is also allowed.

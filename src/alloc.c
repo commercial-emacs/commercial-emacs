@@ -117,7 +117,7 @@ static sem_t sem_main_halted, sem_main_resumed, sem_nonmain_halted, sem_nonmain_
 #endif
 Lisp_Object Vmemory_full;
 PER_THREAD EMACS_INT bytes_since_gc;
-static EMACS_INT bytes_between_gc;
+EMACS_INT bytes_between_gc;
 static bool gc_inhibited;
 
 /* Last recorded live and free-list counts.  */
@@ -4577,20 +4577,11 @@ mark_stack_push (Lisp_Object *value)
   return mark_stack_push_n (value, 1);
 }
 
-static inline bool
-q_garbage_collect (void)
-{
-  return ! NILP (Vmemory_full)
-    || bytes_since_gc >= bytes_between_gc;
-}
-
+/* This gets called up the wazoo.  If you can inline this, you must.  */
+#ifdef HAVE_GCC_TLS
 void
 maybe_garbage_collect (void)
 {
-#ifndef HAVE_GCC_TLS
-  if (q_garbage_collect ())
-    garbage_collect ();
-#else /* HAVE_GCC_TLS */
   if (main_thread_p (current_thread))
     {
       if (q_garbage_collect ())
@@ -4650,8 +4641,8 @@ maybe_garbage_collect (void)
 	    sem_post (&sem_main_resumed); /* home free */
 	}
     }
-#endif /* ! HAVE_GCC_TLS */
 }
+#endif /* HAVE_GCC_TLS */
 
 /* Subroutine of Fgarbage_collect that does most of the work.  */
 
