@@ -1,5 +1,5 @@
 /* Call a Lisp function interactively.
-   Copyright (C) 1985-1986, 1993-1995, 1997, 2000-2023 Free Software
+   Copyright (C) 1985-1986, 1993-1995, 1997, 2000-2024 Free Software
    Foundation, Inc.
 
 This file is NOT part of GNU Emacs.

@@ -1,6 +1,6 @@
 /* xfaces.c -- "Face" primitives.
 
-Copyright (C) 1993-1994, 1998-2023 Free Software Foundation, Inc.
+Copyright (C) 1993-1994, 1998-2024 Free Software Foundation, Inc.
 
 This file is NOT part of GNU Emacs.
 

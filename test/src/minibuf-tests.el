@@ -1,6 +1,6 @@
 ;;; minibuf-tests.el --- tests for minibuf.c functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 2016-2023 Free Software Foundation, Inc.
+;; Copyright (C) 2016-2024 Free Software Foundation, Inc.
 
 ;; This file is NOT part of GNU Emacs.
 

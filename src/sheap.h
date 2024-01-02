@@ -1,6 +1,6 @@
 /* Static heap allocation for GNU Emacs.
 
-Copyright 2016-2023 Free Software Foundation, Inc.
+Copyright 2016-2024 Free Software Foundation, Inc.
 
 This file is NOT part of GNU Emacs.
 

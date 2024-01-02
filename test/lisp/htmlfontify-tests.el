@@ -1,6 +1,6 @@
 ;;; htmlfontify-tests.el --- Test suite. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2015-2023 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2024 Free Software Foundation, Inc.
 
 ;; This file is NOT part of GNU Emacs.
 

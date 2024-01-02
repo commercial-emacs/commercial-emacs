@@ -1,6 +1,6 @@
 ;;; cal-french-tests.el --- tests for cal-french.el  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2021-2023 Free Software Foundation, Inc.
+;; Copyright (C) 2021-2024 Free Software Foundation, Inc.
 
 ;; This file is NOT part of GNU Emacs.
 

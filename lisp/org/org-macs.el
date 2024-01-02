@@ -1,6 +1,6 @@
 ;;; org-macs.el --- Top-level Definitions for Org -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2004-2023 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2024 Free Software Foundation, Inc.
 
 ;; Author: Carsten Dominik <carsten.dominik@gmail.com>
 ;; Keywords: outlines, hypermedia, calendar, text
@@ -56,8 +56,8 @@ by `package-activate-all').")
   ;; `org-assert-version' calls would fail using strict
   ;; `org-git-version' check because the generated Org version strings
   ;; will not match.
-  `(unless (or org--inhibit-version-check (equal (org-release) ,(org-release)))
-     (warn "Org version mismatch.  Org loading aborted.
+  `(unless (or ,org--inhibit-version-check (equal (org-release) ,(org-release)))
+     (warn "Org version mismatch.
 This warning usually appears when a built-in Org version is loaded
 prior to the more recent Org version.
 
