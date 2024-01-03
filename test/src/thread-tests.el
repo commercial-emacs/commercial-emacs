@@ -32,7 +32,7 @@
 (declare-function current-thread "thread.c" ())
 (declare-function make-condition-variable "thread.c" (mutex &optional name))
 (declare-function make-mutex "thread.c" (&optional name))
-(declare-function make-thread "thread.c" (function &optional name))
+(declare-function make-thread "thread.c" (function &optional name noncooperative))
 (declare-function mutex-lock "thread.c" (mutex))
 (declare-function mutex-unlock "thread.c" (mutex))
 (declare-function thread--blocker "thread.c" (thread))
@@ -43,13 +43,13 @@
 (declare-function thread-signal "thread.c" (thread error-symbol data))
 (declare-function thread-yield "thread.c" ())
 (defvar main-thread)
-(defvar-local threads-test-bug48990 "global")
+(defvar-local thread-test-bug48990 "global")
 
-(defclass threads-test-channel ()
+(defclass thread-test-channel ()
   ((condition :initarg :condition)
    (msg-queue :initarg :msg-queue)))
 
-(cl-defmethod threads-test-channel-send ((channel threads-test-channel) message)
+(cl-defmethod thread-test-channel-send ((channel thread-test-channel) message)
   (with-slots (condition msg-queue) channel
     (with-mutex (condition-mutex condition)
       (while (<= (ring-size msg-queue) (ring-length msg-queue))
@@ -57,7 +57,7 @@
       (ring-insert msg-queue message)
       (condition-notify condition t))))
 
-(cl-defmethod threads-test-channel-recv ((channel threads-test-channel))
+(cl-defmethod thread-test-channel-recv ((channel thread-test-channel))
   (with-slots (condition msg-queue) channel
     (with-mutex (condition-mutex condition)
       (while (ring-empty-p msg-queue)
@@ -102,31 +102,31 @@
   (skip-unless (featurep 'threads))
   (should (eq main-thread (car (all-threads)))))
 
-(defvar threads-test-global nil)
+(defvar thread-test-global nil)
 
-(defun threads-test-thread1 ()
-  (setq threads-test-global 23))
+(defun thread-test-thread1 ()
+  (setq thread-test-global 23))
 
 (ert-deftest threads-basic ()
   "Basic thread test."
   (skip-unless (featurep 'threads))
   (should
    (progn
-     (setq threads-test-global nil)
-     (make-thread #'threads-test-thread1)
-     (while (not threads-test-global)
+     (setq thread-test-global nil)
+     (make-thread #'thread-test-thread1)
+     (while (not thread-test-global)
        (thread-yield))
-     threads-test-global)))
+     thread-test-global)))
 
 (ert-deftest threads-join ()
   "Test of `thread-join'."
   (skip-unless (featurep 'threads))
   (should
    (progn
-     (setq threads-test-global nil)
-     (let ((thread (make-thread #'threads-test-thread1)))
+     (setq thread-test-global nil)
+     (let ((thread (make-thread #'thread-test-thread1)))
        (and (= (thread-join thread) 23)
-            (= threads-test-global 23)
+            (= thread-test-global 23)
             (not (thread-live-p thread)))))))
 
 (ert-deftest threads-join-self ()
@@ -143,24 +143,24 @@
       (thread-yield))
     (should-error (thread-join thread))))
 
-(defvar threads-test-binding nil)
+(defvar thread-test-binding nil)
 
-(defun threads-test-thread2 ()
-  (let ((threads-test-binding 23))
+(defun thread-test-thread2 ()
+  (let ((thread-test-binding 23))
     (thread-yield))
-  (setq threads-test-global 23))
+  (setq thread-test-global 23))
 
 (ert-deftest threads-let-binding ()
   "Simple test of threads and let bindings."
   (skip-unless (featurep 'threads))
   (should
    (progn
-     (setq threads-test-global nil)
-     (make-thread #'threads-test-thread2)
-     (while (not threads-test-global)
+     (setq thread-test-global nil)
+     (make-thread #'thread-test-thread2)
+     (while (not thread-test-global)
        (thread-yield))
-     (and (not threads-test-binding)
-	  threads-test-global))))
+     (and (not thread-test-binding)
+	  thread-test-global))))
 
 (ert-deftest threads-mutexp ()
   "Simple test of `mutexp'."
@@ -200,7 +200,7 @@
 (defvar threads-mutex nil)
 (defvar threads-mutex-key nil)
 
-(defun threads-test-mlock ()
+(defun thread-test-mlock ()
   (mutex-lock threads-mutex)
   (setq threads-mutex-key 23)
   (while threads-mutex-key
@@ -214,7 +214,7 @@
    (progn
      (setq threads-mutex (make-mutex))
      (setq threads-mutex-key nil)
-     (make-thread #'threads-test-mlock)
+     (make-thread #'thread-test-mlock)
      ;; Wait for other thread to get the lock.
      (while (not threads-mutex-key)
        (thread-yield))
@@ -224,7 +224,7 @@
      (mutex-unlock threads-mutex)
      t)))
 
-(defun threads-test-mlock2 ()
+(defun thread-test-mlock2 ()
   (setq threads-mutex-key 23)
   (mutex-lock threads-mutex))
 
@@ -236,7 +236,7 @@
      (setq threads-mutex (make-mutex))
      (setq threads-mutex-key nil)
      (mutex-lock threads-mutex)
-     (let ((thr (make-thread #'threads-test-mlock2)))
+     (let ((thr (make-thread #'thread-test-mlock2)))
        (while (not threads-mutex-key)
 	 (thread-yield))
        (thread-signal thr 'quit nil)
@@ -245,19 +245,19 @@
            (thread-join thr)
          (quit (signal 'error nil)))))))
 
-(defun threads-test-io-switch ()
-  (setq threads-test-global 23))
+(defun thread-test-io-switch ()
+  (setq thread-test-global 23))
 
 (ert-deftest threads-io-switch ()
   "Test that `accept-process-output' causes thread switch."
   (skip-unless (featurep 'threads))
   (should
    (progn
-     (setq threads-test-global nil)
-     (make-thread #'threads-test-io-switch)
-     (while (not threads-test-global)
+     (setq thread-test-global nil)
+     (make-thread #'thread-test-io-switch)
+     (while (not thread-test-global)
        (accept-process-output nil 1))
-     threads-test-global)))
+     thread-test-global)))
 
 (ert-deftest threads-condvarp ()
   "Simple test of `condition-variable-p'."
@@ -366,7 +366,7 @@
 
 (defvar threads-condvar nil)
 
-(defun threads-test-condvar-wait ()
+(defun thread-test-condvar-wait ()
   ;; Wait for condvar to be notified.
   (with-mutex (condition-mutex threads-condvar)
     (condition-wait threads-condvar))
@@ -384,7 +384,7 @@
     (while (> (length (all-threads)) 1)
       (thread-yield))
     (setq threads-condvar (make-condition-variable cv-mutex))
-    (setq new-thread (make-thread #'threads-test-condvar-wait))
+    (setq new-thread (make-thread #'thread-test-condvar-wait))
 
     ;; Make sure new-thread is alive.
     (should (thread-live-p new-thread))
@@ -411,12 +411,12 @@
     (should (= (length (all-threads)) 1))
     (should (equal (thread-last-error) '(error "Die, die, die!")))))
 
-(ert-deftest threads-test-bug33073 ()
+(ert-deftest thread-test-bug33073 ()
   (skip-unless (featurep 'threads))
   (let ((th (make-thread 'ignore)))
     (should-not (equal th main-thread))))
 
-(ert-deftest threads-test-bug48990 ()
+(ert-deftest thread-test-bug48990 ()
   "Bug#48990 shows buffer-local and global variables getting clobbered.
 Fixed in b8460fc by transplanting the `backtrace-eval` logic into the context switch
 code, the former having already summited that peak."
@@ -432,16 +432,16 @@ code, the former having already summited that peak."
                                              do (accept-process-output nil 0.2))
                                     (should-not (thread-last-error))
                                     (should (= success i))
-                                    (should (equal threads-test-bug48990
+                                    (should (equal thread-test-bug48990
                                                    (format "local-%d" (1- i))))))
-                      (setq threads-test-bug48990 (format "local-%d" i))
-                      (should (equal threads-test-bug48990 (format "local-%d" i)))
+                      (setq thread-test-bug48990 (format "local-%d" i))
+                      (should (equal thread-test-bug48990 (format "local-%d" i)))
                       (make-thread
                        (lambda ()
                          (let ((body (lambda ()
-                                       (let ((threads-test-bug48990 "let"))
+                                       (let ((thread-test-bug48990 "let"))
                                          (sleep-for (1+ (random 2)))
-                                         (when (equal threads-test-bug48990 "let")
+                                         (when (equal thread-test-bug48990 "let")
                                            (cl-incf success)))))
                                (b (concat "*buffer-" (thread-name (current-thread)) "*")))
                            (unwind-protect
@@ -453,11 +453,11 @@ code, the former having already summited that peak."
                                (when (buffer-live-p b)
                                  (kill-buffer b))))))
                        (format "%d" i)))))
-                (should (equal threads-test-bug48990 "global")))))
+                (should (equal thread-test-bug48990 "global")))))
     (doit t)
     (doit nil)))
 
-(ert-deftest threads-test-bug36609-signal ()
+(ert-deftest thread-test-bug36609-signal ()
   "Would only fail under TEST_INTERACTIVE=yes, and not every time.
 The failure manifests only by being unable to exit the interactive emacs."
   (skip-unless (featurep 'threads))
@@ -489,7 +489,7 @@ The failure manifests only by being unable to exit the interactive emacs."
            do (accept-process-output nil 0.2)
            finally (should (zerop (1- (length (all-threads)))))))
 
-(ert-deftest threads-test-glib-lock ()
+(ert-deftest thread-test-glib-lock ()
   "Would only fail under TEST_INTERACTIVE=yes, and not every time.
 The failure manifests only by being unable to exit the interactive emacs."
   (skip-unless (featurep 'threads))
@@ -503,22 +503,22 @@ The failure manifests only by being unable to exit the interactive emacs."
     (let* ((n 3)
            (capacity 1)
            (channel (make-instance
-                     'threads-test-channel
+                     'thread-test-channel
                      :condition (make-condition-variable (make-mutex) "channel")
                      :msg-queue (make-ring capacity))))
       (dotimes (i n)
         (let ((send-name (format "send-%d" (1+ i)))
 	      (recv-name (format "recv-%d" (- n i))))
           (run-thread send-name
-		      (lambda () (threads-test-channel-send channel 42)))
+		      (lambda () (thread-test-channel-send channel 42)))
           (run-thread recv-name
-		      (lambda () (threads-test-channel-recv channel)))))))
+		      (lambda () (thread-test-channel-recv channel)))))))
   (cl-loop repeat 50
            until (zerop (1- (length (all-threads))))
            do (accept-process-output nil 0.2)
            finally (should (zerop (1- (length (all-threads)))))))
 
-(ert-deftest threads-test-promiscuous-process ()
+(ert-deftest thread-test-promiscuous-process ()
   "Hold to Tromey's seemingly arbitrary 2012 edict outlawing
 `accept-process-output' of a process started by another thread."
   (skip-unless (featurep 'threads))
@@ -528,7 +528,7 @@ The failure manifests only by being unable to exit the interactive emacs."
          (start-proc (lambda (n b)
                        (apply #'start-process n b "cat" (split-string "/dev/urandom"))))
          (n 3))
-    (funcall start-proc "threads-tests-main" (car buffers))
+    (funcall start-proc "thread-tests-main" (car buffers))
     (dotimes (i (1- n))
       (push (get-buffer-create (format "thread-tests-%d" i) t) buffers)
       (make-thread (apply-partially start-proc
@@ -563,7 +563,7 @@ The failure manifests only by being unable to exit the interactive emacs."
     (mapc (lambda (b) (kill-buffer b)) buffers))
   (should-not (thread-last-error)))
 
-(ert-deftest threads-test-catch-throw ()
+(ert-deftest thread-test-catch-throw ()
   "051da60 is supposed to make this work."
   (skip-unless (featurep 'threads))
   (let (timed-out)
@@ -574,7 +574,7 @@ The failure manifests only by being unable to exit the interactive emacs."
              do (accept-process-output nil 0.3)
              finally (should timed-out))))
 
-(ert-deftest threads-test-backgrounded-buffers-still-killable ()
+(ert-deftest thread-test-backgrounded-buffers-still-killable ()
   "0e2d256 is supposed to make this work (Bug#65095)."
   (skip-unless (featurep 'threads))
   (let (buf)
@@ -582,5 +582,24 @@ The failure manifests only by being unable to exit the interactive emacs."
       (setq buf (current-buffer))
       (make-thread (lambda ())))
     (should-not (buffer-live-p buf))))
+
+(ert-deftest thread-test-trivial-multithread ()
+  (skip-unless (featurep 'threads))
+  (skip-unless (cl-search "enable-multithreading" system-configuration-options))
+  (let (results)
+    (dotimes (k 4)
+      (make-thread
+       (lambda ()
+         (cl-loop with n = 249597825381677
+                  for divisor from 2 upto (truncate (sqrt n))
+                  when (zerop (% n divisor))
+                  return (push (format "t%d %d = %d(%d)"
+                                       k n divisor (/ n divisor))
+                               results)))
+       nil :multi))
+    (while (> (length (all-threads)) 1) (sleep-for 1))
+    (mapc (lambda (y) (princ (format "%s\n" y) #'external-debugging-output))
+          results)
+    (should (= (length results) 4))))
 
 ;;; thread-tests.el ends here
