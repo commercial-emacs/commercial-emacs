@@ -796,7 +796,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	    else
 	      val = funcall_general (original_fun, call_nargs, call_args);
 
-	    pop_lisp_frame (specpdl_ptr - 1, &val, make_invalid_specpdl_ref ());
+	    pop_eval_frame (specpdl_ptr - 1, &val, make_invalid_specpdl_ref ());
 	    TOP = val;
 	    NEXT;
 	  }
@@ -864,7 +864,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	    if (saved_top)
 	      {
 		Lisp_Object val = TOP;
-		pop_lisp_frame (specpdl_ptr - 1, &val, make_invalid_specpdl_ref ());
+		pop_eval_frame (specpdl_ptr - 1, &val, make_invalid_specpdl_ref ());
 
 		top = saved_top;
 		pc = bc->fp->saved_pc;

@@ -4577,8 +4577,8 @@ mark_stack_push (Lisp_Object *value)
   return mark_stack_push_n (value, 1);
 }
 
-/* This gets called up the wazoo.  If you can inline this, you must.  */
 #ifdef HAVE_GCC_TLS
+/* Nonmain threads are currently allowed to blow up.  */
 void
 maybe_garbage_collect (void)
 {
@@ -4651,6 +4651,10 @@ garbage_collect (void)
 {
   static struct timespec gc_elapsed = { 0, 0 };
   specpdl_ref count = SPECPDL_INDEX ();
+
+#ifdef HAVE_GCC_TLS
+  reap_threads (); // as good a place for this as any
+#endif
 
   if (gc_inhibited)
     return false;

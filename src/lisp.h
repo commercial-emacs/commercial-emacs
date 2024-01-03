@@ -3270,30 +3270,25 @@ extern bool volatile pending_signals;
 extern void process_pending_signals (void);
 extern void process_quit (void);
 
-/* Someone decided this inlined layer of indirection was worth it
-   to save a call-stack push that directly calling process_quit() or
-   process_pending_signals() would incur.
-
-   In the same way user code manually invokes redisplay(), we rely on
+/* In the same way user code manually invokes redisplay(), we rely on
    programmers to liberally sprinkle maybe_quit calls (particularly
-   within long-running loops), and to determine when such calls are
-   safe.
+   within long-running loops).
+
+   Given the high frequency of eval_form() calls, we aggressively
+   avoid call-stack pushes to process_quit() and
+   process_pending_signals().
 */
 
 INLINE void
 maybe_quit (void)
 {
-#ifdef HAVE_GCC_TLS
-  reap_threads ();
-#endif
   if (QUITP)
     process_quit ();
   else if (pending_signals)
     process_pending_signals ();
 }
 
-/* Process a quit only once per USHRT_MAX + 1 times for efficiency
-   reasons.  */
+/* Process a quit only once per USHRT_MAX + 1 times else time suck.  */
 
 INLINE void
 rarely_quit (unsigned short int count)
@@ -5133,7 +5128,7 @@ check_eval_depth (Lisp_Object error_symbol)
 }
 
 INLINE void
-pop_lisp_frame (union specbinding *frame, Lisp_Object *val, specpdl_ref sa_count)
+pop_eval_frame (union specbinding *frame, Lisp_Object *val, specpdl_ref sa_count)
 {
   --lisp_eval_depth;
   if (backtrace_debug_on_exit (frame))

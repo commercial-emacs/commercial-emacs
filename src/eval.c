@@ -2127,7 +2127,8 @@ populate_evaluated_args (Lisp_Object args,
   CHECK_LIST_END (tail, args);
 }
 
-/* Evaluate FORM within prevailing lexical scope.  */
+/* Evaluate non-byte-compiled FORM within prevailing lexical
+   scope.  */
 
 Lisp_Object
 eval_form (Lisp_Object form)
@@ -2136,7 +2137,7 @@ eval_form (Lisp_Object form)
   Lisp_Object result = form;
   if (SYMBOLP (form))
     {
-      // avoid Fassq overhead
+      /* avoid Fassq overhead */
       Lisp_Object lexbind = Qnil, tail = current_thread->lexical_environment;
       FOR_EACH_TAIL (tail)
 	{
@@ -2153,7 +2154,6 @@ eval_form (Lisp_Object form)
       check_eval_depth (Qexcessive_lisp_nesting);
       maybe_quit ();
       maybe_garbage_collect ();
-
       Lisp_Object original_fun = XCAR (form);
       Lisp_Object args = XCDR (form);
       CHECK_LIST (args);
@@ -2319,8 +2319,7 @@ eval_form (Lisp_Object form)
 	  SAFE_FREE ();
 	  xsignal1 (Qinvalid_function, original_fun);
 	}
-
-      pop_lisp_frame (specpdl_ref_to_ptr (count), &result, sa_count); /* SAFE_FREEs */
+      pop_eval_frame (specpdl_ref_to_ptr (count), &result, sa_count); /* SAFE_FREEs */
     }
   return result;
 }
@@ -2711,7 +2710,7 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
     do_debug_on_call (Qlambda, count);
 
   Lisp_Object val = funcall_general (args[0], nargs - 1, args + 1);
-  pop_lisp_frame (specpdl_ref_to_ptr (count), &val, make_invalid_specpdl_ref ());
+  pop_eval_frame (specpdl_ref_to_ptr (count), &val, make_invalid_specpdl_ref ());
   return val;
 }
 
@@ -2946,19 +2945,17 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
   eassert (! SUBR_NATIVE_COMPILEDP (fun)
 	   || SUBR_NATIVE_COMPILED_DYNP (fun));
  funcall_lambda_return:
-#define UNBIND_TO(COUNT, VALUE) \
-  ((specpdl_ptr == specpdl_ref_to_ptr (COUNT)) ? VALUE : unbind_to (COUNT, VALUE));
-  return UNBIND_TO (count,
-		    CONSP (fun)
-		    ? Fprogn (XCDR (XCDR (fun)))
-		    : SUBR_NATIVE_COMPILEDP (fun)
-		    /* save call to funcall_subr since 0 args by construction */
-		    ? XSUBR (fun)->function.a0 ()
-		    : args_template < 0
-		    ? fetch_and_exec_byte_code (fun, 0, 0, NULL)
-		    : fetch_and_exec_byte_code (fun, args_template,
-						nargs, arg_vector));
-#undef UNBIND_TO
+  Lisp_Object retval
+    = CONSP (fun)
+    ? Fprogn (XCDR (XCDR (fun)))
+    : SUBR_NATIVE_COMPILEDP (fun)
+    /* save call to funcall_subr since 0 args by construction */
+    ? XSUBR (fun)->function.a0 ()
+    : args_template < 0
+    ? fetch_and_exec_byte_code (fun, 0, 0, NULL)
+    : fetch_and_exec_byte_code (fun, args_template, nargs, arg_vector);
+  return specpdl_ptr == specpdl_ref_to_ptr (count)
+    ? retval : unbind_to (count, retval);
 }
 
 DEFUN ("func-arity", Ffunc_arity, Sfunc_arity, 1, 1, 0,
@@ -3442,11 +3439,11 @@ unbind_to (specpdl_ref count, Lisp_Object value)
 	case SPECPDL_LET_BLV:
 	  {
 	    Lisp_Object symbol = specpdl_symbol (specpdl_ptr);
-	    Lisp_Object value = specpdl_value (specpdl_ptr);
+	    Lisp_Object val = specpdl_value (specpdl_ptr);
 	    Lisp_Object where = specpdl_buffer (specpdl_ptr);
 	    eassert (BUFFERP (where));
 	    if (! NILP (Flocal_variable_p (symbol, where)))
-	      set_internal (symbol, value, where, SET_INTERNAL_UNBIND);
+	      set_internal (symbol, val, where, SET_INTERNAL_UNBIND);
 	  }
 	  break;
 	default:
