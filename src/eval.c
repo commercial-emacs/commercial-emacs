@@ -422,6 +422,24 @@ usage: (prog1 FIRST BODY...)  */)
   return val;
 }
 
+/* Avoid Fassq overhead.  */
+
+static inline Lisp_Object
+find_lexbind (struct thread_state *thr, Lisp_Object sym)
+{
+  CHECK_SYMBOL (sym);
+  Lisp_Object lexbind = Qnil, tail = thr->lexical_environment;
+  FOR_EACH_TAIL (tail)
+    {
+      if (CONSP (XCAR (tail)) && EQ (XCAR (XCAR (tail)), sym))
+	{
+	  lexbind = XCAR (tail);
+	  break;
+	}
+    }
+  return lexbind;
+}
+
 DEFUN ("setq", Fsetq, Ssetq, 0, UNEVALLED, 0,
        doc: /* Set each SYM to the value of its VAL.
 The symbols SYM are variables; they are literal (not evaluated).
@@ -444,7 +462,7 @@ usage: (setq [SYM VAL]...)  */)
       tail = XCDR (tail);
       val = eval_form (arg);
       Lisp_Object lexbind = SYMBOLP (sym)
-	? Fassq (sym, current_thread->lexical_environment)
+	? find_lexbind (current_thread, sym)
 	: Qnil;
       if (! NILP (lexbind))
 	XSETCDR (lexbind, val); /* SYM lexically bound.  */
@@ -2137,16 +2155,7 @@ eval_form (Lisp_Object form)
   Lisp_Object result = form;
   if (SYMBOLP (form))
     {
-      /* avoid Fassq overhead */
-      Lisp_Object lexbind = Qnil, tail = current_thread->lexical_environment;
-      FOR_EACH_TAIL (tail)
-	{
-	  if (CONSP (XCAR (tail)) && EQ (XCAR (XCAR (tail)), form))
-	    {
-	      lexbind = XCAR (tail);
-	      break;
-	    }
-	}
+      Lisp_Object lexbind = find_lexbind (current_thread, form);
       result = ! NILP (lexbind) ? XCDR (lexbind) : Fsymbol_value (form);
     }
   else if (CONSP (form))
