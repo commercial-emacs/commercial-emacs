@@ -2153,7 +2153,10 @@ eval_form (Lisp_Object form)
     {
       check_eval_depth (Qexcessive_lisp_nesting);
       maybe_quit ();
+      // temporary ifndef
+#ifndef HAVE_GCC_TLS
       maybe_garbage_collect ();
+#endif
       Lisp_Object original_fun = XCAR (form);
       Lisp_Object args = XCDR (form);
       CHECK_LIST (args);

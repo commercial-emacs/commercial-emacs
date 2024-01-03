@@ -413,7 +413,7 @@ run_timers (void)
 static void
 handle_alarm_signal (int sig)
 {
-  pending_signals = 1;
+  pending_signals = true;
 }
 
 #ifdef HAVE_TIMERFD

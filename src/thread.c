@@ -674,6 +674,7 @@ reap_threads (void)
 static void
 await_reap (struct thread_state *thr)
 {
+  pending_signals = true; // main thread may never see this
   eassert (! main_thread_p (thr));
 #ifdef HAVE_GCC_TLS
   sem_post (&sem_reapees);

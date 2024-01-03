@@ -7206,6 +7206,9 @@ process_pending_signals (void)
   if (pending_signals)
     {
       pending_signals = false;
+#ifdef HAVE_GCC_TLS
+      reap_threads ();
+#endif
       handle_async_input ();
       do_pending_atimers ();
     }
