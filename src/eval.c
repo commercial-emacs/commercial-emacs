@@ -2956,9 +2956,9 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 
   eassert (! SUBR_NATIVE_COMPILEDP (fun)
 	   || SUBR_NATIVE_COMPILED_DYNP (fun));
+  Lisp_Object retval;
  funcall_lambda_return:
-  Lisp_Object retval
-    = CONSP (fun)
+  retval = CONSP (fun)
     ? Fprogn (XCDR (XCDR (fun)))
     : SUBR_NATIVE_COMPILEDP (fun)
     /* save call to funcall_subr since 0 args by construction */
