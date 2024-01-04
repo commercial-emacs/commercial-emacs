@@ -3149,7 +3149,7 @@ anim_prune_animation_cache (Lisp_Object clear)
     {
       struct anim_cache *cache = *pcache;
       if (EQ (clear, Qt)
-	  || (EQ (clear, Qnil) && timespec_cmp (old, cache->update_time) > 0)
+	  || (NILP (clear) && timespec_cmp (old, cache->update_time) > 0)
 	  || EQ (clear, cache->spec))
 	{
 	  if (cache->handle)
@@ -3862,7 +3862,7 @@ slurp_image (Lisp_Object filename, ptrdiff_t *size, const char *image_type)
   char *result = slurp_file (fd, size);
   if (result == NULL)
     image_error ("Error loading %s image `%s'",
-		 make_unibyte_string (image_type, strlen (image_type)),
+		 build_unibyte_string (image_type),
 		 file);
   return result;
 }
