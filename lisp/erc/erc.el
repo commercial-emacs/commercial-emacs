@@ -1690,7 +1690,7 @@ Defaults to the server buffer."
 (defconst erc-default-server "irc.libera.chat"
   "IRC server to use if it cannot be detected otherwise.")
 
-(defconst erc-default-port 6667
+(defvar erc-default-port 6667
   "IRC port to use if it cannot be detected otherwise.")
 
 (defconst erc-default-port-tls 6697
