@@ -1099,6 +1099,11 @@ chat buffers use by default.
 *** New command 'customize-dirlocals'.
 This command pops up a buffer to edit the settings in ".dir-locals.el".
 
+** IELM
+
+---
+*** IELM now remembers input history between sessions.
+
 
 * New Modes and Packages in Emacs 30.1
 

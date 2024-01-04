@@ -152,6 +152,10 @@ This variable is buffer-local.")
 \\[describe-mode] for help.\n"
   "Message to display when IELM is started.")
 
+(defvar ielm--history-file-name
+  (locate-user-emacs-file "ielm-history.el")
+  "Name of the file to read/write IELM input history.")
+
 (defvaralias 'inferior-emacs-lisp-mode-map 'ielm-map)
 (defvar-keymap ielm-map
   :doc "Keymap for IELM mode."
@@ -605,6 +609,11 @@ Customized bindings may be defined in `ielm-map', which currently contains:
             #'ielm-indirect-setup-hook 'append t)
   (setq comint-indirect-setup-function #'emacs-lisp-mode)
 
+  ;; Input history
+  (setq-local comint-input-ring-file-name ielm--history-file-name)
+  (setq-local kill-buffer-hook #'comint-write-input-ring)
+  (comint-read-input-ring t)
+
   ;; A dummy process to keep comint happy. It will never get any input
   (unless (comint-check-proc (current-buffer))
     ;; Was cat, but on non-Unix platforms that might not exist, so
@@ -630,6 +639,9 @@ Customized bindings may be defined in `ielm-map', which currently contains:
     (comint-output-filter (ielm-process) ielm-prompt-internal)
     (set-marker comint-last-input-start (ielm-pm))
     (set-process-filter (get-buffer-process (current-buffer)) 'comint-output-filter)))
+
+(unless noninteractive
+  (add-hook 'kill-emacs-hook #'comint-write-input-ring))
 
 (defun ielm-get-old-input nil
   ;; Return the previous input surrounding point
