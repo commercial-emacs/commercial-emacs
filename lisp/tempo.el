@@ -198,6 +198,10 @@ This is an abnormal hook where the functions are called with one argument
 (defvar-local tempo-region-start (make-marker)
   "Region start when inserting around the region.")
 
+;; Insertion by the template at the region start position should move
+;; the marker to preserve the original region contents.
+(set-marker-insertion-type tempo-region-start t)
+
 (defvar-local tempo-region-stop (make-marker)
   "Region stop when inserting around the region.")
 
@@ -333,7 +337,8 @@ possible."
     (`(r> . ,rest) (if on-region
                        (progn
                          (goto-char tempo-region-stop)
-                         (indent-region (mark) (point) nil))
+                         (indent-region tempo-region-start
+                                        tempo-region-stop))
                        (tempo-insert-prompt-compat rest)))
     (`(s ,name) (tempo-insert-named name))
     (`(l . ,rest) (dolist (elt rest) (tempo-insert elt on-region)))
@@ -344,7 +349,7 @@ possible."
     ('r> (if on-region
 	     (progn
 	       (goto-char tempo-region-stop)
-	       (indent-region (mark) (point) nil))
+	       (indent-region tempo-region-start tempo-region-stop))
 	   (tempo-insert-mark (point-marker))))
     ('> (indent-according-to-mode))
     ('& (if (not (or (= (current-column) 0)
