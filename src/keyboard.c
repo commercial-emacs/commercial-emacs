@@ -7720,7 +7720,7 @@ menu_item_eval_property_1 (Lisp_Object arg)
 {
   /* If we got a quit from within the menu computation,
      quit all the way out of it.  This takes care of C-] in the debugger.  */
-  if (signal_quit_p (arg))
+  if (CONSP (arg) && signal_quit_p (XCAR (arg)))
     quit ();
 
   return Qnil;

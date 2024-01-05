@@ -218,6 +218,7 @@ void
 init_eval_once (void)
 {
   /* Don't forget to update docs (lispref node "Eval").  */
+  max_lisp_eval_depth = 1600;
   Vrun_hooks = Qnil;
   pdumper_do_now_and_after_load (init_eval_once_for_pdumper);
 }
@@ -1760,22 +1761,21 @@ skip_debugger (Lisp_Object conditions, Lisp_Object data)
   return 0;
 }
 
-/* Say whether SIGNAL is a `quit' error (or inherits from it).  */
+/* Say whether SIGNAL is a `quit' symbol (or inherits from it).  */
 bool
-signal_quit_p (Lisp_Object error)
+signal_quit_p (Lisp_Object signal)
 {
-  Lisp_Object signal = CONSP (error) ? XCAR (error) : Qnil;
   Lisp_Object list;
 
   return EQ (signal, Qquit)
-    || (SYMBOLP (signal)
+    || (!NILP (Fsymbolp (signal))
 	&& CONSP (list = Fget (signal, Qerror_conditions))
 	&& !NILP (Fmemq (Qquit, list)));
 }
 
 /* Call the debugger if calling it is currently enabled for CONDITIONS.  */
 static bool
-maybe_call_debugger (Lisp_Object conditions, Lisp_Object error)
+maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig, Lisp_Object data)
 {
   Lisp_Object combined_data = Fcons (sig, data);
 
@@ -1785,15 +1785,15 @@ maybe_call_debugger (Lisp_Object conditions, Lisp_Object error)
       ! input_blocked_p ()
       && NILP (Vinhibit_debugger)
       /* Does user want to enter debugger for this kind of error?  */
-      && (signal_quit_p (error)
+      && (signal_quit_p (sig)
 	  ? debug_on_quit
 	  : wants_debugger (Vdebug_on_error, conditions))
-      && ! skip_debugger (conditions, error)
+      && ! skip_debugger (conditions, combined_data)
       /* See commentary on definition of
          `internal-when-entered-debugger'.  */
       && when_entered_debugger < num_nonmacro_input_events)
     {
-      call_debugger (list2 (Qerror, error));
+      call_debugger (list2 (Qerror, combined_data));
       return 1;
     }
 
@@ -3929,7 +3929,6 @@ clearing `quit-flag' before clearing `inhibit-quit'.  */);
   DEFSYM (QCdocumentation, ":documentation");
   DEFSYM (Qdebug, "debug");
   DEFSYM (Qdebug_early, "debug-early");
-  DEFSYM (Qdebug_early__handler, "debug-early--handler");
 
   DEFVAR_LISP ("inhibit-debugger", Vinhibit_debugger,
 	       doc: /* Non-nil means never enter the debugger.
@@ -4074,7 +4073,6 @@ Don't set this unless you're sure that can't happen.  */);
   defsubr (&Sthrow);
   defsubr (&Sunwind_protect);
   defsubr (&Scondition_case);
-  defsubr (&Shandler_bind_1);
   DEFSYM (QCsuccess, ":success");
   defsubr (&Ssignal);
   defsubr (&Scommandp);

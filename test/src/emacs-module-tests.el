@@ -114,14 +114,15 @@ changes."
 
 (ert-deftest mod-test-non-local-exit-signal-test ()
   (should-error (mod-test-signal))
-  (let (handler-err backtrace)
+  (let (debugger-args backtrace)
     (should-error
-     (handler-bind
-         ((error (lambda (err)
-                   (setq handler-err err
-                         backtrace (with-output-to-string (backtrace))))))
+     (let ((debugger (lambda (&rest args)
+                       (setq debugger-args args
+                             backtrace (with-output-to-string (backtrace)))
+                       (cl-incf num-nonmacro-input-events)))
+           (debug-on-signal t))
        (mod-test-signal)))
-    (should (equal handler-err '(error . 56)))
+    (should (equal debugger-args '(error (error . 56))))
     (should (string-match-p
              (rx bol "  mod-test-signal()" eol)
              backtrace))))
