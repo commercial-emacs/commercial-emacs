@@ -3036,7 +3036,16 @@ and overlay is highlighted between MK and END-MK."
       (cancel-timer next-error-highlight-timer))
   (remove-hook 'pre-command-hook
 	       #'compilation-goto-locus-delete-o))
-
+
+(defun compilation--expand-fn (directory filename)
+  "Expand FILENAME or resolve its true name.
+Unlike `expand-file-name', `file-truename' follows symlinks, which
+we try to avoid if possible."
+  (let* ((expandedname (expand-file-name filename directory)))
+    (if (file-exists-p expandedname)
+        expandedname
+      (file-truename (file-name-concat directory filename)))))
+
 (defun compilation-find-file-1 (marker filename directory &optional formats)
   (or formats (setq formats '("%s")))
   (let ((dirs compilation-search-path)
@@ -3057,8 +3066,8 @@ and overlay is highlighted between MK and END-MK."
             fmts formats)
       ;; For each directory, try each format string.
       (while (and fmts (null buffer))
-        (setq name (file-truename
-                    (file-name-concat thisdir (format (car fmts) filename)))
+        (setq name (compilation--expand-fn thisdir
+                                           (format (car fmts) filename))
               buffer (and (file-exists-p name)
                           (find-file-noselect name))
               fmts (cdr fmts)))
@@ -3080,8 +3089,8 @@ and overlay is highlighted between MK and END-MK."
         (setq thisdir (car dirs)
               fmts formats)
         (while (and fmts (null buffer))
-          (setq name (file-truename
-                      (file-name-concat thisdir (format (car fmts) filename)))
+          (setq name (compilation--expand-fn thisdir
+                                             (format (car fmts) filename))
                 buffer (and (file-exists-p name)
                             (find-file-noselect name))
                 fmts (cdr fmts)))
@@ -3141,8 +3150,7 @@ attempts to find a file whose name is produced by (format FMT FILENAME)."
               (ding) (sit-for 2))
              ((and (file-directory-p name)
                    (not (file-exists-p
-                         (setq name (file-truename
-                                     (file-name-concat name filename))))))
+                         (setq name (compilation--expand-fn name filename)))))
               (message "No `%s' in directory %s" filename origname)
               (ding) (sit-for 2))
              (t
