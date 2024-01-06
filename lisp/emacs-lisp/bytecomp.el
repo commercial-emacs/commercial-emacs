@@ -2546,7 +2546,7 @@ list that represents a doc string reference.
 
 (defun byte-compile-preprocess (form)
   (let ((form* (macroexpand-all form byte-compile-macro-environment)))
-    (cconv-closure-convert form* byte-compile-bound-variables)))
+    (cconv-closure-convert form*)))
 
 ;; byte-hunk-handlers can call this.
 (defun byte-compile-file-form (form)
@@ -2951,8 +2951,8 @@ If FORM is a lambda or a macro, compile into a function."
 	       (byte-compile-warn "repeated variable %s in lambda-list" arg))
 	      (t
 	       (when (and lexical-binding
-	                  (cconv--not-lexical-var-p
-	                   arg byte-compile-bound-variables)
+                          (let ((cconv--dynvars-at-large byte-compile-bound-variables))
+	                    (cconv--dynvar-p arg))
 	                  (byte-compile-warning-enabled-p 'lexical arg))
 	         (byte-compile-warn
 	          "Lexical argument shadows the dynamic variable %S"
@@ -4689,7 +4689,8 @@ Return non-nil if the TOS value was popped."
   ;; The mix of lexical and dynamic bindings mean that we may have to
   ;; juggle things on the stack, to move them to TOS for
   ;; dynamic binding.
-  (if (not (cconv--not-lexical-var-p var byte-compile-bound-variables))
+  (if (not (let ((cconv--dynvars-at-large byte-compile-bound-variables))
+	     (cconv--dynvar-p var)))
       ;; VAR is a simple stack-allocated lexical variable.
       (progn (push (assq var init-lexenv)
                    byte-compile--lexical-environment)

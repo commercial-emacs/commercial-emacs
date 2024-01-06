@@ -2371,7 +2371,7 @@ can do the job."
                      sym))
                ;; Big ugly hack, so we output a warning only during
                ;; byte-compilation, and so we can use
-               ;; byte-compile-not-lexical-var-p to silence the warning
+               ;; cconv--dynvar-p to silence the warning
                ;; when a defvar has been seen but not yet executed.
                (warnfun (lambda ()
                           ;; FIXME: We should also emit a warning for let-bound

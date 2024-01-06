@@ -838,6 +838,35 @@ DEFUN ("internal-make-var-non-special", Fmake_var_non_special,
   return Qnil;
 }
 
+static inline Lisp_Object
+thread_symbol (Lisp_Object symbol)
+{
+#ifdef HAVE_GCC_TLS
+  if (! NILP (current_thread->obarray))
+    {
+      Lisp_Object name = SYMBOL_NAME (symbol);
+      struct Lisp_Symbol *xsymbol = XSYMBOL (symbol);
+      eassert (! main_thread_p (current_thread));
+      Lisp_Object thread_symbol = Fintern (name, current_thread->obarray);
+      if (! EQ (symbol, thread_symbol))
+	{
+	  symbol = thread_symbol;
+	  XSYMBOL (symbol)->u.s.type = xsymbol->u.s.type;
+	  XSYMBOL (symbol)->u.s.trapped_write = xsymbol->u.s.trapped_write;
+	  XSYMBOL (symbol)->u.s.declared_special = xsymbol->u.s.declared_special;
+	  XSYMBOL (symbol)->u.s.val = xsymbol->u.s.val;
+	  XSYMBOL (symbol)->u.s.function = xsymbol->u.s.function;
+	  XSYMBOL (symbol)->u.s.plist = xsymbol->u.s.plist;
+	  XSYMBOL (symbol)->u.s.buffer_local_only = xsymbol->u.s.buffer_local_only;
+	  XSYMBOL (symbol)->u.s.buffer_local_default = xsymbol->u.s.buffer_local_default;
+	  XSYMBOL (symbol)->u.s.c_variable = xsymbol->u.s.c_variable;
+	  XSYMBOL (symbol)->u.s.buffer_local_buffer = xsymbol->u.s.buffer_local_buffer;
+	}
+    }
+#endif
+  return symbol;
+}
+
 static void
 let_bind (Lisp_Object prevailing_env, Lisp_Object var, Lisp_Object val, bool *q_pushed)
 {
@@ -856,7 +885,8 @@ let_bind (Lisp_Object prevailing_env, Lisp_Object var, Lisp_Object val, bool *q_
 	  *q_pushed = true;
 	  record_lexical_environment ();
 	}
-      current_thread->lexical_environment = Fcons (Fcons (var, val), current_thread->lexical_environment);
+      current_thread->lexical_environment
+	= Fcons (Fcons (var, val), current_thread->lexical_environment);
     }
   else
     {
@@ -2832,10 +2862,9 @@ fetch_and_exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
   return exec_byte_code (fun, args_template, nargs, args);
 }
 
-/* Apply a Lisp function FUN to the NARGS evaluated arguments in ARG_VECTOR
-   and return the result of evaluation.
-   FUN must be either a lambda-expression, a compiled-code object,
-   or a module function.  */
+/* Return the result of applying FUN to NARGS number of evaluated
+   arguments in ARG_VECTOR.  FUN is one of a lambda-expression, a
+   compiled-code object, or a module function.  */
 
 static Lisp_Object
 funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
@@ -2868,7 +2897,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
     {
       if (EQ (XCAR (fun), Qclosure))
 	{
-	  Lisp_Object cdr = XCDR (fun);	/* Drop `closure`.  */
+	  Lisp_Object cdr = XCDR (fun);	/* Drop 'closure.  */
 	  if (! CONSP (cdr))
 	    xsignal1 (Qinvalid_function, fun);
 	  fun = cdr;
@@ -3161,25 +3190,8 @@ specbind (Lisp_Object argsym, Lisp_Object value)
     }
 
 #ifdef HAVE_GCC_TLS
-  if (! NILP (current_thread->obarray))
-    {
-      Lisp_Object name = SYMBOL_NAME (symbol);
-      eassert (! main_thread_p (current_thread));
-      symbol = Fintern_soft (name, current_thread->obarray);
-      if (NILP (symbol))
-	symbol = Fintern (name, current_thread->obarray);
-      XSYMBOL (symbol)->u.s.type = xsymbol->u.s.type;
-      XSYMBOL (symbol)->u.s.trapped_write = xsymbol->u.s.trapped_write;
-      XSYMBOL (symbol)->u.s.declared_special = xsymbol->u.s.declared_special;
-      XSYMBOL (symbol)->u.s.val = xsymbol->u.s.val;
-      XSYMBOL (symbol)->u.s.function = xsymbol->u.s.function;
-      XSYMBOL (symbol)->u.s.plist = xsymbol->u.s.plist;
-      XSYMBOL (symbol)->u.s.buffer_local_only = xsymbol->u.s.buffer_local_only;
-      XSYMBOL (symbol)->u.s.buffer_local_default = xsymbol->u.s.buffer_local_default;
-      XSYMBOL (symbol)->u.s.c_variable = xsymbol->u.s.c_variable;
-      XSYMBOL (symbol)->u.s.buffer_local_buffer = xsymbol->u.s.buffer_local_buffer;
-      xsymbol = XSYMBOL (symbol);
-    }
+  symbol = thread_symbol (symbol);
+  xsymbol = XSYMBOL (symbol);
 #endif
 
   /* First, push old value onto let-stack.  Unintuitively, its KIND
