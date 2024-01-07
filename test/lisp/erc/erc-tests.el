@@ -1297,6 +1297,14 @@
     (should-not erc-debug-irc-protocol)))
 
 (ert-deftest erc--split-line ()
+  (let ((erc-split-line-length 0))
+    (should (equal (erc--split-line "") '("")))
+    (should (equal (erc--split-line " ") '(" ")))
+    (should (equal (erc--split-line "1") '("1")))
+    (should (equal (erc--split-line " 1") '(" 1")))
+    (should (equal (erc--split-line "1 ") '("1 ")))
+    (should (equal (erc--split-line "abc") '("abc"))))
+
   (let ((erc-default-recipients '("#chan"))
         (erc-split-line-length 10))
     (should (equal (erc--split-line "") '("")))
@@ -3177,6 +3185,7 @@
   (should (eq (erc--find-group 'autojoin) 'erc-autojoin))
   (should (eq (erc--find-group 'pcomplete 'Completion) 'erc-pcomplete))
   (should (eq (erc--find-group 'capab-identify) 'erc-capab))
+  (should (eq (erc--find-group 'completion) 'erc-pcomplete))
   ;; No group specified.
   (should (eq (erc--find-group 'smiley nil) 'erc))
   (should (eq (erc--find-group 'unmorse nil) 'erc)))
@@ -3524,6 +3533,20 @@ connection."
   (should (equal (erc-retrieve-catalog-entry 's221) "test-top 221 val"))
 
   (makunbound (intern "erc-message-test-top-s221"))
-  (unintern "erc-message-test-top-s221" obarray))
+  (unintern "erc-message-test-top-s221" obarray)
+
+  ;; Inheritance.
+  (let ((obarray (obarray-make)))
+    (set (intern "erc-message-test1-abc") "val test1 abc")
+    (set (intern "erc-message-test2-abc") "val test2 abc")
+    (set (intern "erc-message-test2-def") "val test2 def")
+    (put (intern "test0") 'erc--base-format-catalog (intern "test1"))
+    (put (intern "test1") 'erc--base-format-catalog (intern "test2"))
+    (should (equal (erc-retrieve-catalog-entry 'abc (intern "test0"))
+                   "val test1 abc"))
+    (should (equal (erc-retrieve-catalog-entry 'def (intern "test0"))
+                   "val test2 def"))
+    ;; Terminates.
+    (should-not (erc-retrieve-catalog-entry 'ghi (intern "test0")))))
 
 ;;; erc-tests.el ends here

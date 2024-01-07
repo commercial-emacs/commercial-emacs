@@ -7820,7 +7820,7 @@ When all lines are empty, remove all but the first."
   "Partition non-command input into lines of protocol-compliant length."
   ;; Prior to ERC 5.6, line splitting used to be predicated on
   ;; `erc-flood-protect' being non-nil.
-  (unless (erc--input-split-cmdp state)
+  (unless (or (zerop erc-split-line-length) (erc--input-split-cmdp state))
     (setf (erc--input-split-lines state)
           (mapcan #'erc--split-line (erc--input-split-lines state)))))
 
@@ -7877,12 +7877,13 @@ queue.  Expect LINES-OBJ to be an `erc--input-split' object."
     (user-error "Multiline command detected" ))
   lines-obj)
 
-(cl-defmethod erc--send-input-lines (lines-obj)
+(defun erc--send-input-lines (lines-obj)
   "Send lines in `erc--input-split-lines' object LINES-OBJ."
   (when (erc--input-split-sendp lines-obj)
     (dolist (line (erc--input-split-lines lines-obj))
       (when (erc--input-split-insertp lines-obj)
-        (if (functionp (erc--input-split-insertp lines-obj))
+        (if (eq (erc--input-split-insertp lines-obj)
+                'erc--command-indicator-display)
             (funcall (erc--input-split-insertp lines-obj) line)
           (erc-display-msg line)))
       (erc-process-input-line (concat line "\n")
@@ -9318,6 +9319,12 @@ if yet untried."
   (unless catalog (setq catalog erc-current-message-catalog))
   (symbol-value
    (or (erc--make-message-variable-name catalog key 'softp)
+       (let ((parent catalog)
+             last)
+         (while (and (setq parent (get parent 'erc--base-format-catalog))
+                     (not (setq last (erc--make-message-variable-name
+                                      parent key 'softp)))))
+         last)
        (let ((default (default-toplevel-value 'erc-current-message-catalog)))
          (or (and (not (eq default catalog))
                   (erc--make-message-variable-name default key 'softp))
