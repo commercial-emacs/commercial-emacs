@@ -1370,7 +1370,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 	result = CONSP (pair)
 	  ? XCDR (pair) : xsymbol->u.s.buffer_local_default;
 	if (b == current_buffer)
-	  switch_buffer_local_context (xsymbol, b); /* see header.  */
+	  switch_buffer_local_context (xsymbol, b); /* see function header */
       }
       break;
     case SYMBOL_FORWARDED:

@@ -52,7 +52,7 @@ make -C tree-sitter install
 ```bash
 ./autogen.sh
 ./configure --prefix=$HOME/.local --with-tree-sitter
-make -j4 test/src/tree-sitter-tests
+make test/src/tree-sitter-tests
 src/emacs -Q --eval \
   "(custom-set-variables '(font-lock-support-mode 'tree-sitter-lock-mode))" \
   --visit src/xdisp.c
