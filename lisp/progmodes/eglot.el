@@ -3590,17 +3590,16 @@ edit proposed by the server."
 
 (defun eglot--code-action-bounds ()
   "Calculate appropriate bounds depending on region and point."
-  (let (diags boftap)
+  (let (diags)
     (cond ((use-region-p) `(,(region-beginning) ,(region-end)))
           ((setq diags (flymake-diagnostics (point)))
            (cl-loop for d in diags
                     minimizing (flymake-diagnostic-beg d) into beg
                     maximizing (flymake-diagnostic-end d) into end
                     finally (cl-return (list beg end))))
-          ((setq boftap (bounds-of-thing-at-point 'sexp))
-           (list (car boftap) (cdr boftap)))
           (t
-           (list (point) (point))))))
+           (let ((boftap (bounds-of-thing-at-point 'sexp)))
+             (list (car boftap) (cdr boftap)))))))
 
 (defun eglot-code-actions (beg &optional end action-kind interactive)
   "Find LSP code actions of type ACTION-KIND between BEG and END.
