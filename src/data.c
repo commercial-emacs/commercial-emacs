@@ -1369,7 +1369,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
   switch (xsymbol->u.s.type)
     {
     case SYMBOL_VARALIAS:
-      xsymbol = SYMBOL_ALIAS (xsymbol);
+      main_xsymbol = xsymbol = SYMBOL_ALIAS (xsymbol);
       XSETSYMBOL (symbol, xsymbol);
       goto start;
       break;
