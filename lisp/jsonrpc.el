@@ -703,7 +703,9 @@ originated."
                                    (if id (format " (id:%s)" id) "")
                                    (if error " ERROR" "")
                                    (current-time-string)
-                                   (pp-to-string message))))
+				   (let ((lisp-indent-function ;bug#68072
+                                          #'lisp-indent-function))
+                                     (pp-to-string message)))))
                   (when error
                     (setq msg (propertize msg 'face 'error)))
                   (insert-before-markers msg))
