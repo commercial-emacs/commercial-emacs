@@ -20,11 +20,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
-/* Work around GCC bug 113253.  */
-#if 13 <= __GNUC__
-# pragma GCC diagnostic ignored "-Wanalyzer-deref-before-check"
-#endif
-
 #include "lisp.h"
 #include "character.h"
 #include "buffer.h"
