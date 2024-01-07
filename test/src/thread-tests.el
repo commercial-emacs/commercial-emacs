@@ -377,6 +377,7 @@
 (ert-deftest threads-condvar-wait ()
   "Test waiting on conditional variable."
   (skip-unless (featurep 'threads))
+  (skip-when (and (eq system-type 'darwin) (getenv "GITHUB_ACTIONS")))
   (let ((cv-mutex (make-mutex))
         new-thread)
     ;; We could have spurious threads from the previous tests still
