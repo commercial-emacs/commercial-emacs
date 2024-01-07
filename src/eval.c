@@ -842,9 +842,7 @@ static inline Lisp_Object
 thread_symbol (Lisp_Object symbol)
 {
 #ifdef HAVE_GCC_TLS
-  if (! NILP (current_thread->obarray)
-      // sucks; jit_read() needs symbols to eq
-      && XSYMBOL (symbol)->u.s.type != SYMBOL_LOCAL_SOMEWHERE)
+  if (! NILP (current_thread->obarray))
     {
       Lisp_Object name = SYMBOL_NAME (symbol);
       struct Lisp_Symbol *xsymbol = XSYMBOL (symbol);

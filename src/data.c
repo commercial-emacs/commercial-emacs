@@ -1335,21 +1335,33 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 {
   Lisp_Object result = Qunbound;
   Lisp_Object symbol = make_lisp_ptr (xsymbol, Lisp_Symbol);
+  struct Lisp_Symbol *main_xsymbol = xsymbol;
   struct buffer *b = xbuffer ? xbuffer : current_buffer;
 
   if (! NILP (current_thread->obarray))
     {
       eassert (! main_thread_p (current_thread));
-      Lisp_Object found = oblookup (current_thread->obarray,
-				    SSDATA (xsymbol->u.s.name),
-				    SCHARS (xsymbol->u.s.name),
-				    SBYTES (xsymbol->u.s.name));
-      if (SYMBOLP (found))
+      Lisp_Object main_found = oblookup (Vobarray,
+					 SSDATA (xsymbol->u.s.name),
+					 SCHARS (xsymbol->u.s.name),
+					 SBYTES (xsymbol->u.s.name));
+      if (SYMBOLP (main_found))
 	{
-	  symbol = found;
-	  xsymbol = XSYMBOL (symbol);
-	  /* specbind() should have traversed aliases.  */
-	  eassert (xsymbol->u.s.type != SYMBOL_VARALIAS);
+	  main_xsymbol = XSYMBOL (main_found);
+	  if (main_xsymbol == xsymbol)
+	    {
+	      Lisp_Object found = oblookup (current_thread->obarray,
+					    SSDATA (xsymbol->u.s.name),
+					    SCHARS (xsymbol->u.s.name),
+					    SBYTES (xsymbol->u.s.name));
+	      if (SYMBOLP (found))
+		{
+		  symbol = found;
+		  /* specbind() should have traversed aliases.  */
+		  xsymbol = XSYMBOL (symbol);
+		  eassert (xsymbol->u.s.type != SYMBOL_VARALIAS);
+		}
+	    }
 	}
     }
 
@@ -1366,7 +1378,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
       {
-	Lisp_Object pair = jit_read (xsymbol, b);
+	Lisp_Object pair = jit_read (main_xsymbol, b);
 	result = CONSP (pair)
 	  ? XCDR (pair) : xsymbol->u.s.buffer_local_default;
 	if (b == current_buffer)
