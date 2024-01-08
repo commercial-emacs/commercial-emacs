@@ -887,8 +887,7 @@ let_bind (Lisp_Object prevailing_env, Lisp_Object var, Lisp_Object val, bool *q_
 	  record_lexical_environment ();
 	}
       current_thread->lexical_environment
-	= Fcons (Fcons (canonical_symbol (var), val),
-		 current_thread->lexical_environment);
+	= Fcons (Fcons (var, val), current_thread->lexical_environment);
     }
   else
     {
@@ -1338,7 +1337,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 	    {
 	      record_lexical_environment ();
 	      current_thread->lexical_environment
-		= Fcons (Fcons (canonical_symbol (var), result),
+		= Fcons (Fcons (var, result),
 			 current_thread->lexical_environment);
 	    }
 	  else
@@ -2968,7 +2967,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 
 	  if (! NILP (lexenv) && SYMBOLP (sym))
 	    /* Lexically bind SYM.  */
-	    lexenv = Fcons (Fcons (canonical_symbol (sym), arg), lexenv);
+	    lexenv = Fcons (Fcons (sym, arg), lexenv);
 	  else
 	    /* Dynamically bind SYM.  */
 	    specbind (sym, arg);

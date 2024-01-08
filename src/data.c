@@ -757,11 +757,6 @@ jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
 {
   Lisp_Object pair = assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
 				   BVAR (buffer, local_var_alist));
-  /* if (! strcmp (SSDATA (symbol->u.s.name), "lexical-binding") */
-  /*     && ! strcmp (SSDATA (BVAR (buffer, name)), "hisfooness") */
-  /*     && CONSP (pair)) */
-  /*   fprintf (stderr, "wtf %s\n", SSDATA (symbol->u.s.name)); */
-
   if (CONSP (pair)
       && BUFFERP (symbol->u.s.buffer_local_buffer)
       && XBUFFER (symbol->u.s.buffer_local_buffer) == buffer)
@@ -1371,12 +1366,11 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
       {
-	Lisp_Object canonical = canonical_symbol (symbol),
-	  pair = jit_read (XSYMBOL (canonical), b);
+	Lisp_Object pair = jit_read (XSYMBOL (symbol), b);
 	result = CONSP (pair)
 	  ? XCDR (pair) : xsymbol->u.s.buffer_local_default;
 	if (b == current_buffer)
-	  switch_buffer_local_context (XSYMBOL (canonical), b); /* see function header */
+	  switch_buffer_local_context (XSYMBOL (pair), b); /* see function header */
       }
       break;
     case SYMBOL_FORWARDED:

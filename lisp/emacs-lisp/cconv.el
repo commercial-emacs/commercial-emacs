@@ -562,9 +562,6 @@ FORM is the parent form that binds this var."
     (push fv cconv--fv-alist)
     (when lexical-binding
       (dolist (arg args)
-        (when (string-match-p (regexp-quote "(prin1 zooy)") (format "%s" body))
-          ;;(princ (format "0\n%s\n%s\n%s\n" lexical-binding args body) #'external-debugging-output)
-          (princ (format "0\n%s\n" arg) #'external-debugging-output))
         (cond
          ((eq ?& (aref (symbol-name arg) 0)) nil) ;Ignore &rest, &optional, ...
          (t (let ((var-struct (list arg nil nil nil nil)))
@@ -574,10 +571,6 @@ FORM is the parent form that binds this var."
 
     (dolist (form body)                   ;Analyze body forms.
       (cconv-analyze-form form new-env))
-    (when (string-match-p (regexp-quote "(prin1 zooy)") (format "%s" body))
-      ;;(princ (format "0\n%s\n%s\n%s\n" lexical-binding args body) #'external-debugging-output)
-      (princ (format "0.5\n%s\n%s\n" (car cconv--fv-alist) body) #'external-debugging-output))
-
     ;; Summarize resulting data about arguments.
     (dolist (var-data new-vars)
       (cconv--analyze-use var-data parent-form "argument"))
@@ -599,8 +592,6 @@ FORM is the parent form that binds this var."
 (defun cconv-analyze-form (form env)
   "Collate analysis results in CCONV--RESULTS.
 ENV contains entries (VAR . (READ MUTATED CAPTURED CALLED))."
-  (when (string-match-p (regexp-quote "(prin1 zooy)") (format "%s" form))
-    (princ (format "schlitz\n%s\n" (car cconv--fv-alist)) #'external-debugging-output))
   (pcase form
     (`(,(and (or 'let* 'let) letsym) ,var-vals . ,body-forms) ; let special form
      (let ((cconv--dynvars-at-large cconv--dynvars-at-large)
@@ -640,18 +631,9 @@ ENV contains entries (VAR . (READ MUTATED CAPTURED CALLED))."
      (cconv--analyze-function vrs body-forms env form))
     (`(setq ,var ,expr)
      ;; Mark mutated
-     (let (dunzo)
-       (when-let ((v (assq var env)))
-         (when (eq var 'commands)
-           (setq dunzo t))
-         (setf (nth 2 v) t))
-       (when (and nil dunzo)
-         (princ (format "2.5a\n%s\n%s\n" var env)
-                #'external-debugging-output))
-       (cconv-analyze-form expr env)
-       (when (and nil dunzo)
-         (princ (format "2.5b\n%s\n%s\n" var env)
-                #'external-debugging-output))))
+     (when-let ((v (assq var env)))
+       (setf (nth 2 v) t))
+     (cconv-analyze-form expr env))
     (`((lambda . ,_) . ,_)      ; First element is lambda expression.
      (byte-compile-warn
       "Use of deprecated ((lambda %s ...) ...) form" (nth 1 (car form)))
@@ -714,18 +696,12 @@ are subsets of LEXVARS and DYNVARS, respectively."
         cconv--dynvars-seen
         cconv--results
         cconv--fv-alist)
-    (when (member "zooy" (mapcar #'symbol-name lexvars))
-      (princ (format "2a\n%s\n" form) #'external-debugging-output)
-      (princ (format "wtf\n%s\n" cconv--fv-alist) #'external-debugging-output))
     (cconv-analyze-form
      `#'(lambda () ,form) ; requires "simple lambda" wrapper
      (mapcar (lambda (v) (list v nil nil nil nil)) lexvars))
     (setf cconv--fv-alist (nreverse cconv--fv-alist))
-    (cl-destructuring-bind (body . fvs)
+    (cl-destructuring-bind (_body . fvs)
         (cl-first cconv--fv-alist)
-      (when (member "zooy" (mapcar #'symbol-name lexvars))
-        (princ (format "2b\n%s\n%s\n" (nreverse fvs) body)
-               #'external-debugging-output))
       (cons (nreverse fvs)
             (seq-keep (lambda (var) (car (memq var dynvars)))
                       cconv--dynvars-seen)))))
