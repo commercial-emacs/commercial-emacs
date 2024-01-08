@@ -1366,11 +1366,11 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
       {
-	Lisp_Object pair = jit_read (XSYMBOL (symbol), b);
+	Lisp_Object pair = jit_read (xsymbol, b);
 	result = CONSP (pair)
 	  ? XCDR (pair) : xsymbol->u.s.buffer_local_default;
 	if (b == current_buffer)
-	  switch_buffer_local_context (XSYMBOL (pair), b); /* see function header */
+	  switch_buffer_local_context (xsymbol, b); /* see function header */
       }
       break;
     case SYMBOL_FORWARDED:
