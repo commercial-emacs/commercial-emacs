@@ -30856,7 +30856,6 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 				      dpyinfo->selection_tracking_window,
 				      selection_name,
 				      (XFixesSetSelectionOwnerNotifyMask
-				       | XFixesSetSelectionOwnerNotifyMask
 				       | XFixesSelectionClientCloseNotifyMask));
 	}
 
