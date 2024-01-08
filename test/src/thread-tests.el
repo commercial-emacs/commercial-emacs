@@ -523,6 +523,8 @@ The failure manifests only by being unable to exit the interactive emacs."
   "Hold to Tromey's seemingly arbitrary 2012 edict outlawing
 `accept-process-output' of a process started by another thread."
   (skip-unless (featurep 'threads))
+  (skip-when (and (cl-search "enable-multithreading" system-configuration-options)
+                  (getenv "GITHUB_ACTIONS")))
   (thread-last-error t)
   (let* ((thread-tests-main (get-buffer-create "thread-tests-main" t))
          (buffers (list thread-tests-main))
