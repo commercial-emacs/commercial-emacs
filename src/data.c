@@ -757,6 +757,11 @@ jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
 {
   Lisp_Object pair = assq_no_quit (make_lisp_ptr (symbol, Lisp_Symbol),
 				   BVAR (buffer, local_var_alist));
+  /* if (! strcmp (SSDATA (symbol->u.s.name), "lexical-binding") */
+  /*     && ! strcmp (SSDATA (BVAR (buffer, name)), "hisfooness") */
+  /*     && CONSP (pair)) */
+  /*   fprintf (stderr, "wtf %s\n", SSDATA (symbol->u.s.name)); */
+
   if (CONSP (pair)
       && BUFFERP (symbol->u.s.buffer_local_buffer)
       && XBUFFER (symbol->u.s.buffer_local_buffer) == buffer)
@@ -1335,33 +1340,21 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 {
   Lisp_Object result = Qunbound;
   Lisp_Object symbol = make_lisp_ptr (xsymbol, Lisp_Symbol);
-  struct Lisp_Symbol *main_xsymbol = xsymbol;
   struct buffer *b = xbuffer ? xbuffer : current_buffer;
 
   if (! NILP (current_thread->obarray))
     {
       eassert (! main_thread_p (current_thread));
-      Lisp_Object main_found = oblookup (Vobarray,
-					 SSDATA (xsymbol->u.s.name),
-					 SCHARS (xsymbol->u.s.name),
-					 SBYTES (xsymbol->u.s.name));
-      if (SYMBOLP (main_found))
+      Lisp_Object found = oblookup (current_thread->obarray,
+				    SSDATA (xsymbol->u.s.name),
+				    SCHARS (xsymbol->u.s.name),
+				    SBYTES (xsymbol->u.s.name));
+      if (SYMBOLP (found))
 	{
-	  main_xsymbol = XSYMBOL (main_found);
-	  if (main_xsymbol == xsymbol)
-	    {
-	      Lisp_Object found = oblookup (current_thread->obarray,
-					    SSDATA (xsymbol->u.s.name),
-					    SCHARS (xsymbol->u.s.name),
-					    SBYTES (xsymbol->u.s.name));
-	      if (SYMBOLP (found))
-		{
-		  symbol = found;
-		  /* specbind() should have traversed aliases.  */
-		  xsymbol = XSYMBOL (symbol);
-		  eassert (xsymbol->u.s.type != SYMBOL_VARALIAS);
-		}
-	    }
+	  symbol = found;
+	  /* specbind() should have traversed aliases.  */
+	  xsymbol = XSYMBOL (symbol);
+	  eassert (xsymbol->u.s.type != SYMBOL_VARALIAS);
 	}
     }
 
@@ -1369,7 +1362,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
   switch (xsymbol->u.s.type)
     {
     case SYMBOL_VARALIAS:
-      main_xsymbol = xsymbol = SYMBOL_ALIAS (xsymbol);
+      xsymbol = SYMBOL_ALIAS (xsymbol);
       XSETSYMBOL (symbol, xsymbol);
       goto start;
       break;
@@ -1378,11 +1371,12 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
       {
-	Lisp_Object pair = jit_read (main_xsymbol, b);
+	Lisp_Object canonical = canonical_symbol (symbol),
+	  pair = jit_read (XSYMBOL (canonical), b);
 	result = CONSP (pair)
 	  ? XCDR (pair) : xsymbol->u.s.buffer_local_default;
 	if (b == current_buffer)
-	  switch_buffer_local_context (xsymbol, b); /* see function header */
+	  switch_buffer_local_context (XSYMBOL (canonical), b); /* see function header */
       }
       break;
     case SYMBOL_FORWARDED:

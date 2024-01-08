@@ -503,8 +503,8 @@ usage: (function ARG)  */)
       && CONSP (quoted)
       && EQ (XCAR (quoted), Qlambda))
     {
-      /* A lambda expression within a lexical environment;
-	 return an interpreted closure instead of a simple lambda.  */
+      /* A lambda expression within a lexical environment.  Return an
+	 interpreted closure.  */
       Lisp_Object cdr = XCDR (quoted);
       Lisp_Object tmp = cdr;
       if (CONSP (tmp)
@@ -520,7 +520,8 @@ usage: (function ARG)  */)
 	  CHECK_STRING (docstring);
 	  cdr = Fcons (XCAR (cdr), Fcons (docstring, XCDR (XCDR (cdr))));
 	}
-      return ! NILP (Vinternal_make_interpreted_closure_function)
+      return (! NILP (Vinternal_make_interpreted_closure_function)
+	      && main_thread_p (current_thread))
 	? call2 (Vinternal_make_interpreted_closure_function,
 		 Fcons (Qlambda, cdr),
 		 current_thread->lexical_environment)
@@ -886,7 +887,8 @@ let_bind (Lisp_Object prevailing_env, Lisp_Object var, Lisp_Object val, bool *q_
 	  record_lexical_environment ();
 	}
       current_thread->lexical_environment
-	= Fcons (Fcons (var, val), current_thread->lexical_environment);
+	= Fcons (Fcons (canonical_symbol (var), val),
+		 current_thread->lexical_environment);
     }
   else
     {
@@ -1336,7 +1338,8 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 	    {
 	      record_lexical_environment ();
 	      current_thread->lexical_environment
-		= Fcons (Fcons (var, result), current_thread->lexical_environment);
+		= Fcons (Fcons (canonical_symbol (var), result),
+			 current_thread->lexical_environment);
 	    }
 	  else
 	    specbind (var, result);
@@ -2965,7 +2968,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 
 	  if (! NILP (lexenv) && SYMBOLP (sym))
 	    /* Lexically bind SYM.  */
-	    lexenv = Fcons (Fcons (sym, arg), lexenv);
+	    lexenv = Fcons (Fcons (canonical_symbol (sym), arg), lexenv);
 	  else
 	    /* Dynamically bind SYM.  */
 	    specbind (sym, arg);

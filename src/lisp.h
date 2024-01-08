@@ -5138,6 +5138,18 @@ pop_eval_frame (union specbinding *frame, Lisp_Object *val, specpdl_ref sa_count
   --specpdl_ptr;
 }
 
+INLINE Lisp_Object
+canonical_symbol (Lisp_Object thread_symbol)
+{
+  CHECK_SYMBOL (thread_symbol);
+  Lisp_Object main_symbol =
+    oblookup (Vobarray,
+	      SSDATA (XSYMBOL (thread_symbol)->u.s.name),
+	      SCHARS (XSYMBOL (thread_symbol)->u.s.name),
+	      SBYTES (XSYMBOL (thread_symbol)->u.s.name));
+  return SYMBOLP (main_symbol) && 0 ? main_symbol : thread_symbol;
+}
+
 /* Simplified version of 'define-error' that works with pure
    objects.  */
 void

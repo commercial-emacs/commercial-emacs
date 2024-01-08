@@ -144,29 +144,29 @@ Recall closure conversion is a pre-compilation step.")
     (nreverse res)))
 
 (defun cconv--convert-function (args body env parent-form &optional docstring)
-  "Create a closure to only referenced those free variables used."
-  (cl-assert (equal body (caar cconv--fv-alist)))
-  (let ((used-fvs (cdr (pop cconv--fv-alist)))
-        (i 0)
-        used-formal used-body used-env)
-    ;; `nreverse' positions most closely bound variables first for OClosure.
-    (dolist (fv (nreverse used-fvs))
-      (let ((exp (or (cdr (assq fv env)) fv)))
-        (pcase exp
-          (`(car-safe ,iexp . ,_)
-           (push iexp used-formal)
-           (push `(,fv . (car-safe (internal-get-closed-var ,i))) used-env))
-          (_
-           (push exp used-formal)
-           (push `(,fv . (internal-get-closed-var ,i)) used-env))))
-      (setq i (1+ i)))
-    (setq used-formal (nreverse used-formal)
-          used-env (nreverse used-env)
-          used-body (cconv--convert-funbody args body used-env parent-form))
-    (if (or used-formal docstring)
-        `(internal-make-closure ,args ,used-formal ,docstring . ,used-body)
-      ;; No free variables - do nothing.
-      `(function (lambda ,args . ,used-body)))))
+  "Return closure referencing only those free variables used."
+  (cl-assert (equal body (car (cl-first cconv--fv-alist))))
+  (cl-destructuring-bind (body . fvs)
+      (pop cconv--fv-alist)
+    (let ((i 0) used-formal used-body used-env)
+      ;; OClosure hack: nreverse puts most closely bound variables first.
+      (dolist (fv (nreverse fvs))
+        (let ((exp (or (cdr (assq fv env)) fv)))
+          (pcase exp
+            (`(car-safe ,iexp . ,_)
+             (push iexp used-formal)
+             (push `(,fv . (car-safe (internal-get-closed-var ,i))) used-env))
+            (_
+             (push exp used-formal)
+             (push `(,fv . (internal-get-closed-var ,i)) used-env))))
+        (cl-incf i))
+      (setq used-formal (nreverse used-formal)
+            used-env (nreverse used-env)
+            used-body (cconv--convert-funbody args body used-env parent-form))
+      (if (or used-formal docstring)
+          `(internal-make-closure ,args ,used-formal ,docstring . ,used-body)
+        ;; No free variables - do nothing.
+        `(function (lambda ,args . ,used-body))))))
 
 (defun cconv--remap-llv (new-env var closed-sym)
   ;; Consider,
@@ -362,7 +362,7 @@ of variables for referencing in arbitrary scopes."
          ;; Analogous treatment for `let*` above (Bug#24171).
          (dolist (var-val new-var-vals)
            (cconv-convert--let-shadow
-            (car-safe var-val) env new-env new-extend new-var-vals)))
+             (car-safe var-val) env new-env new-extend new-var-vals)))
        `(,letsym ,(nreverse new-var-vals)
                  . ,(mapcar (lambda (form)
                               (cconv-convert
@@ -385,41 +385,42 @@ of variables for referencing in arbitrary scopes."
     (`(function (lambda ,args . ,body) . ,rest)
      (let* ((docstring (if (eq :documentation (car-safe (car body)))
                            (cconv-convert (cadr (pop body)) env extend)))
-            (bf (if (stringp (car body)) (cdr body) body))
-            (if (when (eq 'interactive (car-safe (car bf)))
-                  (gethash form cconv--interactive-form-funs)))
-            (wrapped (pcase if (`#'(lambda (&rest _cconv--dummy) .,_) t)))
-            (cif (when if (cconv-convert if env extend)))
-            (cf nil))
-       ;; TODO: Because we need to non-destructively modify body, this code
-       ;; is particularly ugly.  This should ideally be moved to
-       ;; cconv--convert-function.
-       (pcase cif
-         ('nil (setq bf nil))
+            (body-form (if (stringp (car body)) (cdr body) body))
+            (iact-form (when (eq 'interactive (car-safe (car body-form)))
+                         (gethash form cconv--interactive-form-funs)))
+            (wrapped (pcase iact-form (`#'(lambda (&rest _cconv--dummy) .,_) t)))
+            (conv-iact-form (when iact-form (cconv-convert iact-form env extend))))
+       ;; TODO: This gets ugly because we non-destructively modify body.
+       ;; This should ideally be moved to cconv--convert-function.
+       (pcase conv-iact-form
+         ('nil (setq body-form nil))
          (`#',f
-          (pcase-let ((`((,f1 . (,_ . ,f2)) . ,f3) bf))
-            (setq bf `((,f1 . (,(if wrapped (nth 2 f) cif) . ,f2)) . ,f3)))
-          (setq cif nil))
+          (pcase-let ((`((,f1 . (,_ . ,f2)) . ,f3) body-form))
+            (setq body-form `((,f1 . (,(if wrapped (nth 2 f) conv-iact-form)
+                                      . ,f2))
+                              . ,f3)))
+          (setq conv-iact-form nil))
          ;; The interactive form needs special treatment, so the form
          ;; inside the `interactive' won't be used any further.
-         (_ (pcase-let ((`((,f1 . (,_ . ,f2)) . ,f3) bf))
-              (setq bf `((,f1 . (nil . ,f2)) . ,f3)))))
-       (when bf
-         ;; If we modified bf, re-build body and form as
+         (_ (pcase-let ((`((,f1 . (,_ . ,f2)) . ,f3) body-form))
+              (setq body-form `((,f1 . (nil . ,f2)) . ,f3)))))
+       (when body-form
+         ;; If we modified BODY-FORM, rebuild BODY and FORM as
          ;; copies with the modified bits.
          (setq body (if (stringp (car body))
-                        (cons (car body) bf)
-                      bf)
+                        (cons (car body) body-form)
+                      body-form)
                form `(function (lambda ,args . ,body) . ,rest))
-         ;; Also, remove the current old entry on the alist, replacing
-         ;; it with the new one.
+         ;; And replace free variables alist entry
          (let ((entry (pop cconv--fv-alist)))
            (push (cons body (cdr entry)) cconv--fv-alist)))
-       (setq cf (cconv--convert-function args body env form docstring))
-       (if cif
-           `(cconv--interactive-helper ,cf ,(if wrapped cif `(list 'quote ,cif)))
-         ;; Normal case, the interactive form needs no special treatment.
-         cf)))
+       (let ((conv-form (cconv--convert-function args body env form docstring)))
+         (if conv-iact-form
+             `(cconv--interactive-helper
+               ,conv-form
+               ,(if wrapped conv-iact-form `(list 'quote ,conv-iact-form)))
+           ;; Normal case, the interactive form needs no special treatment.
+           conv-form))))
     (`(internal-make-closure . ,_)
      (defvar byte-compile-abort-elc)
      (prog1 nil
@@ -552,17 +553,18 @@ FORM is the parent form that binds this var."
 
 (defun cconv--analyze-function (args body env parent-form)
   (let* ((cconv--dynvars-at-large cconv--dynvars-at-large)
-         (fv (list body))
+         (fv (cons body nil)) ;(FUNBODY . (FREE-VARIABLES))
          ;; Analyze body from clean slate env to distinguish uses
          ;; inside function from uses outside of it (wtf?)
          (envcopy (mapcar (lambda (vdata) (list (car vdata) nil nil nil nil)) env))
          (new-env envcopy)
          new-vars)
-    ;; Push it before recursing, so cconv--fv-alist contains entries in
-    ;; the order they'll be used by closure-convert-rec.
     (push fv cconv--fv-alist)
     (when lexical-binding
       (dolist (arg args)
+        (when (string-match-p (regexp-quote "(prin1 zooy)") (format "%s" body))
+          ;;(princ (format "0\n%s\n%s\n%s\n" lexical-binding args body) #'external-debugging-output)
+          (princ (format "0\n%s\n" arg) #'external-debugging-output))
         (cond
          ((eq ?& (aref (symbol-name arg) 0)) nil) ;Ignore &rest, &optional, ...
          (t (let ((var-struct (list arg nil nil nil nil)))
@@ -572,6 +574,10 @@ FORM is the parent form that binds this var."
 
     (dolist (form body)                   ;Analyze body forms.
       (cconv-analyze-form form new-env))
+    (when (string-match-p (regexp-quote "(prin1 zooy)") (format "%s" body))
+      ;;(princ (format "0\n%s\n%s\n%s\n" lexical-binding args body) #'external-debugging-output)
+      (princ (format "0.5\n%s\n%s\n" (car cconv--fv-alist) body) #'external-debugging-output))
+
     ;; Summarize resulting data about arguments.
     (dolist (var-data new-vars)
       (cconv--analyze-use var-data parent-form "argument"))
@@ -579,20 +585,22 @@ FORM is the parent form that binds this var."
     ;; and compute free variables.
     (while env
       (cl-assert (and envcopy (eq (caar env) (caar envcopy))))
-      (let ((free nil)
-            (x (cdr (car env)))
-            (y (cdr (car envcopy))))
+      (let ((x (cdr (car env)))
+            (y (cdr (car envcopy)))
+            free)
         (while x
           (when (car y) (setcar x t) (setq free t))
           (setq x (cdr x) y (cdr y)))
         (when free
           (push (caar env) (cdr fv))
-          (setf (nth 3 (car env)) t))
-        (setq env (cdr env) envcopy (cdr envcopy))))))
+          (setf (nth 3 (car env)) t)))
+      (setq env (cdr env) envcopy (cdr envcopy)))))
 
 (defun cconv-analyze-form (form env)
   "Collate analysis results in CCONV--RESULTS.
 ENV contains entries (VAR . (READ MUTATED CAPTURED CALLED))."
+  (when (string-match-p (regexp-quote "(prin1 zooy)") (format "%s" form))
+    (princ (format "schlitz\n%s\n" (car cconv--fv-alist)) #'external-debugging-output))
   (pcase form
     (`(,(and (or 'let* 'let) letsym) ,var-vals . ,body-forms) ; let special form
      (let ((cconv--dynvars-at-large cconv--dynvars-at-large)
@@ -620,20 +628,30 @@ ENV contains entries (VAR . (READ MUTATED CAPTURED CALLED))."
     (`(function (lambda ,vrs . ,body-forms))
      (when (eq :documentation (car-safe (car body-forms)))
        (cconv-analyze-form (cadr (pop body-forms)) env))
-     (let ((bf (if (stringp (car body-forms)) (cdr body-forms) body-forms)))
-       (when (eq 'interactive (car-safe (car bf)))
-         (let ((if (cadr (car bf))))
-           (unless (macroexp-const-p if) ;Optimize this common case.
-             (let ((f (if (eq 'function (car-safe if)) if
-                        `#'(lambda (&rest _cconv--dummy) ,if))))
-               (setf (gethash form cconv--interactive-form-funs) f)
-               (cconv-analyze-form f env))))))
+     (let ((body-form (if (stringp (car body-forms)) (cdr body-forms) body-forms)))
+       (when (eq 'interactive (car-safe (car body-form)))
+         (let ((iact-form (cadr (car body-form))))
+           (unless (macroexp-const-p iact-form) ;Optimize this common case.
+             (let ((iact-form* (if (eq 'function (car-safe iact-form))
+                                   iact-form
+                                 `#'(lambda (&rest _cconv--dummy) ,iact-form))))
+               (setf (gethash form cconv--interactive-form-funs) iact-form*)
+               (cconv-analyze-form iact-form* env))))))
      (cconv--analyze-function vrs body-forms env form))
     (`(setq ,var ,expr)
      ;; Mark mutated
-     (when-let ((v (assq var env)))
-       (setf (nth 2 v) t))
-     (cconv-analyze-form expr env))
+     (let (dunzo)
+       (when-let ((v (assq var env)))
+         (when (eq var 'commands)
+           (setq dunzo t))
+         (setf (nth 2 v) t))
+       (when (and nil dunzo)
+         (princ (format "2.5a\n%s\n%s\n" var env)
+                #'external-debugging-output))
+       (cconv-analyze-form expr env)
+       (when (and nil dunzo)
+         (princ (format "2.5b\n%s\n%s\n" var env)
+                #'external-debugging-output))))
     (`((lambda . ,_) . ,_)      ; First element is lambda expression.
      (byte-compile-warn
       "Use of deprecated ((lambda %s ...) ...) form" (nth 1 (car form)))
@@ -696,13 +714,19 @@ are subsets of LEXVARS and DYNVARS, respectively."
         cconv--dynvars-seen
         cconv--results
         cconv--fv-alist)
+    (when (member "zooy" (mapcar #'symbol-name lexvars))
+      (princ (format "2a\n%s\n" form) #'external-debugging-output)
+      (princ (format "wtf\n%s\n" cconv--fv-alist) #'external-debugging-output))
     (cconv-analyze-form
      `#'(lambda () ,form) ; requires "simple lambda" wrapper
      (mapcar (lambda (v) (list v nil nil nil nil)) lexvars))
     (setf cconv--fv-alist (nreverse cconv--fv-alist))
-    (cl-destructuring-bind (_cconv-body . cconv-fv)
+    (cl-destructuring-bind (body . fvs)
         (cl-first cconv--fv-alist)
-      (cons (nreverse cconv-fv)
+      (when (member "zooy" (mapcar #'symbol-name lexvars))
+        (princ (format "2b\n%s\n%s\n" (nreverse fvs) body)
+               #'external-debugging-output))
+      (cons (nreverse fvs)
             (seq-keep (lambda (var) (car (memq var dynvars)))
                       cconv--dynvars-seen)))))
 
@@ -732,9 +756,10 @@ dynamically scoped plain symbols or lexically scoped (SYMBOL
                 (`#'(lambda . ,cdr) cdr)
                 (_ (cdr fun))))
              (dynvars (delq nil (mapcar (lambda (b) (when (symbolp b) b)) env)))
-             (fvs (cconv-fv expanded-form lexvars dynvars))
-             (new-env (nconc (mapcar (lambda (fv) (assq fv env)) (car fvs))
-                            (cdr fvs))))
+             (new-env
+              (cl-destructuring-bind (lexv . dynv)
+                  (cconv-fv expanded-form lexvars dynvars)
+                (nconc (mapcar (lambda (fv) (assq fv env)) lexv) dynv))))
         `(closure ,(or new-env '(t)) . ,expanded-fun-cdr)))))
 
 (provide 'cconv)

@@ -603,4 +603,21 @@ The failure manifests only by being unable to exit the interactive emacs."
           results)
     (should (= (length results) 4))))
 
+(ert-deftest thread-test-local-var-alist ()
+  "Thread obarrays bork buffer local variable lookup (460c423)."
+  (skip-unless (featurep 'threads))
+  (with-current-buffer (get-buffer-create "hisfooness")
+    (let* (check
+           (fn (lambda ()
+                 (let (commands)
+                   ;; cconv--analyze-function wouldn't see (lexical-binding . t)
+                   ;; in BVAR (buffer, local_var_alist)
+                   (mapc (lambda (zooy) (push (lambda () (push zooy check)) commands))
+                         (list 2))
+                   (dolist (fun commands)
+                     (funcall fun))))))
+      (make-thread fn)
+      (while (> (length (all-threads)) 1) (sleep-for 1))
+      (should (equal check '(2))))))
+
 ;;; thread-tests.el ends here
