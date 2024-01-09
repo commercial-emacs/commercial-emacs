@@ -521,7 +521,10 @@ usage: (function ARG)  */)
 	  cdr = Fcons (XCAR (cdr), Fcons (docstring, XCDR (XCDR (cdr))));
 	}
       return (! NILP (Vinternal_make_interpreted_closure_function)
-	      && main_thread_p (current_thread))
+#ifdef HAVE_GCC_TLS
+	      && main_thread_p (current_thread)
+#endif
+	      )
 	? call2 (Vinternal_make_interpreted_closure_function,
 		 Fcons (Qlambda, cdr),
 		 current_thread->lexical_environment)
