@@ -222,12 +222,17 @@ This is useful after manually editing the contents of the file."
 	       (member command eshell-prevent-alias-expansion))
     (let ((alias (eshell-lookup-alias command)))
       (if alias
-	  (throw 'eshell-replace-command
-		 `(let ((eshell-command-name ',eshell-last-command-name)
+          (let ((vars `((eshell-command-name ',eshell-last-command-name)
                         (eshell-command-arguments ',eshell-last-arguments)
                         (eshell-prevent-alias-expansion
-                         ',(cons command eshell-prevent-alias-expansion)))
-                    ,(eshell-parse-command (nth 1 alias))))))))
+                         ',(cons command eshell-prevent-alias-expansion)))))
+            ;; Set default-directory as it might have been set by sudo/doas, unless
+            ;; we want to change it permanently.
+            (if (not (string-prefix-p (car (split-string (nth 1 alias) " ")) "cd"))
+                (push `(default-directory ',default-directory) vars))
+	    (throw 'eshell-replace-command
+		   `(let ,vars
+                      ,(eshell-parse-command (nth 1 alias)))))))))
 
 (defun eshell-alias-completions (name)
   "Find all possible completions for NAME.
