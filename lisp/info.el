@@ -4738,8 +4738,14 @@ the variable `Info-file-list-for-emacs'."
 		(eq command 'execute-extended-command))
 	   (Info-goto-emacs-command-node
 	    (read-command "Find documentation for command: ")))
+          ((symbolp command)
+           (Info-goto-emacs-command-node command))
 	  (t
-	   (Info-goto-emacs-command-node command)))))
+	   (message
+            (substitute-command-keys
+             (format
+              "\\`%s' invokes an anonymous command defined with `lambda'"
+              (key-description key))))))))
 
 (defvar Info-link-keymap
   (let ((keymap (make-sparse-keymap)))
