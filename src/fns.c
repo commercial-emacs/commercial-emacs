@@ -4283,11 +4283,10 @@ get_key_arg (Lisp_Object key, ptrdiff_t nargs, Lisp_Object *args, char *used)
 /* Return a Lisp vector which has the same contents as VEC but has
    at least INCR_MIN more entries, where INCR_MIN is positive.
    If NITEMS_MAX is not -1, do not grow the vector to be any larger
-   than NITEMS_MAX.  New entries in the resulting vector are
-   uninitialized.  */
+   than NITEMS_MAX.  New entries in the resulting vector are nil.  */
 
-static Lisp_Object
-larger_vecalloc (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
+Lisp_Object
+larger_vector (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
 {
   struct Lisp_Vector *v;
   ptrdiff_t incr, incr_max, old_size, new_size;
@@ -4304,6 +4303,7 @@ larger_vecalloc (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
   new_size = old_size + incr;
   v = static_vector_allocator (new_size, false);
   memcpy (v->contents, XVECTOR (vec)->contents, old_size * sizeof *v->contents);
+  memclear (v->contents + old_size, (new_size - old_size) * word_size);
   XSETVECTOR (vec, v);
   return vec;
 }
@@ -4568,6 +4568,27 @@ copy_hash_table (struct Lisp_Hash_Table *h1)
 }
 
 
+/* Allocate a Lisp vector of NEW_SIZE elements.
+   Copy elements from VEC and leave the rest undefined.  */
+static Lisp_Object
+alloc_larger_vector (Lisp_Object vec, ptrdiff_t new_size)
+{
+  eassert (VECTORP (vec));
+  ptrdiff_t old_size = ASIZE (vec);
+  eassert (new_size >= old_size);
+  struct Lisp_Vector *v = allocate_vector (new_size);
+  memcpy (v->contents, XVECTOR (vec)->contents, old_size * sizeof *v->contents);
+  XSETVECTOR (vec, v);
+  return vec;
+}
+
+/* Compute index into the index vector from a hash value.  */
+static inline ptrdiff_t
+hash_index_index (struct Lisp_Hash_Table *h, Lisp_Object hash_code)
+{
+  return XUFIXNUM (hash_code) % ASIZE (h->index);
+}
+
 /* Resize hash table H if it's too full.  If H cannot be resized
    because it's already too large, throw an error.  */
 
@@ -4596,14 +4617,11 @@ maybe_resize_hash_table (struct Lisp_Hash_Table *h)
 	new_size = old_size + 1;
 
       /* Allocate all the new vectors before updating *H, to
-	 avoid problems if memory is exhausted.  larger_vecalloc
-	 finishes computing the size of the replacement vectors.  */
-      Lisp_Object next = larger_vecalloc (h->next, new_size - old_size,
-					  new_size);
-      ptrdiff_t next_size = ASIZE (next);
-      for (ptrdiff_t i = old_size; i < next_size - 1; i++)
+	 avoid problems if memory is exhausted.  */
+      Lisp_Object next = alloc_larger_vector (h->next, new_size);
+      for (ptrdiff_t i = old_size; i < new_size - 1; i++)
 	ASET (next, i, make_fixnum (i + 1));
-      ASET (next, next_size - 1, make_fixnum (-1));
+      ASET (next, new_size - 1, make_fixnum (-1));
 
       /* Build the new&larger key_and_value vector, making sure the new
          fields are initialized to `unbound`.  */
@@ -4626,8 +4644,8 @@ maybe_resize_hash_table (struct Lisp_Hash_Table *h)
       for (ptrdiff_t i = 0; i < old_size; i++)
 	if (! NILP (HASH_HASH (h, i)))
 	  {
-	    EMACS_UINT hash_code = XUFIXNUM (HASH_HASH (h, i));
-	    ptrdiff_t start_of_bucket = hash_code % ASIZE (h->index);
+	    Lisp_Object hash_code = HASH_HASH (h, i);
+	    ptrdiff_t start_of_bucket = hash_index_index (h, hash_code);
 	    set_hash_next_slot (h, i, HASH_INDEX (h, start_of_bucket));
 	    set_hash_index_slot (h, start_of_bucket, i);
 	  }
@@ -4655,8 +4673,8 @@ hash_table_rehash (Lisp_Object hash)
   for (i = 0; i < count; i++)
     {
       Lisp_Object key = HASH_KEY (h, i);
-      Lisp_Object hash_code = h->test.hashfn (key, h);
-      ptrdiff_t start_of_bucket = XUFIXNUM (hash_code) % ASIZE (h->index);
+      Lisp_Object hash_code = hash_from_key (h, key);
+      ptrdiff_t start_of_bucket = hash_index_index (h, hash_code);
       set_hash_hash_slot (h, i, hash_code);
       set_hash_next_slot (h, i, HASH_INDEX (h, start_of_bucket));
       set_hash_index_slot (h, start_of_bucket, i);
@@ -4700,15 +4718,6 @@ check_mutable_hash_table (Lisp_Object obj, struct Lisp_Hash_Table *h)
   eassert (! PURE_P (h));
 }
 
-static void
-collect_interval (INTERVAL interval, Lisp_Object collector)
-{
-  nconc2 (collector,
-	  list1(list3 (make_fixnum (interval->position),
-		       make_fixnum (interval->position + LENGTH (interval)),
-		       interval->plist)));
-}
-
 /* Put an entry into hash table H that associates KEY with VALUE.
    HASH is a previously computed hash code of KEY.
    Value is the index of the entry in H matching KEY.  */
@@ -4717,14 +4726,12 @@ ptrdiff_t
 hash_put (struct Lisp_Hash_Table *h, Lisp_Object key, Lisp_Object value,
 	  Lisp_Object hash)
 {
-  ptrdiff_t start_of_bucket, i;
-
   /* Increment count after resizing because resizing may fail.  */
   maybe_resize_hash_table (h);
   h->count++;
 
   /* Store key/value in the key_and_value vector.  */
-  i = h->next_free;
+  ptrdiff_t i = h->next_free;
   eassert (NILP (HASH_HASH (h, i)));
   eassert (EQ (Qunbound, (HASH_KEY (h, i))));
   h->next_free = HASH_NEXT (h, i);
@@ -4735,7 +4742,7 @@ hash_put (struct Lisp_Hash_Table *h, Lisp_Object key, Lisp_Object value,
   set_hash_hash_slot (h, i, hash);
 
   /* Add new entry to its collision chain.  */
-  start_of_bucket = XUFIXNUM (hash) % ASIZE (h->index);
+  ptrdiff_t start_of_bucket = hash_index_index (h, hash);
   set_hash_next_slot (h, i, HASH_INDEX (h, start_of_bucket));
   set_hash_index_slot (h, start_of_bucket, i);
   return i;
@@ -4747,8 +4754,8 @@ hash_put (struct Lisp_Hash_Table *h, Lisp_Object key, Lisp_Object value,
 void
 hash_remove_from_table (struct Lisp_Hash_Table *h, Lisp_Object key)
 {
-  Lisp_Object hash_code = h->test.hashfn (key, h);
-  ptrdiff_t start_of_bucket = XUFIXNUM (hash_code) % ASIZE (h->index);
+  Lisp_Object hash_code = hash_from_key (h, key);
+  ptrdiff_t start_of_bucket = hash_index_index (h, hash_code);
   ptrdiff_t prev = -1;
 
   for (ptrdiff_t i = HASH_INDEX (h, start_of_bucket);
@@ -4768,7 +4775,7 @@ hash_remove_from_table (struct Lisp_Hash_Table *h, Lisp_Object key)
 
 	  /* Clear slots in key_and_value and add the slots to
 	     the free list.  */
-	  set_hash_key_slot (h, i, Qunbound);
+	  set_hash_key_slot (h, i, HASH_UNUSED_ENTRY_KEY);
 	  set_hash_value_slot (h, i, Qnil);
 	  set_hash_hash_slot (h, i, Qnil);
 	  set_hash_next_slot (h, i, h->next_free);
@@ -4795,7 +4802,7 @@ hash_clear (struct Lisp_Hash_Table *h)
       for (ptrdiff_t i = 0; i < size; i++)
 	{
 	  set_hash_next_slot (h, i, i < size - 1 ? i + 1 : -1);
-	  set_hash_key_slot (h, i, Qunbound);
+	  set_hash_key_slot (h, i, HASH_UNUSED_ENTRY_KEY);
 	  set_hash_value_slot (h, i, Qnil);
 	}
 
@@ -4860,7 +4867,7 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 		  h->next_free = i;
 
 		  /* Clear key, value, and hash.  */
-		  set_hash_key_slot (h, i, Qunbound);
+		  set_hash_key_slot (h, i, HASH_UNUSED_ENTRY_KEY);
 		  set_hash_value_slot (h, i, Qnil);
                   if (! NILP (h->hash))
                     set_hash_hash_slot (h, i, Qnil);
@@ -5208,10 +5215,6 @@ in an error.
 usage: (make-hash-table &rest KEYWORD-ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object test, weak;
-  bool purecopy;
-  struct hash_table_test testdesc;
-  ptrdiff_t i;
   USE_SAFE_ALLOCA;
 
   /* The vector `used' is used to keep track of arguments that
@@ -5220,20 +5223,21 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
   memset (used, 0, nargs * sizeof *used);
 
   /* See if there's a `:test TEST' among the arguments.  */
-  i = get_key_arg (QCtest, nargs, args, used);
-  test = i ? args[i] : Qeql;
-  if (EQ (test, Qeq))
+  ptrdiff_t i = get_key_arg (QCtest, nargs, args, used);
+  Lisp_Object test = i ? args[i] : Qeql;
+  if (symbols_with_pos_enabled && SYMBOL_WITH_POS_P (test))
+    test = SYMBOL_WITH_POS_SYM (test);
+  struct hash_table_test testdesc;
+  if (BASE_EQ (test, Qeq))
     testdesc = hashtest_eq;
-  else if (EQ (test, Qeql))
+  else if (BASE_EQ (test, Qeql))
     testdesc = hashtest_eql;
-  else if (EQ (test, Qequal))
+  else if (BASE_EQ (test, Qequal))
     testdesc = hashtest_equal;
   else
     {
       /* See if it is a user-defined test.  */
-      Lisp_Object prop;
-
-      prop = Fget (test, Qhash_table_test);
+      Lisp_Object prop = Fget (test, Qhash_table_test);
       if (!CONSP (prop) || !CONSP (XCDR (prop)))
 	signal_error ("Invalid hash table test", test);
       testdesc.name = test;
@@ -5279,7 +5283,7 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
 
   /* Look for `:weakness WEAK'.  */
   i = get_key_arg (QCweakness, nargs, args, used);
-  weak = i ? args[i] : Qnil;
+  Lisp_Object weak = i ? args[i] : Qnil;
   if (EQ (weak, Qt))
     weak = Qkey_and_value;
   if (! NILP (weak)
@@ -6153,6 +6157,9 @@ syms_of_fns (void)
   defsubr (&Sremhash);
   defsubr (&Smaphash);
   defsubr (&Sdefine_hash_table_test);
+  defsubr (&Sinternal__hash_table_histogram);
+  defsubr (&Sinternal__hash_table_buckets);
+  defsubr (&Sinternal__hash_table_index_size);
   defsubr (&Sstring_search);
   defsubr (&Sobject_intervals);
   defsubr (&Sline_number_at_pos);
