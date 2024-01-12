@@ -3822,13 +3822,24 @@ purecopy_hash_table (struct Lisp_Hash_Table *table)
   struct Lisp_Hash_Table *pure = pure_alloc (sizeof *pure, 0);
   struct hash_table_test pure_test = table->test;
 
-  pure->test.name = purecopy (table->test.name);
-  pure->test.user_hash_function = purecopy (table->test.user_hash_function);
-  pure->test.user_cmp_function = purecopy (table->test.user_cmp_function);
+  /* Purecopy the hash table test.  */
+  pure_test.name = purecopy (table->test.name);
+  pure_test.user_hash_function = purecopy (table->test.user_hash_function);
+  pure_test.user_cmp_function = purecopy (table->test.user_cmp_function);
+
+  pure->header = table->header;
+  pure->weak = purecopy (Qnil);
   pure->hash = purecopy (table->hash);
   pure->next = purecopy (table->next);
   pure->index = purecopy (table->index);
+  pure->count = table->count;
+  pure->next_free = table->next_free;
+  pure->purecopy = table->purecopy;
+  eassert (!pure->mutable);
+  pure->rehash_threshold = table->rehash_threshold;
+  pure->rehash_size = table->rehash_size;
   pure->key_and_value = purecopy (table->key_and_value);
+  pure->test = pure_test;
 
   return pure;
 }

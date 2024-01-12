@@ -2113,7 +2113,7 @@ struct Lisp_Hash_Table;
 
 struct hash_table_test
 {
-  /* Function used to compare keys; always a bare symbol.  */
+  /* Name of the function used to compare keys.  */
   Lisp_Object name;
 
   /* User-supplied hash function, or nil.  */
@@ -2131,32 +2131,10 @@ struct hash_table_test
 
 struct Lisp_Hash_Table
 {
+  /* Change pdumper.c if you change the fields here.  */
+
+  /* This is for Lisp; the hash table code does not refer to it.  */
   union vectorlike_header header;
-
-  /* Hash table internal structure:
-
-     Lisp key         index                  table
-         |            vector
-         | hash fn                  hash    key   value  next
-         v             +--+       +------+-------+------+----+
-     hash value        |-1|       | C351 |  cow  | moo  | -1 |<-
-         |             +--+       +------+-------+------+----+  |
-          ------------>| -------->| 07A8 |  cat  | meow | -1 |  |
-            range      +--+       +------+-------+------+----+  |
-          reduction    |-1|     ->| 91D2 |  dog  | woof |   ----
-                       +--+    |  +------+-------+------+----+
-                       | ------   |  ?   |unbound|  ?   | -1 |<-
-                       +--+       +------+-------+------+----+  |
-                       | -------->| F6B0 | duck  |quack | -1 |  |
-                       +--+       +------+-------+------+----+  |
-                       |-1|     ->|  ?   |unbound|  ?   |   ----
-                       +--+    |  +------+-------+------+----+
-                       :  :    |  :      :       :     :    :
-                               |
-                           next_free
-
-     The table is physically split into three vectors (hash, next,
-     key_and_value) which may or may not be beneficial.  */
 
   /* Nil if table is non-weak.  Otherwise a symbol describing the
      weakness of the table.  */
@@ -2210,7 +2188,7 @@ struct Lisp_Hash_Table
 
   /* Vector of keys and values.  The key of item I is found at index
      2 * I, the value is found at index 2 * I + 1.
-     If the key is HASH_UNUSED_ENTRY_KEY, then this slot is unused.
+     If the key is equal to Qunbound, then this slot is unused.
      This is gc_marked specially if the table is weak.  */
   Lisp_Object key_and_value;
 
@@ -2225,16 +2203,6 @@ struct Lisp_Hash_Table
 
 /* Sanity-check pseudovector layout.  */
 verify (offsetof (struct Lisp_Hash_Table, weak) == header_size);
-
-/* Key value that marks an unused hash table entry.  */
-#define HASH_UNUSED_ENTRY_KEY Qunbound
-
-/* KEY is a key of an unused hash table entry.  */
-INLINE bool
-hash_unused_entry_key_p (Lisp_Object key)
-{
-  return BASE_EQ (key, HASH_UNUSED_ENTRY_KEY);
-}
 
 INLINE bool
 HASH_TABLE_P (Lisp_Object a)
@@ -2280,13 +2248,6 @@ HASH_TABLE_SIZE (const struct Lisp_Hash_Table *h)
   ptrdiff_t size = ASIZE (h->next);
   eassume (0 < size);
   return size;
-}
-
-/* Compute hash value for KEY in hash table H.  */
-INLINE Lisp_Object
-hash_from_key (struct Lisp_Hash_Table *h, Lisp_Object key)
-{
-  return h->test.hashfn (key, h);
 }
 
 void hash_table_rehash (Lisp_Object);
@@ -4187,7 +4148,7 @@ extern void init_eval (void);
 extern void syms_of_eval (void);
 extern void prog_ignore (Lisp_Object);
 extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
-extern void get_backtrace (Lisp_Object *array, ptrdiff_t size);
+extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
 extern bool locally_unbound_blv_let_bounded (struct Lisp_Symbol *symbol);
 void do_debug_on_call (Lisp_Object code, specpdl_ref count);
@@ -4748,7 +4709,6 @@ void syms_of_dbusbind (void);
 extern bool profiler_memory_running;
 extern void malloc_probe (size_t);
 extern void syms_of_profiler (void);
-extern void mark_profiler (void);
 
 /* Defined in tree-sitter.c.  */
 extern void tree_sitter_record_change (ptrdiff_t start_char,

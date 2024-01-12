@@ -3886,10 +3886,8 @@ mark_specpdl (union specbinding *first, union specbinding *ptr)
     }
 }
 
-/* Fill ARRAY of size SIZE with backtrace entries, most recent call first.
-   Truncate the backtrace if longer than SIZE; pad with nil if shorter.  */
 void
-get_backtrace (Lisp_Object *array, ptrdiff_t size)
+get_backtrace (Lisp_Object array)
 {
   union specbinding *pdl = backtrace_top (current_thread);
   /* Copy the backtrace contents into working memory.  */
