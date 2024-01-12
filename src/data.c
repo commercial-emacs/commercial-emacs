@@ -1347,8 +1347,8 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
       if (SYMBOLP (found))
 	{
 	  symbol = found;
-	  /* specbind() should have traversed aliases.  */
 	  xsymbol = XSYMBOL (symbol);
+	  /* specbind() should have traversed aliases.  */
 	  eassert (xsymbol->u.s.type != SYMBOL_VARALIAS);
 	}
     }
