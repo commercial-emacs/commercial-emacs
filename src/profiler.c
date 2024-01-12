@@ -157,7 +157,7 @@ static bool
 trace_equal (Lisp_Object *bt1, Lisp_Object *bt2, int depth)
 {
   for (int i = 0; i < depth; i++)
-    if (!BASE_EQ (bt1[i], bt2[i]) && NILP (Ffunction_equal (bt1[i], bt2[i])))
+    if (!EQ (bt1[i], bt2[i]) && NILP (Ffunction_equal (bt1[i], bt2[i])))
       return false;
   return true;
 }
@@ -171,7 +171,7 @@ trace_hash (Lisp_Object *trace, int depth)
       Lisp_Object f = trace[i];
       EMACS_UINT hash1
 	= (COMPILEDP (f) ? XHASH (AREF (f, COMPILED_BYTECODE))
-	   : (CONSP (f) && CONSP (XCDR (f)) && BASE_EQ (Qclosure, XCAR (f)))
+	   : (CONSP (f) && CONSP (XCDR (f)) && EQ (Qclosure, XCAR (f)))
 	   ? XHASH (XCDR (XCDR (f))) : XHASH (f));
       hash = sxhash_combine (hash, hash1);
     }

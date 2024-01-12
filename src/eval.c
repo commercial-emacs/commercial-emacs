@@ -3892,9 +3892,10 @@ void
 get_backtrace (Lisp_Object *array, ptrdiff_t size)
 {
   /* Copy the backtrace contents into working memory.  */
-  union specbinding *pdl = backtrace_top ();
+  union specbinding *pdl = backtrace_top (current_thread);
   ptrdiff_t i = 0;
-  for (; i < size && backtrace_valid_p (pdl); i++, pdl = backtrace_next (pdl))
+  for (; i < size && backtrace_valid_p (current_thread, pdl);
+       i++, pdl = backtrace_next (current_thread, pdl))
     array[i] = backtrace_function (pdl);
   for (; i < size; i++)
     array[i] = Qnil;

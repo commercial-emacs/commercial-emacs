@@ -4564,7 +4564,7 @@ alloc_larger_vector (Lisp_Object vec, ptrdiff_t new_size)
   eassert (VECTORP (vec));
   ptrdiff_t old_size = ASIZE (vec);
   eassert (new_size >= old_size);
-  struct Lisp_Vector *v = allocate_vector (new_size);
+  struct Lisp_Vector *v = static_vector_allocator (new_size, false);
   memcpy (v->contents, XVECTOR (vec)->contents, old_size * sizeof *v->contents);
   XSETVECTOR (vec, v);
   return vec;
@@ -5211,14 +5211,12 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
   /* See if there's a `:test TEST' among the arguments.  */
   ptrdiff_t i = get_key_arg (QCtest, nargs, args, used);
   Lisp_Object test = i ? args[i] : Qeql;
-  if (symbols_with_pos_enabled && SYMBOL_WITH_POS_P (test))
-    test = SYMBOL_WITH_POS_SYM (test);
   struct hash_table_test testdesc;
-  if (BASE_EQ (test, Qeq))
+  if (EQ (test, Qeq))
     testdesc = hashtest_eq;
-  else if (BASE_EQ (test, Qeql))
+  else if (EQ (test, Qeql))
     testdesc = hashtest_eql;
-  else if (BASE_EQ (test, Qequal))
+  else if (EQ (test, Qequal))
     testdesc = hashtest_equal;
   else
     {

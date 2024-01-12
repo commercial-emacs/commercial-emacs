@@ -2233,7 +2233,7 @@ verify (offsetof (struct Lisp_Hash_Table, weak) == header_size);
 INLINE bool
 hash_unused_entry_key_p (Lisp_Object key)
 {
-  return BASE_EQ (key, HASH_UNUSED_ENTRY_KEY);
+  return EQ (key, HASH_UNUSED_ENTRY_KEY);
 }
 
 INLINE bool
