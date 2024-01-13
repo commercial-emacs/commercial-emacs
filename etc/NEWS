@@ -1125,7 +1125,12 @@ chat buffers use by default.
 +++
 *** New command 'customize-dirlocals'.
 This command pops up a buffer to edit the settings in ".dir-locals.el".
-
+** Calc
+*** Calc parses fractions written using U+2044 FRACTION SLASH
+Fractions of the form 123⁄456 are handled as if written 123:456. Note
+in particular the difference in behavior from U+2215 DIVISION SLASH
+and U+002F SOLIDUS, which result in division rather than a rational
+fraction.
 
 * New Modes and Packages in Emacs 30.1
 

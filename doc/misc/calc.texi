@@ -10571,6 +10571,12 @@ Non-decimal fractions are entered and displayed as
 @samp{@var{radix}#@var{num}:@var{denom}} (or in the analogous three-part
 form).  The numerator and denominator always use the same radix.
 
+Fractions may also be entered with @kbd{⁄} (U+2044 FRACTION SLASH) in
+place of any @kbd{:}. Precomposed fraction characters from @kbd{½}
+(U+00BD VULGAR FRACTION ONE HALF) through @kbd{⅞} (U+215E VULGAR
+FRACTION SEVEN EIGHTHS) as supported as well. Thus @samp{2:3},
+@samp{2⁄3}, and @samp{⅔} are all equivalent.
+
 @node Floats
 @section Floats
 
