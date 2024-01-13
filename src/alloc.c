@@ -2278,6 +2278,8 @@ sweep_vectors (struct thread_state *thr)
 	  lisp_free (thr, lv);
 	}
     }
+
+  gcstat.total_hash_table_bytes = hash_table_allocated_bytes;
 }
 
 /* Maximum number of elements in a vector.  This is a macro so that it
@@ -3816,20 +3818,34 @@ make_pure_vector (ptrdiff_t len)
 static struct Lisp_Hash_Table *
 purecopy_hash_table (struct Lisp_Hash_Table *table)
 {
-  eassert (NILP (table->weak));
+  eassert (table->weakness == Weak_None);
   eassert (table->purecopy);
 
   struct Lisp_Hash_Table *pure = pure_alloc (sizeof *pure, 0);
   *pure = *table;
   pure->mutable = false;
 
-  pure->test.name = purecopy (table->test.name);
-  pure->test.user_hash_function = purecopy (table->test.user_hash_function);
-  pure->test.user_cmp_function = purecopy (table->test.user_cmp_function);
-  pure->hash = purecopy (table->hash);
-  pure->next = purecopy (table->next);
-  pure->index = purecopy (table->index);
-  pure->key_and_value = purecopy (table->key_and_value);
+  if (table->table_size > 0)
+    {
+      ptrdiff_t hash_bytes = table->table_size * sizeof *table->hash;
+      pure->hash = pure_alloc (hash_bytes, -(int)sizeof *table->hash);
+      memcpy (pure->hash, table->hash, hash_bytes);
+
+      ptrdiff_t next_bytes = table->table_size * sizeof *table->next;
+      pure->next = pure_alloc (next_bytes, -(int)sizeof *table->next);
+      memcpy (pure->next, table->next, next_bytes);
+
+      ptrdiff_t nvalues = table->table_size * 2;
+      ptrdiff_t kv_bytes = nvalues * sizeof *table->key_and_value;
+      pure->key_and_value = pure_alloc (kv_bytes,
+					-(int)sizeof *table->key_and_value);
+      for (ptrdiff_t i = 0; i < nvalues; i++)
+	pure->key_and_value[i] = purecopy (table->key_and_value[i]);
+
+      ptrdiff_t index_bytes = table->index_size * sizeof *table->index;
+      pure->index = pure_alloc (index_bytes, -(int)sizeof *table->index);
+      memcpy (pure->index, table->index, index_bytes);
+    }
 
   return pure;
 }
