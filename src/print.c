@@ -91,7 +91,7 @@ static struct print_buffer print_buffer;
    print_number_index holds the largest N already used.
    N has to be strictly larger than 0 since we need to distinguish -N.  */
 static ptrdiff_t print_number_index;
-static void print_interval (INTERVAL interval, void *pprintcharfun);
+static void print_interval (INTERVAL interval, Lisp_Object printcharfun);
 
 /* GDB resets this to zero on W32 to disable OutputDebugString calls.  */
 bool print_output_debug_flag EXTERNALLY_VISIBLE = 1;
@@ -1486,6 +1486,8 @@ print_preprocess_string (INTERVAL *interval, void *arg)
   print_preprocess ((*interval)->plist);
 }
 
+static void print_check_string_charset_prop (INTERVAL interval, Lisp_Object string);
+
 #define PRINT_STRING_NON_CHARSET_FOUND 1
 #define PRINT_STRING_UNSAFE_CHARSET_FOUND 2
 
@@ -1493,7 +1495,7 @@ print_preprocess_string (INTERVAL *interval, void *arg)
 static int print_check_string_result;
 
 static void
-print_check_string_charset_prop (INTERVAL interval, void *pstring)
+print_check_string_charset_prop (INTERVAL interval, Lisp_Object string)
 {
   Lisp_Object val;
 
@@ -1517,7 +1519,6 @@ print_check_string_charset_prop (INTERVAL interval, void *pstring)
   if (! (print_check_string_result & PRINT_STRING_UNSAFE_CHARSET_FOUND))
     {
       ptrdiff_t charpos = interval->position;
-      Lisp_Object string = *(Lisp_Object *)pstring;
       ptrdiff_t bytepos = string_char_to_byte (string, charpos);
       Lisp_Object charset = XCAR (XCDR (val));
 
@@ -1542,7 +1543,7 @@ print_prune_string_charset (Lisp_Object string)
 {
   print_check_string_result = 0;
   traverse_intervals (string_intervals (string), 0,
-		      print_check_string_charset_prop, &string);
+		      print_check_string_charset_prop, string);
   if (NILP (Vprint_charset_text_property)
       || ! (print_check_string_result & PRINT_STRING_UNSAFE_CHARSET_FOUND))
     {
@@ -2347,9 +2348,8 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 
 	  if (string_intervals (obj))
 	    {
-	      Lisp_Object pcf = printcharfun;
 	      traverse_intervals (string_intervals (obj),
-				  0, print_interval, &pcf);
+				  0, print_interval, printcharfun);
 	      printchar (')', printcharfun);
 	    }
 	}
@@ -2739,11 +2739,10 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
    This is part of printing a string that has text properties.  */
 
 static void
-print_interval (INTERVAL interval, void *pprintcharfun)
+print_interval (INTERVAL interval, Lisp_Object printcharfun)
 {
   if (NILP (interval->plist))
     return;
-  Lisp_Object printcharfun = *(Lisp_Object *)pprintcharfun;
   printchar (' ', printcharfun);
   print_object (make_fixnum (interval->position), printcharfun, 1);
   printchar (' ', printcharfun);

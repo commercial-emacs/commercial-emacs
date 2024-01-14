@@ -5160,25 +5160,12 @@ sxhash_obj (Lisp_Object obj, int depth)
 }
 
 static void
-hash_interval (INTERVAL interval, void *arg)
+collect_interval (INTERVAL interval, Lisp_Object collector)
 {
-  EMACS_UINT *phash = arg;
-  EMACS_UINT hash = *phash;
-  hash = sxhash_combine (hash, interval->position);
-  hash = sxhash_combine (hash, LENGTH (interval));
-  hash = sxhash_combine (hash, sxhash_obj (interval->plist, 0));
-  *phash = hash;
-}
-
-static void
-collect_interval (INTERVAL interval, void *arg)
-{
-  Lisp_Object *collector = arg;
-  *collector = Fcons (list3 (make_fixnum (interval->position),
-			     make_fixnum (interval->position
-					  + LENGTH (interval)),
-			     interval->plist),
-		      *collector);
+  nconc2 (collector,
+	  list1(list3 (make_fixnum (interval->position),
+		       make_fixnum (interval->position + LENGTH (interval)),
+		       interval->plist)));
 }
 
 
@@ -5240,9 +5227,14 @@ Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
 {
   if (STRINGP (obj))
     {
-      EMACS_UINT hash = 0;
-      traverse_intervals (string_intervals (obj), 0, hash_interval, &hash);
-      return make_ufixnum (SXHASH_REDUCE (sxhash_combine (sxhash (obj), hash)));
+      /* FIXME: This is very wasteful.  We needn't cons at all.  */
+      Lisp_Object collector = Fcons (Qnil, Qnil);
+      traverse_intervals (string_intervals (obj), 0, collect_interval,
+			  collector);
+      return
+	make_ufixnum (
+	  SXHASH_REDUCE (sxhash_combine (sxhash (obj),
+					 sxhash (CDR (collector)))));
     }
 
   return hash_hash_to_fixnum (hashfn_equal (obj, NULL));
@@ -6224,6 +6216,7 @@ Altering this copy does not change the layout of the text properties
 in OBJECT.  */)
   (register Lisp_Object object)
 {
+  Lisp_Object collector = Fcons (Qnil, Qnil);
   INTERVAL intervals;
 
   if (STRINGP (object))
@@ -6236,9 +6229,8 @@ in OBJECT.  */)
   if (! intervals)
     return Qnil;
 
-  Lisp_Object collector = Qnil;
-  traverse_intervals (intervals, 0, collect_interval, &collector);
-  return Fnreverse (collector);
+  traverse_intervals (intervals, 0, collect_interval, collector);
+  return CDR (collector);
 }
 
 DEFUN ("line-number-at-pos", Fline_number_at_pos,
