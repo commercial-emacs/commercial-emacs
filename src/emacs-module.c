@@ -422,9 +422,8 @@ module_make_global_ref (emacs_env *env, emacs_value value)
 {
   MODULE_FUNCTION_BEGIN (NULL);
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
-  Lisp_Object new_obj = value_to_lisp (value);
-  hash_hash_t hashcode;
-  ptrdiff_t i = hash_lookup_get_hash (h, new_obj, &hashcode);
+  Lisp_Object new_obj = value_to_lisp (value), hashcode;
+  ptrdiff_t i = hash_lookup (h, new_obj, &hashcode);
 
   /* Note: This approach requires the garbage collector to never move
      objects.  */
@@ -461,7 +460,7 @@ module_free_global_ref (emacs_env *env, emacs_value global_value)
   MODULE_FUNCTION_BEGIN ();
   struct Lisp_Hash_Table *h = XHASH_TABLE (Vmodule_refs_hash);
   Lisp_Object obj = value_to_lisp (global_value);
-  ptrdiff_t i = hash_lookup (h, obj);
+  ptrdiff_t i = hash_lookup (h, obj, NULL);
 
   if (module_assertions)
     {
@@ -1570,7 +1569,9 @@ syms_of_module (void)
 {
   staticpro (&Vmodule_refs_hash);
   Vmodule_refs_hash
-    = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
+    = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
+		       DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
+		       Qnil, false);
 
   DEFSYM (Qmodule_load_failed, "module-load-failed");
   Fput (Qmodule_load_failed, Qerror_conditions,

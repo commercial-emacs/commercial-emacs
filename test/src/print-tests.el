@@ -369,6 +369,13 @@ otherwise, use a different charset."
 
   (should
    (string-match
+    "data ()"
+    (let ((h (make-hash-table)))
+      (let ((print-length 0))
+        (format "%S" h)))))
+
+  (should
+   (string-match
     "data (99 99)"
     (let ((h (make-hash-table)))
       (dotimes (i 100)

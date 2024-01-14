@@ -1448,8 +1448,8 @@ print_preprocess (Lisp_Object obj)
 		    if (HASH_TABLE_P (obj))
 		      {
 			struct Lisp_Hash_Table *h = XHASH_TABLE (obj);
-			pp_stack_push_values (h->key_and_value,
-					      2 * h->table_size);
+			obj = h->key_and_value;
+			continue;
 		      }
 		    break;
 		  }
@@ -2521,49 +2521,50 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  {
 	    struct Lisp_Hash_Table *h = XHASH_TABLE (obj);
 	    /* Implement a readable output, e.g.:
-	       #s(hash-table test equal data (k1 v1 k2 v2)) */
-	    print_c_string ("#s(hash-table", printcharfun);
+	       #s(hash-table size 2 test equal data (k1 v1 k2 v2)) */
+	    /* Always print the size.  */
+	    int len = sprintf (buf, "#s(hash-table size %"pD"d",
+			       HASH_TABLE_SIZE (h));
+	    strout (buf, len, len, printcharfun);
 
-	    if (!BASE_EQ (h->test->name, Qeql))
+	    if (!NILP (h->test.name))
 	      {
 		print_c_string (" test ", printcharfun);
-		print_object (h->test->name, printcharfun, escapeflag);
+		print_object (h->test.name, printcharfun, escapeflag);
 	      }
 
-	    if (h->weakness != Weak_None)
+	    if (!NILP (h->weak))
 	      {
 		print_c_string (" weakness ", printcharfun);
-		print_object (hash_table_weakness_symbol (h->weakness),
-			      printcharfun, escapeflag);
+		print_object (h->weak, printcharfun, escapeflag);
 	      }
+
+	    print_c_string (" rehash-size ", printcharfun);
+	    print_object (Fhash_table_rehash_size (obj),
+			  printcharfun, escapeflag);
+
+	    print_c_string (" rehash-threshold ", printcharfun);
+	    print_object (Fhash_table_rehash_threshold (obj),
+			  printcharfun, escapeflag);
 
 	    if (h->purecopy)
 	      print_c_string (" purecopy t", printcharfun);
 
+	    print_c_string (" data (", printcharfun);
+
 	    ptrdiff_t size = h->count;
-	    if (size > 0)
-	      {
-		print_c_string (" data (", printcharfun);
+	    /* Don't print more elements than the specified maximum.  */
+	    if (FIXNATP (Vprint_length) && XFIXNAT (Vprint_length) < size)
+	      size = XFIXNAT (Vprint_length);
 
-		/* Don't print more elements than the specified maximum.  */
-		if (FIXNATP (Vprint_length) && XFIXNAT (Vprint_length) < size)
-		  size = XFIXNAT (Vprint_length);
-
-		print_stack_push ((struct print_stack_entry){
-		    .type = PE_hash,
-		    .u.hash.obj = obj,
-		    .u.hash.nobjs = size * 2,
-		    .u.hash.idx = 0,
-		    .u.hash.printed = 0,
-		    .u.hash.truncated = (size < h->count),
-		  });
-	      }
-	    else
-	      {
-		/* Empty table: we can omit the data entirely.  */
-		printchar (')', printcharfun);
-		--print_depth;   /* Done with this.  */
-	      }
+	    print_stack_push ((struct print_stack_entry){
+		.type = PE_hash,
+		.u.hash.obj = obj,
+		.u.hash.nobjs = size * 2,
+		.u.hash.idx = 0,
+		.u.hash.printed = 0,
+		.u.hash.truncated = (size < h->count),
+	      });
 	    goto next_obj;
 	  }
 
