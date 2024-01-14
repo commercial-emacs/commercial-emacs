@@ -2549,11 +2549,11 @@ dump_hash_table_list (struct dump_context *ctx)
 static hash_table_std_test_t
 hash_table_std_test (const struct hash_table_test *t)
 {
-  if (BASE_EQ (t->name, Qeq))
+  if (EQ (t->name, Qeq))
     return Test_eq;
-  if (BASE_EQ (t->name, Qeql))
+  if (EQ (t->name, Qeql))
     return Test_eql;
-  if (BASE_EQ (t->name, Qequal))
+  if (EQ (t->name, Qequal))
     return Test_equal;
   error ("cannot dump hash tables with user-defined tests");  /* Bug#36769 */
 }
