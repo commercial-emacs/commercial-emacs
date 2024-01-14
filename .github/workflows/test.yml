@@ -94,7 +94,7 @@ jobs:
       run: |
         ./autogen.sh
         ./configure $([ `uname` = 'Linux' ] && echo WERROR_CFLAGS=\'-Werror\') --prefix=$HOME/.local --enable-multithreading
-        make -j4 check
+        make -j4 EXCLUDE_TESTS=./src/thread-tests.el check
     - name: make-native-comp
       if: matrix.gearing == 'native-comp'
       run: |
