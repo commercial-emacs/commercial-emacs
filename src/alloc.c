@@ -133,7 +133,7 @@ PER_THREAD_STATIC struct
   size_t total_buffers;
   /* Size of the ancillary arrays of live hash-table objects.
      The objects themselves are not included (counted as vectors above).  */
-  byte_ct total_hash_table_bytes;
+  size_t total_hash_table_bytes;
 } gcstat;
 
 /* Total size of ancillary arrays of all allocated hash-table objects,
@@ -2160,6 +2160,7 @@ free_by_pvtype (struct Lisp_Vector *vector)
 	    hash_table_allocated_bytes -= bytes;
 	  }
       }
+      break;
 #ifdef HAVE_TREE_SITTER
     case PVEC_TREE_SITTER:
       {
@@ -3684,7 +3685,7 @@ hash_table_alloc_bytes (ptrdiff_t nbytes)
 {
   if (nbytes == 0)
     return NULL;
-  tally_consing (nbytes);
+  bytes_since_gc += nbytes;
   hash_table_allocated_bytes += nbytes;
   return xmalloc (nbytes);
 }
@@ -3693,7 +3694,7 @@ hash_table_alloc_bytes (ptrdiff_t nbytes)
 void
 hash_table_free_bytes (void *p, ptrdiff_t nbytes)
 {
-  tally_consing (-nbytes);
+  bytes_since_gc -= nbytes;
   hash_table_allocated_bytes -= nbytes;
   xfree (p);
 }
@@ -4973,8 +4974,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		      struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
 		      set_vector_marked (ptr);
 		      if (h->weakness == Weak_None)
-			mark_stack_push_values (h->key_and_value,
-						2 * h->table_size);
+			mark_stack_push_n (h->key_and_value, 2 * h->table_size);
 		      else
 			{
 			  /* For weak tables, don't mark the
@@ -4982,28 +4982,6 @@ process_mark_stack (ptrdiff_t base_sp)
 			  eassert (h->next_weak == NULL);
 			  h->next_weak = weak_hash_tables;
 			  weak_hash_tables = h;
-			}
-		      break;
-		    }
-		  case PVEC_HASH_TABLE:
-		    {
-		      struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
-		      ptrdiff_t size = ptr->header.size & PSEUDOVECTOR_SIZE_MASK;
-		      set_vector_marked (ptr);
-		      mark_stack_push_n (ptr->contents, size);
-		      mark_stack_push (&h->test.name);
-		      mark_stack_push (&h->test.user_hash_function);
-		      mark_stack_push (&h->test.user_cmp_function);
-		      if (h->weakness == Weak_None)
-			mark_stack_push_value (h->key_and_value);
-		      else
-			{
-			  /* For weak tables, mark only the vector and not its
-			    contents --- that's what makes it weak.  */
-			  eassert (h->next_weak == NULL);
-			  h->next_weak = weak_hash_tables;
-			  weak_hash_tables = h;
-			  set_vector_marked (XVECTOR (h->key_and_value));
 			}
 		    }
 		    break;

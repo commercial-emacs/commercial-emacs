@@ -2278,12 +2278,26 @@ HASH_KEY (const struct Lisp_Hash_Table *h, ptrdiff_t idx)
   return h->key_and_value[2 * idx];
 }
 
+INLINE Lisp_Object *
+hash_key_addr (const struct Lisp_Hash_Table *h, ptrdiff_t idx)
+{
+  eassert (idx >= 0 && idx < h->table_size);
+  return &(h->key_and_value[2 * idx]);
+}
+
 /* Value is the value part of entry IDX in hash table H.  */
 INLINE Lisp_Object
 HASH_VALUE (const struct Lisp_Hash_Table *h, ptrdiff_t idx)
 {
   eassert (idx >= 0 && idx < h->table_size);
   return h->key_and_value[2 * idx + 1];
+}
+
+INLINE Lisp_Object *
+hash_value_addr (const struct Lisp_Hash_Table *h, ptrdiff_t idx)
+{
+  eassert (idx >= 0 && idx < h->table_size);
+  return &(h->key_and_value[2 * idx + 1]);
 }
 
 /* Value is the hash code computed for entry IDX in hash table H.  */

@@ -4938,15 +4938,13 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 		  /* Make sure key and value survive.  */
 		  if (! key_known_to_survive_p)
 		    {
-		      /* Like HASH_KEY but gets its address.  */
-		      mark_object (aref_addr (h->key_and_value, 2 * i));
+		      mark_object (hash_key_addr (h, i));
                       marked = true;
 		    }
 
 		  if (! value_known_to_survive_p)
 		    {
-		      /* Like HASH_VALUE but get its address.  */
-		      mark_object (aref_addr (h->key_and_value, 2 * i + 1));
+		      mark_object (hash_value_addr (h, i));
                       marked = true;
 		    }
 		}
@@ -5261,9 +5259,9 @@ mark_fns (void)
   for (struct hash_table_user_test *ut = hash_table_user_tests;
        ut; ut = ut->next)
     {
-      mark_object (ut->test.name);
-      mark_object (ut->test.user_cmp_function);
-      mark_object (ut->test.user_hash_function);
+      mark_object (&ut->test.name);
+      mark_object (&ut->test.user_cmp_function);
+      mark_object (&ut->test.user_hash_function);
     }
 }
 

@@ -81,20 +81,19 @@ tree_sitter_language_functor (Lisp_Object progmode)
 {
   static Lisp_Object cache = LISPSYM_INITIALLY (Qnil);
   struct Lisp_Hash_Table *h;
-  Lisp_Object hash;
   ptrdiff_t i;
 
   if (NILP (cache))
     {
-      cache = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
-			       DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
-			       Qnil, false);
+      cache = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE,
+			       Weak_None, false);
       staticpro (&cache);
     }
 
   CHECK_SYMBOL (progmode);
   h = XHASH_TABLE (cache);
-  i = hash_lookup (h, progmode, &hash);
+  hash_hash_t hash;
+  i = hash_lookup_get_hash (h, progmode, &hash);
   if (i < 0)
     {
       Lisp_Object language =
@@ -1234,14 +1233,13 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 
   static Lisp_Object cache = LISPSYM_INITIALLY (Qnil);
   struct Lisp_Hash_Table *h;
-  Lisp_Object hash, fstyle, indents_scm, result = Qnil;
+  Lisp_Object fstyle, indents_scm, result = Qnil;
   ptrdiff_t i;
 
   if (NILP (cache))
     {
-      cache = make_hash_table (hashtest_equal, DEFAULT_HASH_SIZE,
-			       DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
-			       Qnil, false);
+      cache = make_hash_table (&hashtest_equal, DEFAULT_HASH_SIZE,
+			       Weak_None, false);
       staticpro (&cache);
     }
   h = XHASH_TABLE (cache);
@@ -1266,7 +1264,8 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 				  (Fsymbol_value (Qtree_sitter_resources_dir)),
 				  build_string ("queries/"),
 				  language));
-  i = hash_lookup (h, indents_scm, &hash);
+  hash_hash_t hash;
+  i = hash_lookup_get_hash (h, indents_scm, &hash);
 
   /* First retrieve the query.  */
   if (XTREE_SITTER (sitter)->indents_query == NULL || i < 0)
@@ -1437,9 +1436,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			 sitter_end);
 
       Lisp_Object capture_name_to_tsnode =
-	make_hash_table (hashtest_eq, 10,
-			 DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
-			 Qnil, false);
+	make_hash_table (&hashtest_eq, 10, Weak_None, false);
       Lisp_Object obarray = initialize_vector (10, make_fixnum (0));
       const Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
       ptrdiff_t line_target =
