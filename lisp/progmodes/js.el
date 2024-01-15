@@ -3413,6 +3413,9 @@ This function is intended for use in `after-change-functions'."
 (define-derived-mode js-mode prog-mode "JavaScript"
   "Major mode for editing JavaScript."
   :group 'js
+  (js--mode-setup))
+
+(defun js--mode-setup ()
   ;; Ensure all CC Mode "lang variables" are set to valid values.
   (c-init-language-vars js-mode)
   (setq-local indent-line-function #'js-indent-line)
