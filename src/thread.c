@@ -20,7 +20,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    already holds the sys_mutex_t, lisp_mutex_lock() merely increments
    a count of lisp_mutex_t.
 
-   Unlike the one-dimensional sys_mutex_t, lisp_mutex_t cannot be
+   Unlike the binary sys_mutex_t, lisp_mutex_t cannot be
    considered unlocked until a sequence of lisp_mutex_unlock() calls
    decrement its count to zero.  */
 
