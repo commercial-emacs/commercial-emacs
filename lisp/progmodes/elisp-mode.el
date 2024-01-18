@@ -655,7 +655,7 @@ functions are annotated with \"<f>\" via the
 		    (save-excursion
 		      (backward-sexp 1)
 		      (skip-chars-forward "`',‘#")
-		      (point))
+		      (min (point) pos))
 		  (scan-error pos)))
 	   (end
 	    (when (and (< beg (point-max))
@@ -668,7 +668,11 @@ functions are annotated with \"<f>\" via the
                     (skip-chars-backward "'’")
 		    (when (>= (point) pos)
 		      (point)))
-		(scan-error pos))))
+		(scan-error pos)))
+             ((or (>= beg (point-max))
+                  (memq (char-syntax (char-after beg))
+		        '(?\) ?\s)))
+              beg)))
            ;; t if in function position.
            (funpos (eq (char-before beg) ?\())
            (quoted (elisp--form-quoted-p beg))
