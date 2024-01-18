@@ -1257,7 +1257,7 @@ dump_enqueue_object (struct dump_context *ctx,
                      struct link_weight weight)
 {
   /* Fixnums are bit-invariant, and don't need dumping.  */
-  if (! FIXNUMP (object))
+  if (! FIXNUMP (object) && ! EQ (object, Qunbound))
     {
       dump_off state = dump_recall_object (ctx, object);
       bool already_dumped_object = state > DUMP_OBJECT_NOT_SEEN;
