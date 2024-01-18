@@ -2148,7 +2148,6 @@ free_by_pvtype (struct Lisp_Vector *vector)
 	struct Lisp_Hash_Table *h = PSEUDOVEC_STRUCT (vector, Lisp_Hash_Table);
 	if (h->table_size > 0)
 	  {
-	    eassert (h->index_size > 1);
 	    xfree (h->index);
 	    xfree (h->key_and_value);
 	    xfree (h->next);

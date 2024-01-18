@@ -4504,15 +4504,14 @@ make_hash_table (const struct hash_table_test *test, EMACS_INT size,
   h->weakness = weak;
   h->count = 0;
   h->table_size = size;
-  int index_size = hash_index_size (size);
-  h->index_size = index_size;
+  h->index_size = hash_index_size (size);
 
   if (size == 0)
     {
       h->key_and_value = NULL;
       h->hash = NULL;
       h->next = NULL;
-      eassert (index_size == 1);
+      eassert (h->index_size == 1);
       h->index = (hash_idx_t *)empty_hash_index_vector;
       h->next_free = -1;
     }
@@ -4530,8 +4529,8 @@ make_hash_table (const struct hash_table_test *test, EMACS_INT size,
 	h->next[i] = i + 1;
       h->next[size - 1] = -1;
 
-      h->index = hash_table_alloc_bytes (index_size * sizeof *h->index);
-      for (ptrdiff_t i = 0; i < index_size; i++)
+      h->index = hash_table_alloc_bytes (h->index_size * sizeof *h->index);
+      for (ptrdiff_t i = 0; i < h->index_size; i++)
 	h->index[i] = -1;
 
       h->next_free = 0;
