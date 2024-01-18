@@ -4464,14 +4464,9 @@ hash_index_size (ptrdiff_t size)
   ptrdiff_t upper_bound = min (MOST_POSITIVE_FIXNUM,
 			       min (TYPE_MAXIMUM (hash_idx_t),
 				    PTRDIFF_MAX / sizeof (ptrdiff_t)));
-  /* Single-element index vectors are used iff size=0.  */
-  eassert (size > 0);
-  ptrdiff_t lower_bound = 2;
-  ptrdiff_t index_size = size + max (size >> 2, 1);  /* 1.25x larger */
+  ptrdiff_t index_size = size + (size >> 2);  /* 1.25x larger */
   if (index_size < upper_bound)
-    index_size = (index_size < lower_bound
-		  ? lower_bound
-		  : next_almost_prime (index_size));
+    index_size = next_almost_prime (index_size);
   if (index_size > upper_bound)
     error ("Hash table too large");
   return index_size;
