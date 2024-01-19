@@ -968,6 +968,7 @@
   (should (equal (erc--parse-isupport-value "\\x20\\x20\\x20") '("   ")))
   (should (equal (erc--parse-isupport-value "\\x5Co/") '("\\o/")))
   (should (equal (erc--parse-isupport-value "\\x7F,\\x19") '("\\x7F" "\\x19")))
+  (should (equal (erc--parse-isupport-value "a\\x3Db") '("a=b")))
   (should (equal (erc--parse-isupport-value "a\\x2Cb,c") '("a,b" "c"))))
 
 (ert-deftest erc--get-isupport-entry ()
@@ -1661,6 +1662,53 @@
         (should (erc--check-prompt-input-for-excess-lines "" '("a" "b")))
         (should-not (erc--check-prompt-input-for-excess-lines "" '("a" "b")))))
     (should-not erc-ask-about-multiline-input)))
+
+(ert-deftest erc-extract-command-from-line ()
+  ;; FIXME when next modifying `erc-command-regexp's default value,
+  ;; move the single quote in the first group's character alternative
+  ;; to the front, i.e., [A-Za-z'] -> ['A-Za-z], so we can assert
+  ;; equivalence with this more readable `rx' form.
+  (rx bol
+      "/"
+      (group (+ (in "'A-Za-z")))
+      (group (| (: (+ (syntax whitespace)) (* nonl))
+                (* (syntax whitespace))))
+      eol)
+  (erc-mode) ; for `erc-mode-syntax-table'
+
+  ;; Non-command.
+  (should-not (erc-extract-command-from-line "FAKE\n"))
+  ;; Unknown command.
+  (should (equal (erc-extract-command-from-line "/FAKE\n")
+                 '(erc-cmd-default "/FAKE\n")))
+
+  (ert-info ("With `do-not-parse-args'")
+    (should (equal (erc-extract-command-from-line "/MSG\n")
+                   '(erc-cmd-MSG "\n")))
+    (should (equal (erc-extract-command-from-line "/MSG \n")
+                   '(erc-cmd-MSG " \n")))
+    (should (equal (erc-extract-command-from-line "/MSG \n\n")
+                   '(erc-cmd-MSG " \n\n")))
+    (should (equal (erc-extract-command-from-line "/MSG foo\n")
+                   '(erc-cmd-MSG " foo")))
+    (should (equal (erc-extract-command-from-line "/MSG foo\n\n")
+                   '(erc-cmd-MSG " foo")))
+    (should (equal (erc-extract-command-from-line "/MSG foo\n \n")
+                   '(erc-cmd-MSG " foo")))
+    (should (equal (erc-extract-command-from-line "/MSG    foo\n")
+                   '(erc-cmd-MSG "    foo"))))
+
+  (ert-info ("Without `do-not-parse-args'")
+    (should (equal (erc-extract-command-from-line "/HELP\n")
+                   '(erc-cmd-HELP nil)))
+    (should (equal (erc-extract-command-from-line "/HELP \n")
+                   '(erc-cmd-HELP nil)))
+    (should (equal (erc-extract-command-from-line "/HELP foo\n")
+                   '(erc-cmd-HELP ("foo"))))
+    (should (equal (erc-extract-command-from-line "/HELP     foo\n")
+                   '(erc-cmd-HELP ("foo"))))
+    (should (equal (erc-extract-command-from-line "/HELP foo bar\n")
+                   '(erc-cmd-HELP ("foo" "bar"))))))
 
 ;; The point of this test is to ensure output is handled identically
 ;; regardless of whether a command handler is summoned.
@@ -2658,7 +2706,7 @@
                    (list :server "irc.libera.chat"
                          :port 6697
                          :nick (user-login-name)
-                         '&interactive-env
+                         '--interactive-env--
                          '((erc-server-connect-function . erc-open-tls-stream)
                            (erc-join-buffer . window))))))
 
@@ -2668,7 +2716,7 @@
                    (list :server "irc.gnu.org"
                          :port 6697
                          :nick (user-login-name)
-                         '&interactive-env
+                         '--interactive-env--
                          '((erc-server-connect-function . erc-open-tls-stream)
                            (erc-join-buffer . window))))))
 
@@ -2679,7 +2727,7 @@
                      (list :server "irc.gnu.org"
                            :port 6697
                            :nick (user-login-name)
-                           '&interactive-env
+                           '--interactive-env--
                            '((erc-server-connect-function
                               . erc-open-tls-stream)
                              (erc--display-context
