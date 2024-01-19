@@ -158,7 +158,7 @@ magic_db (const char *string, ptrdiff_t string_len, const char *class,
 
 	      case 'L':
 	      case 'l':
-		if (! lang)
+		if (!lang)
 		  {
 		    xfree (path);
 		    return NULL;
@@ -246,7 +246,7 @@ get_system_app (const char *class)
   const char *path;
 
   path = getenv ("XFILESEARCHPATH");
-  if (! path) path = PATH_X_DEFAULTS;
+  if (!path) path = PATH_X_DEFAULTS;
 
   return search_magic_path (path, class, 0);
 }
@@ -271,7 +271,7 @@ get_user_app (const char *class)
   if (path)
     db = search_magic_path (path, class, 0);
 
-  if (! db)
+  if (!db)
     {
       /* Check for APPLRESDIR; it is a path of directories.  In each,
 	 we have to search for LANG/CLASS and then CLASS.  */
@@ -284,13 +284,13 @@ get_user_app (const char *class)
 	}
     }
 
-  if (! db)
+  if (!db)
     {
       /* Check in the home directory.  This is a bit of a hack; let's
 	 hope one's home directory doesn't contain ':' or '%'.  */
       char const *home = get_homedir ();
       db = search_magic_path (home, class, "/%L/%N");
-      if (! db)
+      if (!db)
 	db = search_magic_path (home, class, "/%N");
     }
 

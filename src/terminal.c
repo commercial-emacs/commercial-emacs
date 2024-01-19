@@ -341,7 +341,7 @@ delete_terminal_internal (struct terminal *terminal)
   struct terminal **tp;
 
   for (tp = &terminal_list; *tp != terminal; tp = &(*tp)->next_terminal)
-    if (! *tp)
+    if (!*tp)
       emacs_abort ();
   *tp = terminal->next_terminal;
 

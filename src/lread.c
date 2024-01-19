@@ -213,13 +213,13 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
 
       ptrdiff_t pt_byte = BUF_PT_BYTE (inbuffer);
 
-      if (! BUFFER_LIVE_P (inbuffer))
+      if (!BUFFER_LIVE_P (inbuffer))
 	return -1;
 
       if (pt_byte >= BUF_ZV_BYTE (inbuffer))
 	return -1;
 
-      if (! NILP (BVAR (inbuffer, enable_multibyte_characters)))
+      if (!NILP (BVAR (inbuffer, enable_multibyte_characters)))
 	{
 	  /* Fetch the character code from the buffer.  */
 	  unsigned char *p = BUF_BYTE_ADDRESS (inbuffer, pt_byte);
@@ -232,7 +232,7 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
       else
 	{
 	  c = BUF_FETCH_BYTE (inbuffer, pt_byte);
-	  if (! ASCII_CHAR_P (c))
+	  if (!ASCII_CHAR_P (c))
 	    c = BYTE8_TO_CHAR (c);
 	  pt_byte++;
 	}
@@ -249,7 +249,7 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
       if (bytepos >= BUF_ZV_BYTE (inbuffer))
 	return -1;
 
-      if (! NILP (BVAR (inbuffer, enable_multibyte_characters)))
+      if (!NILP (BVAR (inbuffer, enable_multibyte_characters)))
 	{
 	  /* Fetch the character code from the buffer.  */
 	  unsigned char *p = BUF_BYTE_ADDRESS (inbuffer, bytepos);
@@ -262,7 +262,7 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
       else
 	{
 	  c = BUF_FETCH_BYTE (inbuffer, bytepos);
-	  if (! ASCII_CHAR_P (c))
+	  if (!ASCII_CHAR_P (c))
 	    c = BYTE8_TO_CHAR (c);
 	  bytepos++;
 	}
@@ -358,7 +358,7 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
   while (i < len)
     {
       buf[i++] = c = (*readbyte) (-1, readcharfun);
-      if (c < 0 || ! TRAILING_CODE_P (c))
+      if (c < 0 || !TRAILING_CODE_P (c))
 	{
 	  for (i -= c < 0; 0 < --i; )
 	    (*readbyte) (buf[i], readcharfun);
@@ -427,7 +427,7 @@ unreadchar (Lisp_Object readcharfun, int c)
       ptrdiff_t charpos = BUF_PT (b);
       ptrdiff_t bytepos = BUF_PT_BYTE (b);
 
-      if (! NILP (BVAR (b, enable_multibyte_characters)))
+      if (!NILP (BVAR (b, enable_multibyte_characters)))
 	bytepos -= buf_prev_char_len (b, bytepos);
       else
 	bytepos--;
@@ -440,7 +440,7 @@ unreadchar (Lisp_Object readcharfun, int c)
       ptrdiff_t bytepos = XMARKER (readcharfun)->bytepos;
 
       XMARKER (readcharfun)->charpos--;
-      if (! NILP (BVAR (b, enable_multibyte_characters)))
+      if (!NILP (BVAR (b, enable_multibyte_characters)))
 	bytepos -= buf_prev_char_len (b, bytepos);
       else
 	bytepos--;
@@ -734,7 +734,7 @@ read_filtered_event (bool no_switch_frame, bool ascii_required,
 	      tem1 = Fget (Fcar (tem), Qascii_character);
 	      /* Merge this symbol's modifier bits
 		 with the ASCII equivalent of its basic code.  */
-	      if (! NILP (tem1))
+	      if (!NILP (tem1))
 		XSETFASTINT (val, XFIXNUM (tem1) | XFIXNUM (Fcar (Fcdr (tem))));
 	    }
 	}
@@ -752,7 +752,7 @@ read_filtered_event (bool no_switch_frame, bool ascii_required,
 	}
     }
 
-  if (! NILP (delayed_switch_frame))
+  if (!NILP (delayed_switch_frame))
     unread_switch_frame = delayed_switch_frame;
 
 #if 0
@@ -1096,7 +1096,7 @@ load_warn_unescaped_character_literals (Lisp_Object file)
 {
   Lisp_Object warning =
     safe_calln (intern ("byte-run--unescaped-character-literals-warning"));
-  if (! NILP (warning))
+  if (!NILP (warning))
     {
       AUTO_STRING (format, "Loading `%s': %s");
       CALLN (Fmessage, format, file, warning);
@@ -1228,7 +1228,7 @@ Return t if the file exists and loads successfully.  */)
 
   /* If file name is magic, call the handler.  */
   handler = Ffind_file_name_handler (file, Qload);
-  if (! NILP (handler))
+  if (!NILP (handler))
     return call6 (handler, Qload, file, noerror, nomessage, nosuffix, must_suffix);
 
   /* The presence of this call is the result of a historical accident:
@@ -1236,7 +1236,7 @@ Return t if the file exists and loads successfully.  */)
      everywhere, it accidentally stayed here.  Since then, enough people
      supposedly have things like (load "$PROJECT/foo.el") in their .emacs
      that it seemed risky to remove.  */
-  if (! NILP (noerror))
+  if (!NILP (noerror))
     {
       file = internal_condition_case_1 (Fsubstitute_in_file_name, file,
 					Qt, load_error_handler);
@@ -1278,11 +1278,11 @@ Return t if the file exists and loads successfully.  */)
 	    must_suffix = Qnil;
 	  /* Don't insist on adding a suffix
 	     if the argument includes a directory name.  */
-	  else if (! NILP (Ffile_name_directory (file)))
+	  else if (!NILP (Ffile_name_directory (file)))
 	    must_suffix = Qnil;
 	}
 
-      if (! NILP (nosuffix))
+      if (!NILP (nosuffix))
 	suffixes = Qnil;
       else
 	{
@@ -1315,7 +1315,7 @@ Return t if the file exists and loads successfully.  */)
 	handler = Ffind_file_name_handler (found, Qt);
       else
 	handler = Ffind_file_name_handler (found, Qload);
-      if (! NILP (handler))
+      if (!NILP (handler))
 	return call5 (handler, Qload, found, noerror, nomessage, Qt);
 #ifdef DOS_NT
       /* Tramp has to deal with semi-broken packages that prepend
@@ -1418,7 +1418,7 @@ Return t if the file exists and loads successfully.  */)
 	  fmode = "r" FOPEN_BINARY;
 
           if (is_elc
-	      && ! load_prefer_newer
+	      && !load_prefer_newer
 	      && 0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s1, 0))
             {
 	      bool report_newer;
@@ -1436,7 +1436,7 @@ Return t if the file exists and loads successfully.  */)
   else if (!is_module && !is_native_elisp)
     {
       /* We are loading a source file (*.el).  */
-      if (! NILP (Vload_source_file_function))
+      if (!NILP (Vload_source_file_function))
 	{
 	  Lisp_Object val;
 
@@ -1545,7 +1545,7 @@ Return t if the file exists and loads successfully.  */)
       if (lisp_file_lexically_bound_p (Qget_file_char))
 	set_internal (Qlexical_binding, Qt, Qnil, SET_INTERNAL_SET);
 
-      if (! version || version >= 22)
+      if (!version || version >= 22)
         readevalloop (Qget_file_char, &input, hist_file_name,
                       0, Qnil, Qnil, Qnil, Qnil);
       else
@@ -1560,7 +1560,7 @@ Return t if the file exists and loads successfully.  */)
   unbind_to (count, Qnil);
 
   /* Run any eval-after-load forms for this file.  */
-  if (! NILP (Ffboundp (Qdo_after_load_evaluation)))
+  if (!NILP (Ffboundp (Qdo_after_load_evaluation)))
     call1 (Qdo_after_load_evaluation, hist_file_name) ;
 
   for (int i = 0; i < ARRAYELTS (saved_strings); i++)
@@ -1570,7 +1570,7 @@ Return t if the file exists and loads successfully.  */)
       saved_strings[i].size = 0;
     }
 
-  if (! noninteractive && (NILP (nomessage) || force_load_messages))
+  if (!noninteractive && (NILP (nomessage) || force_load_messages))
     {
       if (is_module)
         message_with_string ("Loading %s (module)...done", file, 1);
@@ -1863,12 +1863,12 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 	else
 	  string = make_string (fn, fnlen);
 	handler = Ffind_file_name_handler (string, Qfile_exists_p);
-	if ((! NILP (handler) || (! NILP (predicate) && !EQ (predicate, Qt)))
+	if ((!NILP (handler) || (!NILP (predicate) && !EQ (predicate, Qt)))
 	    && !FIXNATP (predicate))
 	  {
 	    bool exists;
 	    if (NILP (predicate) || EQ (predicate, Qt))
-	      exists = ! NILP (Ffile_readable_p (string));
+	      exists = !NILP (Ffile_readable_p (string));
 	    else
 	      {
 		Lisp_Object tmp = call1 (predicate, string);
@@ -1919,7 +1919,7 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 		    else
 		      last_errno = errno;
 		  }
-		else if (! (errno == ENOENT || errno == ENOTDIR))
+		else if (!(errno == ENOENT || errno == ENOTDIR))
 		  last_errno = errno;
 	      }
 	    else
@@ -1937,7 +1937,7 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 
 		if (fd < 0)
 		  {
-		    if (! (errno == ENOENT || errno == ENOTDIR))
+		    if (!(errno == ENOENT || errno == ENOTDIR))
 		      last_errno = errno;
 		  }
 		else
@@ -2162,12 +2162,12 @@ readevalloop (Lisp_Object readcharfun,
 
   specbind (Qstandard_input, readcharfun);
   record_unwind_protect_int (readevalloop_1, load_convert_to_unibyte);
-  load_convert_to_unibyte = ! NILP (unibyte);
+  load_convert_to_unibyte = !NILP (unibyte);
 
   Lisp_Object lexical_p = find_symbol_value (XSYMBOL (Qlexical_binding),
 					     current_buffer);
   record_lexical_environment ();
-  current_thread->lexical_environment = ! NILP (lexical_p) && ! EQ (lexical_p, Qunbound)
+  current_thread->lexical_environment = !NILP (lexical_p) && !EQ (lexical_p, Qunbound)
     ? list1 (Qt) : Qnil;
 
   specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);
@@ -2187,7 +2187,7 @@ readevalloop (Lisp_Object readcharfun,
       if (b != 0 && !BUFFER_LIVE_P (b))
 	error ("Reading from killed buffer");
 
-      if (! NILP (start))
+      if (!NILP (start))
 	{
 	  /* Switch to the buffer we are reading from.  */
 	  record_unwind_protect_excursion ();
@@ -2201,7 +2201,7 @@ readevalloop (Lisp_Object readcharfun,
 
 	  /* Set point and ZV around stuff to be read.  */
 	  Fgoto_char (start);
-	  if (! NILP (end))
+	  if (!NILP (end))
 	    Fnarrow_to_region (make_fixnum (BEGV), end);
 
 	  /* Just for cleanliness, convert END to a marker
@@ -2261,7 +2261,7 @@ readevalloop (Lisp_Object readcharfun,
 		    continue_reading_p = 0;
 		}
 	    }
-	  else if (! NILP (Vload_read_function))
+	  else if (!NILP (Vload_read_function))
 	    val = call1 (Vload_read_function, readcharfun);
 	  else
 	    val = read_internal_start (readcharfun, Qnil, Qnil, false);
@@ -2281,7 +2281,7 @@ readevalloop (Lisp_Object readcharfun,
       unbind_to (count1, Qnil);
 
       /* Now eval what we just read.  */
-      if (! NILP (macroexpand))
+      if (!NILP (macroexpand))
         val = readevalloop_eager_expand_eval (val, macroexpand);
       else
         val = eval_form (val);
@@ -2356,7 +2356,7 @@ This function preserves the position of point.  */)
   specbind (Qlexical_binding, lisp_file_lexically_bound_p (buf) ? Qt : Qnil);
   BUF_TEMP_SET_PT (XBUFFER (buf), BUF_BEGV (XBUFFER (buf)));
   readevalloop (buf, 0, filename,
-		! NILP (printflag), unibyte, Qnil, Qnil, Qnil);
+		!NILP (printflag), unibyte, Qnil, Qnil, Qnil);
   return unbind_to (count, Qnil);
 }
 
@@ -2390,7 +2390,7 @@ This function does not move point.  */)
 
   /* `readevalloop' calls functions which check the type of start and end.  */
   readevalloop (cbuf, 0, BVAR (XBUFFER (cbuf), filename),
-		! NILP (printflag), Qnil, read_function,
+		!NILP (printflag), Qnil, read_function,
 		start, end);
 
   return unbind_to (count, Qnil);
@@ -2409,7 +2409,7 @@ with its charpos as (CHARPOS . ATOM).  */)
   retval = read_internal_start (buffer, Qnil, Qnil, true);
 
   warning = safe_calln (intern ("byte-run--unescaped-character-literals-warning"));
-  if (! NILP (warning))
+  if (!NILP (warning))
     call2 (intern ("byte-compile-warn"), build_string ("%s"), warning);
 
   return unbind_to (count, retval);
@@ -2471,7 +2471,7 @@ read_internal_start (Lisp_Object stream, Lisp_Object start,
   readchar_charpos = BUFFERP (stream) ? XBUFFER (stream)->pt : 1;
   /* We can get called from readevalloop which may have set these
      already.  */
-  if (! HASH_TABLE_P (read_objects_map)
+  if (!HASH_TABLE_P (read_objects_map)
       || XHASH_TABLE (read_objects_map)->count)
     read_objects_map
       = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
@@ -3015,7 +3015,7 @@ read_string_literal (Lisp_Object readcharfun)
 
 	  if (CHAR_BYTE8_P (ch))
 	    force_singlebyte = true;
-	  else if (! ASCII_CHAR_P (ch))
+	  else if (!ASCII_CHAR_P (ch))
 	    force_multibyte = true;
 	  else		/* I.e. ASCII_CHAR_P (ch).  */
 	    {
@@ -3059,7 +3059,7 @@ read_string_literal (Lisp_Object readcharfun)
 	  p += CHAR_STRING (ch, (unsigned char *) p);
 	  if (CHAR_BYTE8_P (ch))
 	    force_singlebyte = true;
-	  else if (! ASCII_CHAR_P (ch))
+	  else if (!ASCII_CHAR_P (ch))
 	    force_multibyte = true;
 	}
       nchars++;
@@ -3068,7 +3068,7 @@ read_string_literal (Lisp_Object readcharfun)
   if (ch < 0)
     end_of_file_error ();
 
-  if (! force_multibyte && force_singlebyte)
+  if (!force_multibyte && force_singlebyte)
     {
       /* READ_BUFFER contains raw 8-bit bytes and no multibyte
 	 forms.  Convert it to unibyte.  */
@@ -3554,7 +3554,7 @@ quoted_parse_state (void)
 }
 
 #define ANNOTATE(atom)					\
-  (annotated && ! quoted_parse_state()			\
+  (annotated && !quoted_parse_state()			\
    ? Fcons (make_fixnum (initial_charpos), atom)	\
    : atom)
 
@@ -4108,11 +4108,11 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	/* Only attempt to parse the token as a number if it starts as one.  */
 	char c0 = read_buffer[0];
 	if (((c0 >= '0' && c0 <= '9') || c0 == '.' || c0 == '-' || c0 == '+')
-	    && ! quoted && ! uninterned_symbol && ! skip_shorthand)
+	    && !quoted && !uninterned_symbol && !skip_shorthand)
 	  {
 	    ptrdiff_t len;
 	    result = string_to_number (read_buffer, 10, &len);
-	    if (! NILP (result) && len == nbytes)
+	    if (!NILP (result) && len == nbytes)
 	      {
 		obj = ANNOTATE (result);
 		break;
@@ -4260,8 +4260,8 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	      {
 		/* If it can be recursive, remember it for future
 		   substitutions.  */
-		if (! SYMBOLP (obj) && ! NUMBERP (obj)
-		    && ! (STRINGP (obj) && ! string_intervals (obj)))
+		if (!SYMBOLP (obj) && !NUMBERP (obj)
+		    && !(STRINGP (obj) && !string_intervals (obj)))
 		  {
 		    struct Lisp_Hash_Table *h2
 		      = XHASH_TABLE (read_objects_completed);
@@ -4508,17 +4508,17 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
     {
       /* Convert to floating point, unless the value is already known
 	 because it is infinite or a NaN.  */
-      if (! value)
+      if (!value)
 	value = atof (string + signedp);
       return make_float (negative ? -value : value);
     }
 
   /* Return nil if the number uses invalid syntax.  */
-  if (! (state & LEAD_INT))
+  if (!(state & LEAD_INT))
     return Qnil;
 
   /* Fast path if the integer (san sign) fits in uintmax_t.  */
-  if (! (state & INTOVERFLOW))
+  if (!(state & INTOVERFLOW))
     {
       if (!negative)
 	return make_uint (n);
@@ -4649,7 +4649,7 @@ define_symbol (Lisp_Object sym, char const *str)
   init_symbol (sym, string);
 
   /* Qunbound is uninterned, thus distinct from the symbol 'unbound.  */
-  if (! EQ (sym, Qunbound))
+  if (!EQ (sym, Qunbound))
     {
       Lisp_Object bucket = oblookup (initial_obarray, str, len, len);
       eassert (FIXNUMP (bucket));
@@ -4706,7 +4706,7 @@ it defaults to the value of `obarray'.  */)
   if (NILP (obarray)) obarray = Vobarray;
   obarray = check_obarray (obarray);
 
-  if (! SYMBOLP (name))
+  if (!SYMBOLP (name))
     {
       char *longhand = NULL;
       ptrdiff_t longhand_chars = 0, longhand_bytes = 0;
@@ -5074,14 +5074,14 @@ load_path_check (Lisp_Object lpath)
   /* The only elements that might not exist are those from
      PATH_LOADSEARCH, EMACSLOADPATH.  Anything else is only added if
      it exists.  */
-  for (path_tail = lpath; ! NILP (path_tail); path_tail = XCDR (path_tail))
+  for (path_tail = lpath; !NILP (path_tail); path_tail = XCDR (path_tail))
     {
       Lisp_Object dirfile;
       dirfile = Fcar (path_tail);
       if (STRINGP (dirfile))
         {
           dirfile = Fdirectory_file_name (dirfile);
-          if (! file_accessible_directory_p (dirfile))
+          if (!file_accessible_directory_p (dirfile))
             dir_warning ("Lisp directory", XCAR (path_tail));
         }
     }
@@ -5103,7 +5103,7 @@ load_path_default (void)
      Vsource_directory for invocations of the within-repo `make`
      executable.
   */
-  if (! NILP (Vinstallation_directory))
+  if (!NILP (Vinstallation_directory))
     {
       Lisp_Object tem = Fexpand_file_name (build_string ("lisp"),
 					   Vinstallation_directory),
@@ -5117,12 +5117,12 @@ load_path_default (void)
 	lpath = list1 (tem);
 
       /* Add the within-repo site-lisp (unusual).  */
-      if (! no_site_lisp)
+      if (!no_site_lisp)
         {
           tem = Fexpand_file_name (build_string ("site-lisp"),
                                    Vinstallation_directory);
           tem1 = Ffile_accessible_directory_p (tem);
-          if (! NILP (tem1) && (NILP (Fmember (tem, lpath))))
+          if (!NILP (tem1) && (NILP (Fmember (tem, lpath))))
 	    lpath = Fcons (tem, lpath);
         }
 
@@ -5164,7 +5164,7 @@ init_lread (void)
   /* First, set Vload_path.  */
 
   /* Ignore EMACSLOADPATH when dumping.  */
-  bool use_loadpath = ! will_dump_p ();
+  bool use_loadpath = !will_dump_p ();
 
   if (use_loadpath && egetenv ("EMACSLOADPATH"))
     {
@@ -5187,7 +5187,7 @@ init_lread (void)
           if (! no_site_lisp && PATH_SITELOADSEARCH[0] != '\0')
             {
               Lisp_Object sitelisp = decode_env_path (0, PATH_SITELOADSEARCH, 0);
-              if (! NILP (sitelisp))
+              if (!NILP (sitelisp))
                 default_lpath = nconc2 (sitelisp, default_lpath);
             }
 
@@ -5217,7 +5217,7 @@ init_lread (void)
       if (! will_dump_p () && !no_site_lisp && PATH_SITELOADSEARCH[0] != '\0')
         {
           Lisp_Object sitelisp = decode_env_path (0, PATH_SITELOADSEARCH, 0);
-          if (! NILP (sitelisp))
+          if (!NILP (sitelisp))
 	    Vload_path = nconc2 (sitelisp, Vload_path);
         }
     }
@@ -5248,7 +5248,7 @@ dir_warning (char const *use, Lisp_Object dirname)
     {
       ptrdiff_t diaglen = strlen (diagnostic);
       AUTO_STRING_WITH_LEN (diag, diagnostic, diaglen);
-      if (! NILP (Vlocale_coding_system))
+      if (!NILP (Vlocale_coding_system))
 	{
 	  Lisp_Object s
 	    = code_convert_string_norecord (diag, Vlocale_coding_system, false);

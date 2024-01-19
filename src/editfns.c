@@ -117,7 +117,7 @@ init_editfns (void)
   /* If the user name claimed in the environment vars differs from
      the real uid, use the claimed name to find the full name.  */
   tem = Fstring_equal (Vuser_login_name, Vuser_real_login_name);
-  if (! NILP (tem))
+  if (!NILP (tem))
     tem = Vuser_login_name;
   else
     {
@@ -375,7 +375,7 @@ at POSITION.  */)
 	      if ((OVERLAY_START (ol) == posn
 		   && OVERLAY_FRONT_ADVANCE_P (ol))
 		  || (OVERLAY_END (ol) == posn
-		      && ! OVERLAY_REAR_ADVANCE_P (ol))
+		      && !OVERLAY_REAR_ADVANCE_P (ol))
 		  || OVERLAY_START (ol) > posn
 		  || OVERLAY_END (ol) < posn)
 		; /* The overlay will not cover a char inserted at point.  */
@@ -992,7 +992,7 @@ If POSITION is out of range, the value is nil.  */)
   (Lisp_Object position)
 {
   EMACS_INT pos = fix_position (position);
-  if (! (BEG <= pos && pos <= Z))
+  if (!(BEG <= pos && pos <= Z))
     return Qnil;
   return make_fixnum (CHAR_TO_BYTE (pos));
 }
@@ -1112,7 +1112,7 @@ If POS is out of range, the value is nil.  */)
   else
     {
       EMACS_INT p = fix_position (pos);
-      if (! (BEGV <= p && p < ZV))
+      if (!(BEGV <= p && p < ZV))
 	return Qnil;
 
       pos_byte = CHAR_TO_BYTE (p);
@@ -1147,7 +1147,7 @@ If POS is out of range, the value is nil.  */)
     {
       EMACS_INT p = fix_position (pos);
 
-      if (! (BEGV < p && p <= ZV))
+      if (!(BEGV < p && p <= ZV))
 	return Qnil;
 
       pos_byte = CHAR_TO_BYTE (p);
@@ -1575,7 +1575,7 @@ from adjoining text, if those properties are sticky.  */)
   if (XFIXNUM (byte) < 0 || XFIXNUM (byte) > 255)
     args_out_of_range_3 (byte, make_fixnum (0), make_fixnum (255));
   if (XFIXNUM (byte) >= 128
-      && ! NILP (BVAR (current_buffer, enable_multibyte_characters)))
+      && !NILP (BVAR (current_buffer, enable_multibyte_characters)))
     XSETFASTINT (byte, BYTE8_TO_CHAR (XFIXNUM (byte)));
   return Finsert_char (byte, count, inherit);
 }
@@ -1644,7 +1644,7 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
       end1 = -1;
     }
 
-  if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
+  if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
     result = make_multibyte_string (NULL, end - start, end_byte - start_byte);
   else
     result = make_unibyte_string (NULL, end - start);
@@ -1886,7 +1886,7 @@ determines whether case is significant or ignored.  */)
 	  i1++;
 	}
 
-      if (! NILP (BVAR (bp2, enable_multibyte_characters)))
+      if (!NILP (BVAR (bp2, enable_multibyte_characters)))
 	{
 	  c2 = BUF_FETCH_MULTIBYTE_CHAR (bp2, i2_byte);
 	  i2_byte += buf_next_char_len (bp2, i2_byte);
@@ -2095,7 +2095,7 @@ nil.  */)
   /* compareseq requires indices to be zero-based.  We add BEGV back
      later.  */
   bool early_abort;
-  if (! sys_setjmp (ctx.jmp))
+  if (!sys_setjmp (ctx.jmp))
     early_abort = compareseq (0, size_a, 0, size_b, false, &ctx);
   else
     early_abort = true;
@@ -2395,11 +2395,11 @@ Both characters must have the same length of multi-byte form.  */)
 	  if (maybe_byte_combining
 	      && (maybe_byte_combining == COMBINING_AFTER
 		  ? (pos_byte_next < Z_BYTE
-		     && ! CHAR_HEAD_P (FETCH_BYTE (pos_byte_next)))
+		     && !CHAR_HEAD_P (FETCH_BYTE (pos_byte_next)))
 		  : ((pos_byte_next < Z_BYTE
-		      && ! CHAR_HEAD_P (FETCH_BYTE (pos_byte_next)))
+		      && !CHAR_HEAD_P (FETCH_BYTE (pos_byte_next)))
 		     || (pos_byte > BEG_BYTE
-			 && ! ASCII_CHAR_P (FETCH_BYTE (pos_byte - 1))))))
+			 && !ASCII_CHAR_P (FETCH_BYTE (pos_byte - 1))))))
 	    {
 	      Lisp_Object tem, string;
 
@@ -2423,7 +2423,7 @@ Both characters must have the same length of multi-byte form.  */)
 	      else
 		pos_byte_next += next_char_len (pos_byte_next);
 
-	      if (! NILP (noundo))
+	      if (!NILP (noundo))
 		bset_undo_list (current_buffer, tem);
 	    }
 	  else
@@ -2536,12 +2536,12 @@ It returns the number of characters changed.  */)
   validate_region (&start, &end);
   if (STRINGP (table))
     {
-      if (! multibyte)
+      if (!multibyte)
 	table = string_make_unibyte (table);
       translatable_chars = min (translatable_chars, SBYTES (table));
       string_multibyte = STRING_MULTIBYTE (table);
     }
-  else if (! (CHAR_TABLE_P (table)
+  else if (!(CHAR_TABLE_P (table)
 	      && EQ (XCHAR_TABLE (table)->purpose, Qtranslation_table)))
     error ("Not a translation table");
 
@@ -3351,7 +3351,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	    }
 
 	  ++n;
-	  if (! (n < nargs))
+	  if (!(n < nargs))
 	    error ("Not enough arguments for format string");
 
 	  struct info *spec = &info[ispec++];
@@ -3369,7 +3369,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	     happen after retrying.  */
 	  if ((conversion == 'S'
 	       || (conversion == 's'
-		   && ! STRINGP (arg) && ! SYMBOLP (arg))))
+		   && !STRINGP (arg) && !SYMBOLP (arg))))
 	    {
 	      if (EQ (arg, args[n]))
 		{
@@ -3385,7 +3385,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	    }
 	  else if (conversion == 'c')
 	    {
-	      if (FIXNUMP (arg) && ! ASCII_CHAR_P (XFIXNUM (arg)))
+	      if (FIXNUMP (arg) && !ASCII_CHAR_P (XFIXNUM (arg)))
 		{
 		  if (!multibyte)
 		    {
@@ -3416,7 +3416,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	  if (conversion == 's')
 	    {
 	      if (format == end && format - format_start == 2
-		  && ! string_intervals (args[0]))
+		  && !string_intervals (args[0]))
 		{
 		  val = arg;
 		  goto return_val;
@@ -3454,7 +3454,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		}
 
 	      convbytes = nbytes;
-	      if (convbytes && multibyte && ! STRING_MULTIBYTE (arg))
+	      if (convbytes && multibyte && !STRING_MULTIBYTE (arg))
 		convbytes = count_size_as_multibyte (SDATA (arg), nbytes);
 
 	      ptrdiff_t padding
@@ -3469,7 +3469,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		     for the padding on the left in the info[] array.  */
 		  if (fmt_props)
 		    spec->start = nchars;
-		  if (! minus_flag)
+		  if (!minus_flag)
 		    {
 		      memset (p, ' ', padding);
 		      p += padding;
@@ -3510,7 +3510,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		  convbytes = CONVBYTES_ROOM;
 		}
 	    }
-	  else if (! (conversion == 'c' || conversion == 'd'
+	  else if (!(conversion == 'c' || conversion == 'd'
 		      || float_conversion || conversion == 'i'
 		      || conversion == 'o' || conversion == 'x'
 		      || conversion == 'X'))
@@ -3523,7 +3523,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		                 : "Invalid format operation char #o%03o",
 		       *p);
 	    }
-	  else if (! (FIXNUMP (arg) || ((BIGNUMP (arg) || FLOATP (arg))
+	  else if (!(FIXNUMP (arg) || ((BIGNUMP (arg) || FLOATP (arg))
 					&& conversion != 'c')))
 	    error ("Format specifier doesn't match argument type");
 	  else
@@ -3553,7 +3553,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		{
 		  memcpy (f, PRIdMAX, pMlen);
 		  f += pMlen;
-		  zero_flag &= ! precision_given;
+		  zero_flag &= !precision_given;
 		}
 	      *f++ = conversion;
 	      *f = '\0';
@@ -3682,7 +3682,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		      x = x ? x : 0;
 
 		      sprintf_bytes = sprintf (p, convspec, 0, x);
-		      bool signedp = ! c_isdigit (p[0]);
+		      bool signedp = !c_isdigit (p[0]);
 		      prec = min (precision, sprintf_bytes - signedp);
 		    }
 		}
@@ -3737,9 +3737,9 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	      ptrdiff_t trailing_zeros = 0;
 	      if (excess_precision != 0 && float_conversion)
 		{
-		  if (! c_isdigit (p[sprintf_bytes - 1])
+		  if (!c_isdigit (p[sprintf_bytes - 1])
 		      || (conversion == 'g'
-			  && ! (sharp_flag && strchr (p, '.'))))
+			  && !(sharp_flag && strchr (p, '.'))))
 		    excess_precision = 0;
 		  trailing_zeros = excess_precision;
 		}
@@ -3768,7 +3768,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 				      ? 2 : 0));
 		  eassert (prefixlen == 0 || beglen == 0
 			   || (beglen == 1 && p[0] == '-'
-			       && ! (prefix[0] == '-' || prefix[0] == '+'
+			       && !(prefix[0] == '-' || prefix[0] == '+'
 				     || prefix[0] == ' ')));
 		  if (zero_flag && 0 <= char_hexdigit (p[beglen]))
 		    {
@@ -3951,7 +3951,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
   if (bufsize < p - buf)
     emacs_abort ();
 
-  if (! new_result)
+  if (!new_result)
     {
       val = args[0];
       goto return_val;

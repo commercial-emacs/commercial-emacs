@@ -203,7 +203,7 @@ x_atom_to_symbol (struct x_display_info *dpyinfo, Atom atom)
   char *str;
   Lisp_Object val;
 
-  if (! atom)
+  if (!atom)
     return Qnil;
 
   switch (atom)
@@ -1485,7 +1485,7 @@ wait_for_property_change (struct property_change *change)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   record_unwind_protect_ptr (unpend_property_change, change);
-  if (! change->arrived)
+  if (!change->arrived)
     {
       intmax_t itimeout = max (0, x_selection_timeout);
       intmax_t secs = itimeout / 1000;
@@ -1497,7 +1497,7 @@ wait_for_property_change (struct property_change *change)
 	    && 0 <= timespec_cmp (at, current_timespec ()));
 	   (void) at)
 	wait_reading_process_output (0, 20 * 1000 * 1000, 0, false, NULL, 0);
-      if (! change->arrived)
+      if (!change->arrived)
 	error ("Timed out waiting for property-notify event");
     }
   unbind_to (count, Qnil);
@@ -1602,10 +1602,10 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
 
   count = SPECPDL_INDEX ();
 
-  if (! FRAME_LIVE_P (f))
+  if (!FRAME_LIVE_P (f))
     return unbind_to (count, Qnil);
 
-  if (! NILP (time_stamp))
+  if (!NILP (time_stamp))
     CONS_TO_INTEGER (time_stamp, Time, requestor_time);
 
   /* critical section begin */
@@ -1949,7 +1949,7 @@ x_get_window_property_as_lisp_data (struct x_display_info *dpyinfo,
 
   x_get_window_property (display, window, property, &data, &bytes,
 			 &actual_type, &actual_format, &actual_size);
-  if (! data)
+  if (!data)
     {
       if (for_multiple)
 	return Qnil;
@@ -2856,10 +2856,10 @@ x_check_property_data (Lisp_Object data)
     {
       Lisp_Object o = XCAR (iter);
 
-      if (! NUMBERP (o) && ! STRINGP (o) && ! CONSP (o))
+      if (!NUMBERP (o) && !STRINGP (o) && !CONSP (o))
         return -1;
       else if (CONSP (o) &&
-               (! NUMBERP (XCAR (o)) || ! NUMBERP (XCDR (o))))
+               (!NUMBERP (XCAR (o)) || !NUMBERP (XCDR (o))))
         return -1;
       if (size == INT_MAX)
 	return -1;

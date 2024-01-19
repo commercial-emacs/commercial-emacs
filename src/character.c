@@ -955,7 +955,7 @@ bool
 alphabeticp (int c)
 {
   Lisp_Object category = CHAR_TABLE_REF (Vunicode_category_table, c);
-  if (! FIXNUMP (category))
+  if (!FIXNUMP (category))
     return false;
   EMACS_INT gen_cat = XFIXNUM (category);
 
@@ -978,7 +978,7 @@ bool
 alphanumericp (int c)
 {
   Lisp_Object category = CHAR_TABLE_REF (Vunicode_category_table, c);
-  if (! FIXNUMP (category))
+  if (!FIXNUMP (category))
     return false;
   EMACS_INT gen_cat = XFIXNUM (category);
 
@@ -1000,7 +1000,7 @@ bool
 graphicp (int c)
 {
   Lisp_Object category = CHAR_TABLE_REF (Vunicode_category_table, c);
-  if (! FIXNUMP (category))
+  if (!FIXNUMP (category))
     return false;
   EMACS_INT gen_cat = XFIXNUM (category);
 
@@ -1018,7 +1018,7 @@ bool
 printablep (int c)
 {
   Lisp_Object category = CHAR_TABLE_REF (Vunicode_category_table, c);
-  if (! FIXNUMP (category))
+  if (!FIXNUMP (category))
     return false;
   EMACS_INT gen_cat = XFIXNUM (category);
 
@@ -1033,7 +1033,7 @@ bool
 graphic_base_p (int c)
 {
   Lisp_Object category = CHAR_TABLE_REF (Vunicode_category_table, c);
-  if (! FIXNUMP (category))
+  if (!FIXNUMP (category))
     return false;
   EMACS_INT gen_cat = XFIXNUM (category);
 
@@ -1055,7 +1055,7 @@ bool
 blankp (int c)
 {
   Lisp_Object category = CHAR_TABLE_REF (Vunicode_category_table, c);
-  if (! FIXNUMP (category))
+  if (!FIXNUMP (category))
     return false;
 
   return XFIXNUM (category) == UNICODE_CATEGORY_Zs; /* separator, space */

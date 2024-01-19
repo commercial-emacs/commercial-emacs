@@ -57,7 +57,7 @@ record_point (ptrdiff_t beg)
   first change. FIXME: This check is currently dependent on being
   called before record_first_change, but could be made not to by
   ignoring timestamp undo entries */
-  at_boundary = ! CONSP (BVAR (current_buffer, undo_list))
+  at_boundary = !CONSP (BVAR (current_buffer, undo_list))
                 || NILP (XCAR (BVAR (current_buffer, undo_list)));
 
   /* If this is the first change since save, then record this.*/
@@ -306,7 +306,7 @@ truncate_undo_list (struct buffer *b)
     }
 
   /* Iterate until first undo boundary */
-  while (CONSP (next) && ! NILP (XCAR (next)))
+  while (CONSP (next) && !NILP (XCAR (next)))
     {
       Lisp_Object elt = XCAR (next);
       size_so_far += sizeof (struct Lisp_Cons);
@@ -323,13 +323,13 @@ truncate_undo_list (struct buffer *b)
 
   /* We're at the first undo boundary.  Apply the special function
      (typically `undo-outer-limit-truncate') if applicable.  */
-  if (! NILP (Vundo_outer_limit_function) && INTEGERP (Vundo_outer_limit))
+  if (!NILP (Vundo_outer_limit_function) && INTEGERP (Vundo_outer_limit))
     {
       intmax_t undo_outer_limit;
       if ((integer_to_intmax (Vundo_outer_limit, &undo_outer_limit)
 	   ? size_so_far > undo_outer_limit
 	   : NILP (Fnatnump (Vundo_outer_limit)))
-	  && ! NILP (call1 (Vundo_outer_limit_function, make_int (size_so_far))))
+	  && !NILP (call1 (Vundo_outer_limit_function, make_int (size_so_far))))
 	goto out;
     }
 

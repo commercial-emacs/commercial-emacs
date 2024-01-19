@@ -464,7 +464,7 @@ usage: (setq [SYM VAL]...)  */)
       Lisp_Object lexbind = SYMBOLP (sym)
 	? find_lexbind (current_thread, sym)
 	: Qnil;
-      if (! NILP (lexbind))
+      if (!NILP (lexbind))
 	XSETCDR (lexbind, val); /* SYM lexically bound.  */
       else
 	Fset (sym, val); /* SYM dynamically bound.  */
@@ -499,7 +499,7 @@ usage: (function ARG)  */)
   if (! NILP (XCDR (args)))
     xsignal2 (Qwrong_number_of_arguments, Qfunction, Flength (args));
 
-  if (! NILP (current_thread->lexical_environment)
+  if (!NILP (current_thread->lexical_environment)
       && CONSP (quoted)
       && EQ (XCAR (quoted), Qlambda))
     {
@@ -514,13 +514,13 @@ usage: (function ARG)  */)
 	{
 	  /* Build docstring from (:documentation <form>).  */
 	  Lisp_Object docstring = eval_form (CAR (XCDR (tmp)));
-	  if (SYMBOLP (docstring) && ! NILP (docstring))
+	  if (SYMBOLP (docstring) && !NILP (docstring))
 	    /* OClosure docstrings are just their types, and thus symbols.  */
 	    docstring = Fsymbol_name (docstring);
 	  CHECK_STRING (docstring);
 	  cdr = Fcons (XCAR (cdr), Fcons (docstring, XCDR (XCDR (cdr))));
 	}
-      return (! NILP (Vinternal_make_interpreted_closure_function)
+      return (!NILP (Vinternal_make_interpreted_closure_function)
 #ifdef HAVE_GCC_TLS
 	      && main_thread_p (current_thread)
 #endif
@@ -874,14 +874,14 @@ thread_symbol (Lisp_Object symbol)
 static void
 let_bind (Lisp_Object prevailing_env, Lisp_Object var, Lisp_Object val, bool *q_pushed)
 {
-  bool q_lexical_binding = ! NILP (prevailing_env); /* flukey indicator */
+  bool q_lexical_binding = !NILP (prevailing_env); /* flukey indicator */
   if (q_lexical_binding
       && SYMBOLP (var)
-      && ! XSYMBOL (var)->u.s.declared_special
+      && !XSYMBOL (var)->u.s.declared_special
       && NILP (Fmemq (var, prevailing_env)))
     {
       /* Lexically bind VAR.  */
-      if (! *q_pushed)
+      if (!*q_pushed)
 	{
 	  /* Just push the env previous to the first lexical let
 	     binding.  Nested envs produced by subsequent bindings in
@@ -941,7 +941,7 @@ eval_let (Lisp_Object args, bool nested_envs)
       Lisp_Object bind = XCAR (post_eval),
 	var = XCAR (bind),
 	val = XCDR (bind);
-      eassert (! nested_envs);
+      eassert (!nested_envs);
       let_bind (prevailing_env, var, val, &q_pushed);
     }
   return unbind_to (count, Fprogn (XCDR (args)));
@@ -1285,7 +1285,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
   for (Lisp_Object tail = clauses; CONSP (tail); tail = XCDR (tail))
     {
       Lisp_Object clause = XCAR (tail);
-      if (! (NILP (clause)
+      if (!(NILP (clause)
 	     || (CONSP (clause)
 		 && (SYMBOLP (XCAR (clause))
 		     || CONSP (XCAR (clause))))))
@@ -1329,14 +1329,14 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
     exception_stack_pop (current_thread);
   eassert (before_count == exception_stack_count (current_thread));
   Lisp_Object clause = NILP (triggered_clause) ? success_clause : triggered_clause;
-  if (! NILP (clause))
+  if (!NILP (clause))
     {
       if (NILP (var))
 	result = Fprogn (XCDR (clause));
       else
 	{
 	  specpdl_ref count = SPECPDL_INDEX ();
-	  if (! NILP (current_thread->lexical_environment))
+	  if (!NILP (current_thread->lexical_environment))
 	    {
 	      record_lexical_environment ();
 	      current_thread->lexical_environment
@@ -1506,7 +1506,7 @@ internal_catch_all (Lisp_Object (*function) (void *), void *argument,
                     Lisp_Object (*handler) (enum nonlocal_exit, Lisp_Object))
 {
   struct handler *c = push_exception (Qt, OMNIBUS);
-  if (! c)
+  if (!c)
     return Qcatch_all_memory_full;
 #ifdef ENABLE_CHECKING
   size_t ocount = exception_stack_count (current_thread);
@@ -1601,7 +1601,7 @@ static Lisp_Object
 signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
 {
   /* Edebug hook if specpdl not overflowed.  */
-  if (! NILP (Vsignal_hook_function)
+  if (!NILP (Vsignal_hook_function)
       && specpdl_ptr < specpdl_end)
     call2 (Vsignal_hook_function, error_symbol, data);
 
@@ -1644,9 +1644,9 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
     }
 
   if ((! NILP (Vdebug_on_signal)
-       || ! handler
+       || !handler
        /* Clause containing special 'debug symbol */
-       || (CONSP (handler->what) && ! NILP (Fmemq (Qdebug, handler->what)))
+       || (CONSP (handler->what) && !NILP (Fmemq (Qdebug, handler->what)))
        /* Special symbol invoking debugger */
        || EQ (handler->what, Qerror))
       && maybe_call_debugger (Fget (error_symbol, Qerror_conditions),
@@ -1655,11 +1655,11 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
       if (EQ (error_symbol, Qquit))
 	return Qnil;
     }
-  else if ((! handler || EQ (handler->what, Qerror))
+  else if ((!handler || EQ (handler->what, Qerror))
 	   && noninteractive
 	   && backtrace_on_error_noninteractive
 	   && NILP (Vinhibit_debugger)
-	   && ! NILP (Ffboundp (Qdebug_early)))
+	   && !NILP (Ffboundp (Qdebug_early)))
     {
       /* `debug-early' does not interfere with ERT or customized debuggers */
       specpdl_ref count = SPECPDL_INDEX ();
@@ -1743,7 +1743,7 @@ wants_debugger (Lisp_Object list, Lisp_Object conditions)
 {
   if (NILP (list))
     return 0;
-  if (! CONSP (list))
+  if (!CONSP (list))
     return 1;
 
   while (CONSP (conditions))
@@ -1817,13 +1817,13 @@ maybe_call_debugger (Lisp_Object conditions, Lisp_Object sig, Lisp_Object data)
   if (
       /* Don't try to run the debugger with interrupts blocked.
 	 The editing loop would return anyway.  */
-      ! input_blocked_p ()
+      !input_blocked_p ()
       && NILP (Vinhibit_debugger)
       /* Does user want to enter debugger for this kind of error?  */
       && (signal_quit_p (sig)
 	  ? debug_on_quit
 	  : wants_debugger (Vdebug_on_error, conditions))
-      && ! skip_debugger (conditions, combined_data)
+      && !skip_debugger (conditions, combined_data)
       /* See commentary on definition of
          `internal-when-entered-debugger'.  */
       && when_entered_debugger < num_nonmacro_input_events)
@@ -1916,7 +1916,7 @@ then strings and vectors are not accepted.  */)
         {
           Lisp_Object doc = AREF (fun, COMPILED_DOC_STRING);
           /* An invalid "docstring" is a sign that we have an OClosure.  */
-          genfun = ! (NILP (doc) || VALID_DOCSTRING_P (doc));
+          genfun = !(NILP (doc) || VALID_DOCSTRING_P (doc));
         }
     }
 
@@ -2015,7 +2015,7 @@ this does nothing and returns nil.  */)
       && !AUTOLOADP (XSYMBOL (function)->u.s.function))
     return Qnil;
 
-  if (! NILP (Vloadup_pure_table) && EQ (docstring, make_fixnum (0)))
+  if (!NILP (Vloadup_pure_table) && EQ (docstring, make_fixnum (0)))
     /* `read1' in lread.c has found the docstring starting with "\
        and assumed the docstring will be provided by Snarf-documentation, so it
        passed us 0 instead.  But that leads to accidental sharing in purecopy's
@@ -2191,7 +2191,7 @@ eval_form (Lisp_Object form)
   if (SYMBOLP (form))
     {
       Lisp_Object lexbind = find_lexbind (current_thread, form);
-      result = ! NILP (lexbind) ? XCDR (lexbind) : Fsymbol_value (form);
+      result = !NILP (lexbind) ? XCDR (lexbind) : Fsymbol_value (form);
     }
   else if (CONSP (form))
     {
@@ -2309,12 +2309,12 @@ eval_form (Lisp_Object form)
 	  SAFE_FREE ();
 	  xsignal1 (Qvoid_function, original_fun);
 	}
-      else if (! CONSP (fun))
+      else if (!CONSP (fun))
 	{
 	  SAFE_FREE ();
 	  xsignal1 (Qinvalid_function, original_fun);
 	}
-      else if (! SYMBOLP (XCAR (fun)))
+      else if (!SYMBOLP (XCAR (fun)))
 	{
 	  SAFE_FREE ();
 	  xsignal1 (Qinvalid_function, original_fun);
@@ -2332,7 +2332,7 @@ eval_form (Lisp_Object form)
 	     aware of how it will be interpreted, i.e., with lexical
 	     scoping or not.  */
 	  specbind (Qlexical_binding,
-		    ! NILP (current_thread->lexical_environment) ? Qt : Qnil);
+		    !NILP (current_thread->lexical_environment) ? Qt : Qnil);
 
 	  /* Apprise macro of any defvar declarations in scope. */
 	  Lisp_Object dynvars = Vmacroexp__dynvars;
@@ -2881,7 +2881,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
   if (COMPILEDP (fun))
     {
       Lisp_Object first_slot = AREF (fun, COMPILED_ARGLIST);
-      eassert (! CONSP (fun));
+      eassert (!CONSP (fun));
       if (FIXNUMP (first_slot))
 	{
 	  /* An integer first slot denotes the number of lexically
@@ -2963,12 +2963,12 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 	    }
 	  else if (i < nargs)
 	    arg = arg_vector[i++];
-	  else if (! optional)
+	  else if (!optional)
 	    xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
 	  else
 	    arg = Qnil;
 
-	  if (! NILP (lexenv) && SYMBOLP (sym))
+	  if (!NILP (lexenv) && SYMBOLP (sym))
 	    /* Lexically bind SYM.  */
 	    lexenv = Fcons (Fcons (sym, arg), lexenv);
 	  else
@@ -2978,17 +2978,17 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 	}
     }
 
-  if (! NILP (args) || previous_rest)
+  if (!NILP (args) || previous_rest)
     xsignal1 (Qinvalid_function, fun);
   else if (i < nargs)
     xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
-  else if (! EQ (lexenv, current_thread->lexical_environment))
+  else if (!EQ (lexenv, current_thread->lexical_environment))
     {
       record_lexical_environment ();
       current_thread->lexical_environment = lexenv;
     }
 
-  eassert (! SUBR_NATIVE_COMPILEDP (fun)
+  eassert (!SUBR_NATIVE_COMPILEDP (fun)
 	   || SUBR_NATIVE_COMPILED_DYNP (fun));
   Lisp_Object retval;
  funcall_lambda_return:
@@ -3471,7 +3471,7 @@ unbind_to (specpdl_ref count, Lisp_Object value)
 	    Lisp_Object val = specpdl_value (specpdl_ptr);
 	    Lisp_Object where = specpdl_buffer (specpdl_ptr);
 	    eassert (BUFFERP (where));
-	    if (! NILP (Flocal_variable_p (symbol, where)))
+	    if (!NILP (Flocal_variable_p (symbol, where)))
 	      set_internal (symbol, val, where, SET_INTERNAL_UNBIND);
 	  }
 	  break;
@@ -3501,7 +3501,7 @@ get_backtrace_starting_at (Lisp_Object base)
 {
   union specbinding *pdl = backtrace_top (current_thread);
 
-  if (! NILP (base))
+  if (!NILP (base))
     {
       /* Skip up to BASE.  */
       int offset = 0;
@@ -3708,7 +3708,7 @@ specpdl_internal_walk (union specbinding *pdl, int step, int distance,
 		Lisp_Object value = specpdl_value (bind);
 		eassert (BUFFERP (where));
 
-		if (! NILP (Flocal_variable_p (symbol, where)))
+		if (!NILP (Flocal_variable_p (symbol, where)))
 		  {
 		    bind->let.value
 		      = find_symbol_value (XSYMBOL (symbol), XBUFFER (where));
@@ -3767,7 +3767,7 @@ NFRAMES and BASE are as `backtrace-frame'.  */)
   ptrdiff_t distance = specpdl_ptr - pdl;
   eassert (distance >= 0);
 
-  if (! backtrace_valid_p (current_thread, pdl))
+  if (!backtrace_valid_p (current_thread, pdl))
     error ("Activation frame not found!");
 
   backtrace_eval_unwind (distance);

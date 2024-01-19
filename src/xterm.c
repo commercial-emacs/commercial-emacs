@@ -1828,7 +1828,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 
   if (rc
       && tmp_data
-      && ! bytes_remaining
+      && !bytes_remaining
       && actual_type == dpyinfo->Xatom_MOTIF_DRAG_TARGETS
       && actual_format == 8)
     {
@@ -1853,7 +1853,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	      recs[total_items] = xm_read_targets_table_rec (data + total_bytes,
 							     nitems, byteorder);
 
-	      if (! recs[total_items])
+	      if (!recs[total_items])
 		break;
 
 	      total_bytes += 2 + recs[total_items]->n_targets * 4;
@@ -1961,7 +1961,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
 	}
     }
 
-  if (! rc)
+  if (!rc)
     {
       /* Some implementations of Motif DND set the protocol version of
 	 just the targets table to 1 without actually changing the
@@ -8304,7 +8304,7 @@ x_draw_composite_glyph_string_foreground (struct glyph_string *s)
 	|| x_try_cr_xlib_drawable (s->f, s->gc))
       {
 #endif	/* USE_CAIRO */
-	if (! s->first_glyph->u.cmp.automatic)
+	if (!s->first_glyph->u.cmp.automatic)
 	  {
 	    int y = s->ybase;
 
@@ -8417,7 +8417,7 @@ x_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
 		  >= 1))
 	    {
 	      Lisp_Object acronym
-		= (! glyph->u.glyphless.for_no_font
+		= (!glyph->u.glyphless.for_no_font
 		   ? CHAR_TABLE_REF (Vglyphless_char_display,
 				     glyph->u.glyphless.ch)
 		   : XCHAR_TABLE (Vglyphless_char_display)->extras[0]);
@@ -10496,7 +10496,7 @@ x_draw_glyph_string (struct glyph_string *s)
 
     case COMPOSITE_GLYPH:
       if (s->for_overlaps || (s->cmp_from > 0
-			      && ! s->first_glyph->u.cmp.automatic))
+			      && !s->first_glyph->u.cmp.automatic))
 	s->background_filled_p = true;
       else
 	x_draw_glyph_string_background (s, true);
@@ -10586,13 +10586,13 @@ x_draw_glyph_string (struct glyph_string *s)
 		  val = (WINDOW_BUFFER_LOCAL_VALUE
 			 (Qx_underline_at_descent_line, s->w));
 		  underline_at_descent_line
-		    = (! (NILP (val) || EQ (val, Qunbound))
+		    = (!(NILP (val) || EQ (val, Qunbound))
 		       || s->face->underline_at_descent_line_p);
 
 		  val = (WINDOW_BUFFER_LOCAL_VALUE
 			 (Qx_use_underline_position_properties, s->w));
 		  use_underline_position_properties
-		    = ! (NILP (val) || EQ (val, Qunbound));
+		    = !(NILP (val) || EQ (val, Qunbound));
 
                   /* Get the underline thickness.  Default is 1 pixel.  */
                   if (font && font->underline_thickness > 0)
@@ -11075,7 +11075,7 @@ XTflash (struct frame *f)
 
   /* Keep waiting until past the time wakeup or any input gets
      available.  */
-  while (! detect_input_pending ())
+  while (!detect_input_pending ())
     {
       struct timespec current = current_timespec ();
       struct timespec timeout;
@@ -11553,7 +11553,7 @@ make_invisible_cursor (struct x_display_info *dpyinfo)
       col.red = col.green = col.blue = 0;
       col.flags = DoRed | DoGreen | DoBlue;
       pixc = XCreatePixmapCursor (dpy, pix, pix, &col, &col, 0, 0);
-      if (! x_had_errors_p (dpy) && pixc != None)
+      if (!x_had_errors_p (dpy) && pixc != None)
         c = pixc;
       XFreePixmap (dpy, pix);
     }
@@ -13445,7 +13445,7 @@ x_detect_focus_change (struct x_display_info *dpyinfo, struct frame *frame,
 
         if (event->xcrossing.detail != NotifyInferior
             && event->xcrossing.focus
-            && ! (focus_state & FOCUS_EXPLICIT))
+            && !(focus_state & FOCUS_EXPLICIT))
           x_focus_changed ((event->type == EnterNotify ? FocusIn : FocusOut),
 			   FOCUS_IMPLICIT,
 			   dpyinfo, frame, bufp);
@@ -13559,7 +13559,7 @@ x_frame_rehighlight (struct x_display_info *dpyinfo)
 	= ((FRAMEP (FRAME_FOCUS_FRAME (dpyinfo->x_focus_frame)))
 	   ? XFRAME (FRAME_FOCUS_FRAME (dpyinfo->x_focus_frame))
 	   : dpyinfo->x_focus_frame);
-      if (! FRAME_LIVE_P (dpyinfo->highlight_frame))
+      if (!FRAME_LIVE_P (dpyinfo->highlight_frame))
 	{
 	  fset_focus_frame (dpyinfo->x_focus_frame, Qnil);
 	  dpyinfo->highlight_frame = dpyinfo->x_focus_frame;
@@ -13727,7 +13727,7 @@ x_find_modifier_meanings (struct x_display_info *dpyinfo)
   }
 
   /* If we couldn't find any meta keys, accept any alt keys as meta keys.  */
-  if (! dpyinfo->meta_mod_mask)
+  if (!dpyinfo->meta_mod_mask)
     {
       dpyinfo->meta_mod_mask = dpyinfo->alt_mod_mask;
       dpyinfo->alt_mod_mask = 0;
@@ -14793,7 +14793,7 @@ x_window_to_scroll_bar (Display *display, Window window_id, int type)
     {
       Lisp_Object bar, condemned;
 
-      if (! FRAME_X_P (XFRAME (frame)))
+      if (!FRAME_X_P (XFRAME (frame)))
         continue;
 
       /* Scan this frame's scroll bar list for a scroll bar with the
@@ -14802,9 +14802,9 @@ x_window_to_scroll_bar (Display *display, Window window_id, int type)
       for (bar = FRAME_SCROLL_BARS (XFRAME (frame));
 	   /* This trick allows us to search both the ordinary and
               condemned scroll bar lists with one loop.  */
-	   ! NILP (bar) || (bar = condemned,
+	   !NILP (bar) || (bar = condemned,
 			       condemned = Qnil,
-			       ! NILP (bar));
+			       !NILP (bar));
 	   bar = XSCROLL_BAR (bar)->next)
 	if (XSCROLL_BAR (bar)->x_window == window_id
             && FRAME_X_DISPLAY (XFRAME (frame)) == display
@@ -16759,14 +16759,14 @@ XTredeem_scroll_bar (struct window *w)
       else
 	XSCROLL_BAR (bar->prev)->next = bar->next;
 
-      if (! NILP (bar->next))
+      if (!NILP (bar->next))
 	XSCROLL_BAR (bar->next)->prev = bar->prev;
 
       bar->next = FRAME_SCROLL_BARS (f);
       bar->prev = Qnil;
       XSETVECTOR (barobj, bar);
       fset_scroll_bars (f, barobj);
-      if (! NILP (bar->next))
+      if (!NILP (bar->next))
 	XSETVECTOR (XSCROLL_BAR (bar->next)->prev, bar);
     }
 
@@ -16794,14 +16794,14 @@ XTredeem_scroll_bar (struct window *w)
       else
 	XSCROLL_BAR (bar->prev)->next = bar->next;
 
-      if (! NILP (bar->next))
+      if (!NILP (bar->next))
 	XSCROLL_BAR (bar->next)->prev = bar->prev;
 
       bar->next = FRAME_SCROLL_BARS (f);
       bar->prev = Qnil;
       XSETVECTOR (barobj, bar);
       fset_scroll_bars (f, barobj);
-      if (! NILP (bar->next))
+      if (!NILP (bar->next))
 	XSETVECTOR (XSCROLL_BAR (bar->next)->prev, bar);
     }
 }
@@ -16951,7 +16951,7 @@ x_scroll_bar_handle_click (struct scroll_bar *bar,
   int new_start, new_end;
 #endif
 
-  if (! WINDOWP (bar->window))
+  if (!WINDOWP (bar->window))
     emacs_abort ();
 
   emacs_event->kind = (bar->horizontal
@@ -17424,7 +17424,7 @@ event_handler_gdk (GdkXEvent *gxev, GdkEvent *ev, gpointer data)
 	}
 #endif
 
-      if (! dpyinfo)
+      if (!dpyinfo)
         current_finish = X_EVENT_NORMAL;
       else
 	current_count
@@ -18552,7 +18552,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
                    KDE will then start two Emacsen, one for the
                    session manager and one for this. */
 #ifdef HAVE_X_SM
-                if (! x_session_have_connection ())
+                if (!x_session_have_connection ())
 #endif
                   {
                     f = x_top_window_to_frame (dpyinfo,
@@ -19926,7 +19926,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	       /* Any "vendor-specific" key is ok.  */
 	       || (orig_keysym & (1 << 28))
 	       || (keysym != NoSymbol && nbytes == 0))
-	      && ! (IsModifierKey (orig_keysym)
+	      && !(IsModifierKey (orig_keysym)
 		    /* The symbols from XK_ISO_Lock
 		       to XK_ISO_Last_Group_Lock
 		       don't have real modifiers but
@@ -21371,7 +21371,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
             if (!(tab_bar_p && NILP (tab_bar_arg)) && !tool_bar_p)
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
-              if (! popup_activated ())
+              if (!popup_activated ())
 #endif
                 {
                   if (ignore_next_mouse_click_timeout
@@ -21444,7 +21444,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
            GTK right away.  Instead, save it and pass it to Xt or GTK
            from kbd_buffer_get_event.  That way, we can run some Lisp
            code first.  */
-        if (! popup_activated ()
+        if (!popup_activated ()
 #ifdef USE_GTK
             /* Gtk+ menus only react to the first three buttons. */
             && event->xbutton.button < 3
@@ -23155,7 +23155,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 		  if (!(tab_bar_p && NILP (tab_bar_arg)) && !tool_bar_p)
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
-		    if (! popup_activated ())
+		    if (!popup_activated ())
 #endif
 		      {
 			if (ignore_next_mouse_click_timeout)
@@ -23792,7 +23792,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		       /* Any "vendor-specific" key is ok.  */
 		       || (keysym & (1 << 28))
 		       || (keysym != NoSymbol && nbytes == 0))
-		      && ! (IsModifierKey (keysym)
+		      && !(IsModifierKey (keysym)
 			    /* The symbols from XK_ISO_Lock
 			       to XK_ISO_Last_Group_Lock
 			       don't have real modifiers but
@@ -24849,7 +24849,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
     }
 
   if (do_help
-      && ! (hold_quit && hold_quit->kind != NO_EVENT))
+      && !(hold_quit && hold_quit->kind != NO_EVENT))
     {
       Lisp_Object frame;
 
@@ -25031,7 +25031,7 @@ XTread_socket (struct terminal *terminal, struct input_event *hold_quit)
 
   /* On some systems, an X bug causes Emacs to get no more events
      when the window is destroyed.  Detect that.  (1994.)  */
-  if (! event_found)
+  if (!event_found)
     {
       /* Emacs and the X Server eats up CPU time if XNoOp is done every time.
 	 One XNOOP in 100 loops will make Emacs terminate.
@@ -26136,7 +26136,7 @@ x_connection_closed (Display *dpy, const char *error_message, bool ioerror)
 
       if (FRAME_X_P (XFRAME (frame))
 	  && FRAME_X_P (XFRAME (minibuf_frame))
-	  && ! EQ (frame, minibuf_frame)
+	  && !EQ (frame, minibuf_frame)
 	  && FRAME_DISPLAY_INFO (XFRAME (minibuf_frame)) == dpyinfo)
 	delete_frame (frame, Qnoelisp);
     }
@@ -28380,9 +28380,9 @@ x_make_frame_visible (struct frame *f)
          call x_set_offset a second time
          if we get to x_make_frame_visible a second time
 	 before the window gets really visible.  */
-      if (! FRAME_ICONIFIED_P (f)
-	  && ! FRAME_X_EMBEDDED_P (f)
-	  && ! f->output_data.x->asked_for_visible)
+      if (!FRAME_ICONIFIED_P (f)
+	  && !FRAME_X_EMBEDDED_P (f)
+	  && !f->output_data.x->asked_for_visible)
 	x_set_offset (f, f->left_pos, f->top_pos, 0);
 
 #ifndef USE_GTK
@@ -28576,7 +28576,7 @@ x_make_frame_invisible (struct frame *f)
   else
 #endif
 
-    if (! XWithdrawWindow (FRAME_X_DISPLAY (f), window,
+    if (!XWithdrawWindow (FRAME_X_DISPLAY (f), window,
 			   DefaultScreen (FRAME_X_DISPLAY (f))))
       {
 	unblock_input ();
@@ -28646,7 +28646,7 @@ x_iconify_frame (struct frame *f)
 #if defined (USE_GTK)
   if (FRAME_GTK_OUTER_WIDGET (f))
     {
-      if (! FRAME_VISIBLE_P (f))
+      if (!FRAME_VISIBLE_P (f))
         gtk_widget_show_all (FRAME_GTK_OUTER_WIDGET (f));
 
       gtk_window_iconify (GTK_WINDOW (FRAME_GTK_OUTER_WIDGET (f)));
@@ -28692,9 +28692,9 @@ x_iconify_frame (struct frame *f)
 
   /* Make sure the X server knows where the window should be positioned,
      in case the user deiconifies with the window manager.  */
-  if (! FRAME_VISIBLE_P (f)
-      && ! FRAME_ICONIFIED_P (f)
-      && ! FRAME_X_EMBEDDED_P (f))
+  if (!FRAME_VISIBLE_P (f)
+      && !FRAME_ICONIFIED_P (f)
+      && !FRAME_X_EMBEDDED_P (f))
     x_set_offset (f, f->left_pos, f->top_pos, 0);
 
   /* Since we don't know which revision of X we're running, we'll use both
@@ -28715,7 +28715,7 @@ x_iconify_frame (struct frame *f)
     msg.xclient.data.l[3] = 0;
     msg.xclient.data.l[4] = 0;
 
-    if (! XSendEvent (FRAME_X_DISPLAY (f),
+    if (!XSendEvent (FRAME_X_DISPLAY (f),
 		      FRAME_DISPLAY_INFO (f)->root_window,
 		      False,
 		      SubstructureRedirectMask | SubstructureNotifyMask,
@@ -29859,7 +29859,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
         argc = 0;
         argv[argc++] = initial_argv[0];
 
-        if (! NILP (display_name))
+        if (!NILP (display_name))
           {
             argv[argc++] = display_opt;
             argv[argc++] = SSDATA (display_name);
@@ -30824,7 +30824,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
   /* Only do this for the very first display in the Emacs session.
      Ignore X session management when Emacs was first started on a
      tty or started as a daemon.  */
-  if (!dpyinfo->next && ! IS_DAEMON)
+  if (!dpyinfo->next && !IS_DAEMON)
     x_session_initialize (dpyinfo);
 #endif
 

@@ -173,10 +173,10 @@ print_prepare (Lisp_Object printcharfun)
   if (NILP (printcharfun))
     {
       if (NILP (BVAR (current_buffer, enable_multibyte_characters))
-	  && ! print_escape_multibyte)
+	  && !print_escape_multibyte)
 	specbind (Qprint_escape_multibyte, Qt);
-      if (! NILP (BVAR (current_buffer, enable_multibyte_characters))
-	  && ! print_escape_nonascii)
+      if (!NILP (BVAR (current_buffer, enable_multibyte_characters))
+	  && !print_escape_nonascii)
 	specbind (Qprint_escape_nonascii, Qt);
       if (print_buffer.buffer != NULL)
 	{
@@ -195,7 +195,7 @@ print_prepare (Lisp_Object printcharfun)
       print_buffer.pos = 0;
       print_buffer.pos_byte = 0;
     }
-  if (EQ (printcharfun, Qt) && ! noninteractive)
+  if (EQ (printcharfun, Qt) && !noninteractive)
     setup_echo_area_for_printing (multibyte);
   pc.printcharfun = printcharfun;
   return pc;
@@ -294,7 +294,7 @@ printchar_to_stream (unsigned int ch, FILE *stream)
       for (; i < n; i++)
 	if (CHARACTERP (AREF (dv, i)))
 	  break;
-      if (! (i < n))
+      if (!(i < n))
 	break;
       ch = XFIXNAT (AREF (dv, i));
     }
@@ -483,10 +483,10 @@ print_string (Lisp_Object string, Lisp_Object printcharfun)
 
       if (STRING_MULTIBYTE (string))
 	chars = SCHARS (string);
-      else if (! print_escape_nonascii
+      else if (!print_escape_nonascii
 	       && (EQ (printcharfun, Qt)
-		   ? ! NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))
-		   : ! NILP (BVAR (current_buffer, enable_multibyte_characters))))
+		   ? !NILP (BVAR (&buffer_slot_defaults, enable_multibyte_characters))
+		   : !NILP (BVAR (current_buffer, enable_multibyte_characters))))
 	{
 	  /* If unibyte string STRING contains 8-bit codes, we must
 	     convert STRING to a multibyte string containing the same
@@ -967,7 +967,7 @@ append to existing target file.  */)
 
       fd = emacs_open (SSDATA (ENCODE_FILE (file)),
 		       (O_WRONLY | O_CREAT
-			| (! NILP (append) ? O_APPEND : O_TRUNC)),
+			| (!NILP (append) ? O_APPEND : O_TRUNC)),
 		       0666);
       if (fd < 0)
 	report_file_error ("Cannot open debugging output stream", file);
@@ -1387,26 +1387,26 @@ pp_stack_pop (void)
 static void
 print_preprocess (Lisp_Object obj)
 {
-  eassert (! NILP (Vprint_circle));
+  eassert (!NILP (Vprint_circle));
   ptrdiff_t base_sp = ppstack.sp;
 
   for (;;)
     {
       if (PRINT_CIRCLE_CANDIDATE_P (obj))
 	{
-	  if (! HASH_TABLE_P (Vprint_number_table))
+	  if (!HASH_TABLE_P (Vprint_number_table))
 	    Vprint_number_table = CALLN (Fmake_hash_table, QCtest, Qeq);
 
 	  Lisp_Object num = Fgethash (obj, Vprint_number_table, Qnil);
-	  if (! NILP (num)
+	  if (!NILP (num)
 	      /* If Vprint_continuous_numbering is non-nil and OBJ is a gensym,
 		 always print the gensym with a number.  This is a special for
 		 the lisp function byte-compile-output-docform.  */
-	      || (! NILP (Vprint_continuous_numbering)
+	      || (!NILP (Vprint_continuous_numbering)
 		  && SYMBOLP (obj)
 		  && !SYMBOL_INTERNED_P (obj)))
 	    { /* OBJ appears more than once.  Let's remember that.  */
-	      if (! FIXNUMP (num))
+	      if (!FIXNUMP (num))
 		{
 		  print_number_index++;
 		  /* Negative number indicates it hasn't been printed yet.  */
@@ -1504,18 +1504,18 @@ print_check_string_charset_prop (INTERVAL interval, void *pstring)
     return;
   for (val = interval->plist; CONSP (val) && ! EQ (XCAR (val), Qcharset);
        val = XCDR (XCDR (val)));
-  if (! CONSP (val))
+  if (!CONSP (val))
     {
       print_check_string_result |= PRINT_STRING_NON_CHARSET_FOUND;
       return;
     }
-  if (! (print_check_string_result & PRINT_STRING_NON_CHARSET_FOUND))
+  if (!(print_check_string_result & PRINT_STRING_NON_CHARSET_FOUND))
     {
-      if (! EQ (val, interval->plist)
+      if (!EQ (val, interval->plist)
 	  || CONSP (XCDR (XCDR (val))))
 	print_check_string_result |= PRINT_STRING_NON_CHARSET_FOUND;
     }
-  if (! (print_check_string_result & PRINT_STRING_UNSAFE_CHARSET_FOUND))
+  if (!(print_check_string_result & PRINT_STRING_UNSAFE_CHARSET_FOUND))
     {
       ptrdiff_t charpos = interval->position;
       Lisp_Object string = *(Lisp_Object *)pstring;
@@ -1525,8 +1525,8 @@ print_check_string_charset_prop (INTERVAL interval, void *pstring)
       for (ptrdiff_t i = 0; i < LENGTH (interval); i++)
 	{
 	  int c = fetch_string_char_advance (string, &charpos, &bytepos);
-	  if (! ASCII_CHAR_P (c)
-	      && ! EQ (CHARSET_NAME (CHAR_CHARSET (c)), charset))
+	  if (!ASCII_CHAR_P (c)
+	      && !EQ (CHARSET_NAME (CHAR_CHARSET (c)), charset))
 	    {
 	      print_check_string_result |= PRINT_STRING_UNSAFE_CHARSET_FOUND;
 	      break;
@@ -1545,7 +1545,7 @@ print_prune_string_charset (Lisp_Object string)
   traverse_intervals (string_intervals (string), 0,
 		      print_check_string_charset_prop, &string);
   if (NILP (Vprint_charset_text_property)
-      || ! (print_check_string_result & PRINT_STRING_UNSAFE_CHARSET_FOUND))
+      || !(print_check_string_result & PRINT_STRING_UNSAFE_CHARSET_FOUND))
     {
       string = Fcopy_sequence (string);
       if (print_check_string_result & PRINT_STRING_NON_CHARSET_FOUND)
@@ -1708,7 +1708,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 
     case PVEC_OVERLAY:
       print_c_string ("#<overlay ", printcharfun);
-      if (! OVERLAY_BUFFER (obj))
+      if (!OVERLAY_BUFFER (obj))
 	print_c_string ("in no buffer", printcharfun);
       else
 	{
@@ -1866,7 +1866,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 
     case PVEC_FONT:
       {
-	if (! FONT_OBJECT_P (obj))
+	if (!FONT_OBJECT_P (obj))
 	  {
 	    if (FONT_SPEC_P (obj))
 	      print_c_string ("#<font-spec", printcharfun);
@@ -2273,7 +2273,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  bool need_nonhex = false;
 	  bool multibyte = STRING_MULTIBYTE (obj);
 
-	  if (! EQ (Vprint_charset_text_property, Qt))
+	  if (!EQ (Vprint_charset_text_property, Qt))
 	    obj = print_prune_string_charset (obj);
 
 	  if (string_intervals (obj))
@@ -2293,7 +2293,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 
 	      if (multibyte
 		  ? (CHAR_BYTE8_P (c) && (c = CHAR_TO_BYTE8 (c), true))
-		  : (SINGLE_BYTE_CHAR_P (c) && ! ASCII_CHAR_P (c)
+		  : (SINGLE_BYTE_CHAR_P (c) && !ASCII_CHAR_P (c)
 		     && print_escape_nonascii))
 		{
 		  /* When printing a raw 8-bit byte in a multibyte buffer, or
@@ -2304,7 +2304,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 		  need_nonhex = false;
 		}
 	      else if (multibyte
-		       && ! ASCII_CHAR_P (c) && print_escape_multibyte)
+		       && !ASCII_CHAR_P (c) && print_escape_multibyte)
 		{
 		  /* When requested, print multibyte chars using
 		     hex escapes.  */
@@ -2375,7 +2375,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  || *p == '?'
 	  || *p == '.';
 
-	if (! NILP (Vprint_gensym)
+	if (!NILP (Vprint_gensym)
 	    && !SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (obj))
 	  print_c_string ("#:", printcharfun);
 	else if (size_byte == 0)

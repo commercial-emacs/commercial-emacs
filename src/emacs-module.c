@@ -1218,7 +1218,7 @@ module_function_data (const struct Lisp_Module_Function *function)
 static void
 module_assert_runtime (struct emacs_runtime *runtime)
 {
-  if (! module_assertions)
+  if (!module_assertions)
     return;
   ptrdiff_t count = 0;
   for (const union specbinding *pdl = specpdl; pdl != specpdl_ptr; ++pdl)
@@ -1235,7 +1235,7 @@ module_assert_runtime (struct emacs_runtime *runtime)
 static void
 module_assert_env (emacs_env *env)
 {
-  if (! module_assertions)
+  if (!module_assertions)
     return;
   ptrdiff_t count = 0;
   for (const union specbinding *pdl = specpdl; pdl != specpdl_ptr; ++pdl)
@@ -1376,11 +1376,11 @@ allocate_emacs_value (emacs_env *env, Lisp_Object obj)
   struct emacs_value_storage *storage = &env->private_members->storage;
   eassert (storage->current);
   eassert (storage->current->offset < value_frame_size);
-  eassert (! storage->current->next);
+  eassert (!storage->current->next);
   if (storage->current->offset == value_frame_size - 1)
     {
       storage->current->next = malloc (sizeof *storage->current->next);
-      if (! storage->current->next)
+      if (!storage->current->next)
         {
           module_out_of_memory (env);
           return NULL;

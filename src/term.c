@@ -158,7 +158,7 @@ tty_send_additional_strings (struct terminal *terminal, Lisp_Object sym)
      form of quitting or signaling an error, since this function can
      run as part of the "emergency escape" procedure invoked in the
      middle of GC, where quitting means crashing (Bug#17406).  */
-  if (! terminal->name)
+  if (!terminal->name)
     return;
   struct tty_display_info *tty = terminal->display_info.tty;
 
@@ -613,7 +613,7 @@ encode_terminal_code (struct glyph *src, int src_len,
 	      }
 	}
       /* We must skip glyphs to be padded for a wide character.  */
-      else if (! CHAR_GLYPH_PADDING_P (*src))
+      else if (!CHAR_GLYPH_PADDING_P (*src))
 	{
 	  GLYPH g;
 	  int c UNINIT;
@@ -674,7 +674,7 @@ encode_terminal_code (struct glyph *src, int src_len,
 	    }
 	  else
 	    {
-	      if (! STRING_MULTIBYTE (string))
+	      if (!STRING_MULTIBYTE (string))
 		string = string_to_multibyte (string);
 	      nbytes = buf - encode_terminal_src;
 	      if (encode_terminal_src_size - nbytes < SBYTES (string))
@@ -877,7 +877,7 @@ tty_insert_glyphs (struct frame *f, struct glyph *start, int len)
   tty_turn_on_insert (tty);
   cmplus (tty, len);
 
-  if (! start)
+  if (!start)
     space[0] = SPACEGLYPH;
 
   /* If terminal_coding does any conversion, use it, otherwise use
@@ -1839,7 +1839,7 @@ produce_glyphless_glyph (struct it *it, Lisp_Object acronym)
     {
       if (it->glyphless_method == GLYPHLESS_DISPLAY_ACRONYM)
 	{
-	  if (! STRINGP (acronym) && CHAR_TABLE_P (Vglyphless_char_display))
+	  if (!STRINGP (acronym) && CHAR_TABLE_P (Vglyphless_char_display))
 	    acronym = CHAR_TABLE_REF (Vglyphless_char_display, it->c);
 	  if (CONSP (acronym))
 	    acronym = XCDR (acronym);
@@ -2337,7 +2337,7 @@ frame's terminal). */)
       t->display_info.tty->input = t->display_info.tty->output
 	= fd < 0 ? 0 : fdopen (fd, "w+");
 
-      if (! t->display_info.tty->input)
+      if (!t->display_info.tty->input)
 	{
 	  int open_errno = errno;
 	  emacs_close (fd);
@@ -2913,7 +2913,7 @@ tty_menu_add_selection (tty_menu *menu, int pane,
   if (pane)
     {
       menu = tty_menu_search_pane (menu, pane);
-      if (! menu)
+      if (!menu)
 	return 0;
     }
   tty_menu_make_room (menu);
@@ -3645,7 +3645,7 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
 	    item_data = SSDATA (item_name);
 
 	  if (lpane == TTYM_FAILURE
-	      || (! tty_menu_add_selection (menu, lpane, item_data,
+	      || (!tty_menu_add_selection (menu, lpane, item_data,
 					    !NILP (enable), help_string)))
 	    {
 	      tty_menu_destroy (menu);
@@ -4022,7 +4022,7 @@ init_tty (const char *name, const char *terminal_type, bool must_succeed)
 	 ? NULL
 	 : fdopen (fd, "w+"));
 
-    if (! tty->input)
+    if (!tty->input)
       {
 	char const *diagnostic
 	  = (fd < 0) ? "Could not open file: %s" : "Not a tty device: %s";
@@ -4444,7 +4444,7 @@ vfatal (const char *str, va_list ap)
 {
   fputs ("emacs: ", stderr);
   vfprintf (stderr, str, ap);
-  if (! (str[0] && str[strlen (str) - 1] == '\n'))
+  if (!(str[0] && str[strlen (str) - 1] == '\n'))
     putc ('\n', stderr);
   exit (1);
 }
@@ -4503,7 +4503,7 @@ delete_tty (struct terminal *terminal)
       for (p = tty_list; p && p->next != tty; p = p->next)
         ;
 
-      if (! p)
+      if (!p)
         /* This should not happen.  */
         emacs_abort ();
 

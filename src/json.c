@@ -1101,12 +1101,12 @@ read_jsonrpc_forever (Lisp_Object proc)
 {
   struct Lisp_Process *p = XPROCESS (proc);
   struct thread_state *self = current_thread;
-  bool releasable = ! NILP (Fprocess_thread (proc)); /* is not rogue */
+  bool releasable = !NILP (Fprocess_thread (proc)); /* is not rogue */
   int channel = p->infd;
   eassert (0 <= channel
 	   && channel < FD_SETSIZE
 #ifndef WINDOWSNT
-	   && ! (fcntl (channel, F_GETFL) & O_NONBLOCK)
+	   && !(fcntl (channel, F_GETFL) & O_NONBLOCK)
 #endif
 	   );
   int factor = 1;

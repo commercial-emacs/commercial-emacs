@@ -1721,7 +1721,7 @@ Return nil if POS is not visible in WINDOW.  */)
   if (!NILP (pos))
     {
       EMACS_INT p = fix_position (pos);
-      if (! (BEGV <= p && p <= ZV))
+      if (!(BEGV <= p && p <= ZV))
 	args_out_of_range (window, pos);
       textpos = p;
     }

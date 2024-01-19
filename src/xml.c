@@ -202,7 +202,7 @@ parse_region (Lisp_Object start, Lisp_Object end, Lisp_Object base_url,
   if (istart < GPT && GPT < iend)
     move_gap_both (iend, iend_byte);
 
-  if (! NILP (base_url))
+  if (!NILP (base_url))
     {
       CHECK_STRING (base_url);
       burl = SSDATA (base_url);

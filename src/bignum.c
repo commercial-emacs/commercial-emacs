@@ -449,7 +449,7 @@ check_integer_range (Lisp_Object x, intmax_t lo, intmax_t hi)
 {
   CHECK_INTEGER (x);
   intmax_t i;
-  if (! (integer_to_intmax (x, &i) && lo <= i && i <= hi))
+  if (!(integer_to_intmax (x, &i) && lo <= i && i <= hi))
     args_out_of_range_3 (x, make_int (lo), make_int (hi));
   return i;
 }
@@ -462,7 +462,7 @@ check_uinteger_max (Lisp_Object x, uintmax_t hi)
 {
   CHECK_INTEGER (x);
   uintmax_t i;
-  if (! (integer_to_uintmax (x, &i) && i <= hi))
+  if (!(integer_to_uintmax (x, &i) && i <= hi))
     args_out_of_range_3 (x, make_fixnum (0), make_uint (hi));
   return i;
 }

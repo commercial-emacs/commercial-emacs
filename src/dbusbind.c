@@ -1361,7 +1361,7 @@ usage: (dbus-message-internal &rest REST)  */)
   handler = Qnil;
 
   CHECK_FIXNAT (message_type);
-  if (! (DBUS_MESSAGE_TYPE_INVALID <= XFIXNAT (message_type)
+  if (!(DBUS_MESSAGE_TYPE_INVALID <= XFIXNAT (message_type)
 	 && XFIXNAT (message_type) < DBUS_NUM_MESSAGE_TYPES))
     XD_SIGNAL2 (build_string ("Invalid message type"), message_type);
   mtype = XFIXNAT (message_type);

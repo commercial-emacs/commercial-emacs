@@ -50,7 +50,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* Test for membership, allowing for t (actually any non-cons) to mean the
    universal set.  */
 
-#define TMEM(sym, set) (CONSP (set) ? ! NILP (Fmemq (sym, set)) : ! NILP (set))
+#define TMEM(sym, set) (CONSP (set) ? !NILP (Fmemq (sym, set)) : !NILP (set))
 
 static Lisp_Object merge_properties_sticky (Lisp_Object, Lisp_Object);
 static INTERVAL merge_interval_right (INTERVAL);
@@ -89,7 +89,7 @@ create_root_interval (Lisp_Object parent)
 {
   INTERVAL new = static_interval_allocator ();
 
-  if (! STRINGP (parent))
+  if (!STRINGP (parent))
     {
       new->total_length = (BUF_Z (XBUFFER (parent))
 			   - BUF_BEG (XBUFFER (parent)));
@@ -288,7 +288,7 @@ rotate_right (INTERVAL A)
   eassert (LENGTH (B) > 0);
 
   /* Deal with any Parent of A;  make it point to B.  */
-  if (! ROOT_INTERVAL_P (A))
+  if (!ROOT_INTERVAL_P (A))
     {
       if (AM_LEFT_CHILD (A))
 	set_interval_left (INTERVAL_PARENT (A), B);
@@ -339,7 +339,7 @@ rotate_left (INTERVAL A)
   eassert (LENGTH (B) > 0);
 
   /* Deal with any parent of A;  make it point to B.  */
-  if (! ROOT_INTERVAL_P (A))
+  if (!ROOT_INTERVAL_P (A))
     {
       if (AM_LEFT_CHILD (A))
 	set_interval_left (INTERVAL_PARENT (A), B);
@@ -578,7 +578,7 @@ interval_start_pos (INTERVAL source)
   if (!source)
     return 0;
 
-  if (! INTERVAL_HAS_OBJECT (source))
+  if (!INTERVAL_HAS_OBJECT (source))
     return 0;
   GET_INTERVAL_OBJECT (parent, source);
   if (BUFFERP (parent))
@@ -669,7 +669,7 @@ next_interval (register INTERVAL interval)
       return i;
     }
 
-  while (! NULL_PARENT (i))
+  while (!NULL_PARENT (i))
     {
       if (AM_LEFT_CHILD (i))
 	{
@@ -696,7 +696,7 @@ previous_interval (register INTERVAL interval)
   if (!interval)
     return NULL;
 
-  if (! NULL_LEFT_CHILD (interval))
+  if (!NULL_LEFT_CHILD (interval))
     {
       i = interval->left;
       while (! NULL_RIGHT_CHILD (i))
@@ -825,16 +825,16 @@ adjust_intervals_for_insertion (INTERVAL tree,
   /* If within an interval which is neither rear- nor front-sticky,
      split it at the insertion point to avoid propagating its
      properties.  */
-  if (position != i->position && ! eobp)
+  if (position != i->position && !eobp)
     {
       Lisp_Object tail = i->plist,
 	front = textget (i->plist, Qfront_sticky),
 	rear = textget (i->plist, Qrear_nonsticky);
 
-      if (! CONSP (rear) && ! NILP (rear))
+      if (!CONSP (rear) && !NILP (rear))
 	  /* All properties nonsticky, so split the interval.  */
 	goto check_done;
-      else if (! CONSP (front) && ! NILP (front))
+      else if (!CONSP (front) && !NILP (front))
 	{
 	  /* All properties sticky, so don't split the interval.  */
 	  tail = Qnil;
@@ -848,11 +848,11 @@ adjust_intervals_for_insertion (INTERVAL tree,
 	      Lisp_Object tmp, prop = XCAR (tail);
 
 	      /* Is PROP front-sticky?  */
-	      if (CONSP (front) && ! NILP (Fmemq (prop, front)))
+	      if (CONSP (front) && !NILP (Fmemq (prop, front)))
 		continue;
 
 	      /* Is PROP rear-nonsticky?  */
-	      if (CONSP (rear) && ! NILP (Fmemq (prop, rear)))
+	      if (CONSP (rear) && !NILP (Fmemq (prop, rear)))
 		break;
 
 	      /* Is PROP in Vtext_property_default_nonsticky?  */
@@ -925,15 +925,15 @@ adjust_intervals_for_insertion (INTERVAL tree,
       pright = i ? i->plist : Qnil;
       set_interval_plist (&newi, merge_properties_sticky (pleft, pright));
 
-      if (! prev) /* i.e. position == BEG */
+      if (!prev) /* i.e. position == BEG */
 	{
-	  if (! intervals_equal (i, &newi))
+	  if (!intervals_equal (i, &newi))
 	    {
 	      i = split_interval_left (i, length);
 	      set_interval_plist (i, newi.plist);
 	    }
 	}
-      else if (! intervals_equal (prev, &newi))
+      else if (!intervals_equal (prev, &newi))
 	{
 	  prev = split_interval_right (prev, position - prev->position);
 	  set_interval_plist (prev, newi.plist);
@@ -1027,8 +1027,8 @@ merge_properties_sticky (Lisp_Object pleft, Lisp_Object pright)
 	 stickiness to SYM.  */
       tmp = Fassq (sym, Vtext_property_default_nonsticky);
       use_left = (lpresent
-		  && ! (TMEM (sym, lrear)
-			|| (CONSP (tmp) && ! NILP (XCDR (tmp)))));
+		  && !(TMEM (sym, lrear)
+			|| (CONSP (tmp) && !NILP (XCDR (tmp)))));
       use_right = (TMEM (sym, rfront)
 		   || (CONSP (tmp) && NILP (XCDR (tmp))));
       if (use_left && use_right)
@@ -1084,7 +1084,7 @@ merge_properties_sticky (Lisp_Object pleft, Lisp_Object pright)
       tmp = Fassq (sym, Vtext_property_default_nonsticky);
 
       /* Since rval is known to be nil in this loop, the test simplifies.  */
-      if (! (TMEM (sym, lrear) || (CONSP (tmp) && ! NILP (XCDR (tmp)))))
+      if (!(TMEM (sym, lrear) || (CONSP (tmp) && !NILP (XCDR (tmp)))))
 	{
 	  props = Fcons (lval, Fcons (sym, props));
 	  if (TMEM (sym, lfront))
@@ -1100,7 +1100,7 @@ merge_properties_sticky (Lisp_Object pleft, Lisp_Object pright)
 	}
     }
   props = Fnreverse (props);
-  if (! NILP (rear))
+  if (!NILP (rear))
     props = Fcons (Qrear_nonsticky, Fcons (Fnreverse (rear), props));
 
   cat = textget (props, Qcategory);
@@ -1369,7 +1369,7 @@ merge_interval_right (register INTERVAL i)
   eassert (TOTAL_LENGTH (i) >= 0);
 
   successor = i;
-  while (! NULL_PARENT (successor))	   /* It's above us.  Subtract as
+  while (!NULL_PARENT (successor))	   /* It's above us.  Subtract as
 					      we ascend.  */
     {
       if (AM_LEFT_CHILD (successor))
@@ -1425,7 +1425,7 @@ merge_interval_left (register INTERVAL i)
   eassert (TOTAL_LENGTH (i) >= 0);
 
   predecessor = i;
-  while (! NULL_PARENT (predecessor))	/* It's above us.  Go up,
+  while (!NULL_PARENT (predecessor))	/* It's above us.  Go up,
 					   subtracting ABSORB.  */
     {
       if (AM_RIGHT_CHILD (predecessor))
@@ -1459,9 +1459,9 @@ reproduce_interval (INTERVAL source)
 
   copy_properties (source, target);
 
-  if (! NULL_LEFT_CHILD (source))
+  if (!NULL_LEFT_CHILD (source))
     set_interval_left (target, reproduce_tree (source->left, target));
-  if (! NULL_RIGHT_CHILD (source))
+  if (!NULL_RIGHT_CHILD (source))
     set_interval_right (target, reproduce_tree (source->right, target));
 
   eassert (LENGTH (target) > 0);
@@ -1788,7 +1788,7 @@ adjust_for_invis_intang (ptrdiff_t pos, ptrdiff_t test_offs, ptrdiff_t adj,
 				     &invis_overlay);
 
   if ((!test_intang
-       || ! NILP (Fget_char_property (test_pos, Qintangible, Qnil)))
+       || !NILP (Fget_char_property (test_pos, Qintangible, Qnil)))
       && TEXT_PROP_MEANS_INVISIBLE (invis_propval)
       /* This next test is true if the invisible property has a stickiness
 	 such that an insertion at POS would inherit it.  */
@@ -1798,7 +1798,7 @@ adjust_for_invis_intang (ptrdiff_t pos, ptrdiff_t test_offs, ptrdiff_t adj,
 	     == (test_offs == 0 ? 1 : -1))
 	  /* Invisible property is from an overlay.  */
 	  : (test_offs == 0
-	     ? ! OVERLAY_FRONT_ADVANCE_P (invis_overlay)
+	     ? !OVERLAY_FRONT_ADVANCE_P (invis_overlay)
 	     : OVERLAY_REAR_ADVANCE_P (invis_overlay))))
     pos += adj;
 
@@ -1840,7 +1840,7 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
 
   /* If we have no text properties and overlays,
      then we can do it quickly.  */
-  if (!buffer_intervals (current_buffer) && ! have_overlays)
+  if (!buffer_intervals (current_buffer) && !have_overlays)
     {
       temp_set_point_both (current_buffer, charpos, bytepos);
       return;
@@ -1875,7 +1875,7 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
 
   /* Moving within an interval.  */
   if (to == from && toprev == fromprev && INTERVAL_VISIBLE_P (to)
-      && ! have_overlays)
+      && !have_overlays)
     {
       temp_set_point_both (current_buffer, charpos, bytepos);
       return;
@@ -1988,8 +1988,8 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
      two intervals are not equivalent.  These hooks take
      (old_point, new_point) as arguments.  */
   if (NILP (Vinhibit_point_motion_hooks)
-      && (! intervals_equal (from, to)
-	  || ! intervals_equal (fromprev, toprev)))
+      && (!intervals_equal (from, to)
+	  || !intervals_equal (fromprev, toprev)))
     {
       Lisp_Object leave_after, leave_before, enter_after, enter_before;
 
@@ -2013,17 +2013,17 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
       else
 	enter_after = Qnil;
 
-      if (! EQ (leave_before, enter_before) && !NILP (leave_before))
+      if (!EQ (leave_before, enter_before) && !NILP (leave_before))
       	call2 (leave_before, make_fixnum (old_position),
       	       make_fixnum (charpos));
-      if (! EQ (leave_after, enter_after) && !NILP (leave_after))
+      if (!EQ (leave_after, enter_after) && !NILP (leave_after))
       	call2 (leave_after, make_fixnum (old_position),
       	       make_fixnum (charpos));
 
-      if (! EQ (enter_before, leave_before) && !NILP (enter_before))
+      if (!EQ (enter_before, leave_before) && !NILP (enter_before))
       	call2 (enter_before, make_fixnum (old_position),
       	       make_fixnum (charpos));
-      if (! EQ (enter_after, leave_after) && !NILP (enter_after))
+      if (!EQ (enter_after, leave_after) && !NILP (enter_after))
       	call2 (enter_after, make_fixnum (old_position),
       	       make_fixnum (charpos));
     }
@@ -2040,7 +2040,7 @@ move_if_not_intangible (ptrdiff_t position)
 
   XSETINT (pos, position);
 
-  if (! NILP (Vinhibit_point_motion_hooks))
+  if (!NILP (Vinhibit_point_motion_hooks))
     /* If intangible is inhibited, always move point to POSITION.  */
     ;
   else if (PT < position && XFIXNUM (pos) < ZV)
@@ -2262,7 +2262,7 @@ compare_string_intervals (Lisp_Object s1, Lisp_Object s2)
 
       /* If we ever find a mismatch between the strings,
 	 they differ.  */
-      if (! intervals_equal_1 (i1, i2, true))
+      if (!intervals_equal_1 (i1, i2, true))
 	return 0;
 
       /* Advance POS till the end of the shorter interval,

@@ -160,7 +160,7 @@ get_current_directory (bool encode)
   dir = expand_and_dir_to_file (dir);
   Lisp_Object encoded_dir = ENCODE_FILE (remove_slash_colon (dir));
 
-  if (! file_accessible_directory_p (encoded_dir))
+  if (!file_accessible_directory_p (encoded_dir))
     report_file_error ("Setting current directory", curdir);
 
   return encode ? encoded_dir : dir;
@@ -390,7 +390,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 
 	if (!NILP (Vcoding_system_for_write))
 	  val = Vcoding_system_for_write;
-	else if (! must_encode)
+	else if (!must_encode)
 	  val = Qraw_text;
 	else
 	  {
@@ -730,7 +730,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 	val = raw_text_coding_system (val);
       setup_coding_system (val, &process_coding);
       process_coding.dst_multibyte
-	= ! NILP (BVAR (current_buffer, enable_multibyte_characters));
+	= !NILP (BVAR (current_buffer, enable_multibyte_characters));
       process_coding.src_multibyte = 0;
     }
 
@@ -807,7 +807,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 	  if (!nread)
 	    ;
 	  else if (NILP (BVAR (current_buffer, enable_multibyte_characters))
-		   && ! CODING_MAY_REQUIRE_DECODING (&process_coding))
+		   && !CODING_MAY_REQUIRE_DECODING (&process_coding))
             {
               insert_1_both (buf, nread, nread, 0, 0, 0);
               signal_after_change (PT - nread, 0, nread);
@@ -829,7 +829,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 	      unbind_to (count1, Qnil);
 	      if (display_on_the_fly
 		  && CODING_REQUIRE_DETECTION (&saved_coding)
-		  && ! CODING_REQUIRE_DETECTION (&process_coding))
+		  && !CODING_REQUIRE_DETECTION (&process_coding))
 		{
 		  /* We have detected some coding system, but the
 		     detection may have been via insufficient data.
@@ -1646,7 +1646,7 @@ getenv_internal_1 (const char *var, ptrdiff_t varlen, char **value,
 	  /* NT environment variables are case insensitive.  */
 	  && ! strnicmp (SSDATA (entry), var, varlen)
 #else  /* not WINDOWSNT */
-	  && ! memcmp (SDATA (entry), var, varlen)
+	  && !memcmp (SDATA (entry), var, varlen)
 #endif /* not WINDOWSNT */
 	  )
 	{

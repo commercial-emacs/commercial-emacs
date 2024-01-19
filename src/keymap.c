@@ -637,7 +637,7 @@ For more information, see Info node `(elisp) Keymaps'.
 usage: (map-keymap FUNCTION KEYMAP)  */)
   (Lisp_Object function, Lisp_Object keymap, Lisp_Object sort_first)
 {
-  if (! NILP (sort_first))
+  if (!NILP (sort_first))
     return call2 (intern ("map-keymap-sorted"), function, keymap);
 
   map_keymap (keymap, map_keymap_call, function, NULL, 1);
@@ -1558,7 +1558,7 @@ current_minor_maps (Lisp_Object **modeptr, Lisp_Object **mapptr)
       for ( ; CONSP (alist); alist = XCDR (alist))
 	if ((assoc = XCAR (alist), CONSP (assoc))
 	    && (var = XCAR (assoc), SYMBOLP (var))
-	    && (val = find_symbol_value (XSYMBOL (var), NULL), ! EQ (val, Qunbound))
+	    && (val = find_symbol_value (XSYMBOL (var), NULL), !EQ (val, Qunbound))
 	    && !NILP (val))
 	  {
 	    Lisp_Object temp;
@@ -2112,7 +2112,7 @@ For an approximate inverse of this, see `kbd'.  */)
       Lisp_Object list = lists[li];
       ptrdiff_t listlen = listlens[li], i_byte = 0;
 
-      if (! (NILP (list) || STRINGP (list) || VECTORP (list) || CONSP (list)))
+      if (!(NILP (list) || STRINGP (list) || VECTORP (list) || CONSP (list)))
 	wrong_type_argument (Qarrayp, list);
 
       for (ptrdiff_t i = 0; i < listlen; )
@@ -2189,7 +2189,7 @@ push_key_description (EMACS_INT ch, char *p)
   c2 = c & ~(alt_modifier | ctrl_modifier | hyper_modifier
 	     | meta_modifier | shift_modifier | super_modifier);
 
-  if (! CHARACTERP (make_fixnum (c2)))
+  if (!CHARACTERP (make_fixnum (c2)))
     {
       /* KEY_DESCRIPTION_SIZE is large enough for this.  */
       p += sprintf (p, "[%d]", c);
@@ -2719,7 +2719,7 @@ symbol property are ignored.  */)
 	 entries from the "Edit => Paste from Kill Menu".
 	 Change them all to "(any string)", so that there
 	 seems to be only one menu item to report.  */
-      if (! NILP (sequence))
+      if (!NILP (sequence))
 	{
 	  Lisp_Object tem1;
 	  tem1 = Faref (sequence, make_fixnum (ASIZE (sequence) - 1));
@@ -3324,7 +3324,7 @@ describe_vector (Lisp_Object vector, Lisp_Object prefix, Lisp_Object args,
 	}
     }
 
-  if (CHAR_TABLE_P (vector) && ! NILP (XCHAR_TABLE (vector)->defalt))
+  if (CHAR_TABLE_P (vector) && !NILP (XCHAR_TABLE (vector)->defalt))
     {
       if (!NILP (elt_prefix))
 	insert1 (elt_prefix);

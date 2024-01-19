@@ -268,7 +268,7 @@ lmalloc (size_t size, bool q_clear)
 
 #ifdef USE_ALIGNED_ALLOC
   /* When not malloc_laligned (rare), else-clause risks infloop.  */
-  if (! malloc_laligned () && (adjsize % LISP_ALIGNMENT == 0))
+  if (!malloc_laligned () && (adjsize % LISP_ALIGNMENT == 0))
     {
       p = aligned_alloc (LISP_ALIGNMENT, adjsize);
       if (q_clear && p && adjsize)
@@ -300,11 +300,11 @@ lrealloc (void *p, size_t size)
   for (;;)
     {
       newp = realloc (newp, adjsize);
-      if (! adjsize || ! newp || laligned (newp, adjsize))
+      if (!adjsize || !newp || laligned (newp, adjsize))
 	break;
       adjsize = max (adjsize, adjsize + LISP_ALIGNMENT);
     }
-  eassert (! newp || laligned (newp, adjsize));
+  eassert (!newp || laligned (newp, adjsize));
   return newp;
 }
 
@@ -441,7 +441,7 @@ xpalloc (void *pa, ptrdiff_t *nitems, ptrdiff_t nitems_incr_min,
       nbytes = adjusted_nbytes - adjusted_nbytes % item_size;
     }
 
-  if (! pa)
+  if (!pa)
     *nitems = 0;
   if (n - n0 < nitems_incr_min
       && (ckd_add (&n, n0, nitems_incr_min)
@@ -514,7 +514,7 @@ static void *
 lisp_malloc (size_t nbytes, bool q_clear, enum mem_type mtype)
 {
   void *val = lmalloc (nbytes, q_clear);
-  if (! val)
+  if (!val)
     memory_full (nbytes);
   else if (mtype != MEM_TYPE_NON_LISP)
     mem_insert (val, (char *) val + nbytes, mtype, &mem_root);
@@ -528,7 +528,7 @@ lisp_malloc (size_t nbytes, bool q_clear, enum mem_type mtype)
 static void
 lisp_free (struct thread_state *thr, void *block)
 {
-  if (block && ! pdumper_object_p (block))
+  if (block && !pdumper_object_p (block))
     {
       free (block);
       mem_delete (mem_find (thr, block), &THREAD_FIELD (thr, m_mem_root));
@@ -628,7 +628,7 @@ enum { MAX_SENTINEL = (1 + 2 * ABLOCKS_NBLOCKS) };
 static void *
 lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
 {
-  if (! THREAD_FIELD (thr, m_free_ablocks))
+  if (!THREAD_FIELD (thr, m_free_ablocks))
     {
       void *base;
       struct ablocks *abase;
@@ -800,7 +800,7 @@ allocate_interval (void)
 static void
 mark_interval_tree_functor (INTERVAL *i, void *dummy)
 {
-  eassert (! interval_marked_p (*i));
+  eassert (!interval_marked_p (*i));
   set_interval_marked (*i);
   mark_object (&(*i)->plist);
 }
@@ -808,8 +808,8 @@ mark_interval_tree_functor (INTERVAL *i, void *dummy)
 static void
 mark_interval_tree_functor_mgc (INTERVAL *i, void *dummy)
 {
-  eassert (! interval_marked_p (*i));
-  if (mgc_xpntr_p (*i) && ! mgc_fwd_xpntr (*i))
+  eassert (!interval_marked_p (*i));
+  if (mgc_xpntr_p (*i) && !mgc_fwd_xpntr (*i))
     {
       *i = mgc_flip_xpntr (*i, Space_Interval);
       if (INTERVAL_HAS_OBJECT (*i))
@@ -825,7 +825,7 @@ mark_interval_tree_functor_mgc (INTERVAL *i, void *dummy)
 static void
 mark_interval_tree (INTERVAL *i)
 {
-  if (! *i)
+  if (!*i)
     return;
   if (mgc_xpntr_p (*i))
     {
@@ -1289,17 +1289,17 @@ sweep_sdata (struct thread_state *thr)
 	      struct Lisp_String *s = from->string;
 	      const ptrdiff_t nbytes = from->nbytes;
 	      const ptrdiff_t step = sdata_size (nbytes) + GC_STRING_OVERRUN_COOKIE_SIZE;
-	      eassert (!s || ! XSTRING_MARKED_P (s));
+	      eassert (!s || !XSTRING_MARKED_P (s));
 	      eassert (nbytes <= LARGE_STRING_THRESH);
 
 	      /* Check that the string size recorded in the string is the
 		 same as the one recorded in the sdata structure.  */
-	      eassume (! s || STRING_BYTES (s) == from->nbytes);
+	      eassume (!s || STRING_BYTES (s) == from->nbytes);
 
 	      /* Compute NEXT_FROM now before FROM can mutate.  */
 	      next_from = (sdata *) ((char *) from + step);
 
-	      eassume (! memcmp (string_overrun_cookie,
+	      eassume (!memcmp (string_overrun_cookie,
 				 (char *) next_from - GC_STRING_OVERRUN_COOKIE_SIZE,
 				 GC_STRING_OVERRUN_COOKIE_SIZE));
 
@@ -1540,7 +1540,7 @@ new_lisp_string (EMACS_INT nchars, EMACS_INT nbytes, bool multibyte)
   allocate_sdata (s, nchars, nbytes, false);
   XSETSTRING (string, s);
   string_chars_consed += nbytes;
-  if (! multibyte)
+  if (!multibyte)
     STRING_SET_UNIBYTE (string);
   return string;
 }
@@ -1564,13 +1564,13 @@ make_formatted_string (char *buf, const char *format, ...)
 void
 pin_string (Lisp_Object string)
 {
-  eassert (STRINGP (string) && ! STRING_MULTIBYTE (string));
+  eassert (STRINGP (string) && !STRING_MULTIBYTE (string));
   struct Lisp_String *s = XSTRING (string);
   ptrdiff_t size = STRING_BYTES (s);
   unsigned char *data = s->u.s.data;
 
   if (size <= LARGE_STRING_THRESH
-      && ! PURE_P (data) && ! pdumper_object_p (data)
+      && !PURE_P (data) && !pdumper_object_p (data)
       && s->u.s.size_byte != Sdata_Pinned)
     {
       eassert (s->u.s.size_byte == Sdata_Unibyte);
@@ -1599,7 +1599,7 @@ pin_string (Lisp_Object string)
    &= ~((bits_word) 1 << ((n) % BITS_PER_BITS_WORD)))
 
 #define FLOAT_BLOCK(fptr) \
-  (eassert (! pdumper_object_p (fptr)),                                  \
+  (eassert (!pdumper_object_p (fptr)),                                  \
    ((struct float_block *) (((uintptr_t) (fptr)) & ~(BLOCK_ALIGN - 1))))
 
 #define FLOAT_INDEX(fptr) \
@@ -1668,14 +1668,14 @@ make_float (double float_value)
     }
 
   XFLOAT_INIT (val, float_value);
-  eassert (! XFLOAT_MARKED_P (XFLOAT (val)));
+  eassert (!XFLOAT_MARKED_P (XFLOAT (val)));
   bytes_since_gc += sizeof (struct Lisp_Float);
   ++floats_consed;
   return val;
 }
 
 #define CONS_BLOCK(fptr) \
-  (eassert (! pdumper_object_p (fptr)),                                  \
+  (eassert (!pdumper_object_p (fptr)),                                  \
    ((struct cons_block *) ((uintptr_t) (fptr) & ~(BLOCK_ALIGN - 1))))
 
 #define CONS_INDEX(fptr) \
@@ -1755,7 +1755,7 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
 
   XSETCAR (val, car);
   XSETCDR (val, cdr);
-  eassert (! XCONS_MARKED_P (XCONS (val)));
+  eassert (!XCONS_MARKED_P (XCONS (val)));
   bytes_since_gc += sizeof (struct Lisp_Cons);
   ++cons_cells_consed;
 
@@ -2106,7 +2106,7 @@ free_by_pvtype (struct Lisp_Vector *vector)
       break;
     case PVEC_MARKER:
       /* sweep_buffer() ought to have unchained it.  */
-      eassert (! PSEUDOVEC_STRUCT (vector, Lisp_Marker)->buffer);
+      eassert (!PSEUDOVEC_STRUCT (vector, Lisp_Marker)->buffer);
       break;
     case PVEC_USER_PTR:
       {
@@ -2361,7 +2361,7 @@ allocate_vector (ptrdiff_t len, bool q_clear)
 	      /* Either leave no residual or one big enough to sustain a
 		 non-degenerate vector.  A hanging chad of MEM_TYPE_VBLOCK
 		 triggers all manner of ENABLE_CHECKING failures.  */
-	      if (! restbytes || restbytes >= LISP_VECTOR_MIN)
+	      if (!restbytes || restbytes >= LISP_VECTOR_MIN)
 		{
 		  ASAN_UNPOISON_VECTOR_CONTENTS (p, nbytes - header_size);
 		  vector_free_lists[index] = vector_next (p);
@@ -2486,7 +2486,7 @@ Lisp_Object
 initialize_vector (ptrdiff_t length, Lisp_Object init)
 {
   struct Lisp_Vector *p = static_vector_allocator (length, NILP (init));
-  if (! NILP (init))
+  if (!NILP (init))
     for (ptrdiff_t i = 0; i < length; ++i)
       p->contents[i] = init;
   return make_lisp_ptr (p, Lisp_Vectorlike);
@@ -2829,8 +2829,8 @@ queue_doomed_finalizers (struct Lisp_Finalizer *dest,
        current != src;
        current = next, next = current->next)
     {
-      if (! vectorlike_marked_p (&current->header)
-          && ! NILP (current->function))
+      if (!vectorlike_marked_p (&current->header)
+          && !NILP (current->function))
         {
           unchain_finalizer (current);
           finalizer_insert (dest, current);
@@ -2895,7 +2895,7 @@ static bool
 vector_marked_p (const struct Lisp_Vector *v)
 {
   bool ret;
-  eassert (! mgc_xpntr_p (v));
+  eassert (!mgc_xpntr_p (v));
   if (pdumper_object_p (v))
     {
       /* Checking "cold" saves faulting in vector header.  */
@@ -2915,7 +2915,7 @@ vector_marked_p (const struct Lisp_Vector *v)
 static void
 set_vector_marked (struct Lisp_Vector *v)
 {
-  eassert (! vector_marked_p (v));
+  eassert (!vector_marked_p (v));
   if (pdumper_object_p (v))
     {
       eassert (PVTYPE (v) != PVEC_BOOL_VECTOR);
@@ -2959,7 +2959,7 @@ static bool
 string_marked_p (const struct Lisp_String *s)
 {
   bool ret;
-  eassert (! mgc_xpntr_p (s));
+  eassert (!mgc_xpntr_p (s));
   if (pdumper_object_p (s))
     ret = pdumper_marked_p (s);
   else
@@ -2970,7 +2970,7 @@ string_marked_p (const struct Lisp_String *s)
 static void
 set_string_marked (struct Lisp_String *s)
 {
-  eassert (! string_marked_p (s));
+  eassert (!string_marked_p (s));
   if (pdumper_object_p (s))
     pdumper_set_marked (s);
   else
@@ -3206,7 +3206,7 @@ live_vector_pointer (struct Lisp_Vector *vector, void *p)
 	   || distance == 0
 	   || (sizeof vector->header <= distance
 	       && distance < vector_nbytes (vector)
-	       && (! (vector->header.size & PSEUDOVECTOR_FLAG)
+	       && (!(vector->header.size & PSEUDOVECTOR_FLAG)
 		   ? (offsetof (struct Lisp_Vector, contents) <= distance
 		      && (((distance - offsetof (struct Lisp_Vector, contents))
 			   % word_size)
@@ -3292,7 +3292,7 @@ mark_maybe_pointer (void *const *p)
       int type = pdumper_find_object_type (po);
       ret = (pdumper_valid_object_type_p (type)
 	     // Verify P’s tag, if any, matches pdumper-reported type.
-	     && (! USE_LSB_TAG || *p == po || cp - cpo == type));
+	     && (!USE_LSB_TAG || *p == po || cp - cpo == type));
       if (ret)
 	mark_automatic_object (make_lisp_ptr (po, type));
     }
@@ -3304,7 +3304,7 @@ mark_maybe_pointer (void *const *p)
       char *cpo = po;
       ret = (pdumper_find_object_type (po) == Lisp_Symbol
 	     // Verify P’s tag, if any, matches pdumper-reported type.
-	     && (! USE_LSB_TAG || p_sym == po || cp - cpo == Lisp_Symbol));
+	     && (!USE_LSB_TAG || p_sym == po || cp - cpo == Lisp_Symbol));
       if (ret)
 	mark_automatic_object (make_lisp_ptr (po, Lisp_Symbol));
     }
@@ -3314,7 +3314,7 @@ mark_maybe_pointer (void *const *p)
       /* analogous logic to set_string_marked() */
       ptrdiff_t offset;
       void *forwarded = mgc_fwd_xpntr (xpntr);
-      if (! forwarded)
+      if (!forwarded)
 	{
 	  ret = true;
 	  if ((enum Lisp_Type) xpntr_type < Lisp_Type_Max)
@@ -3986,7 +3986,7 @@ purecopy (Lisp_Object obj)
     }
   else if (SYMBOLP (obj))
     {
-      if (! XSYMBOL (obj)->u.s.pinned && ! c_symbol_p (XSYMBOL (obj)))
+      if (!XSYMBOL (obj)->u.s.pinned && !c_symbol_p (XSYMBOL (obj)))
 	{
 	  /* As of 2014, recording first block containing pinned
 	     symbols in FIRST_BLOCK_PINNED saves us scanning 15K
@@ -4005,7 +4005,7 @@ purecopy (Lisp_Object obj)
       Fsignal (Qerror, list1 (CALLN (Fformat, fmt, obj)));
     }
 
-  if (! NILP (Vloadup_pure_table)) /* Hash consing.  */
+  if (!NILP (Vloadup_pure_table)) /* Hash consing.  */
     Fputhash (obj, obj, Vloadup_pure_table);
 
   return obj;
@@ -4368,7 +4368,7 @@ mark_glyph_matrix (struct glyph_matrix *matrix)
 
 	    for (; glyph < end_glyph; ++glyph)
 	      if (STRINGP (glyph->object)
-		  && ! string_marked_p (XSTRING (glyph->object)))
+		  && !string_marked_p (XSTRING (glyph->object)))
 		mark_object (&glyph->object);
 	  }
       }
@@ -4383,7 +4383,7 @@ mark_vectorlike (union vectorlike_header *header)
   if (size & PSEUDOVECTOR_FLAG)
     size &= PSEUDOVECTOR_SIZE_MASK;
 
-  eassert (! vectorlike_marked_p (header));
+  eassert (!vectorlike_marked_p (header));
   set_vectorlike_marked (header);
   mark_objects (ptr->contents, size);
 }
@@ -4403,12 +4403,12 @@ mark_char_table (struct Lisp_Vector *ptr, enum pvec_type pvectype)
        ++i)
     {
       Lisp_Object *val = &ptr->contents[i];
-      if (! FIXNUMP (*val) &&
-	  (! SYMBOLP (*val) || ! symbol_marked_p (XSYMBOL (*val))))
+      if (!FIXNUMP (*val) &&
+	  (!SYMBOLP (*val) || !symbol_marked_p (XSYMBOL (*val))))
 	{
 	  if (SUB_CHAR_TABLE_P (*val))
 	    {
-	      if (! vector_marked_p (XVECTOR (*val)))
+	      if (!vector_marked_p (XVECTOR (*val)))
 		mark_char_table (XVECTOR (*val), PVEC_SUB_CHAR_TABLE);
 	    }
 	  else
@@ -4501,13 +4501,13 @@ mark_discard_killed_buffers (Lisp_Object list)
 {
   Lisp_Object tail, *prev = &list;
 
-  for (tail = list; CONSP (tail) && ! cons_marked_p (XCONS (tail));
+  for (tail = list; CONSP (tail) && !cons_marked_p (XCONS (tail));
        tail = XCDR (tail))
     {
       Lisp_Object tem = XCAR (tail);
       if (CONSP (tem))
 	tem = XCAR (tem);
-      if (BUFFERP (tem) && ! BUFFER_LIVE_P (XBUFFER (tem)))
+      if (BUFFERP (tem) && !BUFFER_LIVE_P (XBUFFER (tem)))
 	*prev = XCDR (tail);
       else
 	{
@@ -4588,7 +4588,7 @@ mark_stack_pop (void)
 {
   Lisp_Object *ret;
   struct mark_entry *entry;
-  eassume (! mark_stack_empty_p ());
+  eassume (!mark_stack_empty_p ());
 
   entry = &mark_stk.stack[mark_stk.sp - 1];
   eassert (entry->n > 0);
@@ -4766,7 +4766,7 @@ garbage_collect (void)
   FOR_EACH_LIVE_BUFFER (tail, buffer)
     {
       struct buffer *b = XBUFFER (buffer);
-      if (! EQ (BVAR (b, undo_list), Qt))
+      if (!EQ (BVAR (b, undo_list), Qt))
 	bset_undo_list (b, compact_undo_list (BVAR (b, undo_list)));
       mark_object (&BVAR (b, undo_list));
     }
@@ -4831,7 +4831,7 @@ gc_process_string (Lisp_Object *objp)
   if (forwarded)
     {
       XSETSTRING (*objp, forwarded);
-      eassert (! XSTRING_MARKED_P (s));
+      eassert (!XSTRING_MARKED_P (s));
     }
   else if (mgc_xpntr_p (s))
     {
@@ -4844,7 +4844,7 @@ gc_process_string (Lisp_Object *objp)
       s1->u.s.intervals = balance_intervals (s1->u.s.intervals);
       mark_interval_tree (&s1->u.s.intervals);
     }
-  else if (! string_marked_p (s))
+  else if (!string_marked_p (s))
     {
       set_string_marked (s);
       mark_interval_tree (&s->u.s.intervals);
@@ -4942,7 +4942,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	    if (forwarded)
 	      {
 		XSETVECTOR (*objp, forwarded);
-		eassert (! XVECTOR_MARKED_P (ptr));
+		eassert (!XVECTOR_MARKED_P (ptr));
 	      }
 	    else if (mgc_xpntr_p (ptr))
 	      {
@@ -4953,10 +4953,10 @@ process_mark_stack (ptrdiff_t base_sp)
 		  size &= PSEUDOVECTOR_SIZE_MASK;
 		mark_stack_push_n (ptr->contents, size);
 	      }
-	    else if (! vector_marked_p (ptr))
+	    else if (!vector_marked_p (ptr))
 	      {
-		if (! PSEUDOVECTORP (*objp, PVEC_SUBR)
-		    && ! PSEUDOVECTORP (*objp, PVEC_THREAD))
+		if (!PSEUDOVECTORP (*objp, PVEC_SUBR)
+		    && !PSEUDOVECTORP (*objp, PVEC_THREAD))
 		  eassert (check_live (xpntr, MEM_TYPE_VECTORLIKE));
 		switch (PVTYPE (ptr))
 		  {
@@ -4994,8 +4994,8 @@ process_mark_stack (ptrdiff_t base_sp)
 		       always marked (they're in the old section
 		       and don't have mark bits), and we're in a
 		       ! vector_marked_p() block */
-		    eassert (! vector_marked_p (ptr)
-			     && ! pdumper_object_p (ptr));
+		    eassert (!vector_marked_p (ptr)
+			     && !pdumper_object_p (ptr));
 		    set_vector_marked (ptr);
 		    break;
 		  case PVEC_OVERLAY:
@@ -5042,7 +5042,7 @@ process_mark_stack (ptrdiff_t base_sp)
                 if (forwarded)
                   {
                     XSETSYMBOL (*objp, forwarded);
-                    eassert (! symbol_marked_p (ptr));
+                    eassert (!symbol_marked_p (ptr));
                     break; /* !!! */
                   }
                 XSETSYMBOL (*objp, mgc_flip_xpntr (ptr, Space_Symbol));
@@ -5052,7 +5052,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      {
 		if (symbol_marked_p (ptr))
 		  break; /* !!! */
-		else if (! c_symbol_p (ptr))
+		else if (!c_symbol_p (ptr))
 		  eassert (check_live (xpntr, MEM_TYPE_SYMBOL));
 		eassert (valid_lisp_object_p (ptr->u.s.function));
 		set_symbol_marked (ptr);
@@ -5082,7 +5082,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		break;
 	      }
 
-	    if (! PURE_P (XSTRING (ptr->u.s.name)))
+	    if (!PURE_P (XSTRING (ptr->u.s.name)))
 	      gc_process_string (&ptr->u.s.name);
 
 	    if (ptr->u.s.next)
@@ -5099,7 +5099,7 @@ process_mark_stack (ptrdiff_t base_sp)
                 if (forwarded)
                   {
                     XSETCONS (*objp, forwarded);
-                    eassert (! cons_marked_p (ptr));
+                    eassert (!cons_marked_p (ptr));
                     break; /* !!! */
                   }
                 XSETCONS (*objp, mgc_flip_xpntr (ptr, Space_Cons));
@@ -5114,7 +5114,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      }
 
 	    /* Put cdr, then car onto stack.  */
-	    if (! NILP (ptr->u.s.u.cdr))
+	    if (!NILP (ptr->u.s.u.cdr))
 	      mark_stack_push (&ptr->u.s.u.cdr);
 	    mark_stack_push (&ptr->u.s.car);
 	  }
@@ -5131,7 +5131,7 @@ process_mark_stack (ptrdiff_t base_sp)
                 if (forwarded)
                   {
                     XSETFLOAT (*objp, forwarded);
-                    eassert (! XFLOAT_MARKED_P (ptr));
+                    eassert (!XFLOAT_MARKED_P (ptr));
                     break; /* !!! */
                   }
                 XSETFLOAT (*objp, mgc_flip_xpntr (ptr, Space_Float));
@@ -5141,7 +5141,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	    else
 	      {
 		eassert (check_live (xpntr, MEM_TYPE_FLOAT));
-		if (! XFLOAT_MARKED_P (ptr))
+		if (!XFLOAT_MARKED_P (ptr))
 		  XFLOAT_MARK (ptr);
 	      }
 	  }
@@ -5176,7 +5176,7 @@ mark_terminals (void)
 #ifdef HAVE_WINDOW_SYSTEM
       mark_image_cache (t->image_cache);
 #endif /* HAVE_WINDOW_SYSTEM */
-      if (! vectorlike_marked_p (&t->header))
+      if (!vectorlike_marked_p (&t->header))
 	mark_vectorlike (&t->header);
     }
 }
@@ -5407,7 +5407,7 @@ sweep_intervals (struct thread_state *thr)
 		: BLOCK_NINTERVALS);
 	   ++i)
         {
-          if (! iblk->intervals[i].gcmarkbit)
+          if (!iblk->intervals[i].gcmarkbit)
             {
               set_interval_parent (&iblk->intervals[i], THREAD_FIELD (thr, m_interval_free_list));
               interval_free_list = &iblk->intervals[i];

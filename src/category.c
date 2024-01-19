@@ -116,9 +116,9 @@ the current buffer's category table.  */)
   CHECK_STRING (docstring);
   table = check_category_table (table);
 
-  if (! NILP (CATEGORY_DOCSTRING (table, XFIXNAT (category))))
+  if (!NILP (CATEGORY_DOCSTRING (table, XFIXNAT (category))))
     error ("Category `%c' is already defined", (int) XFIXNAT (category));
-  if (! NILP (Vloadup_pure_table))
+  if (!NILP (Vloadup_pure_table))
     docstring = Fpurecopy (docstring);
   SET_CATEGORY_DOCSTRING (table, XFIXNAT (category), docstring);
 
@@ -221,7 +221,7 @@ copy_category_table (Lisp_Object table)
 {
   table = copy_char_table (table);
 
-  if (! NILP (XCHAR_TABLE (table)->defalt))
+  if (!NILP (XCHAR_TABLE (table)->defalt))
     set_char_table_defalt (table,
 			   Fcopy_sequence (XCHAR_TABLE (table)->defalt));
   set_char_table_extras
@@ -409,10 +409,10 @@ word_boundary_p (int c1, int c2)
 	  && (NILP (XCAR (elt))
 	      || (CATEGORYP (XCAR (elt))
 		  && CATEGORY_MEMBER (XFIXNAT (XCAR (elt)), category_set1)
-		  && ! CATEGORY_MEMBER (XFIXNAT (XCAR (elt)), category_set2)))
+		  && !CATEGORY_MEMBER (XFIXNAT (XCAR (elt)), category_set2)))
 	  && (NILP (XCDR (elt))
 	      || (CATEGORYP (XCDR (elt))
-		  && ! CATEGORY_MEMBER (XFIXNAT (XCDR (elt)), category_set1)
+		  && !CATEGORY_MEMBER (XFIXNAT (XCDR (elt)), category_set1)
 		  && CATEGORY_MEMBER (XFIXNAT (XCDR (elt)), category_set2))))
 	return !default_result;
     }

@@ -141,7 +141,7 @@ read_dirent (DIR *dir, Lisp_Object dirname)
       struct dirent *dp = readdir (dir);
       if (dp || errno == 0)
 	return dp;
-      if (! (errno == EAGAIN || errno == EINTR))
+      if (!(errno == EAGAIN || errno == EINTR))
 	{
 #ifdef WINDOWSNT
 	  /* The MS-Windows implementation of 'opendir' doesn't
@@ -764,7 +764,7 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
 					       file, zero,
 					       Qnil,
 					       Qnil),
-		       ! EQ (Qt, cmp))))
+		       !EQ (Qt, cmp))))
 		bestmatch = name;
 	    }
 	  bestmatchsize = matchsize;

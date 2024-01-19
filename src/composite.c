@@ -263,7 +263,7 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
       ptrdiff_t len = ASIZE (key);
 
       for (ptrdiff_t i = 1; i < len; i++)
-	if (! VECTORP (AREF (key, i)))
+	if (!VECTORP (AREF (key, i)))
 	  goto invalid_composition;
     }
   else if (VECTORP (components) || CONSP (components))
@@ -708,13 +708,13 @@ composition_gstring_p (Lisp_Object gstring)
   if (! VECTORP (header) || ASIZE (header) < 2)
     return 0;
   if (! NILP (LGSTRING_FONT (gstring))
-      && (! FONT_OBJECT_P (LGSTRING_FONT (gstring))
-	  && ! CODING_SYSTEM_P (LGSTRING_FONT (gstring))))
+      && (!FONT_OBJECT_P (LGSTRING_FONT (gstring))
+	  && !CODING_SYSTEM_P (LGSTRING_FONT (gstring))))
     return 0;
   for (i = 1; i < ASIZE (LGSTRING_HEADER (gstring)); i++)
-    if (! FIXNATP (AREF (LGSTRING_HEADER (gstring), i)))
+    if (!FIXNATP (AREF (LGSTRING_HEADER (gstring), i)))
       return 0;
-  if (! NILP (LGSTRING_ID (gstring)) && ! FIXNATP (LGSTRING_ID (gstring)))
+  if (!NILP (LGSTRING_ID (gstring)) && !FIXNATP (LGSTRING_ID (gstring)))
     return 0;
   for (i = 0; i < LGSTRING_GLYPH_LEN (gstring); i++)
     {
@@ -1006,7 +1006,7 @@ inhibit_auto_composition (void)
     {
       char *name = tty_type_name (Qnil);
 
-      if (name && ! strcmp (SSDATA (Vauto_composition_mode), name))
+      if (name && !strcmp (SSDATA (Vauto_composition_mode), name))
 	return true;
     }
 
@@ -1047,7 +1047,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
     }
   if ((NILP (string)
        && NILP (BVAR (current_buffer, enable_multibyte_characters)))
-      || (STRINGP (string) && ! STRING_MULTIBYTE (string))
+      || (STRINGP (string) && !STRING_MULTIBYTE (string))
       || inhibit_auto_composition ())
     return;
   if (bytepos < 0) // then compute it
@@ -1065,7 +1065,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	  Lisp_Object val = CHAR_TABLE_REF (Vcomposition_function_table, c);
 	  if (c == '\n')
 	    break;
-	  if (! NILP (val))
+	  if (!NILP (val))
 	    {
 	      for (EMACS_INT ridx = 0; CONSP (val); val = XCDR (val), ridx++)
 		{
@@ -1084,7 +1084,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	    }
 	}
       if (charpos == cmp_it->stop_pos
-	  && ! (STRINGP (string) && cmp_it->stop_pos == SCHARS (string)))
+	  && !(STRINGP (string) && cmp_it->stop_pos == SCHARS (string)))
 	/* Characters after CMP_IT->STOP_POS could be composed with ones before;
 	   so stop at the safest offset preceding CMP_IT->STOP_POS.  */
 	charpos = max (initpos, cmp_it->stop_pos - MAX_AUTO_COMPOSITION_LOOKBACK);
@@ -1147,7 +1147,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	  if (STRINGP (string))
 	    {
 	      p--, bytepos--;
-	      while (! CHAR_HEAD_P (*p))
+	      while (!CHAR_HEAD_P (*p))
 		p--, bytepos--;
 	      charpos--;
 	    }
@@ -1164,7 +1164,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
       /* Skip all uncomposable characters.  */
       if (NILP (string))
 	{
-	  while (charpos - 1 > ostop_pos && ! char_composable_p (c))
+	  while (charpos - 1 > ostop_pos && !char_composable_p (c))
 	    {
 	      dec_both (&charpos, &bytepos);
 	      c = FETCH_MULTIBYTE_CHAR (bytepos);
@@ -1172,10 +1172,10 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	}
       else
 	{
-	  while (charpos - 1 > ostop_pos && ! char_composable_p (c))
+	  while (charpos - 1 > ostop_pos && !char_composable_p (c))
 	    {
 	      p--;
-	      while (! CHAR_HEAD_P (*p))
+	      while (!CHAR_HEAD_P (*p))
 		p--;
 	      charpos--;
 	      c = STRING_CHAR (p);
@@ -1304,7 +1304,7 @@ composition_reseat_it (struct composition_it *cmp_it, ptrdiff_t charpos,
 	    direction = QR2L;
 	  lgstring = autocmp_chars (elt, cpos, bpos, charpos + 1, w, face,
 				    string, direction, cmp_it->ch);
-	  if (! composition_gstring_p (lgstring)
+	  if (!composition_gstring_p (lgstring)
 	      || cpos + LGSTRING_CHAR_LEN (lgstring) - 1 != charpos)
 	    /* Composition failed or didn't cover the current
 	       character.  */
@@ -1411,7 +1411,7 @@ composition_update_it (struct composition_it *cmp_it, ptrdiff_t charpos, ptrdiff
 	  cmp_it->from = cmp_it->to = 0;
 	  return -1;
 	}
-      if (! cmp_it->reversed_p)
+      if (!cmp_it->reversed_p)
 	{
 	  glyph = LGSTRING_GLYPH (gstring, cmp_it->from);
 	  from = LGLYPH_FROM (glyph);
@@ -1545,7 +1545,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
   */
   do
     {
-      if (! char_composable_p (STRING_CHAR (cur.p)))
+      if (!char_composable_p (STRING_CHAR (cur.p)))
 	{
 	  if (pos < limit)  /* case (2), easy */
 	    goto search_forward;
@@ -1666,7 +1666,7 @@ composition_adjust_point (ptrdiff_t last_pt, ptrdiff_t new_pt)
     return new_pt;
 
   /* Next check for automatic composition.  */
-  if (! find_automatic_composition (new_pt, (ptrdiff_t) -1, &beg, &end, &val, Qnil)
+  if (!find_automatic_composition (new_pt, (ptrdiff_t) -1, &beg, &end, &val, Qnil)
       || beg == new_pt)
     return new_pt;
   for (ptrdiff_t i = 0; i < LGSTRING_GLYPH_LEN (val); ++i)
@@ -1756,7 +1756,7 @@ should be ignored.  */)
       CHECK_STRING (string);
       ptrdiff_t chars = SCHARS (string);
       validate_subarray (string, from, to, chars, &frompos, &topos);
-      if (! STRING_MULTIBYTE (string))
+      if (!STRING_MULTIBYTE (string))
 	{
 	  ptrdiff_t i;
 
@@ -1776,7 +1776,7 @@ should be ignored.  */)
   header = fill_gstring_header (frompos, frombyte,
 				topos, font_object, string);
   gstring = composition_gstring_lookup_cache (header);
-  if (! NILP (gstring))
+  if (!NILP (gstring))
     return gstring;
 
   if (LGSTRING_GLYPH_LEN (gstring_work) < topos - frompos)
@@ -1850,12 +1850,12 @@ See `find-composition' for more details.  */)
   if (!NILP (string))
     {
       CHECK_STRING (string);
-      if (! (0 <= fixed_pos && fixed_pos <= SCHARS (string)))
+      if (!(0 <= fixed_pos && fixed_pos <= SCHARS (string)))
 	args_out_of_range (string, pos);
     }
   else
     {
-      if (! (BEGV <= fixed_pos && fixed_pos <= ZV))
+      if (!(BEGV <= fixed_pos && fixed_pos <= ZV))
 	args_out_of_range (Fcurrent_buffer (), pos);
     }
   from = fixed_pos;
@@ -1865,12 +1865,12 @@ See `find-composition' for more details.  */)
       if (((NILP (string)
 	    && !NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	   || (!NILP (string) && STRING_MULTIBYTE (string)))
-	  && ! inhibit_auto_composition ()
+	  && !inhibit_auto_composition ()
 	  && find_automatic_composition (from, to, &start, &end, &gstring, string))
 	return list3 (make_fixnum (start), make_fixnum (end), gstring);
       return Qnil;
     }
-  if (! (start <= fixed_pos && fixed_pos < end))
+  if (!(start <= fixed_pos && fixed_pos < end))
     {
       ptrdiff_t s, e;
 

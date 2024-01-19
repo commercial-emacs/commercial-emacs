@@ -154,7 +154,7 @@ itree_stack_create (intmax_t initial_size)
 static void
 itree_stack_destroy (struct itree_stack *stack)
 {
-  if (! stack)
+  if (!stack)
     return;
   if (stack->nodes)
     xfree (stack->nodes);

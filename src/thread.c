@@ -125,7 +125,7 @@ restore_thread (struct thread_state *thr)
 	}
     }
 
-  if (! NILP (thr->error_symbol) && thr->exception_stack_top)
+  if (!NILP (thr->error_symbol) && thr->exception_stack_top)
     {
       Lisp_Object sym = thr->error_symbol,
 	data = thr->error_data;
@@ -675,7 +675,7 @@ static void
 await_reap (struct thread_state *thr)
 {
   pending_signals = true; // main thread may never see this
-  eassert (! main_thread_p (thr));
+  eassert (!main_thread_p (thr));
 #ifdef HAVE_GCC_TLS
   sem_post (&sem_reapees);
   sem_wait_ (&sem_reap_begin, thr);
@@ -820,7 +820,7 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   new_thread->thread_name =
     NILP (name) ? NULL : xstrdup (SSDATA (ENCODE_SYSTEM (name)));
 
-  if (! sys_thread_create (&thr, run_thread, new_thread))
+  if (!sys_thread_create (&thr, run_thread, new_thread))
     {
       all_threads = all_threads->next_thread; /* restore to original.  */
       error ("Could not start a new thread");
@@ -959,7 +959,7 @@ is an error for a thread to try to join itself.  */)
   if (thread_live_p (tstate))
     with_flushed_stack (thread_join_callback, tstate);
 
-  if (! NILP (error_symbol))
+  if (!NILP (error_symbol))
     Fsignal (error_symbol, error_data);
 
   return tstate->result;

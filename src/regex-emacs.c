@@ -1400,7 +1400,7 @@ struct range_table_work_area
     for (C0 = (FROM); C0 <= (TO); C0++)				\
       {								\
 	C1 = TRANSLATE (C0);					\
-	if (! ASCII_CHAR_P (C1))				\
+	if (!ASCII_CHAR_P (C1))				\
 	  {							\
 	    SET_RANGE_TABLE_WORK_AREA ((work_area), C1, C1);	\
 	    if ((C1 = RE_CHAR_TO_UNIBYTE (C1)) < 0)		\
@@ -2776,7 +2776,7 @@ at_begline_loc_p (re_char *pattern, re_char *p)
       while (prev > pattern && '0' <= prev[-1] && prev[-1] <= '9')
 	--prev;
 
-      if (! (prev > pattern + 1 && prev[-1] == '?' && prev[-2] == '('))
+      if (!(prev > pattern + 1 && prev[-1] == '?' && prev[-2] == '('))
 	return false;
       prev -= 2;
       break;
@@ -3459,7 +3459,7 @@ re_search_2 (struct re_pattern_buffer *bufp, const char *str1, ptrdiff_t size1,
 	 because that case doesn't repeat.  */
       if (anchored_start && startpos > 0)
 	{
-	  if (! ((startpos <= size1 ? string1[startpos - 1]
+	  if (!((startpos <= size1 ? string1[startpos - 1]
 		  : string2[startpos - size1 - 1])
 		 == '\n'))
 	    goto advance;
@@ -3543,7 +3543,7 @@ re_search_2 (struct re_pattern_buffer *bufp, const char *str1, ptrdiff_t size1,
 		{
 		  buf_ch = STRING_CHAR (d);
 		  buf_ch = TRANSLATE (buf_ch);
-		  if (! fastmap[CHAR_LEADING_CODE (buf_ch)])
+		  if (!fastmap[CHAR_LEADING_CODE (buf_ch)])
 		    goto advance;
 		}
 	      else
@@ -3554,7 +3554,7 @@ re_search_2 (struct re_pattern_buffer *bufp, const char *str1, ptrdiff_t size1,
 		  if (translated != ch
 		      && (ch = RE_CHAR_TO_UNIBYTE (translated)) >= 0)
 		    buf_ch = ch;
-		  if (! fastmap[TRANSLATE (buf_ch)])
+		  if (!fastmap[TRANSLATE (buf_ch)])
 		    goto advance;
 		}
 	    }
@@ -3887,7 +3887,7 @@ mutually_exclusive_charset (struct re_pattern_buffer *bufp, re_char *p1,
 	  /* We win if the charset_not inside the loop lists
 		 every character listed in the charset after.  */
 	  for (idx = 0; idx < (int) p2[1]; idx++)
-	    if (! (p2[2 + idx] == 0
+	    if (!(p2[2 + idx] == 0
 		   || (idx < CHARSET_BITMAP_SIZE (p1)
 		       && ((p2[2 + idx] & ~ p1[2 + idx]) == 0))))
 	      break;
@@ -4472,7 +4472,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
 		    pat_charlen = 1;
 		  }
 		buf_ch = RE_CHAR_TO_MULTIBYTE (*d);
-		if (! CHAR_BYTE8_P (buf_ch))
+		if (!CHAR_BYTE8_P (buf_ch))
 		  {
 		    buf_ch = TRANSLATE (buf_ch);
 		    buf_ch = RE_CHAR_TO_UNIBYTE (buf_ch);
@@ -4545,7 +4545,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
 	      {
 		int c1 = RE_CHAR_TO_MULTIBYTE (c);
 
-		if (! CHAR_BYTE8_P (c1))
+		if (!CHAR_BYTE8_P (c1))
 		  {
 		    c1 = TRANSLATE (c1);
 		    c1 = RE_CHAR_TO_UNIBYTE (c1);

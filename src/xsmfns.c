@@ -171,7 +171,7 @@ smc_save_yourself_CB (SmcConn smcConn,
   Lisp_Object user_login_name = Fuser_login_name (Qnil);
 
   /* Must have these.  */
-  if (! STRINGP (Vinvocation_name) || ! STRINGP (user_login_name))
+  if (! STRINGP (Vinvocation_name) || !STRINGP (user_login_name))
     return;
 
   /* How to start a new instance of Emacs.  */
@@ -272,9 +272,9 @@ smc_save_yourself_CB (SmcConn smcConn,
 
   /* See if we maybe shall interact with the user.  */
   if (interactStyle != SmInteractStyleAny
-      || ! shutdown
+      || !shutdown
       || saveType == SmSaveLocal
-      || ! SmcInteractRequest (smcConn, SmDialogNormal, smc_interact_CB, 0))
+      || !SmcInteractRequest (smcConn, SmDialogNormal, smc_interact_CB, 0))
     {
       /* No interaction, we are done saving ourself.  */
       SmcSaveYourselfDone (smcConn, True);
@@ -350,7 +350,7 @@ static void
 ice_conn_watch_CB (IceConn iceConn, IcePointer clientData,
                    int opening, IcePointer *watchData)
 {
-  if (! opening)
+  if (!opening)
     {
       ice_connection_closed ();
       return;
@@ -509,9 +509,9 @@ Do not call this function yourself. */)
 
   /* Check doing_interact so that we don't do anything if someone called
      this at the wrong time. */
-  if (doing_interact && ! kill_emacs)
+  if (doing_interact && !kill_emacs)
     {
-      bool cancel_shutdown = ! NILP (call0 (Qemacs_session_save));
+      bool cancel_shutdown = !NILP (call0 (Qemacs_session_save));
 
       SmcInteractDone (smc_conn, cancel_shutdown);
       SmcSaveYourselfDone (smc_conn, True);

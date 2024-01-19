@@ -469,7 +469,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
   Lisp_Object bytestr = AREF (fun, COMPILED_BYTECODE);
 
  setup_frame: ;
-  eassert (! STRING_MULTIBYTE (bytestr));
+  eassert (!STRING_MULTIBYTE (bytestr));
   eassert (string_immovable_p (bytestr));
   /* FIXME: in debug mode (!NDEBUG, BYTE_CODE_SAFE or enabled checking),
      save the specpdl index on function entry and check that it is the same
@@ -510,7 +510,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
   bool rest = (args_template & 128) != 0;
   int mandatory = args_template & 127;
   ptrdiff_t nonrest = args_template >> 8;
-  if (! (mandatory <= nargs && (rest || nargs <= nonrest)))
+  if (!(mandatory <= nargs && (rest || nargs <= nonrest)))
     Fsignal (Qwrong_number_of_arguments,
 	     list2 (Fcons (make_fixnum (mandatory), make_fixnum (nonrest)),
 		    make_fixnum (nargs)));
@@ -825,7 +825,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	op_branch:
 	  op -= pc - bytestr_data;
 	  if (BYTE_CODE_SAFE
-	      && ! (bytestr_data - pc <= op
+	      && !(bytestr_data - pc <= op
 		    && op < bytestr_data + bytestr_length - pc))
 	    emacs_abort ();
 	  quitcounter += op < 0;
@@ -1120,7 +1120,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	      = ((VECTORP (arrayval) || RECORDP (arrayval))
 		 ? PVSIZE (arrayval)
 		 : -1);
-	    if (! FIXNUMP (idxval))
+	    if (!FIXNUMP (idxval))
 	      {
 		record_in_backtrace (Qaset, &TOP, 3);
 		wrong_type_argument (Qfixnump, idxval);
@@ -1742,7 +1742,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	CASE_DEFAULT
 	CASE (Bconstant):
 	  if (BYTE_CODE_SAFE
-	      && ! (Bconstant <= op && op < Bconstant + const_length))
+	      && !(Bconstant <= op && op < Bconstant + const_length))
 	    emacs_abort ();
 	  PUSH (vectorp[op - Bconstant]);
 	  NEXT;

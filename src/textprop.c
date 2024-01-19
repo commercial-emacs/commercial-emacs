@@ -27,7 +27,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* Test for membership, allowing for t (actually any non-cons) to mean the
    universal set.  */
 
-#define TMEM(sym, set) (CONSP (set) ? ! NILP (Fmemq (sym, set)) : ! NILP (set))
+#define TMEM(sym, set) (CONSP (set) ? !NILP (Fmemq (sym, set)) : !NILP (set))
 
 
 /* NOTES:  previous- and next- property change will have to skip
@@ -154,7 +154,7 @@ validate_interval_range (Lisp_Object object, Lisp_Object *begin,
     {
       register struct buffer *b = XBUFFER (object);
 
-      if (! (BUF_BEGV (b) <= XFIXNUM (*begin) && XFIXNUM (*begin) <= XFIXNUM (*end)
+      if (!(BUF_BEGV (b) <= XFIXNUM (*begin) && XFIXNUM (*begin) <= XFIXNUM (*end)
 	     && XFIXNUM (*end) <= BUF_ZV (b)))
 	args_out_of_range (begin0, end0);
       i = buffer_intervals (b);
@@ -181,7 +181,7 @@ validate_interval_range (Lisp_Object object, Lisp_Object *begin,
       searchpos = XFIXNUM (*begin);
     }
 
-  if (! i)
+  if (!i)
     return (force ? create_root_interval (object) : i);
 
   return find_interval (i, searchpos);
@@ -203,7 +203,7 @@ validate_plist (Lisp_Object list)
       do
 	{
 	  tail = XCDR (tail);
-	  if (! CONSP (tail))
+	  if (!CONSP (tail))
 	    error ("Odd length text property list");
 	  tail = XCDR (tail);
 	  maybe_quit ();
@@ -236,7 +236,7 @@ interval_has_all_properties (Lisp_Object plist, INTERVAL i)
 	  {
 	    /* Found the same property on both lists.  If the
 	       values are unequal, return false.  */
-	    if (! EQ (Fcar (XCDR (tail1)), Fcar (XCDR (tail2))))
+	    if (!EQ (Fcar (XCDR (tail1)), Fcar (XCDR (tail2))))
 	      return false;
 
 	    /* Property has same value on both lists; go to next one.  */
@@ -244,7 +244,7 @@ interval_has_all_properties (Lisp_Object plist, INTERVAL i)
 	    break;
 	  }
 
-      if (! found)
+      if (!found)
 	return false;
     }
 
@@ -329,7 +329,7 @@ set_properties (Lisp_Object properties, INTERVAL interval, Lisp_Object object)
       for (sym = interval->plist;
 	   PLIST_ELT_P (sym, value);
 	   sym = XCDR (value))
-	if (! EQ (property_value (properties, XCAR (sym)),
+	if (!EQ (property_value (properties, XCAR (sym)),
 		  XCAR (value)))
 	  {
 	    record_property_change (interval->position, LENGTH (interval),
@@ -407,7 +407,7 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 			  || EQ (XCAR (tail), Qcomposition)
 			  || EQ (XCAR (tail), Qwrap_prefix)
 			  || EQ (XCAR (tail), Qline_prefix))
-		      && ! NILP (Fmemq (sym1, XCDR (tail))))
+		      && !NILP (Fmemq (sym1, XCDR (tail))))
 		    {
 		      XBUFFER (buf)->text->monospace = false;
 		      goto monospace_done;
@@ -421,8 +421,8 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 		    {
 		      Lisp_Object *attrs = xvector_contents (lface);
 		      if (! UNSPECIFIEDP (*(attrs + LFACE_HEIGHT_INDEX))
-			  || ! UNSPECIFIEDP (*(attrs + LFACE_FONT_INDEX))
-			  || ! UNSPECIFIEDP (*(attrs + LFACE_SWIDTH_INDEX)))
+			  || !UNSPECIFIEDP (*(attrs + LFACE_FONT_INDEX))
+			  || !UNSPECIFIEDP (*(attrs + LFACE_SWIDTH_INDEX)))
 			{
 			  XBUFFER (buf)->text->monospace = false;
 			  goto monospace_done;
@@ -440,7 +440,7 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 		}
 	    monospace_done:;
 	    }
-	  if (! CONSP (tail2))
+	  if (!CONSP (tail2))
 	    /* INTERVAL's plist does not have sym1.  */
 	    set_interval_plist (interval,
 				Fcons (sym1, Fcons (val1, interval->plist)));
@@ -448,7 +448,7 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 	    Fsetcar (this_cdr, val1);
 	  else if (CONSP (Fcar (this_cdr)) &&
 		   /* Special-case anonymous face properties. */
-		   (! EQ (sym1, Qface) ||
+		   (!EQ (sym1, Qface) ||
 		    NILP (Fkeywordp (Fcar (Fcar (this_cdr))))))
 	    {
 	      /* Previous value is a list, so prepend (or append) */
@@ -489,7 +489,7 @@ remove_properties (Lisp_Object plist, Lisp_Object list, INTERVAL i, Lisp_Object 
   bool changed = false;
 
   /* True means tail1 is a plist, otherwise it is a list.  */
-  bool use_plist = ! NILP (plist);
+  bool use_plist = !NILP (plist);
   Lisp_Object tail1 = use_plist ? plist : list;
 
   Lisp_Object current_plist = i->plist;
@@ -605,7 +605,7 @@ form, use the `describe-text-properties' command.  */)
      it means it's the end of OBJECT.
      There are no properties at the very end,
      since no character follows.  */
-  if (! i || XFIXNUM (position) == LENGTH (i) + i->position)
+  if (!i || XFIXNUM (position) == LENGTH (i) + i->position)
     return Qnil;
 
   return i->plist;
@@ -1217,7 +1217,7 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
 
  retry:
   unchanged = validate_interval_range (object, &start, &end, hard);
-  if (! unchanged)
+  if (!unchanged)
     return Qnil;
 
   interval = unchanged;
@@ -1597,7 +1597,7 @@ Use `set-text-properties' if you want to remove all text properties.  */)
   len = XFIXNUM (end) - s;
 
   /* If there are no properties on this entire interval, return.  */
-  if (! interval_has_some_properties (properties, i))
+  if (!interval_has_some_properties (properties, i))
     {
       ptrdiff_t got = LENGTH (i) - (s - i->position);
 
@@ -1609,7 +1609,7 @@ Use `set-text-properties' if you want to remove all text properties.  */)
 	  i = next_interval (i);
 	  got = LENGTH (i);
 	}
-      while (! interval_has_some_properties (properties, i));
+      while (!interval_has_some_properties (properties, i));
     }
   /* Split away the beginning of this interval; what we don't
      want to modify.  */
@@ -1647,7 +1647,7 @@ Use `set-text-properties' if you want to remove all text properties.  */)
 
       if (LENGTH (i) >= len)
 	{
-	  if (! interval_has_some_properties (properties, i))
+	  if (!interval_has_some_properties (properties, i))
 	    {
 	      eassert (modified);
 	      if (BUFFERP (object))
@@ -1723,7 +1723,7 @@ Return t if any property was actually removed, nil otherwise.  */)
   len = XFIXNUM (end) - s;
 
   /* If there are no properties on the interval, return.  */
-  if (! interval_has_some_properties_list (properties, i))
+  if (!interval_has_some_properties_list (properties, i))
     {
       ptrdiff_t got = LENGTH (i) - (s - i->position);
 
@@ -1735,7 +1735,7 @@ Return t if any property was actually removed, nil otherwise.  */)
 	  i = next_interval (i);
 	  got = LENGTH (i);
 	}
-      while (! interval_has_some_properties_list (properties, i));
+      while (!interval_has_some_properties_list (properties, i));
     }
   /* Split away the beginning of this interval; what we don't
      want to modify.  */
@@ -1758,7 +1758,7 @@ Return t if any property was actually removed, nil otherwise.  */)
 
       if (LENGTH (i) >= len)
 	{
-	  if (! interval_has_some_properties_list (properties, i))
+	  if (!interval_has_some_properties_list (properties, i))
 	    {
 	      if (modified)
 		{
@@ -1881,7 +1881,7 @@ markers).  If OBJECT is a string, START and END are 0-based indices into it.  */
     {
       if (i->position >= e)
 	break;
-      if (! EQ (textget (i->plist, property), value))
+      if (!EQ (textget (i->plist, property), value))
 	{
 	  if (i->position > s)
 	    s = i->position;
@@ -2027,7 +2027,7 @@ copy_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object src,
       Lisp_Object res = Fcar (stuff);
       res = Fadd_text_properties (Fcar (res), Fcar (Fcdr (res)),
 				  Fcar (Fcdr (Fcdr (res))), dest);
-      if (! NILP (res))
+      if (!NILP (res))
 	modified = true;
       stuff = Fcdr (stuff);
     }
@@ -2274,8 +2274,8 @@ verify_interval_modification (struct buffer *buf,
 
 		      tem = textget (prev->plist, Qrear_nonsticky);
 		      if (! TMEM (Qread_only, tem)
-			  && (! NILP (plist_get (prev->plist,Qread_only))
-			      || ! TMEM (Qcategory, tem)))
+			  && (!NILP (plist_get (prev->plist,Qread_only))
+			      || !TMEM (Qcategory, tem)))
 			text_read_only (before);
 		    }
 		}
@@ -2299,8 +2299,8 @@ verify_interval_modification (struct buffer *buf,
 
 		  tem = textget (prev->plist, Qrear_nonsticky);
 		  if (! TMEM (Qread_only, tem)
-		      && (! NILP (plist_get (prev->plist, Qread_only))
-			  || ! TMEM (Qcategory, tem)))
+		      && (!NILP (plist_get (prev->plist, Qread_only))
+			  || !TMEM (Qcategory, tem)))
 		    text_read_only (after);
 		}
 	    }

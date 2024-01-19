@@ -964,7 +964,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
   /* Add the value to the appropriate history list, if any.  This is
      done after the previous buffer has been made current again, in
      case the history variable is buffer-local.  */
-  if (! (NILP (Vhistory_add_new_input) || NILP (histstring)))
+  if (!(NILP (Vhistory_add_new_input) || NILP (histstring)))
     call2 (Qadd_to_history, histvar, histstring);
 
   /* If Lisp form desired instead of string, parse it.  */
@@ -1405,7 +1405,7 @@ Fifth arg INHERIT-INPUT-METHOD, if non-nil, means the minibuffer inherits
   val = Fread_from_minibuffer (prompt, initial_input, Qnil,
 			       Qnil, history, default_value,
 			       inherit_input_method);
-  if (STRINGP (val) && SCHARS (val) == 0 && ! NILP (default_value))
+  if (STRINGP (val) && SCHARS (val) == 0 && !NILP (default_value))
     val = CONSP (default_value) ? XCAR (default_value) : default_value;
   return unbind_to (count, val);
 }
@@ -1769,7 +1769,7 @@ or from one of the possible completions.  */)
 						   string, zero,
 						   Qnil,
 						   Qnil),
-			   ! EQ (Qt, tem))))
+			   !EQ (Qt, tem))))
 		    bestmatch = eltstring;
 		}
 	      if (bestmatchsize != SCHARS (eltstring)

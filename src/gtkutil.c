@@ -528,7 +528,7 @@ xg_get_image_for_pixmap (struct frame *f,
       && STRINGP (file = image_find_image_file (specified_file)))
     {
       char *encoded_file = SSDATA (ENCODE_FILE (file));
-      if (! old_widget)
+      if (!old_widget)
         old_widget = GTK_IMAGE (gtk_image_new_from_file (encoded_file));
       else
         gtk_image_set_from_file (old_widget, encoded_file);
@@ -701,7 +701,7 @@ get_utf8_string (const char *str)
       up = utf8_str = xmalloc (alloc);
       p = (unsigned char *)str;
 
-      while (! (cp = g_locale_to_utf8 ((char *)p, -1, &bytes_read,
+      while (!(cp = g_locale_to_utf8 ((char *)p, -1, &bytes_read,
                                        &bytes_written, &err))
              && err->code == G_CONVERT_ERROR_ILLEGAL_SEQUENCE)
         {
@@ -829,7 +829,7 @@ hierarchy_ch_cb (GtkWidget *widget,
   xp_output *x = f->output_data.xp;
   GtkWidget *top = gtk_widget_get_toplevel (x->ttip_lbl);
 
-  if (! top || ! GTK_IS_WINDOW (top))
+  if (!top || !GTK_IS_WINDOW (top))
       gtk_widget_hide (previous_toplevel);
 }
 
@@ -1580,7 +1580,7 @@ xg_create_frame_widgets (struct frame *f)
   wfixed = gtk_fixed_new ();
 #endif
 
-  if (! wtop || ! wvbox || ! whbox || ! wfixed)
+  if (!wtop || !wvbox || !whbox || !wfixed)
     {
       if (wtop) gtk_widget_destroy (wtop);
       if (wvbox) gtk_widget_destroy (wvbox);
@@ -1597,7 +1597,7 @@ xg_create_frame_widgets (struct frame *f)
   gtk_widget_set_name (wfixed, SSDATA (Vx_resource_name));
 
   /* If this frame has a title or name, set it in the title bar.  */
-  if (! NILP (f->title))
+  if (!NILP (f->title))
     title = SSDATA (ENCODE_UTF_8 (f->title));
   else if (! NILP (f->name))
     title = SSDATA (ENCODE_UTF_8 (f->name));
@@ -2365,7 +2365,7 @@ create_dialog (widget_value *wv,
         {
           /* This is one button to add to the dialog.  */
           w = gtk_button_new_with_label (utf8_label);
-          if (! item->enabled)
+          if (!item->enabled)
             gtk_widget_set_sensitive (w, FALSE);
           if (select_cb)
             g_signal_connect (G_OBJECT (w), "clicked",
@@ -2645,7 +2645,7 @@ xg_get_file_with_chooser (struct frame *f,
         file = Fexpand_file_name (file, Qnil);
 
       utf8_filename = SSDATA (ENCODE_UTF_8 (file));
-      if (! NILP (Ffile_directory_p (file)))
+      if (!NILP (Ffile_directory_p (file)))
         gtk_file_chooser_set_current_folder (GTK_FILE_CHOOSER (filewin),
                                              utf8_filename);
       else
@@ -2964,7 +2964,7 @@ static xg_list_node xg_menu_item_cb_list;
 static xg_menu_cb_data *
 make_cl_data (xg_menu_cb_data *cl_data, struct frame *f, GCallback highlight_cb)
 {
-  if (! cl_data)
+  if (!cl_data)
     {
       cl_data = xmalloc (sizeof *cl_data);
       cl_data->f = f;
@@ -3038,7 +3038,7 @@ xg_mark_data (void)
     {
       xg_menu_item_cb_data *cb_data = (xg_menu_item_cb_data *) iter;
 
-      if (! NILP (cb_data->help))
+      if (!NILP (cb_data->help))
         mark_object (&cb_data->help);
     }
 
@@ -3281,7 +3281,7 @@ xg_create_one_menuitem (widget_value *item,
   g_object_set_data (G_OBJECT (w), XG_ITEM_DATA, cb_data);
 
   /* final item, not a submenu  */
-  if (item->call_data && ! item->contents)
+  if (item->call_data && !item->contents)
     {
       if (select_cb)
         cb_data->select_id
@@ -3591,9 +3591,9 @@ xg_update_menubar (GtkWidget *menubar,
 		   GCallback highlight_cb,
 		   xg_menu_cb_data *cl_data)
 {
-  if (! iter && ! val)
+  if (!iter && !val)
     return;
-  else if (iter && ! val)
+  else if (iter && !val)
     {
       /* Item(s) have been removed.  Remove all remaining items.  */
       xg_destroy_widgets (iter);
@@ -3606,7 +3606,7 @@ xg_update_menubar (GtkWidget *menubar,
       val = 0;
       iter = 0;
     }
-  else if (! iter && val)
+  else if (!iter && val)
     {
       /* Item(s) added.  Add all new items in one call.  */
       create_menus (val, f, select_cb, deactivate_cb, highlight_cb,
@@ -3635,7 +3635,7 @@ xg_update_menubar (GtkWidget *menubar,
 
       /* See if the changed entry (val) is present later in the menu bar  */
       for (iter2 = iter;
-           iter2 && ! val_in_menubar;
+           iter2 && !val_in_menubar;
            iter2 = g_list_next (iter2))
         {
           witem2 = GTK_MENU_ITEM (iter2->data);
@@ -3644,10 +3644,10 @@ xg_update_menubar (GtkWidget *menubar,
 
       /* See if the current entry (iter) is present later in the
          specification for the new menu bar.  */
-      for (cur = val; cur && ! iter_in_new_menubar; cur = cur->next)
+      for (cur = val; cur && !iter_in_new_menubar; cur = cur->next)
         iter_in_new_menubar = xg_item_label_same_p (witem, cur->name);
 
-      if (val_in_menubar && ! iter_in_new_menubar)
+      if (val_in_menubar && !iter_in_new_menubar)
         {
           int nr = pos;
 
@@ -3665,7 +3665,7 @@ xg_update_menubar (GtkWidget *menubar,
           *list = iter = gtk_container_get_children (GTK_CONTAINER (menubar));
           while (nr-- > 0) iter = g_list_next (iter);
         }
-      else if (! val_in_menubar && ! iter_in_new_menubar)
+      else if (!val_in_menubar && !iter_in_new_menubar)
         {
           /*  This corresponds to:
                 Current:  A B C
@@ -3696,7 +3696,7 @@ xg_update_menubar (GtkWidget *menubar,
           val = val->next;
           ++pos;
         }
-      else if (! val_in_menubar && iter_in_new_menubar)
+      else if (!val_in_menubar && iter_in_new_menubar)
         {
           /*  This corresponds to:
                 Current:  A B C
@@ -3793,7 +3793,7 @@ xg_update_menu_item (widget_value *val,
       wkey = GTK_LABEL (list->next->data);
       g_list_free (list);
 
-      if (! utf8_key)
+      if (!utf8_key)
         {
           /* Remove the key and keep just the label.  */
           g_object_ref (G_OBJECT (wlbl));
@@ -3826,13 +3826,13 @@ xg_update_menu_item (widget_value *val,
   if (wkey) old_key = gtk_label_get_label (wkey);
   if (wlbl) old_label = gtk_label_get_label (wlbl);
 
-  if (wkey && utf8_key && (! old_key || strcmp (utf8_key, old_key) != 0))
+  if (wkey && utf8_key && (!old_key || strcmp (utf8_key, old_key) != 0))
     {
       label_changed = true;
       gtk_label_set_text (wkey, utf8_key);
     }
 
-  if (utf8_label && (! old_label || strcmp (utf8_label, old_label) != 0))
+  if (utf8_label && (!old_label || strcmp (utf8_label, old_label) != 0))
     {
       label_changed = true;
       gtk_label_set_text (wlbl, utf8_label);
@@ -3841,7 +3841,7 @@ xg_update_menu_item (widget_value *val,
   if (utf8_key) g_free (utf8_key);
   if (utf8_label) g_free (utf8_label);
 
-  if (! val->enabled && gtk_widget_get_sensitive (w))
+  if (!val->enabled && gtk_widget_get_sensitive (w))
     gtk_widget_set_sensitive (w, FALSE);
   else if (val->enabled && ! gtk_widget_get_sensitive (w))
     gtk_widget_set_sensitive (w, TRUE);
@@ -3857,7 +3857,7 @@ xg_update_menu_item (widget_value *val,
       if (val->call_data && ! val->contents)
         {
           /* This item shall have a select callback.  */
-          if (! cb_data->select_id)
+          if (!cb_data->select_id)
             cb_data->select_id
               = g_signal_connect (G_OBJECT (w), "activate",
                                   select_cb, cb_data);
@@ -3928,10 +3928,10 @@ xg_update_submenu (GtkWidget *submenu,
     /* Remember first radio button in a group.  If we get a mismatch in
        a radio group we must rebuild the whole group so that the connections
        in GTK becomes correct.  */
-    if (cur->button_type == BUTTON_TYPE_RADIO && ! first_radio)
+    if (cur->button_type == BUTTON_TYPE_RADIO && !first_radio)
       first_radio = iter;
     else if (cur->button_type != BUTTON_TYPE_RADIO
-             && ! GTK_IS_RADIO_MENU_ITEM (w))
+             && !GTK_IS_RADIO_MENU_ITEM (w))
       first_radio = 0;
 
     if (GTK_IS_SEPARATOR_MENU_ITEM (w))
@@ -4211,7 +4211,7 @@ xg_event_is_for_menubar (struct frame *f, const XEvent *event)
     }
   else
 #endif
-  if (! (event->xbutton.x >= 0
+  if (!(event->xbutton.x >= 0
          && event->xbutton.x < FRAME_PIXEL_WIDTH (f)
          && event->xbutton.y >= 0
          && event->xbutton.y < FRAME_MENUBAR_HEIGHT (f)
@@ -4230,9 +4230,9 @@ xg_event_is_for_menubar (struct frame *f, const XEvent *event)
   gevent.any.type = GDK_NOTHING;
   gwdesc = gtk_get_event_widget (&gevent);
   if (! gwdesc) return 0;
-  if (! GTK_IS_MENU_BAR (gwdesc)
-      && ! GTK_IS_MENU_ITEM (gwdesc)
-      && ! gtk_widget_is_ancestor (x->menubar_widget, gwdesc))
+  if (!GTK_IS_MENU_BAR (gwdesc)
+      && !GTK_IS_MENU_ITEM (gwdesc)
+      && !gtk_widget_is_ancestor (x->menubar_widget, gwdesc))
     return 0;
 
   list = gtk_container_get_children (GTK_CONTAINER (x->menubar_widget));
@@ -5338,7 +5338,7 @@ xg_tool_bar_help_callback (GtkWidget *w,
   struct frame *f = g_object_get_data (G_OBJECT (w), XG_FRAME_DATA);
   Lisp_Object help, frame;
 
-  if (! f || ! f->n_tool_bar_items || NILP (f->tool_bar_items))
+  if (!f || !f->n_tool_bar_items || NILP (f->tool_bar_items))
     return FALSE;
 
   if (event->type == GDK_ENTER_NOTIFY)
@@ -5459,7 +5459,7 @@ xg_create_tool_bar (struct frame *f)
   struct xg_frame_tb_info *tbinfo
     = g_object_get_data (G_OBJECT (FRAME_GTK_OUTER_WIDGET (f)),
                          TB_INFO_KEY);
-  if (! tbinfo)
+  if (!tbinfo)
     {
       tbinfo = xmalloc (sizeof (*tbinfo));
       tbinfo->last_tool_bar = Qnil;
@@ -5508,7 +5508,7 @@ find_rtl_image (struct frame *f, Lisp_Object image, Lisp_Object rtl)
         {
           file = call1 (intern ("file-name-sans-extension"),
                        Ffile_name_nondirectory (file));
-          if (! NILP (Fequal (file, rtl_name)))
+          if (!NILP (Fequal (file, rtl_name)))
             {
               image = rtl_image;
               break;
@@ -5628,7 +5628,7 @@ is_box_type (GtkWidget *vb, bool is_horizontal)
     {
       GtkOrientation ori = gtk_orientable_get_orientation (GTK_ORIENTABLE (vb));
       ret = (ori == GTK_ORIENTATION_HORIZONTAL && is_horizontal)
-        || (ori == GTK_ORIENTATION_VERTICAL && ! is_horizontal);
+        || (ori == GTK_ORIENTATION_VERTICAL && !is_horizontal);
     }
   return ret;
 #else
@@ -5753,7 +5753,7 @@ find_icon_from_name (char *name,
       *icon_name = name + 2;
       name = NULL;
 
-      if (! gtk_icon_theme_has_icon (icon_theme, *icon_name))
+      if (!gtk_icon_theme_has_icon (icon_theme, *icon_name))
         *icon_name = NULL;
     }
 
@@ -5794,7 +5794,7 @@ update_frame_tool_bar (struct frame *f)
   GtkIconTheme *icon_theme;
 
 
-  if (! FRAME_GTK_WIDGET (f))
+  if (!FRAME_GTK_WIDGET (f))
     return;
 
 #ifdef HAVE_PGTK
@@ -5839,12 +5839,12 @@ update_frame_tool_bar (struct frame *f)
   tbinfo = g_object_get_data (G_OBJECT (FRAME_GTK_OUTER_WIDGET (f)),
                               TB_INFO_KEY);
 
-  if (! NILP (tbinfo->last_tool_bar) && ! NILP (f->tool_bar_items)
+  if (!NILP (tbinfo->last_tool_bar) && !NILP (f->tool_bar_items)
       && tbinfo->n_last_items == f->n_tool_bar_items
       && tbinfo->hmargin == hmargin && tbinfo->vmargin == vmargin
       && tbinfo->dir == dir
-      && ! NILP (Fequal (tbinfo->style, style))
-      && ! NILP (Fequal (tbinfo->last_tool_bar, f->tool_bar_items)))
+      && !NILP (Fequal (tbinfo->style, style))
+      && !NILP (Fequal (tbinfo->last_tool_bar, f->tool_bar_items)))
     {
       unblock_input ();
       return;
@@ -5875,7 +5875,7 @@ update_frame_tool_bar (struct frame *f)
       Lisp_Object rtl;
       GtkWidget *wbutton = NULL;
       Lisp_Object specified_file;
-      bool vert_only = ! NILP (PROP (TOOL_BAR_ITEM_VERT_ONLY));
+      bool vert_only = !NILP (PROP (TOOL_BAR_ITEM_VERT_ONLY));
       Lisp_Object label
 	= (EQ (style, Qimage) || (vert_only && horiz))
 	? Qnil
@@ -5926,7 +5926,7 @@ update_frame_tool_bar (struct frame *f)
         {
           Lisp_Object tem;
           for (tem = stock; CONSP (tem); tem = XCDR (tem))
-            if (! NILP (tem) && STRINGP (XCAR (tem)))
+            if (!NILP (tem) && STRINGP (XCAR (tem)))
               {
                 stock_name = find_icon_from_name (SSDATA (XCAR (tem)),
                                                   icon_theme,
@@ -6145,7 +6145,7 @@ xg_change_toolbar_position (struct frame *f, Lisp_Object pos)
   xp_output *x = f->output_data.xp;
   GtkWidget *top_widget = x->toolbar_widget;
 
-  if (! x->toolbar_widget || ! top_widget)
+  if (!x->toolbar_widget || !top_widget)
     return;
 
   block_input ();

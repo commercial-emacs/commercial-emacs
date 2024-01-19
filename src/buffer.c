@@ -116,7 +116,7 @@ fix_position (Lisp_Object pos)
   if (MARKERP (pos))
     return marker_position (pos);
   CHECK_TYPE (BIGNUMP (pos), Qinteger_or_marker_p, pos);
-  return ! NILP (Fnatnump (pos)) ? MOST_POSITIVE_FIXNUM : MOST_NEGATIVE_FIXNUM;
+  return !NILP (Fnatnump (pos)) ? MOST_POSITIVE_FIXNUM : MOST_NEGATIVE_FIXNUM;
 }
 
 /* These setters are used only in this file, so they can be private.
@@ -521,7 +521,7 @@ static void
 run_buffer_list_update_hook (struct buffer *buf)
 {
   eassert (buf);
-  if (! (NILP (Vrun_hooks) || buf->inhibit_buffer_hooks))
+  if (!(NILP (Vrun_hooks) || buf->inhibit_buffer_hooks))
     call1 (Vrun_hooks, Qbuffer_list_update_hook);
 }
 
@@ -570,7 +570,7 @@ even if it is dead.  The return value is never nil.  */)
      anchoring a search.  */
   alloc_buffer_text (b, BUF_GAP_SIZE (b) + 1);
   unblock_input ();
-  if (! BUF_BEG_ADDR (b))
+  if (!BUF_BEG_ADDR (b))
     memory_full (BUF_GAP_SIZE (b) + 1);
 
   b->pt = BEG;
@@ -638,8 +638,8 @@ static void
 add_buffer_overlay (struct buffer *b, struct Lisp_Overlay *ov,
                     ptrdiff_t begin, ptrdiff_t end)
 {
-  eassert (! ov->buffer);
-  if (! b->overlays)
+  eassert (!ov->buffer);
+  if (!b->overlays)
     b->overlays = itree_create ();
   ov->buffer = b;
   itree_insert (b->overlays, ov->interval, begin, end);
@@ -650,7 +650,7 @@ add_buffer_overlay (struct buffer *b, struct Lisp_Overlay *ov,
 static void
 copy_overlays (struct buffer *from, struct buffer *to)
 {
-  eassert (to && ! to->overlays);
+  eassert (to && !to->overlays);
   struct itree_node *node;
 
   ITREE_FOREACH (node, from->overlays, PTRDIFF_MIN, PTRDIFF_MAX, ASCENDING)
@@ -721,8 +721,8 @@ record_buffer_markers (struct buffer *b)
     {
       Lisp_Object buffer;
 
-      eassert (! NILP (BVAR (b, begv_marker)));
-      eassert (! NILP (BVAR (b, zv_marker)));
+      eassert (!NILP (BVAR (b, begv_marker)));
+      eassert (!NILP (BVAR (b, zv_marker)));
 
       XSETBUFFER (buffer, b);
       set_marker_both (BVAR (b, pt_marker), buffer, b->pt, b->pt_byte);
@@ -738,7 +738,7 @@ record_buffer_markers (struct buffer *b)
 static void
 fetch_buffer_markers (struct buffer *b)
 {
-  if (! NILP (BVAR (b, pt_marker)))
+  if (!NILP (BVAR (b, pt_marker)))
     {
       Lisp_Object m;
 
@@ -916,7 +916,7 @@ remove_buffer_overlay (struct buffer *b, struct Lisp_Overlay *ov)
 static void
 drop_overlay (struct Lisp_Overlay *ov)
 {
-  if (! ov->buffer)
+  if (!ov->buffer)
     return;
 
   modify_overlay (ov->buffer, overlay_start (ov), overlay_end (ov));
@@ -930,7 +930,7 @@ delete_all_overlays (struct buffer *b)
 {
   struct itree_node *node;
 
-  if (! b->overlays)
+  if (!b->overlays)
     return;
 
   /* The general rule is that the tree cannot be modified from within
@@ -968,7 +968,7 @@ free_buffer_overlays (struct buffer *b)
 static void
 set_overlays_multibyte (bool multibyte)
 {
-  if (! current_buffer->overlays || Z == Z_BYTE)
+  if (!current_buffer->overlays || Z == Z_BYTE)
     return;
 
   struct itree_node **nodes = NULL;
@@ -1070,7 +1070,7 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
 
   /* If the standard case table has been altered and invalidated,
      fix up its insides first.  */
-  if (! (CHAR_TABLE_P (XCHAR_TABLE (Vascii_downcase_table)->extras[0])
+  if (!(CHAR_TABLE_P (XCHAR_TABLE (Vascii_downcase_table)->extras[0])
 	 && CHAR_TABLE_P (XCHAR_TABLE (Vascii_downcase_table)->extras[1])
 	 && CHAR_TABLE_P (XCHAR_TABLE (Vascii_downcase_table)->extras[2])))
     Fset_standard_case_table (Vascii_downcase_table);
@@ -1103,7 +1103,7 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
 		 `permanent-local-hook' property. */
 	      if (EQ (bind, Qt)
 		  || (SYMBOLP (bind)
-		      && ! NILP (Fget (bind, Qpermanent_local_hook))))
+		      && !NILP (Fget (bind, Qpermanent_local_hook))))
 		nbinds = Fcons (bind, nbinds);
 	    }
 	  nbinds = Fnreverse (nbinds);
@@ -1114,11 +1114,11 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
 	}
     }
 
-  eassert (! ignore_perm || NILP (BVAR (b, local_var_alist)));
+  eassert (!ignore_perm || NILP (BVAR (b, local_var_alist)));
 
   /* Douse local_flags bit for killed.  */
   for (int i = 0; i < last_per_buffer_idx; ++i)
-    if (ignore_perm || ! buffer_permanent_local_flags[i])
+    if (ignore_perm || !buffer_permanent_local_flags[i])
       SET_LOCALIZED_SLOT_P (b, i, 0);
 
   /* Set slot values for killed.  */
@@ -1191,7 +1191,7 @@ BUFFER defaults to the current buffer.
 Return nil if BUFFER has been killed.  */)
   (register Lisp_Object buffer)
 {
-  return BVAR (! NILP (buffer) ? XBUFFER (buffer) : current_buffer, name);
+  return BVAR (!NILP (buffer) ? XBUFFER (buffer) : current_buffer, name);
 }
 
 DEFUN ("buffer-file-name", Fbuffer_file_name, Sbuffer_file_name, 0, 1, 0,
@@ -1199,7 +1199,7 @@ DEFUN ("buffer-file-name", Fbuffer_file_name, Sbuffer_file_name, 0, 1, 0,
 No argument or nil as argument means use the current buffer.  */)
   (register Lisp_Object buffer)
 {
-  return BVAR (! NILP (buffer) ? XBUFFER (buffer) : current_buffer, filename);
+  return BVAR (!NILP (buffer) ? XBUFFER (buffer) : current_buffer, filename);
 }
 
 DEFUN ("buffer-base-buffer", Fbuffer_base_buffer, Sbuffer_base_buffer,
@@ -1310,7 +1310,7 @@ No argument or nil as argument means use current buffer as BUFFER.  */)
 
   Lisp_Object tem = buffer_local_variables_1 (b, PER_BUFFER_VAR_OFFSET (undo_list),
 					      intern ("buffer-undo-list"));
-  if (! NILP (tem))
+  if (!NILP (tem))
     result = Fcons (tem, result);
 
   return result;
@@ -1413,7 +1413,7 @@ state of the current buffer.  Use with care.  */)
     {
       Lisp_Object fn = BVAR (b, file_truename);
       /* Test buffer-file-name so that binding it to nil is effective.  */
-      if (!NILP (fn) && ! NILP (BVAR (b, filename)))
+      if (!NILP (fn) && !NILP (BVAR (b, filename)))
         {
           bool already = SAVE_MODIFF < MODIFF;
           if (!already && !NILP (flag))
@@ -1679,10 +1679,10 @@ compact_buffer (struct buffer *buffer)
       /* changed since last compaction */
       && BUF_COMPACT (buffer) != BUF_MODIFF (buffer))
     {
-      if (! EQ (BVAR(buffer, undo_list), Qt)) /* undo not disabled.  */
+      if (!EQ (BVAR(buffer, undo_list), Qt)) /* undo not disabled.  */
 	truncate_undo_list (buffer);
 
-      if (! buffer->text->inhibit_shrinking)
+      if (!buffer->text->inhibit_shrinking)
 	{
 	  /* Shrink if gap exceeds either 10% of buffer size or
 	     GAP_BYTES_DFL bytes.  */
@@ -2283,7 +2283,7 @@ advance_to_char_boundary (ptrdiff_t byte_pos)
     return BEG;
 
   c = FETCH_BYTE (byte_pos);
-  if (! CHAR_HEAD_P (c))
+  if (!CHAR_HEAD_P (c))
     {
       /* We should advance BYTE_POS only when C is a constituent of a
          multibyte sequence.  */
@@ -2294,7 +2294,7 @@ advance_to_char_boundary (ptrdiff_t byte_pos)
 	  byte_pos--;
 	  c = FETCH_BYTE (byte_pos);
 	}
-      while (! CHAR_HEAD_P (c) && byte_pos > BEG);
+      while (!CHAR_HEAD_P (c) && byte_pos > BEG);
       byte_pos += next_char_len (byte_pos);
       if (byte_pos < orig_byte_pos)
 	byte_pos = orig_byte_pos;
@@ -2601,11 +2601,11 @@ current buffer is cleared.  */)
 
       if (EQ (flag, Qt)
 	  && GPT_BYTE > 1 && GPT_BYTE < Z_BYTE
-	  && ! CHAR_HEAD_P (*(GAP_END_ADDR)))
+	  && !CHAR_HEAD_P (*(GAP_END_ADDR)))
 	{
 	  unsigned char *q = GPT_ADDR - 1;
 
-	  while (! CHAR_HEAD_P (*q) && q > BEG_ADDR) q--;
+	  while (!CHAR_HEAD_P (*q) && q > BEG_ADDR) q--;
 	  if (LEADING_CODE_P (*q))
 	    {
 	      ptrdiff_t new_gpt = GPT_BYTE - (GPT_ADDR - q);
@@ -2856,13 +2856,13 @@ overlays_in (ptrdiff_t beg, ptrdiff_t end, bool extend,
       else if (node->begin == end)
         {
           next = node->begin;
-          if ((! empty || end < ZV) && beg < end)
+          if ((!empty || end < ZV) && beg < end)
             break;
           if (empty && node->begin != node->end)
             continue;
         }
 
-      if (! empty && node->begin == node->end)
+      if (!empty && node->begin == node->end)
         continue;
 
       if (extend && idx == len)
@@ -3174,7 +3174,7 @@ record_overlay_string (struct sortstrlist *ssl, Lisp_Object str,
 
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     nbytes = SCHARS (str);
-  else if (! STRING_MULTIBYTE (str))
+  else if (!STRING_MULTIBYTE (str))
     nbytes = count_size_as_multibyte (SDATA (str),
 				      SBYTES (str));
   else
@@ -3188,7 +3188,7 @@ record_overlay_string (struct sortstrlist *ssl, Lisp_Object str,
     {
       if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	nbytes = SCHARS (str2);
-      else if (! STRING_MULTIBYTE (str2))
+      else if (!STRING_MULTIBYTE (str2))
 	nbytes = count_size_as_multibyte (SDATA (str2),
 					  SBYTES (str2));
       else
@@ -3216,7 +3216,7 @@ record_overlay_string (struct sortstrlist *ssl, Lisp_Object str,
 ptrdiff_t
 overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
 {
-  bool multibyte = ! NILP (BVAR (current_buffer, enable_multibyte_characters));
+  bool multibyte = !NILP (BVAR (current_buffer, enable_multibyte_characters));
   struct itree_node *node;
 
   overlay_heads.used = overlay_heads.bytes = 0;
@@ -3398,7 +3398,7 @@ for the rear of the overlay advance when text is inserted there
     CHECK_BUFFER (buffer);
 
   b = XBUFFER (buffer);
-  if (! BUFFER_LIVE_P (b))
+  if (!BUFFER_LIVE_P (b))
     error ("Attempt to create overlay in a dead buffer");
 
   if (MARKERP (beg) && !EQ (Fmarker_buffer (beg), buffer))
@@ -3417,8 +3417,8 @@ for the rear of the overlay advance when text is inserted there
 
   ptrdiff_t obeg = clip_to_bounds (BUF_BEG (b), XFIXNUM (beg), BUF_Z (b));
   ptrdiff_t oend = clip_to_bounds (obeg, XFIXNUM (end), BUF_Z (b));
-  ov = build_overlay (! NILP (front_advance),
-                      ! NILP (rear_advance), Qnil);
+  ov = build_overlay (!NILP (front_advance),
+                      !NILP (rear_advance), Qnil);
   add_buffer_overlay (b, XOVERLAY (ov), obeg, oend);
 
   /* We don't need to redisplay the region covered by the overlay, because
@@ -3498,9 +3498,9 @@ buffer.  */)
       o_end = OVERLAY_END (overlay);
     }
 
-  if (! EQ (buffer, obuffer))
+  if (!EQ (buffer, obuffer))
     {
-      if (! NILP (obuffer))
+      if (!NILP (obuffer))
         remove_buffer_overlay (XBUFFER (obuffer), XOVERLAY (overlay));
       add_buffer_overlay (XBUFFER (buffer), XOVERLAY (overlay), n_beg, n_end);
     }
@@ -3509,7 +3509,7 @@ buffer.  */)
                               n_beg, n_end);
 
   /* If the overlay has changed buffers, do a thorough redisplay.  */
-  if (! EQ (buffer, obuffer))
+  if (!EQ (buffer, obuffer))
     {
       /* Redisplay where the overlay was.  */
       if (ob)
@@ -3555,7 +3555,7 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
   CHECK_OVERLAY (overlay);
 
   b = OVERLAY_BUFFER (overlay);
-  if (! b)
+  if (!b)
     return Qnil;
 
   specbind (Qinhibit_quit, Qt);
@@ -3592,7 +3592,7 @@ DEFUN ("overlay-start", Foverlay_start, Soverlay_start, 1, 1, 0,
   (Lisp_Object overlay)
 {
   CHECK_OVERLAY (overlay);
-  if (! OVERLAY_BUFFER (overlay))
+  if (!OVERLAY_BUFFER (overlay))
     return Qnil;
 
   return make_fixnum (OVERLAY_START (overlay));
@@ -3603,7 +3603,7 @@ DEFUN ("overlay-end", Foverlay_end, Soverlay_end, 1, 1, 0,
   (Lisp_Object overlay)
 {
   CHECK_OVERLAY (overlay);
-  if (! OVERLAY_BUFFER (overlay))
+  if (!OVERLAY_BUFFER (overlay))
     return Qnil;
 
   return make_fixnum (OVERLAY_END (overlay));
@@ -3618,7 +3618,7 @@ Return nil if OVERLAY has been deleted.  */)
 
   CHECK_OVERLAY (overlay);
 
-  if (! OVERLAY_BUFFER (overlay))
+  if (!OVERLAY_BUFFER (overlay))
     return Qnil;
 
   XSETBUFFER (buffer, OVERLAY_BUFFER (overlay));
@@ -3825,7 +3825,7 @@ VALUE will be returned.*/)
       if (changed)
 	modify_overlay (b, OVERLAY_START (overlay),
                         OVERLAY_END (overlay));
-      if (EQ (prop, Qevaporate) && ! NILP (value)
+      if (EQ (prop, Qevaporate) && !NILP (value)
 	  && (OVERLAY_START (overlay)
               == OVERLAY_END (overlay)))
 	Fdelete_overlay (overlay);
@@ -3905,7 +3905,7 @@ report_overlay_modification (Lisp_Object start, Lisp_Object end, bool after,
 	 Scan the overlays to find the functions to call.  */
       last_overlay_modification_hooks_used = 0;
 
-      if (! current_buffer->overlays)
+      if (!current_buffer->overlays)
         return;
       ITREE_FOREACH (node, current_buffer->overlays,
                      begin_arg - (insertion ? 1 : 0),
@@ -4657,7 +4657,7 @@ init_buffer (void)
       /* Maybe this should really use some standard subroutine
          whose definition is filename syntax dependent.  */
       ptrdiff_t len = strlen (pwd);
-      bool add_slash = ! IS_DIRECTORY_SEP (pwd[len - 1]);
+      bool add_slash = !IS_DIRECTORY_SEP (pwd[len - 1]);
 
       /* At this moment, we still don't know how to decode the directory
          name.  So, we keep the bytes in unibyte form so that file I/O

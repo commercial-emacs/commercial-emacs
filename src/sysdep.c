@@ -1635,7 +1635,7 @@ init_system_name (void)
   for (p = hostname; *p; p++)
     if (*p == ' ' || *p == '\t')
       *p = '-';
-  if (! (STRINGP (Vsystem_name) && SBYTES (Vsystem_name) == p - hostname
+  if (!(STRINGP (Vsystem_name) && SBYTES (Vsystem_name) == p - hostname
 	 && strcmp (SSDATA (Vsystem_name), hostname) == 0))
     Vsystem_name = build_string (hostname);
   xfree (hostname_alloc);
@@ -1709,7 +1709,7 @@ handle_signal (int sig, signal_handler_t handler)
   int restore_errno = errno;
 #ifdef HAVE_PTHREAD
   /* Funnel signal to main thread.  */
-  if (! pthread_equal (pthread_self (), main_thread_id))
+  if (!pthread_equal (pthread_self (), main_thread_id))
     {
       sigset_t blocked;
       sigemptyset (&blocked);
@@ -2321,7 +2321,7 @@ int
 emacs_openat (int dirfd, char const *file, int oflags, int mode)
 {
   int fd;
-  if (! (oflags & O_TEXT))
+  if (!(oflags & O_TEXT))
     oflags |= O_BINARY;
   oflags |= O_CLOEXEC;
   while ((fd = sys_openat (dirfd, file, oflags, mode)) < 0 && errno == EINTR)
@@ -2341,7 +2341,7 @@ int
 emacs_open_noquit (char const *file, int oflags, int mode)
 {
   int fd;
-  if (! (oflags & O_TEXT))
+  if (!(oflags & O_TEXT))
     oflags |= O_BINARY;
   oflags |= O_CLOEXEC;
   do
@@ -4419,7 +4419,7 @@ str_collate (Lisp_Object s1, Lisp_Object s2,
     }
   else
     {
-      if (! NILP (ignore_case))
+      if (!NILP (ignore_case))
 	for (int i = 1; i < 3; i++)
 	  {
 	    wchar_t *p = (i == 1) ? p1 : p2;

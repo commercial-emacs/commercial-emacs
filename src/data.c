@@ -112,7 +112,7 @@ fwd_set (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
 	  {
 	    intmax_t i;
 	    CHECK_INTEGER (newval);
-	    if (! integer_to_intmax (newval, &i))
+	    if (!integer_to_intmax (newval, &i))
 	      xsignal1 (Qoverflow_error, newval);
 	    *XFIXNUMFWD (valpp)->intvar = i;
 	  }
@@ -137,7 +137,7 @@ fwd_set (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
 		  FOR_EACH_LIVE_BUFFER (tail, buffer)
 		    {
 		      struct buffer *b = XBUFFER (buffer);
-		      if (! LOCALIZED_SLOT_P (b, idx))
+		      if (!LOCALIZED_SLOT_P (b, idx))
 			set_per_buffer_value (b, offset, newval);
 		    }
 		}
@@ -162,7 +162,7 @@ fwd_set (lispfwd valpp, Lisp_Object newval, struct buffer *buf)
 		    if (CONSP (rangeprop))
 		      {
 			Lisp_Object min = XCAR (rangeprop), max = XCDR (rangeprop);
-			if (! NUMBERP (newval)
+			if (!NUMBERP (newval)
 			    || NILP (CALLN (Fleq, min, newval, max)))
 			  wrong_range (min, max, newval);
 		      }
@@ -763,7 +763,7 @@ jit_read (struct Lisp_Symbol *symbol, struct buffer *buffer)
     {
       /* No context switch, update lisp from C.  */
       Lisp_Object cval = fwd_get (symbol->u.s.c_variable, buffer);
-      if (! EQ (cval, Qunbound))
+      if (!EQ (cval, Qunbound))
 	XSETCDR (pair, cval);
     }
   return pair;
@@ -982,9 +982,9 @@ The return value is undefined.  */)
   (register Lisp_Object symbol, Lisp_Object definition, Lisp_Object docstring)
 {
   CHECK_SYMBOL (symbol);
-  if (! NILP (Vloadup_pure_table)
+  if (!NILP (Vloadup_pure_table)
       /* If `definition' is a keymap, immutable (and copying) is wrong.  */
-      && ! KEYMAPP (definition))
+      && !KEYMAPP (definition))
     definition = Fpurecopy (definition);
 
   defalias (symbol, definition);
@@ -1162,7 +1162,7 @@ Value, if non-nil, is a list (interactive SPEC).  */)
     {
       Lisp_Object form
         = module_function_interactive_form (XMODULE_FUNCTION (fun));
-      if (! NILP (form))
+      if (!NILP (form))
         return form;
     }
 #endif
@@ -1239,7 +1239,7 @@ The value, if non-nil, is a list of mode name symbols.  */)
     {
       Lisp_Object form
         = module_function_command_modes (XMODULE_FUNCTION (fun));
-      if (! NILP (form))
+      if (!NILP (form))
         return form;
     }
 #endif
@@ -1339,7 +1339,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 
   if (! NILP (current_thread->obarray))
     {
-      eassert (! main_thread_p (current_thread));
+      eassert (!main_thread_p (current_thread));
       Lisp_Object found = oblookup (current_thread->obarray,
 				    SSDATA (xsymbol->u.s.name),
 				    SCHARS (xsymbol->u.s.name),
@@ -1377,7 +1377,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
     case SYMBOL_PER_BUFFER:
     case SYMBOL_KBOARD:
       result = fwd_get (SYMBOL_FWD (xsymbol), b);
-      eassert (! (EQ (result, Qunbound)));
+      eassert (!(EQ (result, Qunbound)));
       break;
     default:
       emacs_abort ();
@@ -1436,7 +1436,7 @@ locally_bind_new_blv (Lisp_Object variable)
   if (NILP (pair))
     {
       Lisp_Object cval = fwd_get (xsymbol->u.s.c_variable, current_buffer);
-      pair = Fcons (variable, (! EQ (cval, Qunbound)
+      pair = Fcons (variable, (!EQ (cval, Qunbound)
 			       ? cval : xsymbol->u.s.buffer_local_default));
       bset_local_var_alist
 	(current_buffer, Fcons (pair, BVAR (current_buffer, local_var_alist)));
@@ -1461,7 +1461,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
   if (xsymbol->u.s.trapped_write == SYMBOL_NOWRITE)
     {
       if (NILP (Fkeywordp (symbol))
-          || ! EQ (newval, Fsymbol_value (symbol)))
+          || !EQ (newval, Fsymbol_value (symbol)))
 	xsignal1 (Qsetting_constant, symbol);
       return; /* Allow setting keywords to their own value.  */
     }
@@ -1501,11 +1501,11 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 	    /* locally_unbound_blv_let_bounded means
 	       "assignment sets default binding."  If not,
 	       then okay to set value binding.  */
-	    && ! locally_unbound_blv_let_bounded (xsymbol))
+	    && !locally_unbound_blv_let_bounded (xsymbol))
 	  /* Fulfill contract of `make-variable-buffer-local'.  */
 	  pair = locally_bind_new_blv (symbol);
 
-	if (! NILP (pair))
+	if (!NILP (pair))
 	  XSETCDR (pair, newval);
 	else
 	  xsymbol->u.s.buffer_local_default = newval;
@@ -1523,7 +1523,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
 	if (bindflag == SET_INTERNAL_SET)
 	  {
 	    int idx = PER_BUFFER_IDX (XBUFFER_OBJFWD (valpp)->offset);
-	    if (idx > 0 && ! LOCALIZED_SLOT_P (XBUFFER (buf), idx))
+	    if (idx > 0 && !LOCALIZED_SLOT_P (XBUFFER (buf), idx))
 	      {
 		if (locally_unbound_blv_let_bounded (xsymbol)) // Bug#44733
 		  set_default_internal (symbol, newval, bindflag);
@@ -1649,7 +1649,7 @@ notify_variable_watchers (Lisp_Object symbol,
 
   if (NILP (buffer)
       && ! EQ (operation, Qset_default) && !EQ (operation, Qmakunbound)
-      && ! NILP (Flocal_variable_if_set_p (symbol, Fcurrent_buffer ())))
+      && !NILP (Flocal_variable_if_set_p (symbol, Fcurrent_buffer ())))
     {
       XSETBUFFER (buffer, current_buffer);
     }
@@ -1717,7 +1717,7 @@ default_value (Lisp_Object symbol)
     case SYMBOL_FORWARDED:
       {
 	result = fwd_get (SYMBOL_FWD (sym), NULL);
-	eassert (! EQ (Qunbound, result));
+	eassert (!EQ (Qunbound, result));
 	break;
       }
     default:
@@ -1762,7 +1762,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
   if (sym->u.s.trapped_write == SYMBOL_NOWRITE)
     {
       if (NILP (Fkeywordp (symbol))
-          || ! EQ (value, Fsymbol_value (symbol)))
+          || !EQ (value, Fsymbol_value (symbol)))
 	xsignal1 (Qsetting_constant, symbol);
       return; /* Allow setting keywords to their own value.  */
     }
@@ -1810,7 +1810,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 		/* Propagate VALUE to all buffers lacking a nominal
 		   local binding for slot.  */
 		struct buffer *b = XBUFFER (buf);
-		if (! LOCALIZED_SLOT_P (b, idx))
+		if (!LOCALIZED_SLOT_P (b, idx))
 		  set_per_buffer_value (b, offset, value);
 	      }
 	  }
@@ -1992,7 +1992,7 @@ kill_local_variable_internal (struct Lisp_Symbol *sym, struct buffer *buffer)
 	if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
 	  notify_variable_watchers (variable, Qnil, Qmakunbound,
 				    make_lisp_ptr (buffer, Lisp_Vectorlike));
-	if (! NILP (pair))
+	if (!NILP (pair))
 	  bset_local_var_alist
 	    (buffer, Fdelq (pair, BVAR (buffer, local_var_alist)));
 	if (BUFFERP (sym->u.s.buffer_local_buffer)
@@ -2027,7 +2027,7 @@ VARIABLE's default binding.  */)
   (Lisp_Object variable, Lisp_Object buffer)
 {
   Lisp_Object result = Qnil;
-  buffer = ! NILP (buffer) ? buffer : Fcurrent_buffer ();
+  buffer = !NILP (buffer) ? buffer : Fcurrent_buffer ();
   struct Lisp_Symbol *sym;
 
   CHECK_SYMBOL (variable);
@@ -2042,7 +2042,7 @@ VARIABLE's default binding.  */)
       goto start;
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
-      result = ! NILP (assq_no_quit (variable, BVAR (XBUFFER (buffer),
+      result = !NILP (assq_no_quit (variable, BVAR (XBUFFER (buffer),
 						     local_var_alist)))
 	? Qt : Qnil;
       break;
@@ -2123,11 +2123,11 @@ If the current binding is global (the default), the value is nil.  */)
       result = Fframe_terminal (selected_frame);
       break;
     case SYMBOL_PER_BUFFER:
-      if (! NILP (Flocal_variable_p (variable, Fcurrent_buffer ())))
+      if (!NILP (Flocal_variable_p (variable, Fcurrent_buffer ())))
 	result = Fcurrent_buffer ();
       break;
     case SYMBOL_LOCAL_SOMEWHERE:
-      if (! NILP (Flocal_variable_p (variable, Fcurrent_buffer ())))
+      if (!NILP (Flocal_variable_p (variable, Fcurrent_buffer ())))
 	result = Fcurrent_buffer ();
       break;
     case SYMBOL_FORWARDED:
@@ -2564,7 +2564,7 @@ cons_to_unsigned (Lisp_Object c, uintmax_t max)
 	}
     }
 
-  if (! (valid && val <= max))
+  if (!(valid && val <= max))
     error ("Not an in-range integer, integral float, or cons of integers");
   return val;
 }
@@ -2625,7 +2625,7 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
 	}
     }
 
-  if (! (valid && min <= val && val <= max))
+  if (!(valid && min <= val && val <= max))
     error ("Not an in-range integer, integral float, or cons of integers");
   return val;
 }
@@ -2773,7 +2773,7 @@ static Lisp_Object
 float_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 		    ptrdiff_t argnum, double accum, Lisp_Object next)
 {
-  if (! floating_point_op (code))
+  if (!floating_point_op (code))
     wrong_type_argument (Qinteger_or_marker_p, next);
   return floatop_arith_driver (code, nargs, args, argnum, accum,
 			       XFLOAT_DATA (next));

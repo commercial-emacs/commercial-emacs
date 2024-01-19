@@ -393,7 +393,7 @@ setup_cpu_timer (Lisp_Object sampling_interval)
 {
   int billion = 1000000000;
 
-  if (! RANGED_FIXNUMP (1, sampling_interval,
+  if (!RANGED_FIXNUMP (1, sampling_interval,
 			 (TYPE_MAXIMUM (time_t) < EMACS_INT_MAX / billion
 			  ? ((EMACS_INT) TYPE_MAXIMUM (time_t) * billion
 			     + (billion - 1))
@@ -409,7 +409,7 @@ setup_cpu_timer (Lisp_Object sampling_interval)
   sigaction (SIGPROF, &action, 0);
 
 #ifdef HAVE_ITIMERSPEC
-  if (! profiler_timer_ok)
+  if (!profiler_timer_ok)
     {
       /* System clocks to try, in decreasing order of desirability.  */
       static clockid_t const system_clock[] = {
@@ -479,7 +479,7 @@ See also `profiler-log-size' and `profiler-max-stack-depth'.  */)
     {
       profiler_cpu_interval = sampling_interval;
       profiler_cpu_running = status;
-      if (! profiler_cpu_running)
+      if (!profiler_cpu_running)
 	error ("Unable to start profiler timer");
     }
 

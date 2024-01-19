@@ -727,7 +727,7 @@ bidi_cache_find (ptrdiff_t charpos, bool resolved_only, struct bidi_it *bidi_it)
   ptrdiff_t i = bidi_cache_search (charpos, -1, scan_dir);
 
   if (i >= bidi_cache_start
-      && (! resolved_only || bidi_cache[i].resolved_level >= 0))
+      && (!resolved_only || bidi_cache[i].resolved_level >= 0))
     {
       bidi_copy_it (bidi_it, &bidi_cache[i]);
       bidi_it->scan_dir = scan_dir; /* cached scan direction is junk.  */
@@ -922,7 +922,7 @@ bidi_unshelve_cache (void *databuf, bool just_free)
 bool
 bidi_initialize (void)
 {
-  if (! NILP (bidi_type_table))
+  if (!NILP (bidi_type_table))
     return true;
   if (NILP (Fassq (Qbidi_class, Vchar_code_property_alist)))
     return false;
@@ -1016,7 +1016,7 @@ void
 bidi_init_it (ptrdiff_t charpos, ptrdiff_t bytepos, bool frame_window_p,
 	      struct bidi_it *bidi_it)
 {
-  if (! bidi_initialize ())
+  if (!bidi_initialize ())
     emacs_abort ();
   if (charpos >= 0)
     bidi_it->charpos = charpos;
@@ -1575,7 +1575,7 @@ bidi_paragraph_init (bidi_dir_t dir, struct bidi_it *bidi_it, bool no_default_p)
       bidi_type_t type;
       const unsigned char *s;
 
-      if (! bidi_initialize ())
+      if (!bidi_initialize ())
 	emacs_abort ();
 
       /* If we are inside a paragraph separator, we are just waiting
@@ -2704,7 +2704,7 @@ bidi_resolve_brackets (struct bidi_it *bidi_it)
     next_for_neutral = bidi_it->next_for_neutral;
   else
     next_for_neutral.charpos = -1;
-  if (! bidi_it->first_elt)
+  if (!bidi_it->first_elt)
     {
       type = bidi_cache_find (bidi_it->charpos + bidi_it->nchars, 0, bidi_it);
       ch = bidi_it->ch;
@@ -3066,7 +3066,7 @@ bidi_level_of_next_char (struct bidi_it *bidi_it)
     }
 
   /* Check cache if character was already fully resolved.  */
-  if (bidi_cache_idx > bidi_cache_start && ! bidi_it->first_elt)
+  if (bidi_cache_idx > bidi_cache_start && !bidi_it->first_elt)
     {
       int bob = ((bidi_it->string.s || STRINGP (bidi_it->string.lstring))
 		 ? 0 : 1);
@@ -3274,7 +3274,7 @@ bidi_next (struct bidi_it *bidi_it)
     bidi_it->scan_dir = 1;	/* default to logical order */
 
   /* If we just passed a newline, initialize for the next line.  */
-  if (! bidi_it->first_elt
+  if (!bidi_it->first_elt
       && (bidi_it->ch == '\n' || bidi_it->ch == BIDI_EOB))
     bidi_line_init (bidi_it);
 
@@ -3309,7 +3309,7 @@ bidi_next (struct bidi_it *bidi_it)
       int expected_next_level = old_level + incr;
 
       /* Jump (or walk) to the other edge of this level.  */
-      bidi_find_other_level_edge (bidi_it, level_to_search, ! ascending);
+      bidi_find_other_level_edge (bidi_it, level_to_search, !ascending);
       /* Switch scan direction and peek at the next character in the
 	 new direction.  */
       bidi_it->scan_dir = -bidi_it->scan_dir;

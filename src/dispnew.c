@@ -1099,7 +1099,7 @@ find_glyph_row_slice (struct glyph_matrix *window_matrix,
 void
 reenable_glyph_row (struct glyph_row *row)
 {
-  if (! row->enabled_p)
+  if (!row->enabled_p)
     {
       /* Emacs marks rows for clearing by setting enabled_p to false.
 	 They get actually cleared now, then re-enabled. */
@@ -1146,8 +1146,8 @@ sync_glyph_row_margins (struct window *w, struct glyph_row *row)
 	{
 	  row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[LAST_AREA] - right;
 	  /* Leave room for a border glyph.  */
-	  if (! FRAME_WINDOW_P (XFRAME (w->frame))
-	      && ! WINDOW_RIGHTMOST_P (w)
+	  if (!FRAME_WINDOW_P (XFRAME (w->frame))
+	      && !WINDOW_RIGHTMOST_P (w)
 	      && right > 0)
 	    row->glyphs[RIGHT_MARGIN_AREA] -= 1;
 	}
@@ -3976,19 +3976,19 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
      distinguishable by their lower VPOS) must be redrawn.  */
   bool header_line_p = current_row->mode_line_p
     && (vpos <= (w->current_matrix->tab_line_p ? 1 : 0));
-  bool mode_line_p = current_row->mode_line_p && ! header_line_p;
+  bool mode_line_p = current_row->mode_line_p && !header_line_p;
   bool changed_p = false;
 
   /* If rows are at different X or Y, or rows have different height,
      or the current row is marked invalid, redraw the entire line.  */
-  if (! current_row->enabled_p
+  if (!current_row->enabled_p
       || desired_row->y != current_row->y
       || desired_row->ascent != current_row->ascent
       || desired_row->phys_ascent != current_row->phys_ascent
       || desired_row->phys_height != current_row->phys_height
       || desired_row->visible_height != current_row->visible_height
       || current_row->overlapped_p
-      || (current_row->mouse_face_p && ! mode_line_p)
+      || (current_row->mouse_face_p && !mode_line_p)
       || current_row->x != desired_row->x)
     {
       output_cursor_to (w, vpos, 0, desired_row->y, desired_row->x);
@@ -4028,7 +4028,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
       if (MATRIX_ROW_EXTENDS_FACE_P (desired_row)
 	  && (desired_stop_pos < current_row->used[TEXT_AREA]
 	      || (desired_stop_pos == current_row->used[TEXT_AREA]
-		  && ! MATRIX_ROW_EXTENDS_FACE_P (current_row))))
+		  && !MATRIX_ROW_EXTENDS_FACE_P (current_row))))
 	--desired_stop_pos;
 
       stop = min (current_row->used[TEXT_AREA], desired_stop_pos);
@@ -4039,7 +4039,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
 	 in common.  */
       while (i < stop)
 	{
-	  bool can_skip_p = ! abort_skipping;
+	  bool can_skip_p = !abort_skipping;
 
 	  /* Skip over glyphs that both rows have in common.  These
 	     don't have to be written.  We can't skip if the last
@@ -4056,7 +4056,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
 
 	      rif->get_glyph_overhangs (glyph, XFRAME (w->frame),
 					&left, &right);
-	      can_skip_p = (right == 0 && ! abort_skipping);
+	      can_skip_p = (right == 0 && !abort_skipping);
 	    }
 
 	  if (can_skip_p)
@@ -4114,7 +4114,7 @@ update_text_area (struct window *w, struct glyph_row *updated_row, int vpos)
 	      int start_x = x, start_hpos = i;
 	      struct glyph *start = desired_glyph;
 	      int current_x = x;
-	      bool skip_first_p = ! can_skip_p;
+	      bool skip_first_p = !can_skip_p;
 
 	      /* Find the next glyph that's equal again.  */
 	      while (i < stop
@@ -4236,7 +4236,7 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
       eassert (desired_row->enabled_p);
 
       /* Update display of the left margin area, if there is one.  */
-      if (! desired_row->full_width_p && w->left_margin_cols > 0)
+      if (!desired_row->full_width_p && w->left_margin_cols > 0)
 	{
 	  changed_p = true;
 	  update_marginal_area (w, desired_row, LEFT_MARGIN_AREA, vpos);
@@ -4263,7 +4263,7 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
 	}
 
       /* Draw truncation marks etc.  */
-      if (! current_row->enabled_p
+      if (!current_row->enabled_p
 	  || desired_row->y != current_row->y
 	  || desired_row->visible_height != current_row->visible_height
 	  || desired_row->cursor_in_fringe_p != current_row->cursor_in_fringe_p
@@ -4558,7 +4558,7 @@ scrolling_window (struct window *w, int tab_line_p)
     {
       int bottom;
 
-      if (! MATRIX_ROW_ENABLED_P (desired_matrix, i))
+      if (!MATRIX_ROW_ENABLED_P (desired_matrix, i))
 	return 0;
       bottom = MATRIX_ROW_BOTTOM_Y (MATRIX_ROW (desired_matrix, i));
       if (bottom <= yb)
@@ -5087,7 +5087,7 @@ scrolling (struct frame *frame)
 	  return false;
 	}
       old_hash[i] = line_hash_code (frame, MATRIX_ROW (current_matrix, i));
-      if (! MATRIX_ROW_ENABLED_P (desired_matrix, i))
+      if (!MATRIX_ROW_ENABLED_P (desired_matrix, i))
 	{
 	  /* This line cannot be redrawn, so don't let scrolling mess it.  */
 	  new_hash[i] = old_hash[i];
@@ -5687,7 +5687,7 @@ handle_window_change_signal (int sig)
   */
   for (tty = tty_list; tty; tty = tty->next)
     {
-      if (! tty->term_initted)
+      if (!tty->term_initted)
 	continue;
 
       /* Suspended tty frames have tty->input == NULL avoid trying to
@@ -5837,8 +5837,8 @@ FILE = nil means just close any termscript file currently open.  */)
 {
   struct tty_display_info *tty;
 
-  if (! FRAME_TERMCAP_P (SELECTED_FRAME ())
-      && ! FRAME_MSDOS_P (SELECTED_FRAME ()))
+  if (!FRAME_TERMCAP_P (SELECTED_FRAME ())
+      && !FRAME_MSDOS_P (SELECTED_FRAME ()))
     error ("Current frame is not on a tty device");
 
   tty = CURTTY ();
@@ -5888,7 +5888,7 @@ when TERMINAL is nil.  */)
     {
       struct tty_display_info *tty = t->display_info.tty;
 
-      if (! tty->output)
+      if (!tty->output)
 	error ("Terminal is currently suspended");
 
       if (tty->termscript)
@@ -6038,7 +6038,7 @@ sit_for (Lisp_Object timeout, bool reading, int display_option)
   else if (FLOATP (timeout))
     {
       double seconds = XFLOAT_DATA (timeout);
-      if (! (0 < seconds))
+      if (!(0 < seconds))
 	return Qt;
       else
 	{
@@ -6187,13 +6187,13 @@ pass nil for VARIABLE.  */)
     n += 3;
   /* Reallocate the vector if data has grown to need it,
      or if it has shrunk a lot.  */
-  if (! VECTORP (state)
+  if (!VECTORP (state)
       || n > ASIZE (state)
       || n + 20 < ASIZE (state) / 2)
     /* Add 20 extra so we grow it less often.  */
     {
       state = initialize_vector (n + 20, Qlambda);
-      if (! NILP (variable))
+      if (!NILP (variable))
 	Fset (variable, state);
       else
 	frame_and_buffer_state = state;
@@ -6385,7 +6385,7 @@ init_display_interactive (void)
       char const *msg
 	= "Please set the environment variable TERM; see 'tset'.\n";
 #ifdef HAVE_WINDOW_SYSTEM
-      if (! inhibit_window_system)
+      if (!inhibit_window_system)
 	msg = ("Please set the environment variable DISPLAY or TERM; "
 	       "see 'tset'.\n");
 #endif /* HAVE_WINDOW_SYSTEM */

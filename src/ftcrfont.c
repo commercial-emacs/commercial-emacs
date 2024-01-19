@@ -143,7 +143,7 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   FcMatrix *matrix;
 
   val = assq_no_quit (QCfont_entity, AREF (entity, FONT_EXTRA_INDEX));
-  if (! CONSP (val))
+  if (!CONSP (val))
     return Qnil;
   val = XCDR (val);
   filename = XCAR (val);

@@ -294,7 +294,7 @@ do_scrolling (struct frame *frame, struct glyph_matrix *current_matrix,
 	  j -= p->deletecount;
 
 	  /* Set the terminal window, if not done already.  */
- 	  if (! terminal_window_p)
+	  if (!terminal_window_p)
 	    {
 	      set_terminal_window (frame, window_size + unchanged_at_top);
 	      terminal_window_p = 1;

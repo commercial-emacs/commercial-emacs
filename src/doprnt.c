@@ -491,7 +491,7 @@ doprnt (char *buffer, ptrdiff_t bufsize, const char *format,
 	src = uLSQM, srclen = sizeof uLSQM - 1;
       else if (EQ (quoting_style, Qcurve) && fmtchar == '\'')
 	src = uRSQM, srclen = sizeof uRSQM - 1;
-      else if (! LEADING_CODE_P (fmtchar))
+      else if (!LEADING_CODE_P (fmtchar))
 	{
 	  if (EQ (quoting_style, Qstraight) && fmtchar == '`')
 	    fmtchar = '\'';

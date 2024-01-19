@@ -551,7 +551,7 @@ image_create_bitmap_from_data (struct frame *f, char *bits,
   bitmap = XCreateBitmapFromData (FRAME_X_DISPLAY (f),
 				  dpyinfo->root_window,
 				  bits, width, height);
-  if (! bitmap)
+  if (!bitmap)
     return -1;
 #endif /* HAVE_X_WINDOWS */
 
@@ -1185,7 +1185,7 @@ valid_image_p (Lisp_Object object)
 	      break;
 	    }
 	  tail = XCDR (tail);
-	  if (! CONSP (tail))
+	  if (!CONSP (tail))
 	    return false;
 	}
     }
@@ -1334,7 +1334,7 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
 	  break;
 
 	case IMAGE_POSITIVE_INTEGER_VALUE:
-	  if (! RANGED_FIXNUMP (1, value, INT_MAX))
+	  if (!RANGED_FIXNUMP (1, value, INT_MAX))
 	    return false;
 	  break;
 
@@ -1372,12 +1372,12 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
 	  return false;
 
 	case IMAGE_NUMBER_VALUE:
-	  if (! NUMBERP (value))
+	  if (!NUMBERP (value))
 	    return false;
 	  break;
 
 	case IMAGE_INTEGER_VALUE:
-	  if (! TYPE_RANGED_FIXNUMP (int, value))
+	  if (!TYPE_RANGED_FIXNUMP (int, value))
 	    return false;
 	  break;
 
@@ -1625,7 +1625,7 @@ prepare_image_for_display (struct frame *f, struct image *img)
   /* If IMG doesn't have a pixmap yet, load it now, using the image
      type dependent loader function.  */
   if (img->pixmap == NO_PIXMAP && !img->load_failed_p)
-    img->load_failed_p = ! img->type->load_img (f, img);
+    img->load_failed_p = !img->type->load_img (f, img);
 
 #ifdef USE_CAIRO
   if (!img->load_failed_p)
@@ -1756,7 +1756,7 @@ four_corners_best (Emacs_Pix_Context pimg, int *corners,
 RGB_PIXEL_COLOR
 image_background (struct image *img, struct frame *f, Emacs_Pix_Context pimg)
 {
-  if (! img->background_valid)
+  if (!img->background_valid)
     /* IMG doesn't have a background yet, try to guess a reasonable value.  */
     {
       bool free_pimg = !pimg;
@@ -1799,7 +1799,7 @@ int
 image_background_transparent (struct image *img, struct frame *f,
                               Emacs_Pix_Context mask)
 {
-  if (! img->background_transparent_valid)
+  if (!img->background_transparent_valid)
     /* IMG doesn't have a background yet, try to guess a reasonable value.  */
     {
       if (img->mask)
@@ -2221,7 +2221,7 @@ evicted.  */)
       return Qnil;
     }
 
-  if (! (NILP (filter) || FRAMEP (filter)))
+  if (!(NILP (filter) || FRAMEP (filter)))
     clear_image_caches (filter);
   else
     clear_image_cache (decode_window_system_frame (filter), Qt);
@@ -2617,7 +2617,7 @@ compute_image_rotation (struct image *img, double *rotation)
   Lisp_Object value = image_spec_value (img->spec, QCrotation, &foundp);
   if (!foundp)
     return;
-  if (! NUMBERP (value))
+  if (!NUMBERP (value))
     {
       image_error ("Invalid image `:rotation' parameter");
       return;
@@ -3022,7 +3022,7 @@ lookup_image (struct frame *f, Lisp_Object spec, int face_id)
 	      img->vmargin += eabs (img->relief);
 	    }
 
-	  if (! img->background_valid)
+	  if (!img->background_valid)
 	    {
 	      bg = image_spec_value (img->spec, QCbackground, NULL);
 	      if (!NILP (bg))
@@ -4423,7 +4423,7 @@ xbm_read_bitmap_data (struct frame *f, char *contents, char *end,
   expect ('=');
   expect ('{');
 
-  if (! image_check_image_size (0, *width, *height))
+  if (!image_check_image_size (0, *width, *height))
     {
       if (!inhibit_image_error)
 	image_error ("Image too large (%dx%d)",
@@ -5033,7 +5033,7 @@ xpm_image_p (Lisp_Object object)
 	  && fmt[XPM_FILE].count + fmt[XPM_DATA].count == 1
 	  /* Either no `:color-symbols' or it's a list of conses
 	     whose car and cdr are strings.  */
-	  && (! fmt[XPM_COLOR_SYMBOLS].count
+	  && (!fmt[XPM_COLOR_SYMBOLS].count
 	      || xpm_valid_color_symbols_p (fmt[XPM_COLOR_SYMBOLS].value)));
 }
 #endif	/* HAVE_XPM || HAVE_NS || HAVE_HAIKU || HAVE_PGTK */
@@ -6616,7 +6616,7 @@ image_build_heuristic_mask (struct frame *f, struct image *img,
 #ifndef HAVE_NTGUI
 #ifndef HAVE_NS
   /* Create an image and pixmap serving as mask.  */
-  if (! image_create_x_image_and_pixmap (f, img, img->width, img->height, 1,
+  if (!image_create_x_image_and_pixmap (f, img, img->width, img->height, 1,
 					 &mask_img, 1))
     return;
 #endif /* !HAVE_NS */
@@ -7572,12 +7572,12 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   c->pixels = pixels;
   c->rows = rows;
 
-  if (! (info_ptr && end_info))
+  if (!(info_ptr && end_info))
     {
       png_destroy_read_struct (&c->png_ptr, &c->info_ptr, &c->end_info);
       png_ptr = 0;
     }
-  if (! png_ptr)
+  if (!png_ptr)
     {
       if (fp) fclose (fp);
       return 0;
@@ -8086,7 +8086,7 @@ jpeg_memory_src (j_decompress_ptr cinfo, JOCTET *data, ptrdiff_t len)
 {
   struct jpeg_source_mgr *src = cinfo->src;
 
-  if (! src)
+  if (!src)
     {
       /* First time for this JPEG object?  */
       src = cinfo->mem->alloc_small ((j_common_ptr) cinfo,
@@ -8188,7 +8188,7 @@ jpeg_file_src (j_decompress_ptr cinfo, FILE *fp)
 {
   struct jpeg_stdio_mgr *src = (struct jpeg_stdio_mgr *) cinfo->src;
 
-  if (! src)
+  if (!src)
     {
       /* First time for this JPEG object?  */
       src = cinfo->mem->alloc_small ((j_common_ptr) cinfo,
@@ -8764,7 +8764,7 @@ tiff_load (struct frame *f, struct image *img)
     }
 
   /* Create the X image and pixmap.  */
-  if (! (height <= min (PTRDIFF_MAX, SIZE_MAX) / sizeof *buf / width
+  if (!(height <= min (PTRDIFF_MAX, SIZE_MAX) / sizeof *buf / width
 	 && image_create_x_image_and_pixmap (f, img, width, height, 0,
 					     &ximg, 0)))
     {
@@ -11426,7 +11426,7 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
       else
 	viewbox_width = viewbox_height = 0;
 
-      if (! (0 < viewbox_width && 0 < viewbox_height))
+      if (!(0 < viewbox_width && 0 < viewbox_height))
 	{
 	  /* We haven't found a usable set of sizes, so try working out
 	     the visible area.  */

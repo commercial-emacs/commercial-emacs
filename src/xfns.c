@@ -2291,7 +2291,7 @@ x_set_name (struct frame *f, Lisp_Object name, bool explicit)
       if (f->explicit_name && NILP (name))
 	update_mode_lines = 37;
 
-      f->explicit_name = ! NILP (name);
+      f->explicit_name = !NILP (name);
     }
   else if (f->explicit_name)
     return;
@@ -2310,14 +2310,14 @@ x_set_name (struct frame *f, Lisp_Object name, bool explicit)
     CHECK_STRING (name);
 
   /* Don't change the name if it's already NAME.  */
-  if (! NILP (Fstring_equal (name, f->name)))
+  if (!NILP (Fstring_equal (name, f->name)))
     return;
 
   fset_name (f, name);
 
   /* For setting the frame title, the title parameter should override
      the name parameter.  */
-  if (! NILP (f->title))
+  if (!NILP (f->title))
     name = f->title;
 
   x_set_name_internal (f, name);
@@ -2436,13 +2436,13 @@ x_set_alpha (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       else if (FLOATP (item))
 	{
 	  alpha = XFLOAT_DATA (item);
-	  if (! (0 <= alpha && alpha <= 1.0))
+	  if (!(0 <= alpha && alpha <= 1.0))
 	    args_out_of_range (make_float (0.0), make_float (1.0));
 	}
       else if (FIXNUMP (item))
 	{
 	  EMACS_INT ialpha = XFIXNUM (item);
-	  if (! (0 <= ialpha && ialpha <= 100))
+	  if (!(0 <= ialpha && ialpha <= 100))
 	    args_out_of_range (make_fixnum (0), make_fixnum (100));
 	  alpha = ialpha / 100.0;
 	}
@@ -2917,7 +2917,7 @@ xic_create_xfontset (struct frame *f)
         }
     }
 
-  if (! xfs)
+  if (!xfs)
     {
       char buf[256];
       char **missing_list;
@@ -2934,7 +2934,7 @@ xic_create_xfontset (struct frame *f)
 #endif
       if (missing_list)
 	XFreeStringList (missing_list);
-      if (! xfs)
+      if (!xfs)
 	{
 	  /* List of pixel sizes most likely available.  Find one that
 	     is closest to pixel_size.  */
@@ -2951,9 +2951,9 @@ xic_create_xfontset (struct frame *f)
 	    {
 	      int this_size;
 
-	      if (! *larger)
+	      if (!*larger)
 		this_size = *smaller--;
-	      else if (! *smaller)
+	      else if (!*smaller)
 		this_size = *larger++;
 	      else if (pixel_size - *smaller < *larger - pixel_size)
 		this_size = *smaller--;
@@ -2972,7 +2972,7 @@ xic_create_xfontset (struct frame *f)
 		break;
 	    }
 	}
-      if (! xfs)
+      if (!xfs)
 	{
 	  const char *last_resort = "-*-*-*-r-normal--*-*-*-*-*-*";
 
@@ -3074,7 +3074,7 @@ create_frame_xic (struct frame *f)
     goto out;
 
   xim = FRAME_X_XIM (f);
-  if (!xim || ! FRAME_X_XIM_STYLES(f))
+  if (!xim || !FRAME_X_XIM_STYLES(f))
     goto out;
 
   /* Determine XIC style.  */
@@ -4386,7 +4386,7 @@ x_window (struct frame *f, long window_prompting)
 static void
 x_window (struct frame *f)
 {
-  if (! xg_create_frame_widgets (f))
+  if (!xg_create_frame_widgets (f))
     error ("Unable to create window");
 
 #ifdef HAVE_X_I18N
@@ -4573,12 +4573,12 @@ x_icon_verify (struct frame *f, Lisp_Object parms)
      icons in an icon window.  */
   icon_x = gui_frame_get_and_record_arg (f, parms, Qicon_left, 0, 0, RES_TYPE_NUMBER);
   icon_y = gui_frame_get_and_record_arg (f, parms, Qicon_top, 0, 0, RES_TYPE_NUMBER);
-  if (! EQ (icon_x, Qunbound) && ! EQ (icon_y, Qunbound))
+  if (!EQ (icon_x, Qunbound) && !EQ (icon_y, Qunbound))
     {
       CHECK_FIXNUM (icon_x);
       CHECK_FIXNUM (icon_y);
     }
-  else if (! EQ (icon_x, Qunbound) || ! EQ (icon_y, Qunbound))
+  else if (! EQ (icon_x, Qunbound) || !EQ (icon_y, Qunbound))
     error ("Both left and top icon corners of icon must be specified");
 }
 
@@ -4597,8 +4597,8 @@ x_icon (struct frame *f, Lisp_Object parms)
     = gui_frame_get_and_record_arg (f, parms, Qicon_top, 0, 0, RES_TYPE_NUMBER);
   int icon_xval, icon_yval;
 
-  bool xgiven = ! EQ (icon_x, Qunbound);
-  bool ygiven = ! EQ (icon_y, Qunbound);
+  bool xgiven = !EQ (icon_x, Qunbound);
+  bool ygiven = !EQ (icon_y, Qunbound);
   if (xgiven != ygiven)
     error ("Both left and top icon corners of icon must be specified");
   if (xgiven)
@@ -4803,7 +4803,7 @@ x_default_font_parameter (struct frame *f, Lisp_Object parms)
 				   Qfont, "font", "Font",
 				   RES_TYPE_STRING));
 
-  if (! FONTP (font) && ! STRINGP (font))
+  if (!FONTP (font) && !STRINGP (font))
     {
       const char *names[]
 	= {
@@ -4928,8 +4928,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
   name = gui_display_get_arg (dpyinfo, parms, Qname, "name", "Name",
                               RES_TYPE_STRING);
   if (!STRINGP (name)
-      && ! EQ (name, Qunbound)
-      && ! NILP (name))
+      && !EQ (name, Qunbound)
+      && !NILP (name))
     error ("Invalid frame name--not a string or nil");
 
   if (STRINGP (name))
@@ -4983,7 +4983,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
                                          NULL,
                                          NULL,
                                          RES_TYPE_BOOLEAN)))
-      && ! (EQ (tem, Qunbound)))
+      && !(EQ (tem, Qunbound)))
     undecorated = true;
 
   FRAME_UNDECORATED (f) = undecorated;
@@ -4995,7 +4995,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
                                          NULL,
                                          NULL,
                                          RES_TYPE_BOOLEAN)))
-      && ! (EQ (tem, Qunbound)))
+      && !(EQ (tem, Qunbound)))
     override_redirect = true;
 
   FRAME_OVERRIDE_REDIRECT (f) = override_redirect;
@@ -5025,7 +5025,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
                                           "iconName",
                                           "Title",
                                           RES_TYPE_STRING));
-  if (! STRINGP (f->icon_name))
+  if (!STRINGP (f->icon_name))
     fset_icon_name (f, Qnil);
 
   FRAME_DISPLAY_INFO (f) = dpyinfo;
@@ -5126,7 +5126,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
     }
 
   /* Frame contents get displaced if an embedded X window has a border.  */
-  if (! FRAME_X_EMBEDDED_P (f))
+  if (!FRAME_X_EMBEDDED_P (f))
     gui_default_parameter (f, parms, Qborder_width, make_fixnum (0),
                            "borderWidth", "BorderWidth", RES_TYPE_NUMBER);
 
@@ -5140,7 +5140,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
       value = gui_display_get_arg (dpyinfo, parms, Qinternal_border_width,
                                    "internalBorder", "internalBorder",
                                    RES_TYPE_NUMBER);
-      if (! EQ (value, Qunbound))
+      if (!EQ (value, Qunbound))
 	parms = Fcons (Fcons (Qinternal_border_width, value),
 		       parms);
     }
@@ -5162,7 +5162,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
       value = gui_display_get_arg (dpyinfo, parms, Qchild_frame_border_width,
                                    "childFrameBorder", "childFrameBorder",
                                    RES_TYPE_NUMBER);
-      if (! EQ (value, Qunbound))
+      if (!EQ (value, Qunbound))
 	parms = Fcons (Fcons (Qchild_frame_border_width, value),
 		       parms);
     }
@@ -5438,7 +5438,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
 	 from `x-create-frame-with-faces' (see above comment).  */
       f->was_invisible
 	= (f->was_invisible
-	   && (! EQ (height, Qunbound) || ! EQ (width, Qunbound)));
+	   && (!EQ (height, Qunbound) || !EQ (width, Qunbound)));
 
       store_frame_param (f, Qvisibility, visibility);
     }
@@ -7721,7 +7721,7 @@ silently ignored.  */)
 
   CHECK_STRING (prop);
 
-  if (! NILP (format))
+  if (!NILP (format))
     {
       CHECK_FIXNUM (format);
 
@@ -7766,7 +7766,7 @@ silently ignored.  */)
       nelements = SBYTES (value) / elsize;
     }
 
-  if (! NILP (window_id))
+  if (!NILP (window_id))
     {
       CONS_TO_INTEGER (window_id, Window, target_window);
       if (! target_window)
@@ -7774,7 +7774,7 @@ silently ignored.  */)
     }
   else
     {
-      if (! NILP (outer_p))
+      if (!NILP (outer_p))
         target_window = FRAME_OUTER_WINDOW (f);
       else
         target_window = FRAME_X_WINDOW (f);
@@ -7795,7 +7795,7 @@ silently ignored.  */)
     = xcb_intern_atom (FRAME_DISPLAY_INFO (f)->xcb_connection,
 		       0, SBYTES (prop), SSDATA (prop));
 
-  if (! NILP (type))
+  if (!NILP (type))
     {
       CHECK_STRING (type);
       target_type_cookie
@@ -7867,7 +7867,7 @@ silently ignored.  */)
 
   CHECK_STRING (prop);
 
-  if (! NILP (window_id))
+  if (!NILP (window_id))
     {
       CONS_TO_INTEGER (window_id, Window, target_window);
       if (! target_window)
@@ -7919,7 +7919,7 @@ x_window_property_intern (struct frame *f,
 
       rc = XGetWindowProperty (FRAME_X_DISPLAY (f), target_window,
                                prop_atom, 0, bytes_remaining,
-                               ! NILP (delete_p), target_type,
+                               !NILP (delete_p), target_type,
                                &actual_type, &actual_format,
                                &actual_size, &bytes_remaining,
                                &tmp_data);
@@ -8019,7 +8019,7 @@ if PROP has no value of TYPE (always a string in the MS Windows case). */)
 
   CHECK_STRING (prop);
 
-  if (! NILP (window_id))
+  if (!NILP (window_id))
     {
       CONS_TO_INTEGER (window_id, Window, target_window);
       if (! target_window)
@@ -8048,7 +8048,7 @@ if PROP has no value of TYPE (always a string in the MS Windows case). */)
                                          vector_ret_p,
                                          &found);
   if (NILP (prop_value)
-      && ! found
+      && !found
       && NILP (window_id)
       && target_window != FRAME_OUTER_WINDOW (f))
     {
@@ -8448,7 +8448,7 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
       value = gui_display_get_arg (dpyinfo, parms, Qinternal_border_width,
                                    "internalBorder", "internalBorder",
                                    RES_TYPE_NUMBER);
-      if (! EQ (value, Qunbound))
+      if (!EQ (value, Qunbound))
 	parms = Fcons (Fcons (Qinternal_border_width, value),
 		       parms);
     }
@@ -9588,8 +9588,8 @@ value of DIR as in previous invocations; this is standard MS Windows behavior.  
     cdef_file = SSDATA (dir);
 
   fn = xg_get_file_name (f, SSDATA (prompt), cdef_file,
-                         ! NILP (mustmatch),
-                         ! NILP (only_dir_p));
+                         !NILP (mustmatch),
+                         !NILP (only_dir_p));
 
   if (fn)
     {

@@ -84,7 +84,7 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
   else
     FD_ZERO (&all_wfds);
 
-  ngfds = ! context_acquired ? -1 : g_main_context_query (context,
+  ngfds = !context_acquired ? -1 : g_main_context_query (context,
 							  G_PRIORITY_LOW,
 							  &tmo_in_millisec,
 							  gfds, nbuf);

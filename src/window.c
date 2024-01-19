@@ -465,7 +465,7 @@ Return WINDOW.  */)
   CHECK_LIVE_FRAME (frame);
   CHECK_LIVE_WINDOW (window);
 
-  if (! EQ (frame, WINDOW_FRAME (XWINDOW (window))))
+  if (!EQ (frame, WINDOW_FRAME (XWINDOW (window))))
     error ("In `set-frame-selected-window', WINDOW is not on FRAME");
 
   if (EQ (frame, selected_frame))
@@ -874,7 +874,7 @@ total height of WINDOW.  */)
 {
   struct window *w = decode_valid_window (window);
 
-  if (! EQ (round, Qfloor) && ! EQ (round, Qceiling))
+  if (! EQ (round, Qfloor) && !EQ (round, Qceiling))
     return make_fixnum (w->total_lines);
   else
     {
@@ -911,7 +911,7 @@ total width of WINDOW.  */)
 {
   struct window *w = decode_valid_window (window);
 
-  if (! EQ (round, Qfloor) && ! EQ (round, Qceiling))
+  if (! EQ (round, Qfloor) && !EQ (round, Qceiling))
     return make_fixnum (w->total_cols);
   else
     {
@@ -1825,15 +1825,15 @@ If UPDATE, recompute that position.  */)
   CHECK_BUFFER (w->contents);
   b = XBUFFER (w->contents);
 
-  if (! NILP (update)
-      && ! noninteractive
+  if (!NILP (update)
+      && !noninteractive
       && (windows_or_buffers_changed
-	  || ! w->window_end_valid
+	  || !w->window_end_valid
 	  || b->clip_changed
 	  || b->prevent_redisplay_optimizations_p
 	  || window_outdated (w))
       /* i.e., not daemon (Bug#20565).  */
-      && ! FRAME_INITIAL_P (WINDOW_XFRAME (w)))
+      && !FRAME_INITIAL_P (WINDOW_XFRAME (w)))
     {
       struct text_pos startp;
       struct it it;
@@ -2450,7 +2450,7 @@ unshow_buffer (register struct window *w)
   /* Point in the selected window's buffer
      is actually stored in that buffer, and the window's pointm isn't used.
      So don't clobber point in that buffer.  */
-  if (! EQ (buf, XWINDOW (selected_window)->contents)
+  if (!EQ (buf, XWINDOW (selected_window)->contents)
       /* Don't clobber point in current buffer either (this could be
 	 useful in connection with bug#12208).
       && XBUFFER (buf) != current_buffer  */
@@ -5676,7 +5676,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
      something like (scroll-down 1) with PT in the line before
      the partially visible one would recenter.  */
 
-  if (! window_start_coordinates (w, PT, &x, &y, &rtop, &rbot, &rowh, &vpos))
+  if (!window_start_coordinates (w, PT, &x, &y, &rtop, &rbot, &rowh, &vpos))
     {
       itdata = bidi_shelve_cache ();
       /* Move backward half the height of the window.  Performance note:
@@ -6308,7 +6308,7 @@ scroll_command (Lisp_Object window, Lisp_Object n, int direction)
   eassert (eabs (direction) == 1);
 
   w = XWINDOW (window);
-  other_window = ! EQ (window, selected_window);
+  other_window = !EQ (window, selected_window);
 
   /* If given window's buffer isn't current, make it current for the
      moment.  If the window's buffer is the same, but it is not the
@@ -7072,7 +7072,7 @@ the return value is nil.  Otherwise the value is t.  */)
 	 window holds garbage.)  We do this now, before
 	 restoring the window contents, and prevent it from
 	 being done later on when we select a new window.  */
-      if (! NILP (XWINDOW (selected_window)->contents))
+      if (!NILP (XWINDOW (selected_window)->contents))
 	{
 	  w = XWINDOW (selected_window);
 	  set_marker_both (w->pointm,
@@ -7556,7 +7556,7 @@ save_window_save (Lisp_Object window, struct Lisp_Vector *vector, ptrdiff_t i)
       if (BUFFERP (w->contents))
 	{
 	  bool window_point_insertion_type
-	    = ! NILP (find_symbol_value (XSYMBOL (Qwindow_point_insertion_type),
+	    = !NILP (find_symbol_value (XSYMBOL (Qwindow_point_insertion_type),
 					 XBUFFER (w->contents)));
 
 	  /* Save w's value of point in the window configuration.  If w

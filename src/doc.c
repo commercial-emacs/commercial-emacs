@@ -638,7 +638,7 @@ default_to_grave_quoting_style (void)
 {
   if (!text_quoting_flag)
     return true;
-  if (! DISP_TABLE_P (Vstandard_display_table))
+  if (!DISP_TABLE_P (Vstandard_display_table))
     return false;
   Lisp_Object dv = DISP_CHAR_VECTOR (XCHAR_TABLE (Vstandard_display_table),
 				     LEFT_SINGLE_QUOTATION_MARK);

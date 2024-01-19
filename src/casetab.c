@@ -39,9 +39,9 @@ See `set-case-table' for more information on these data structures.  */)
 {
   Lisp_Object up, canon, eqv;
 
-  if (! CHAR_TABLE_P (object))
+  if (!CHAR_TABLE_P (object))
     return Qnil;
-  if (! EQ (XCHAR_TABLE (object)->purpose, Qcase_table))
+  if (!EQ (XCHAR_TABLE (object)->purpose, Qcase_table))
     return Qnil;
 
   up = XCHAR_TABLE (object)->extras[0];

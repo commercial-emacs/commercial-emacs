@@ -559,7 +559,7 @@ scan_for_column (ptrdiff_t *endpos, EMACS_INT *goalcol,
   prev_bpos = scan_byte;
 
   window = Fget_buffer_window (Fcurrent_buffer (), Qnil);
-  w = ! NILP (window) ? XWINDOW (window) : NULL;
+  w = !NILP (window) ? XWINDOW (window) : NULL;
 
   memset (&cmp_it, 0, sizeof cmp_it);
   cmp_it.id = -1;
@@ -641,7 +641,7 @@ scan_for_column (ptrdiff_t *endpos, EMACS_INT *goalcol,
 	 to this character.  */
 
       if (dp != 0
-	  && ! (multibyte && LEADING_CODE_P (c))
+	  && !(multibyte && LEADING_CODE_P (c))
 	  && VECTORP (DISP_CHAR_VECTOR (dp, c)))
 	{
 	  Lisp_Object charvec;
@@ -950,7 +950,7 @@ position_indentation (ptrdiff_t pos_byte)
       switch (*p++)
 	{
 	case 0240:
-	  if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
+	  if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	    return column;
 	  FALLTHROUGH;
 	case ' ':
@@ -1587,7 +1587,7 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
 	    }
 
 	  if (dp != 0
-	      && ! (multibyte && LEADING_CODE_P (c))
+	      && !(multibyte && LEADING_CODE_P (c))
 	      && VECTORP (DISP_CHAR_VECTOR (dp, c)))
 	    {
 	      charvec = DISP_CHAR_VECTOR (dp, c);
@@ -1805,7 +1805,7 @@ visible section of the buffer, and pass LINE and COL as TOPOS.  */)
       CHECK_CONS (offsets);
       CHECK_FIXNUM (XCAR (offsets));
       CHECK_FIXNUM (XCDR (offsets));
-      if (! (0 <= XFIXNUM (XCAR (offsets)) && XFIXNUM (XCAR (offsets)) <= PTRDIFF_MAX
+      if (!(0 <= XFIXNUM (XCAR (offsets)) && XFIXNUM (XCAR (offsets)) <= PTRDIFF_MAX
 	     && 0 <= XFIXNUM (XCDR (offsets)) && XFIXNUM (XCDR (offsets)) <= INT_MAX))
 	args_out_of_range (XCAR (offsets), XCDR (offsets));
       hscroll = XFIXNUM (XCAR (offsets));
@@ -2069,7 +2069,7 @@ window_column_x (struct window *w, Lisp_Object window,
   double x = col * FRAME_COLUMN_WIDTH (XFRAME (w->frame)) + 0.5;
 
   /* FIXME: Should this be limited to W's dimensions?  */
-  if (! (INT_MIN <= x && x <= INT_MAX))
+  if (!(INT_MIN <= x && x <= INT_MAX))
     args_out_of_range (window, column);
 
   return x;
@@ -2191,7 +2191,7 @@ buffer, whether or not it is currently displayed in some window.  */)
       int start_x UNINIT;
       int first_x, to_x = -1;
 
-      bool start_x_given = ! NILP (cur_col);
+      bool start_x_given = !NILP (cur_col);
       if (start_x_given)
 	{
 	  start_col = extract_float (cur_col);
@@ -2204,7 +2204,7 @@ buffer, whether or not it is currently displayed in some window.  */)
 	 will sometimes err by one column.  */
       int lnum_width = 0;
       int lnum_pixel_width = 0;
-      if (! NILP (Vdisplay_line_numbers))
+      if (!NILP (Vdisplay_line_numbers))
 	line_number_display_width (w, &lnum_width, &lnum_pixel_width);
       SET_TEXT_POS (pt, PT, PT_BYTE);
       itdata = bidi_shelve_cache ();
@@ -2226,7 +2226,7 @@ buffer, whether or not it is currently displayed in some window.  */)
 	  while (s < e)
 	    if (*s++ == '\n')
 	      it_overshoot_count++;
-	  if (! it_overshoot_count)
+	  if (!it_overshoot_count)
 	    it_overshoot_count = -1;
 	}
       else
@@ -2339,7 +2339,7 @@ buffer, whether or not it is currently displayed in some window.  */)
 	}
 
       /* Move to the goal column on top of any hscroll.  */
-      if (! NILP (lcols))
+      if (!NILP (lcols))
 	{
 	  move_it_x (&it, first_x + to_x);
 	  /* EZ min-impact, max-obfuscation fix 6514b30.  Moving off a
@@ -2347,7 +2347,7 @@ buffer, whether or not it is currently displayed in some window.  */)
 	  if (nlines >= 0 && it.area == TEXT_AREA)
 	    {
 	      while (it.method == GET_FROM_STRING
-		     && ! it.string_from_display_prop_p
+		     && !it.string_from_display_prop_p
 		     && memchr (SSDATA (it.string) + IT_STRING_BYTEPOS (it),
 				'\n',
 				SBYTES (it.string) - IT_STRING_BYTEPOS (it)))

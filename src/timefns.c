@@ -517,7 +517,7 @@ lisp_time_hz_ticks (struct lisp_time t, Lisp_Object hz)
 	return make_int (ticks / XFIXNUM (t.hz)
 			 - (ticks % XFIXNUM (t.hz) < 0));
     }
-  else if (! (BIGNUMP (hz) && 0 < mpz_sgn (*xbignum_val (hz))))
+  else if (!(BIGNUMP (hz) && 0 < mpz_sgn (*xbignum_val (hz))))
     invalid_hz (hz);
 
   /* Fall back on bignum arithmetic.  */
@@ -729,7 +729,7 @@ decode_time_components (enum timeform form,
       break;
     }
 
-  if (! (INTEGERP (high) && INTEGERP (low)
+  if (!(INTEGERP (high) && INTEGERP (low)
 	 && FIXNUMP (usec) && FIXNUMP (psec)))
     return EINVAL;
   EMACS_INT us = XFIXNUM (usec);
@@ -813,7 +813,7 @@ decode_lisp_time (Lisp_Object specified_time, bool decode_secs_only,
 	{
 	  Lisp_Object low_tail = XCDR (low);
 	  low = XCAR (low);
-	  if (! decode_secs_only)
+	  if (!decode_secs_only)
 	    {
 	      if (CONSP (low_tail))
 		{
@@ -841,7 +841,7 @@ decode_lisp_time (Lisp_Object specified_time, bool decode_secs_only,
 
       /* Require LOW to be an integer, as otherwise the computation
 	 would be considerably trickier.  */
-      if (! INTEGERP (low))
+      if (!INTEGERP (low))
 	form = TIMEFORM_INVALID;
     }
   else if (FASTER_TIMEFNS && INTEGERP (specified_time))
@@ -885,14 +885,14 @@ mpz_time (mpz_t const z, time_t *t)
   if (TYPE_SIGNED (time_t))
     {
       intmax_t i;
-      if (! (mpz_to_intmax (z, &i) && TIME_T_MIN <= i && i <= TIME_T_MAX))
+      if (!(mpz_to_intmax (z, &i) && TIME_T_MIN <= i && i <= TIME_T_MAX))
 	return false;
       *t = i;
     }
   else
     {
       uintmax_t i;
-      if (! (mpz_to_uintmax (z, &i) && i <= TIME_T_MAX))
+      if (!(mpz_to_uintmax (z, &i) && i <= TIME_T_MAX))
 	return false;
       *t = i;
     }
@@ -1005,7 +1005,7 @@ lisp_time_argument (Lisp_Object specified_time)
 {
   struct lisp_time lt = lisp_time_struct (specified_time, 0);
   struct timespec t = lisp_to_timespec (lt);
-  if (! timespec_valid_p (t))
+  if (!timespec_valid_p (t))
     time_overflow ();
   return t;
 }
@@ -1018,7 +1018,7 @@ lisp_seconds_argument (Lisp_Object specified_time)
   struct lisp_time lt;
   decode_lisp_time (specified_time, true, &lt, 0);
   struct timespec t = lisp_to_timespec (lt);
-  if (! timespec_valid_p (t))
+  if (!timespec_valid_p (t))
     time_overflow ();
   return t.tv_sec;
 }
@@ -1218,7 +1218,7 @@ time_cmp (Lisp_Object a, Lisp_Object b)
   struct lisp_time tb = lisp_time_struct (b, 0);
   mpz_t const *za = bignum_integer (&mpz[0], ta.ticks);
   mpz_t const *zb = bignum_integer (&mpz[1], tb.ticks);
-  if (! (FASTER_TIMEFNS && EQ (ta.hz, tb.hz)))
+  if (!(FASTER_TIMEFNS && EQ (ta.hz, tb.hz)))
     {
       /* This could be sped up by looking at the signs, sizes, and
 	 number of bits of the two sides; see how GMP does mpq_cmp.
@@ -1587,7 +1587,7 @@ check_tm_member (Lisp_Object obj, int offset)
       CHECK_INTEGER (obj);
       mpz_sub_ui (mpz[0], *bignum_integer (&mpz[0], obj), offset);
       intmax_t i;
-      if (! (mpz_to_intmax (mpz[0], &i) && INT_MIN <= i && i <= INT_MAX))
+      if (!(mpz_to_intmax (mpz[0], &i) && INT_MIN <= i && i <= INT_MAX))
 	time_overflow ();
       return i;
     }
@@ -1816,7 +1816,7 @@ without consideration for daylight saving time.  */)
   struct tm *tmp = emacs_localtime_rz (tz, &value, &tm);
   int localtime_errno = errno;
   xtzfree (tz);
-  if (! tmp)
+  if (!tmp)
     time_error (localtime_errno);
 
   static char const wday_name[][4] =

@@ -128,7 +128,7 @@ static void
 restore_menu_items (Lisp_Object saved)
 {
   menu_items = XCAR (saved);
-  menu_items_inuse = ! NILP (menu_items);
+  menu_items_inuse = !NILP (menu_items);
   menu_items_allocated = (VECTORP (menu_items) ? ASIZE (menu_items) : 0);
   saved = XCDR (saved);
   menu_items_used = XFIXNUM (XCAR (saved));
@@ -424,7 +424,7 @@ single_menu_item (Lisp_Object key, Lisp_Object item, Lisp_Object dummy, void *sk
   || defined (HAVE_NTGUI) || defined (HAVE_HAIKU) || defined (HAVE_PGTK)
   /* Display a submenu using the toolkit.  */
   if (FRAME_WINDOW_P (XFRAME (Vmenu_updating_frame))
-      && ! (NILP (map) || NILP (enabled)))
+      && !(NILP (map) || NILP (enabled)))
     {
       push_submenu_start ();
       single_keymap_panes (map, Qnil, key, skp->maxdepth - 1);

@@ -1096,7 +1096,7 @@ make_frame_without_minibuffer (Lisp_Object mini_window, KBOARD *kb,
     {
       /* Use default-minibuffer-frame if possible.  */
       if (!FRAMEP (KVAR (kb, Vdefault_minibuffer_frame))
-	  || ! FRAME_LIVE_P (XFRAME (KVAR (kb, Vdefault_minibuffer_frame))))
+	  || !FRAME_LIVE_P (XFRAME (KVAR (kb, Vdefault_minibuffer_frame))))
 	{
           Lisp_Object frame_dummy;
 
@@ -1568,7 +1568,7 @@ do_switch_frame (Lisp_Object frame, int track, int for_deletion, Lisp_Object nor
     fset_selected_window (f, f->minibuffer_window);
   f->select_mini_window_flag = false;
 
-  if (! FRAME_MINIBUF_ONLY_P (XFRAME (selected_frame)))
+  if (!FRAME_MINIBUF_ONLY_P (XFRAME (selected_frame)))
     last_nonminibuf_frame = XFRAME (selected_frame);
 
   Fselect_window (f->selected_window, norecord);
@@ -2630,7 +2630,7 @@ mouse_position (bool call_mouse_position_function)
 						  &time_dummy);
     }
 
-  if (! NILP (x) && f)
+  if (!NILP (x) && f)
     {
       int col = XFIXNUM (x);
       int row = XFIXNUM (y);
@@ -3041,7 +3041,7 @@ The redirection lasts until `redirect-frame-focus' is called to change it.  */)
      know what other frame should receive those keystrokes.  */
   struct frame *f = decode_any_frame (frame);
 
-  if (! NILP (focus_frame))
+  if (!NILP (focus_frame))
     CHECK_LIVE_FRAME (focus_frame);
 
   fset_focus_frame (f, focus_frame);
@@ -3169,7 +3169,7 @@ set_term_frame_name (struct frame *f, Lisp_Object name)
       CHECK_STRING (name);
 
       /* Don't change the name if it's already NAME.  */
-      if (! NILP (Fstring_equal (name, f->name)))
+      if (!NILP (Fstring_equal (name, f->name)))
 	return;
 
       /* Don't allow the user to set the frame name to F<num>, so it
@@ -3306,7 +3306,7 @@ store_frame_param (struct frame *f, Lisp_Object prop, Lisp_Object val)
   if (EQ (prop, Qbuffer_predicate))
     fset_buffer_predicate (f, val);
 
-  if (! FRAME_WINDOW_P (f))
+  if (!FRAME_WINDOW_P (f))
     {
       if (EQ (prop, Qmenu_bar_lines))
 	set_menu_bar_lines (f, val, make_fixnum (FRAME_MENU_BAR_LINES (f)));
@@ -4380,7 +4380,7 @@ gui_set_frame_parameters (struct frame *f, Lisp_Object alist)
     }
 
   /* If one of the icon positions was not set, preserve or default it.  */
-  if (! TYPE_RANGED_FIXNUMP (int, icon_left))
+  if (!TYPE_RANGED_FIXNUMP (int, icon_left))
     {
 #ifdef HAVE_X_WINDOWS
       icon_left_no_change = 1;
@@ -4389,7 +4389,7 @@ gui_set_frame_parameters (struct frame *f, Lisp_Object alist)
       if (NILP (icon_left))
 	XSETINT (icon_left, 0);
     }
-  if (! TYPE_RANGED_FIXNUMP (int, icon_top))
+  if (!TYPE_RANGED_FIXNUMP (int, icon_top))
     {
 #ifdef HAVE_X_WINDOWS
       icon_top_no_change = 1;
@@ -4423,8 +4423,8 @@ gui_set_frame_parameters (struct frame *f, Lisp_Object alist)
     }
 
   if ((!NILP (left) || !NILP (top))
-      && ! (left_no_change && top_no_change)
-      && ! (FIXNUMP (left) && XFIXNUM (left) == f->left_pos
+      && !(left_no_change && top_no_change)
+      && !(FIXNUMP (left) && XFIXNUM (left) == f->left_pos
 	    && FIXNUMP (top) && XFIXNUM (top) == f->top_pos))
     {
       int leftpos = 0;
@@ -4501,7 +4501,7 @@ gui_set_frame_parameters (struct frame *f, Lisp_Object alist)
 
 #ifdef HAVE_X_WINDOWS
   if ((!NILP (icon_left) || !NILP (icon_top))
-      && ! (icon_left_no_change && icon_top_no_change))
+      && !(icon_left_no_change && icon_top_no_change))
     x_wm_set_icon_position (f, XFIXNUM (icon_left), XFIXNUM (icon_top));
 #endif /* HAVE_X_WINDOWS */
 
@@ -4752,14 +4752,14 @@ gui_set_font (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 	     disallow font names that include a dash followed by a
 	     number.  So in those cases we simply call
 	     set_new_font_hook below to generate a new fontset.  */
-	  if (NILP (spec) || ! font_match_p (spec, font_object))
+	  if (NILP (spec) || !font_match_p (spec, font_object))
 	    fontset = -1;
 	}
     }
   else
     signal_error ("Invalid font", arg);
 
-  if (! NILP (Fequal (font_object, oldval)))
+  if (!NILP (Fequal (font_object, oldval)))
     return;
 
   if (FRAME_TERMINAL (f)->set_new_font_hook)
@@ -4799,7 +4799,7 @@ gui_set_font (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 void
 gui_set_font_backend (struct frame *f, Lisp_Object new_value, Lisp_Object old_value)
 {
-  if (! NILP (new_value)
+  if (!NILP (new_value)
       && !CONSP (new_value))
     {
       char *p0, *p1;
@@ -4824,7 +4824,7 @@ gui_set_font_backend (struct frame *f, Lisp_Object new_value, Lisp_Object old_va
       new_value = Fnreverse (new_value);
     }
 
-  if (! NILP (old_value) && ! NILP (Fequal (old_value, new_value)))
+  if (!NILP (old_value) && !NILP (Fequal (old_value, new_value)))
     return;
 
   if (FRAME_FONT (f))
@@ -5114,13 +5114,13 @@ gui_set_alpha (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
       else if (FLOATP (item))
 	{
 	  alpha = XFLOAT_DATA (item);
-	  if (! (0 <= alpha && alpha <= 1.0))
+	  if (!(0 <= alpha && alpha <= 1.0))
 	    args_out_of_range (make_float (0.0), make_float (1.0));
 	}
       else if (FIXNUMP (item))
 	{
 	  EMACS_INT ialpha = XFIXNUM (item);
-	  if (! (0 <= ialpha && ialpha <= 100))
+	  if (!(0 <= ialpha && ialpha <= 100))
 	    args_out_of_range (make_fixnum (0), make_fixnum (100));
 	  alpha = ialpha / 100.0;
 	}
@@ -5150,13 +5150,13 @@ gui_set_alpha_background (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   else if (FLOATP (arg))
     {
       alpha = XFLOAT_DATA (arg);
-      if (! (0 <= alpha && alpha <= 1.0))
+      if (!(0 <= alpha && alpha <= 1.0))
 	args_out_of_range (make_float (0.0), make_float (1.0));
     }
   else if (FIXNUMP (arg))
     {
       EMACS_INT ialpha = XFIXNUM (arg);
-      if (! (0 <= ialpha && ialpha <= 100))
+      if (!(0 <= ialpha && ialpha <= 100))
 	args_out_of_range (make_fixnum (0), make_fixnum (100));
       alpha = ialpha / 100.0;
     }
@@ -5530,7 +5530,7 @@ gui_frame_get_and_record_arg (struct frame *f, Lisp_Object alist,
 
   value = gui_display_get_arg (FRAME_DISPLAY_INFO (f), alist, param,
                                attribute, class, type);
-  if (! NILP (value) && ! EQ (value, Qunbound))
+  if (!NILP (value) && !EQ (value, Qunbound))
     store_frame_param (f, param, value);
 
   return value;
@@ -5689,7 +5689,7 @@ On Nextstep, this just calls `ns-parse-geometry'.  */)
 
       if (x >= 0 && (geometry & XNegative))
 	element = list3 (Qleft, Qminus, make_fixnum (-x));
-      else if (x < 0 && ! (geometry & XNegative))
+      else if (x < 0 && !(geometry & XNegative))
 	element = list3 (Qleft, Qplus, make_fixnum (x));
       else
 	element = Fcons (Qleft, make_fixnum (x));
@@ -5702,7 +5702,7 @@ On Nextstep, this just calls `ns-parse-geometry'.  */)
 
       if (y >= 0 && (geometry & YNegative))
 	element = list3 (Qtop, Qminus, make_fixnum (-y));
-      else if (y < 0 && ! (geometry & YNegative))
+      else if (y < 0 && !(geometry & YNegative))
 	element = list3 (Qtop, Qplus, make_fixnum (y));
       else
 	element = Fcons (Qtop, make_fixnum (y));
@@ -5813,7 +5813,7 @@ gui_figure_window_size (struct frame *f, Lisp_Object parms, bool tabbar_p,
 
   height = gui_display_get_arg (dpyinfo, parms, Qheight, 0, 0, RES_TYPE_NUMBER);
   width = gui_display_get_arg (dpyinfo, parms, Qwidth, 0, 0, RES_TYPE_NUMBER);
-  if (! EQ (width, Qunbound) || ! EQ (height, Qunbound))
+  if (!EQ (width, Qunbound) || !EQ (height, Qunbound))
     {
       if (! EQ (width, Qunbound))
 	{
@@ -5851,7 +5851,7 @@ gui_figure_window_size (struct frame *f, Lisp_Object parms, bool tabbar_p,
 	    }
 	}
 
-      if (! EQ (height, Qunbound))
+      if (!EQ (height, Qunbound))
 	{
 	  if (CONSP (height) && EQ (XCAR (height), Qtext_pixels))
 	    {
@@ -5889,7 +5889,7 @@ gui_figure_window_size (struct frame *f, Lisp_Object parms, bool tabbar_p,
 
       user_size = gui_display_get_arg (dpyinfo, parms, Quser_size, 0, 0,
                                        RES_TYPE_NUMBER);
-      if (! NILP (user_size) && ! EQ (user_size, Qunbound))
+      if (!NILP (user_size) && !EQ (user_size, Qunbound))
 	window_prompting |= USSize;
       else
 	window_prompting |= PSize;
@@ -5902,7 +5902,7 @@ gui_figure_window_size (struct frame *f, Lisp_Object parms, bool tabbar_p,
   left = gui_display_get_arg (dpyinfo, parms, Qleft, 0, 0, RES_TYPE_NUMBER);
   user_position = gui_display_get_arg (dpyinfo, parms, Quser_position, 0, 0,
                                        RES_TYPE_NUMBER);
-  if (! EQ (top, Qunbound) || ! EQ (left, Qunbound))
+  if (!EQ (top, Qunbound) || !EQ (left, Qunbound))
     {
       if (EQ (top, Qminus))
 	{
@@ -5964,7 +5964,7 @@ gui_figure_window_size (struct frame *f, Lisp_Object parms, bool tabbar_p,
 	    window_prompting |= XNegative;
 	}
 
-      if (! NILP (user_position) && ! EQ (user_position, Qunbound))
+      if (!NILP (user_position) && !EQ (user_position, Qunbound))
 	window_prompting |= USPosition;
       else
 	window_prompting |= PPosition;
@@ -5997,7 +5997,7 @@ gui_figure_window_size (struct frame *f, Lisp_Object parms, bool tabbar_p,
 void
 frame_make_pointer_invisible (struct frame *f)
 {
-  if (! NILP (Vmake_pointer_invisible))
+  if (!NILP (Vmake_pointer_invisible))
     {
       if (f && FRAME_LIVE_P (f) && !f->pointer_invisible
           && FRAME_TERMINAL (f)->toggle_invisible_pointer_hook)

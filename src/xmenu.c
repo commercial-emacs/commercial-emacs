@@ -211,7 +211,7 @@ x_menu_wait_for_event (void *data)
           XFlush (dpyinfo->display);
         }
 
-      if (! timespec_valid_p (next_time))
+      if (!timespec_valid_p (next_time))
         ntp = 0;
       else
         ntp = &next_time;
@@ -798,7 +798,7 @@ menubar_selection_callback (GtkWidget *widget, gpointer client_data)
   if (xg_crazy_callback_abort)
     return;
 
-  if (! cb_data || ! cb_data->cl_data || ! cb_data->cl_data->f)
+  if (!cb_data || !cb_data->cl_data || !cb_data->cl_data->f)
     return;
 
   /* For a group of radio buttons, GTK calls the selection callback first
@@ -807,7 +807,7 @@ menubar_selection_callback (GtkWidget *widget, gpointer client_data)
      the deselected item and then the selected item is executed.  Prevent that
      by ignoring the non-active item.  */
   if (GTK_IS_RADIO_MENU_ITEM (widget)
-      && ! gtk_check_menu_item_get_active (GTK_CHECK_MENU_ITEM (widget)))
+      && !gtk_check_menu_item_get_active (GTK_CHECK_MENU_ITEM (widget)))
     return;
 
   /* When a menu is popped down, X generates a focus event (i.e. focus
@@ -950,7 +950,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
   id = f->output_data.x->id;
 #endif
 
-  if (! menubar_widget)
+  if (!menubar_widget)
     deep_p = true;
   /* Make the first call for any given frame always go deep.  */
   else if (!f->output_data.x->saved_menu_event && !deep_p)
@@ -974,7 +974,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
       /* If we are making a new widget, its contents are empty,
 	 do always reinitialize them.  */
-      if (! menubar_widget)
+      if (!menubar_widget)
 	previous_menu_items_used = 0;
 
       buffer = XWINDOW (FRAME_SELECTED_WINDOW (f))->contents;
@@ -1505,7 +1505,7 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
   GtkMenuPositionFunc pos_func = 0;  /* Pop up at pointer.  */
   struct next_popup_x_y popup_x_y;
   specpdl_ref specpdl_count = SPECPDL_INDEX ();
-  bool use_pos_func = ! for_click;
+  bool use_pos_func = !for_click;
 
 #ifdef HAVE_GTK3
   /* Always use position function for Gtk3.  Otherwise menus may become
@@ -2354,7 +2354,7 @@ x_dialog_show (struct frame *f, Lisp_Object title,
 	wv->call_data = aref_addr (menu_items, i);
 	prev_wv = wv;
 
-	if (! boundary_seen)
+	if (!boundary_seen)
 	  left_count++;
 
 	nb_buttons++;
@@ -2363,7 +2363,7 @@ x_dialog_show (struct frame *f, Lisp_Object title,
 
     /* If the boundary was not specified,
        by default put half on the left and half on the right.  */
-    if (! boundary_seen)
+    if (!boundary_seen)
       left_count = nb_buttons - nb_buttons / 2;
 
     wv = make_widget_value (dialog_name, NULL, false, Qnil);

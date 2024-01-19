@@ -627,7 +627,7 @@ do								\
   {								\
     struct ccl_program called_ccl;				\
     if (stack_idx >= 256					\
-	|| ! setup_ccl_program (&called_ccl, (symbol)))		\
+	|| !setup_ccl_program (&called_ccl, (symbol)))		\
       {								\
 	if (stack_idx > 0)					\
 	  {							\
@@ -751,7 +751,7 @@ while (0)
   do								\
     {								\
       EMACS_INT prog_word = XFIXNUM ((ccl_prog)[ic]);		\
-      if (! ASCENDING_ORDER (lo, prog_word, hi))		\
+      if (!ASCENDING_ORDER (lo, prog_word, hi))		\
 	CCL_INVALID_CMD;					\
       (var) = prog_word;					\
     }								\
@@ -766,7 +766,7 @@ while (0)
    output buffer.  If CH is less than 256, CH is written as is.  */
 #define CCL_WRITE_CHAR(ch)			\
   do {						\
-    if (! dst)					\
+    if (!dst)					\
       CCL_INVALID_CMD;				\
     else if (dst < dst_end)			\
       *dst++ = (ch);				\
@@ -798,7 +798,7 @@ while (0)
 /* Read one byte from the current input buffer into Rth register.  */
 #define CCL_READ_CHAR(r)			\
   do {						\
-    if (! src)					\
+    if (!src)					\
       CCL_INVALID_CMD;				\
     else if (src < src_end)			\
       r = *src++;				\
@@ -829,7 +829,7 @@ while (0)
     unsigned ncode;						\
 								\
     charset = char_charset ((c), (charset_list), &ncode);	\
-    if (! charset && ! NILP (charset_list))			\
+    if (!charset && !NILP (charset_list))			\
       charset = char_charset ((c), Qnil, &ncode);	  	\
     if (charset)						\
       {								\
@@ -1343,7 +1343,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 	      break;
 
 	    case CCL_WriteMultibyteChar2:
-	      if (! dst)
+	      if (!dst)
 		CCL_INVALID_CMD;
 	      i = CCL_DECODE_CHAR (reg[RRR], reg[rrr]);
 	      CCL_WRITE_CHAR (i);
@@ -1385,7 +1385,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		  {
 		    Lisp_Object opl;
 		    opl = HASH_VALUE (h, eop);
-		    if (! (IN_INT_RANGE (eop) && CHARACTERP (opl)))
+		    if (!(IN_INT_RANGE (eop) && CHARACTERP (opl)))
 		      CCL_INVALID_CMD;
 		    reg[RRR] = charset_unicode;
 		    reg[rrr] = XFIXNUM (opl);
@@ -1414,7 +1414,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		  {
 		    Lisp_Object opl;
 		    opl = HASH_VALUE (h, eop);
-		    if (! (FIXNUMP (opl) && IN_INT_RANGE (XFIXNUM (opl))))
+		    if (!(FIXNUMP (opl) && IN_INT_RANGE (XFIXNUM (opl))))
 		      CCL_INVALID_CMD;
 		    reg[RRR] = XFIXNUM (opl);
 		    reg[7] = 1; /* r7 true for success */
@@ -1681,7 +1681,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 			{
 			  attrib = XCAR (content);
 			  value = XCDR (content);
-			  if (! (FIXNUMP (attrib) && FIXNUMP (value)
+			  if (!(FIXNUMP (attrib) && FIXNUMP (value)
 				 && IN_INT_RANGE (XFIXNUM (value))))
 			    continue;
 			  op = XFIXNUM (value);
@@ -1732,7 +1732,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		int point;
 		j = XFIXNUM (ccl_prog[ic++]); /* map_id */
 		op = reg[rrr];
-		if (! (VECTORP (Vcode_conversion_map_vector)
+		if (!(VECTORP (Vcode_conversion_map_vector)
 		       && j < ASIZE (Vcode_conversion_map_vector)))
 		  {
 		    reg[RRR] = -1;
@@ -1745,7 +1745,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		    break;
 		  }
 		map = XCDR (map);
-		if (! (VECTORP (map)
+		if (!(VECTORP (map)
 		       && 0 < ASIZE (map)
 		       && FIXNUMP (AREF (map, 0))
 		       && XFIXNUM (AREF (map, 0)) <= op
@@ -1892,7 +1892,7 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
   int i, veclen, unresolved = 0;
   Lisp_Object result, contents, val;
 
-  if (! (CCL_HEADER_MAIN < ASIZE (ccl) && ASIZE (ccl) <= INT_MAX))
+  if (!(CCL_HEADER_MAIN < ASIZE (ccl) && ASIZE (ccl) <= INT_MAX))
     return Qnil;
   result = Fcopy_sequence (ccl);
   veclen = ASIZE (result);
@@ -1943,7 +1943,7 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
       return Qnil;
     }
 
-  if (! (0 <= XFIXNUM (AREF (result, CCL_HEADER_BUF_MAG))
+  if (!(0 <= XFIXNUM (AREF (result, CCL_HEADER_BUF_MAG))
 	 && ASCENDING_ORDER (0, XFIXNUM (AREF (result, CCL_HEADER_EOF)),
 			     ASIZE (ccl))))
     return Qnil;
@@ -1972,19 +1972,19 @@ ccl_get_compiled_code (Lisp_Object ccl_prog, ptrdiff_t *idx)
     return Qnil;
 
   val = Fget (ccl_prog, Qccl_program_idx);
-  if (! FIXNATP (val)
+  if (!FIXNATP (val)
       || XFIXNUM (val) >= ASIZE (Vccl_program_table))
     return Qnil;
   slot = AREF (Vccl_program_table, XFIXNUM (val));
-  if (! VECTORP (slot)
+  if (!VECTORP (slot)
       || ASIZE (slot) != 4
-      || ! VECTORP (AREF (slot, 1)))
+      || !VECTORP (AREF (slot, 1)))
     return Qnil;
   *idx = XFIXNUM (val);
   if (NILP (AREF (slot, 2)))
     {
       val = resolve_symbol_ccl_program (AREF (slot, 1));
-      if (! VECTORP (val))
+      if (!VECTORP (val))
 	return Qnil;
       ASET (slot, 1, val);
       ASET (slot, 2, Qt);
@@ -2006,7 +2006,7 @@ setup_ccl_program (struct ccl_program *ccl, Lisp_Object ccl_prog)
       struct Lisp_Vector *vp;
 
       ccl_prog = ccl_get_compiled_code (ccl_prog, &ccl->idx);
-      if (! VECTORP (ccl_prog))
+      if (!VECTORP (ccl_prog))
 	return false;
       vp = XVECTOR (ccl_prog);
       ccl->size = vp->header.size;
@@ -2047,7 +2047,7 @@ See the documentation of `define-ccl-program' for the detail of CCL program.  */
     return Qnil;
 
   val = Fget (object, Qccl_program_idx);
-  return ((! FIXNATP (val)
+  return ((!FIXNATP (val)
 	   || XFIXNUM (val) >= ASIZE (Vccl_program_table))
 	  ? Qnil : Qt);
 }

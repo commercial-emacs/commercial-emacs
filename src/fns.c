@@ -237,7 +237,7 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil).  */
       rarely_quit (len);
       last_tail = XCDR (tail);
     }
-  if (! NILP (last_tail))
+  if (!NILP (last_tail))
     return Qnil;
   return make_fixnum (len);
 }
@@ -280,8 +280,8 @@ Letter-case is significant, but text properties are ignored. */)
   CHECK_STRING (string2);
 
   bool use_byte_compare =
-    ! NILP (bytecompare)
-    || (! STRING_MULTIBYTE (string1) && ! STRING_MULTIBYTE (string2));
+    !NILP (bytecompare)
+    || (!STRING_MULTIBYTE (string1) && !STRING_MULTIBYTE (string2));
   ptrdiff_t len1 = use_byte_compare ? SBYTES (string1) : SCHARS (string1);
   ptrdiff_t len2 = use_byte_compare ? SBYTES (string2) : SCHARS (string2);
   ptrdiff_t x, y, lastdiag, olddiag;
@@ -478,7 +478,7 @@ Symbols are also allowed; their print names are used instead.  */)
     CHECK_STRING (string2);
 
   ptrdiff_t n = min (SCHARS (string1), SCHARS (string2));
-  if (! STRING_MULTIBYTE (string1) && ! STRING_MULTIBYTE (string2))
+  if (!STRING_MULTIBYTE (string1) && !STRING_MULTIBYTE (string2))
     {
       /* Each argument is either unibyte or all-ASCII multibyte:
 	 we can compare bytewise.  */
@@ -1554,7 +1554,7 @@ validate_subarray (Lisp_Object array, Lisp_Object from, Lisp_Object to,
   else
     wrong_type_argument (Qintegerp, to);
 
-  if (! (0 <= f && f <= t && t <= size))
+  if (!(0 <= f && f <= t && t <= size))
     args_out_of_range_3 (array, from, to);
 
   *ifrom = f;
@@ -2012,7 +2012,7 @@ TESTFN is called with 2 arguments: a car of an alist element and KEY.  */)
 Lisp_Object
 assoc_no_quit (Lisp_Object key, Lisp_Object alist)
 {
-  for (; ! NILP (alist); alist = XCDR (alist))
+  for (; !NILP (alist); alist = XCDR (alist))
     {
       Lisp_Object car = XCAR (alist);
       if (CONSP (car)
@@ -2175,7 +2175,7 @@ does not modify the argument.  */)
 	  Lisp_Object tem;
 
 	  tem = make_multibyte_string (NULL, nchars, nbytes);
-	  if (! STRING_MULTIBYTE (seq))
+	  if (!STRING_MULTIBYTE (seq))
 	    STRING_SET_UNIBYTE (tem);
 
 	  for (i = nchars = nbytes = ibyte = 0;
@@ -2549,7 +2549,7 @@ This is the last value stored with `(put SYMBOL PROPNAME VALUE)'.  */)
   CHECK_SYMBOL (symbol);
   Lisp_Object propval = plist_get (CDR (Fassq (symbol, Voverriding_plist_environment)),
 				   propname);
-  if (! NILP (propval))
+  if (!NILP (propval))
     return propval;
   return plist_get (XSYMBOL (symbol)->u.s.plist, propname);
 }
@@ -2653,7 +2653,7 @@ The value is actually the tail of PLIST whose car is PROP.  */)
       if (!NILP (call2 (predicate, XCAR (tail), prop)))
 	return tail;
       tail = XCDR (tail);
-      if (! CONSP (tail))
+      if (!CONSP (tail))
 	break;
     }
   CHECK_TYPE (NILP (tail), Qplistp, plist);
@@ -2789,9 +2789,9 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
       if (equal_kind == EQUAL_NO_QUIT)
 	for (; CONSP (o1); o1 = XCDR (o1))
 	  {
-	    if (! CONSP (o2))
+	    if (!CONSP (o2))
 	      return false;
-	    if (! equal_no_quit (XCAR (o1), XCAR (o2)))
+	    if (!equal_no_quit (XCAR (o1), XCAR (o2)))
 	      return false;
 	    o2 = XCDR (o2);
 	    if (EQ (XCDR (o1), o2))
@@ -2800,9 +2800,9 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
       else
 	FOR_EACH_TAIL (o1)
 	  {
-	    if (! CONSP (o2))
+	    if (!CONSP (o2))
 	      return false;
-	    if (! internal_equal (XCAR (o1), XCAR (o2),
+	    if (!internal_equal (XCAR (o1), XCAR (o2),
 				  equal_kind, depth + 1, ht))
 	      return false;
 	    o2 = XCDR (o2);
@@ -2846,7 +2846,7 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 		    && !memcmp (bool_vector_data (o1), bool_vector_data (o2),
 			        bool_vector_bytes (size)));
 	  }
-	else if (! SX_ADMITS_COMPARISON (pvtype))
+	else if (!SX_ADMITS_COMPARISON (pvtype))
 	  return false;
 
 	for (ptrdiff_t i = 0; i < PVSIZE (o1); i++)
@@ -2854,7 +2854,7 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	    Lisp_Object v1, v2;
 	    v1 = AREF (o1, i);
 	    v2 = AREF (o2, i);
-	    if (! internal_equal (v1, v2, equal_kind, depth + 1, ht))
+	    if (!internal_equal (v1, v2, equal_kind, depth + 1, ht))
 	      return false;
 	  }
 	return true;
@@ -3007,7 +3007,7 @@ mapcar1 (EMACS_INT leni, Lisp_Object *vals, Lisp_Object fn, Lisp_Object seq)
       Lisp_Object tail = seq;
       for (ptrdiff_t i = 0; i < leni; i++)
 	{
-	  if (! CONSP (tail))
+	  if (!CONSP (tail))
 	    return i;
 	  Lisp_Object dummy = call1 (fn, XCAR (tail));
 	  if (vals)
@@ -3207,7 +3207,7 @@ by a mouse, or by some window-system gesture, or via a menu.  */)
       && (CONSP (last_nonmenu_event)
 	  || (NILP (last_nonmenu_event) && CONSP (last_input_event))
 	  || (val = find_symbol_value (XSYMBOL (Qfrom__tty_menu_p), NULL),
-	      (! NILP (val) && ! EQ (val, Qunbound))))
+	      (!NILP (val) && !EQ (val, Qunbound))))
       && use_dialog_box)
     {
       Lisp_Object pane, menu, obj;
@@ -3412,9 +3412,9 @@ FILENAME are suppressed.  */)
 	 but if we require the same feature recursively 3 times,
 	 signal an error.  */
       tem = require_nesting_list;
-      while (! NILP (tem))
+      while (!NILP (tem))
 	{
-	  if (! NILP (Fequal (feature, XCAR (tem))))
+	  if (!NILP (Fequal (feature, XCAR (tem))))
 	    nesting++;
 	  tem = XCDR (tem);
 	}
@@ -3755,7 +3755,7 @@ base64_encode_region_1 (Lisp_Object beg, Lisp_Object end, bool line_break,
   encoded_length = base64_encode_1 ((char *) BYTE_POS_ADDR (ibeg),
 				    encoded, length, line_break,
 				    pad, base64url,
-				    ! NILP (BVAR (current_buffer, enable_multibyte_characters)));
+				    !NILP (BVAR (current_buffer, enable_multibyte_characters)));
   if (encoded_length > allength)
     emacs_abort ();
 
@@ -3974,7 +3974,7 @@ are ignored instead of signaling an error.  */)
   ptrdiff_t old_pos = PT;
   ptrdiff_t decoded_length;
   ptrdiff_t inserted_chars;
-  bool multibyte = ! NILP (BVAR (current_buffer, enable_multibyte_characters));
+  bool multibyte = !NILP (BVAR (current_buffer, enable_multibyte_characters));
   USE_SAFE_ALLOCA;
 
   validate_region (&beg, &end);
@@ -3992,8 +3992,8 @@ are ignored instead of signaling an error.  */)
 
   move_gap_both (XFIXNAT (beg), ibeg);
   decoded_length = base64_decode_1 ((char *) BYTE_POS_ADDR (ibeg),
-				    decoded, length, ! NILP (base64url),
-				    multibyte, ! NILP (ignore_invalid),
+				    decoded, length, !NILP (base64url),
+				    multibyte, !NILP (ignore_invalid),
 				    &inserted_chars);
   if (decoded_length > allength)
     emacs_abort ();
@@ -4049,8 +4049,8 @@ ignored instead of signaling an error.  */)
   /* The decoded result should be unibyte. */
   ptrdiff_t decoded_chars;
   decoded_length = base64_decode_1 (SSDATA (string), decoded, length,
-				    ! NILP (base64url), false,
-				    ! NILP (ignore_invalid), &decoded_chars);
+				    !NILP (base64url), false,
+				    !NILP (ignore_invalid), &decoded_chars);
   if (decoded_length > length)
     emacs_abort ();
   else if (decoded_length >= 0)
@@ -4776,7 +4776,7 @@ check_mutable_hash_table (Lisp_Object obj, struct Lisp_Hash_Table *h)
 {
   if (!h->mutable)
     signal_error ("hash table test modifies table", obj);
-  eassert (! PURE_P (h));
+  eassert (!PURE_P (h));
 }
 
 /* Put an entry into hash table H that associates KEY with VALUE.
@@ -4920,7 +4920,7 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 
 	  if (remove_entries_p)
 	    {
-              eassert (! remove_p
+              eassert (!remove_p
                        == (key_known_to_survive_p && value_known_to_survive_p));
 	      if (remove_p)
 		{
@@ -4948,10 +4948,10 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
 	    }
 	  else
 	    {
-	      if (! remove_p)
+	      if (!remove_p)
 		{
 		  /* Make sure key and value survive.  */
-		  if (! key_known_to_survive_p)
+		  if (!key_known_to_survive_p)
 		    {
 		      mark_object (hash_key_addr (h, i));
                       marked = true;
@@ -5134,7 +5134,7 @@ sxhash_obj (Lisp_Object obj, int depth)
 	/* temporary to verify rewriting of a4610c3 */
 	eassert (pvec_type == PVEC_SUB_CHAR_TABLE ? SUB_CHAR_TABLE_P (obj) : true);
 
-	if (! SX_ADMITS_ANYTHING (pvec_type)) /* a4610c3: sub_char_tables crash. */
+	if (!SX_ADMITS_ANYTHING (pvec_type)) /* a4610c3: sub_char_tables crash. */
 	  return 42;
 	else if (SX_ADMITS_COMPARISON (pvec_type))
 	  return sxhash_vector (obj, depth);
@@ -5768,8 +5768,8 @@ extract_data_from_object (Lisp_Object spec,
       struct buffer *bp = XBUFFER (object);
       set_buffer_internal (bp);
 
-      b = ! NILP (start) ? fix_position (start) : BEGV;
-      e = ! NILP (end) ? fix_position (end) : ZV;
+      b = !NILP (start) ? fix_position (start) : BEGV;
+      e = !NILP (end) ? fix_position (end) : ZV;
       if (b > e)
 	{
 	  EMACS_INT temp = b;
@@ -5785,7 +5785,7 @@ extract_data_from_object (Lisp_Object spec,
 	  /* Decide the coding-system to encode the data with.
 	     See fileio.c:Fwrite-region */
 
-	  if (! NILP (Vcoding_system_for_write))
+	  if (!NILP (Vcoding_system_for_write))
 	    coding_system = Vcoding_system_for_write;
 	  else
 	    {
@@ -5807,12 +5807,12 @@ extract_data_from_object (Lisp_Object spec,
 					   Qwrite_region,
 					   make_fixnum (b), make_fixnum (e),
 					   Fbuffer_file_name (object));
-		  if (CONSP (val) && ! NILP (XCDR (val)))
+		  if (CONSP (val) && !NILP (XCDR (val)))
 		    coding_system = XCDR (val);
 		}
 
 	      if (NILP (coding_system)
-		  && ! NILP (BVAR (XBUFFER (object), buffer_file_coding_system)))
+		  && !NILP (BVAR (XBUFFER (object), buffer_file_coding_system)))
 		{
 		  /* If we still have not decided a coding system, use the
 		     default value of buffer-file-coding-system.  */
@@ -5820,7 +5820,7 @@ extract_data_from_object (Lisp_Object spec,
 		}
 
 	      if (!force_raw_text
-		  && ! NILP (Ffboundp (Vselect_safe_coding_system_function)))
+		  && !NILP (Ffboundp (Vselect_safe_coding_system_function)))
 		/* Confirm that VAL can surely encode the current region.  */
 		coding_system = call4 (Vselect_safe_coding_system_function,
 				       make_fixnum (b), make_fixnum (e),
@@ -5878,7 +5878,7 @@ extract_data_from_object (Lisp_Object spec,
         }
     }
 
-  if (! STRINGP (object))
+  if (!STRINGP (object))
     signal_error ("Invalid object argument",
 		  NILP (object) ? build_string ("nil") : object);
   return SSDATA (object);
@@ -6185,7 +6185,7 @@ Case is always significant and text properties are ignored. */)
   if (STRING_MULTIBYTE (haystack)
       ? (STRING_MULTIBYTE (needle)
          || SCHARS (haystack) == SBYTES (haystack) || string_ascii_p (needle))
-      : (! STRING_MULTIBYTE (needle)
+      : (!STRING_MULTIBYTE (needle)
          || SCHARS (needle) == SBYTES (needle)))
     {
       if (STRING_MULTIBYTE (haystack) && STRING_MULTIBYTE (needle)
@@ -6225,7 +6225,7 @@ Case is always significant and text properties are ignored. */)
                     SSDATA (uni_needle), SBYTES (uni_needle));
     }
 
-  if (! res)
+  if (!res)
     return Qnil;
 
   return make_int (string_byte_to_char (haystack, res - SSDATA (haystack)));
@@ -6248,7 +6248,7 @@ in OBJECT.  */)
   else
     wrong_type_argument (Qbuffer_or_string_p, object);
 
-  if (! intervals)
+  if (!intervals)
     return Qnil;
 
   Lisp_Object collector = Qnil;

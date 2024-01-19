@@ -98,7 +98,7 @@ tree_sitter_language_functor (Lisp_Object progmode)
     {
       Lisp_Object language =
 	Fcdr_safe (Fassq (progmode, Fsymbol_value (Qtree_sitter_mode_alist)));
-      if (! NILP (language))
+      if (!NILP (language))
 	{
 	  Lisp_Object module =
 	    concat2 (Ffile_name_as_directory
@@ -241,7 +241,7 @@ ensure_highlighter(Lisp_Object sitter)
       intptr_t i = 0;
       FILE *fp = NULL;
 
-      eassert (! NILP (language)); /* by tree_sitter_create() */
+      eassert (!NILP (language)); /* by tree_sitter_create() */
 
       FOR_EACH_TAIL (alist)
 	{
@@ -273,7 +273,7 @@ ensure_highlighter(Lisp_Object sitter)
 	{
 	  long highlights_query_length;
 	  fp = fopen (SSDATA (highlights_scm), "rb");
-	  if (! fp) {
+	  if (!fp) {
 	      suberror = highlights_scm;
 	      error = "Cannot fopen";
 	      goto finally;
@@ -346,7 +346,7 @@ tree_sitter_read_buffer (void *payload, uint32_t byte_index,
 					       tree_sitter_scan_characters * 4 + 1);
     }
 
-  if (! BUFFER_LIVE_P (bp))
+  if (!BUFFER_LIVE_P (bp))
     error ("Selecting deleted buffer");
 
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
@@ -400,7 +400,7 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
   CHECK_FIXNUM (beg);
   CHECK_FIXNUM (end);
   sitter = Ftree_sitter (Fcurrent_buffer ());
-  if (! NILP (sitter))
+  if (!NILP (sitter))
     {
       TSHighlighter *ts_highlighter = ensure_highlighter (sitter);
       Lisp_Object language = Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
@@ -417,7 +417,7 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 	  TSNode node = ts_node_first_child_for_byte
 	    (ts_tree_root_node (parsed_tree (XTREE_SITTER (sitter))),
 	     BUFFER_TO_SITTER (XFIXNUM (beg)));
-	  while (! ts_node_is_null (node)
+	  while (!ts_node_is_null (node)
 		 && ts_node_start_byte (node) < BUFFER_TO_SITTER (XFIXNUM (end)))
 	    {
 	      Lisp_Object node_start, node_end, source_code;
@@ -432,7 +432,7 @@ do_highlights (Lisp_Object beg, Lisp_Object end, HighlightsFunctor fn)
 		{
 		  TSNode prosp = ts_node_first_child_for_byte
 		    (node, BUFFER_TO_SITTER (XFIXNUM (beg)));
-		  if (! ts_node_is_null (prosp)
+		  if (!ts_node_is_null (prosp)
 		      && ts_node_start_byte (prosp) <= BUFFER_TO_SITTER (XFIXNUM (beg)))
 		    {
 		      node = prosp;
@@ -513,7 +513,7 @@ DEFUN ("tree-sitter-root-node",
   CHECK_BUFFER (buffer);
   sitter = Ftree_sitter (buffer);
 
-  if (! NILP (sitter))
+  if (!NILP (sitter))
     {
       const TSTree *tree = parsed_tree (XTREE_SITTER (sitter));
       if (tree != NULL)
@@ -641,18 +641,18 @@ DEFUN ("tree-sitter-cursor-at",
 			       (XTREE_SITTER_NODE (root_node)->node,
 				byte));
   for (TSNode node = ts_tree_cursor_current_node (&cursor);
-       ! ts_node_is_null (node);
+       !ts_node_is_null (node);
        (void) node)
     {
       if (byte < ts_node_start_byte (node))
 	break;
       else if (byte >= ts_node_end_byte(node))
 	{
-	  if (! ts_tree_cursor_goto_next_sibling (&cursor))
+	  if (!ts_tree_cursor_goto_next_sibling (&cursor))
 	    break;
 	  node = ts_tree_cursor_current_node (&cursor);
 	}
-      else if (! ts_tree_cursor_goto_first_child (&cursor))
+      else if (!ts_tree_cursor_goto_first_child (&cursor))
 	break;
       else
 	node = ts_tree_cursor_current_node (&cursor);
@@ -1052,7 +1052,7 @@ DEFUN ("tree-sitter-node-field-name-for-child",
   CHECK_TREE_SITTER_NODE (node);
   CHECK_FIXNAT (n);
 
-  if (! ts_node_is_null (XTREE_SITTER_NODE (node)->node))
+  if (!ts_node_is_null (XTREE_SITTER_NODE (node)->node))
     {
       const char *ret = ts_node_field_name_for_child
 	(XTREE_SITTER_NODE (node)->node, (uint32_t) XFIXNAT (n));
@@ -1122,7 +1122,7 @@ DEFUN ("tree-sitter-node-string",
 
   CHECK_TREE_SITTER_NODE (node);
 
-  if (! ts_node_is_null (XTREE_SITTER_NODE (node)->node))
+  if (!ts_node_is_null (XTREE_SITTER_NODE (node)->node))
     {
       char *ret = ts_node_string (XTREE_SITTER_NODE (node)->node);
       sexp = build_string (ret);
@@ -1199,7 +1199,7 @@ parent_earlier_line (Lisp_Object node, ptrdiff_t node_beg)
 {
   Lisp_Object parent = Ftree_sitter_node_parent (node);
   for ( ; /* Get nearest parent on different line.  */
-	(! NILP (parent)
+	(!NILP (parent)
 	 && same_line (node_beg,
 		       SITTER_TO_BUFFER
 		       (ts_node_start_byte
@@ -1345,7 +1345,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 		    }
 		  xfree (content);
 		}
-	      if (! fp)
+	      if (!fp)
 		{
 		  Lisp_Object args[2];
 		  args[0] = build_string ("%s not found or malformed");
@@ -1573,7 +1573,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 
 		  if (0 == strcmp ("comment",
 				   ts_node_type (XTREE_SITTER_NODE (node)->node))
-		      && ! same_line (node_beg, PT)
+		      && !same_line (node_beg, PT)
                       && node_beg < PT)
 		    {
 		      struct text_pos pt;
@@ -1587,7 +1587,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			 Preceding line's indent + (2 for delim) + (1 space).
 			 (Assuming space fails for say #foo in bash).  */
 		      for ( ;
-			    pos != ZV && ! isspace (FETCH_CHAR (pos));
+			    pos != ZV && !isspace (FETCH_CHAR (pos));
 			    ++pos, ++comment_start);
 		      for ( ;
 			    pos != ZV && isspace (FETCH_CHAR (pos));
@@ -1631,8 +1631,8 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			  last_dented_pos = node_beg;
 			}
 		    }
-		  else if (! same_line (capture_beg, capture_end - 1)
-			   && ! same_line (node_beg, PT)
+		  else if (!same_line (capture_beg, capture_end - 1)
+			   && !same_line (node_beg, PT)
                            && node_beg < PT)
 		    {
 		      if (0 == strcmp (capture_name, "indent"))
@@ -1738,7 +1738,7 @@ DEFUN ("tree-sitter-changed-range",
   CHECK_BUFFER (buffer);
   sitter = Ftree_sitter (buffer);
 
-  if (! NILP (sitter))
+  if (!NILP (sitter))
     {
       const TSTree *tree = parsed_tree (XTREE_SITTER (sitter)),
 	*prev_tree = XTREE_SITTER (sitter)->prev_tree;
@@ -1772,13 +1772,13 @@ DEFUN ("tree-sitter",
 
   sitter = Fbuffer_local_value (Qtree_sitter_sitter, buffer);
   if (NILP (sitter)
-      || ! EQ (XTREE_SITTER (sitter)->progmode, BVAR (XBUFFER (buffer), major_mode)))
+      || !EQ (XTREE_SITTER (sitter)->progmode, BVAR (XBUFFER (buffer), major_mode)))
     {
       sitter = Fset (Qtree_sitter_sitter,
 		     tree_sitter_create (BVAR (XBUFFER (buffer), major_mode)));
     }
 
-  if (! NILP (sitter))
+  if (!NILP (sitter))
     {
       if (XTREE_SITTER (sitter)->tree == NULL)
 	{
@@ -1808,7 +1808,7 @@ tree_sitter_record_change (ptrdiff_t start_char,
 			   ptrdiff_t new_end_char)
 {
   Lisp_Object sitter = Fbuffer_local_value (Qtree_sitter_sitter, Fcurrent_buffer ());
-  if (! NILP (sitter))
+  if (!NILP (sitter))
     {
       TSTree *tree = XTREE_SITTER (sitter)->tree;
       if (tree != NULL)

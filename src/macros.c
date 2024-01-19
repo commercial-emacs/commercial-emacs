@@ -243,7 +243,7 @@ each iteration of the macro.  Iteration stops if LOOPFUNC returns nil.  */)
   /* C-x z after the macro should repeat the macro.  */
   Vreal_this_command = KVAR (current_kboard, Vlast_kbd_macro);
 
-  if (! NILP (KVAR (current_kboard, defining_kbd_macro)))
+  if (!NILP (KVAR (current_kboard, defining_kbd_macro)))
     error ("Can't execute anonymous macro while defining one");
   else if (NILP (KVAR (current_kboard, Vlast_kbd_macro)))
     error ("No kbd macro has been defined");

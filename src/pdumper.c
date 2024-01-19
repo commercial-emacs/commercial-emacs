@@ -855,7 +855,7 @@ dump_remember_object (struct dump_context *ctx,
 static void *
 dump_object_emacs_ptr (Lisp_Object lv)
 {
-  if (SUBRP (lv) && ! SUBR_NATIVE_COMPILEDP (lv))
+  if (SUBRP (lv) && !SUBR_NATIVE_COMPILEDP (lv))
     return XSUBR (lv);
   if (dump_builtin_symbol_p (lv))
     return XSYMBOL (lv);
@@ -1261,8 +1261,8 @@ dump_enqueue_object (struct dump_context *ctx,
     {
       dump_off state = dump_recall_object (ctx, object);
       bool already_dumped_object = state > DUMP_OBJECT_NOT_SEEN;
-      eassert (! ctx->flags.assert_already_seen || already_dumped_object);
-      if (! already_dumped_object)
+      eassert (!ctx->flags.assert_already_seen || already_dumped_object);
+      if (!already_dumped_object)
         {
           if (state == DUMP_OBJECT_NOT_SEEN)
             {
@@ -2540,7 +2540,7 @@ hash_table_contents (struct Lisp_Hash_Table *h)
 static dump_off
 dump_hash_table_list (struct dump_context *ctx)
 {
-  if (! NILP (ctx->hash_tables))
+  if (!NILP (ctx->hash_tables))
     return dump_object (ctx, CALLN (Fapply, Qvector, ctx->hash_tables));
   else
     return 0;
@@ -3199,7 +3199,7 @@ static void
 dump_hot_parts_of_discardable_objects (struct dump_context *ctx)
 {
   Lisp_Object copied_queue = ctx->copied_queue;
-  while (! NILP (copied_queue))
+  while (!NILP (copied_queue))
     {
       Lisp_Object copied = dump_pop (&copied_queue);
       if (SYMBOLP (copied))
@@ -3518,7 +3518,7 @@ dump_drain_user_remembered_data_cold (struct dump_context *ctx)
                 }
               else
                 {
-                  eassert (! dump_object_self_representing_p (lv));
+                  eassert (!dump_object_self_representing_p (lv));
                   dump_off dump_offset = dump_recall_object (ctx, lv);
                   if (dump_offset <= 0)
                     error ("raw-pointer object not dumped?!");
@@ -3651,7 +3651,7 @@ decode_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
            dump_emacs_reloc_to_lv didn't do its job.
            dump_emacs_reloc_to_lv should have added a
            RELOC_EMACS_IMMEDIATE relocation instead.  */
-        eassert (! dump_object_self_representing_p (target_value));
+        eassert (!dump_object_self_representing_p (target_value));
         int tag_type = XTYPE (target_value);
         reloc.length = tag_type;
         eassert (reloc.length == tag_type);
@@ -3756,13 +3756,13 @@ drain_reloc_list (struct dump_context *ctx,
 			       alignof (struct emacs_reloc)));
   struct dump_table_locator locator = {0};
   locator.offset = ctx->offset;
-  for (; ! NILP (relocs); locator.nr_entries += 1)
+  for (; !NILP (relocs); locator.nr_entries += 1)
     {
       Lisp_Object reloc = dump_pop (&relocs);
       Lisp_Object merged;
       while (merger != NULL
-	     && ! NILP (relocs)
-	     && (merged = merger (reloc, XCAR (relocs)), ! NILP (merged)))
+	     && !NILP (relocs)
+	     && (merged = merger (reloc, XCAR (relocs)), !NILP (merged)))
         {
           reloc = merged;
           relocs = XCDR (relocs);
@@ -3930,7 +3930,7 @@ DEFUN ("dump-emacs-portable",
   eassert (initialized);
   (void) unused;
 
-  if (! noninteractive)
+  if (!noninteractive)
     error ("Dumping Emacs currently works only in batch mode.  "
            "If you'd like it to work interactively, please consider "
            "contributing a patch to Emacs.");
@@ -3938,7 +3938,7 @@ DEFUN ("dump-emacs-portable",
   if (!main_thread_p (current_thread))
     error ("This function can be called only in the main thread");
 
-  if (! NILP (XCDR (Fall_threads ())))
+  if (!NILP (XCDR (Fall_threads ())))
     error ("No other Lisp threads can be running when this function is called");
 
   /* Clear detritus in memory.  */
@@ -4063,8 +4063,8 @@ DEFUN ("dump-emacs-portable",
       dump_drain_normal_queue (ctx);
     }
   while (!dump_queue_empty_p (&ctx->dump_queue)
-	 || ! NILP (ctx->deferred_hash_tables)
-	 || ! NILP (ctx->deferred_symbols));
+	 || !NILP (ctx->deferred_hash_tables)
+	 || !NILP (ctx->deferred_symbols));
 
   ctx->header.hash_list = ctx->offset;
   dump_hash_table_list (ctx);
@@ -4076,8 +4076,8 @@ DEFUN ("dump-emacs-portable",
       dump_drain_normal_queue (ctx);
     }
   while (!dump_queue_empty_p (&ctx->dump_queue)
-	 || ! NILP (ctx->deferred_hash_tables)
-	 || ! NILP (ctx->deferred_symbols));
+	 || !NILP (ctx->deferred_hash_tables)
+	 || !NILP (ctx->deferred_symbols));
 
   dump_sort_copied_objects (ctx);
 

@@ -156,12 +156,12 @@ rename_lock_file (char const *old, char const *new, bool force)
 #ifdef WINDOWSNT
   return sys_rename_replace (old, new, force);
 #else
-  if (! force)
+  if (!force)
     {
       struct stat st;
 
       int r = renameat_noreplace (AT_FDCWD, old, AT_FDCWD, new);
-      if (! (r < 0 && errno == ENOSYS))
+      if (!(r < 0 && errno == ENOSYS))
 	return r;
       if (link (old, new) == 0)
 	return unlink (old) == 0 || errno == ENOENT ? 0 : -1;
@@ -283,7 +283,7 @@ lock_file_1 (Lisp_Object lfname, bool force)
 			       : "%s@%s.%"PRIdMAX);
   int len = snprintf (lock_info_str, sizeof lock_info_str,
 		      lock_info_fmt, user_name, host_name, pid, boot);
-  if (! (0 <= len && len < sizeof lock_info_str))
+  if (!(0 <= len && len < sizeof lock_info_str))
     return ENAMETOOLONG;
 
   return create_lock_file (SSDATA (lfname), lock_info_str, force);
@@ -388,7 +388,7 @@ current_lock_owner (lock_info_type *owner, Lisp_Object lfname)
     return EINVAL;
 
   /* The PID is everything from the last '.' to the ':' or equivalent.  */
-  if (! c_isdigit (dot[1]))
+  if (!c_isdigit (dot[1]))
     return EINVAL;
   errno = 0;
   pid = strtoimax (dot + 1, &owner->colon, 10);
@@ -409,12 +409,12 @@ current_lock_owner (lock_info_type *owner, Lisp_Object lfname)
 	 This works around a bug in the Linux CIFS kernel client, which can
 	 mistakenly transliterate ':' to U+F022 in symlink contents.
 	 See <https://bugzilla.redhat.com/show_bug.cgi?id=1384153>.  */
-      if (! (boot[0] == '\200' && boot[1] == '\242'))
+      if (!(boot[0] == '\200' && boot[1] == '\242'))
 	return EINVAL;
       boot += 2;
       FALLTHROUGH;
     case ':':
-      if (! c_isdigit (boot[0]))
+      if (!c_isdigit (boot[0]))
 	return EINVAL;
       boot_time = strtoimax (boot, &lfinfo_end, 10);
       break;
@@ -580,7 +580,7 @@ unlock_file (Lisp_Object fn)
     return Qnil;
 
   int err = current_lock_owner (0, lfname);
-  if (! (err == 0 || err == ANOTHER_OWNS_IT
+  if (!(err == 0 || err == ANOTHER_OWNS_IT
 	 || (err == I_OWN_IT
 	     && (unlink (SSDATA (lfname)) == 0 || (err = errno) == ENOENT))))
     report_file_errno ("Unlocking file", fn, err);

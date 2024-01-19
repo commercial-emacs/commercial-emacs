@@ -530,7 +530,7 @@ char_quoted (ptrdiff_t charpos, ptrdiff_t bytepos)
       UPDATE_SYNTAX_TABLE_BACKWARD (charpos);
       c = FETCH_CHAR_AS_MULTIBYTE (bytepos);
       code = SYNTAX (c);
-      if (! (code == Scharquote || code == Sescape))
+      if (!(code == Scharquote || code == Sescape))
 	break;
 
       quoted = !quoted;
@@ -1460,7 +1460,7 @@ scan_words (ptrdiff_t from, EMACS_INT count)
       /* Now CH0 is a character which begins a word and FROM is the
          position of the next character.  */
       func = CHAR_TABLE_REF (Vfind_word_boundary_function_table, ch0);
-      if (! NILP (Ffboundp (func)))
+      if (!NILP (Ffboundp (func)))
 	{
 	  pos = call2 (func, make_fixnum (from - 1), make_fixnum (end));
 	  if (FIXNUMP (pos) && from < XFIXNUM (pos) && XFIXNUM (pos) <= ZV)
@@ -1509,7 +1509,7 @@ scan_words (ptrdiff_t from, EMACS_INT count)
       /* Now CH1 is a character which ends a word and FROM is the
          position of it.  */
       func = CHAR_TABLE_REF (Vfind_word_boundary_function_table, ch1);
-      if (! NILP (Ffboundp (func)))
+      if (!NILP (Ffboundp (func)))
  	{
 	  pos = call2 (func, make_fixnum (from), make_fixnum (beg));
 	  if (FIXNUMP (pos) && BEGV <= XFIXNUM (pos) && XFIXNUM (pos) < from)
@@ -1529,7 +1529,7 @@ scan_words (ptrdiff_t from, EMACS_INT count)
 	      ch0 = FETCH_CHAR_AS_MULTIBYTE (from_byte);
 	      code = SYNTAX (ch0);
 	      if ((code != Sword
-		   && (! words_include_escapes
+		   && (!words_include_escapes
 		       || (code != Sescape && code != Scharquote)))
 		  || word_boundary_p (ch0, ch1))
 		{
@@ -1571,7 +1571,7 @@ instead.  See Info node `(elisp) Word Motion' for details.  */)
     CHECK_FIXNUM (arg);
 
   val = orig_val = scan_words (PT, XFIXNUM (arg));
-  if (! orig_val)
+  if (!orig_val)
     val = XFIXNUM (arg) > 0 ? ZV : BEGV;
 
   /* Avoid jumping out of an input field.  */
@@ -1687,7 +1687,7 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
 
   int nclasses = 0;
   unsigned char classes[RECC_NUM_CLASSES];
-  if (! string_multibyte)
+  if (!string_multibyte)
     {
       bool string_has_eight_bit = 0;
 
@@ -1736,14 +1736,14 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		  int lim2 = c2 + 1;
 		  while (c < lim2)
 		    fastmap[c++] = 1;
-		  if (! ASCII_CHAR_P (c2))
+		  if (!ASCII_CHAR_P (c2))
 		    string_has_eight_bit = 1;
 		}
 	    }
 	  else
 	    {
 	      fastmap[c] = 1;
-	      if (! ASCII_CHAR_P (c))
+	      if (!ASCII_CHAR_P (c))
 		string_has_eight_bit = 1;
 	    }
 	}
@@ -1951,9 +1951,9 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		    goto fwd_ok;
 		}
 
-	      if (! fastmap[*p])
+	      if (!fastmap[*p])
 		break;
-	      if (! ASCII_CHAR_P (c))
+	      if (!ASCII_CHAR_P (c))
 		{
 		  /* As we are looking at a multibyte character, we
 		     must look up the character in the table
@@ -2014,7 +2014,7 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
 	      unsigned char *prev_p = p;
 	      do
 		p--;
-	      while (stop <= p && ! CHAR_HEAD_P (*p));
+	      while (stop <= p && !CHAR_HEAD_P (*p));
 
 	      c = STRING_CHAR (p);
 
@@ -2026,9 +2026,9 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		    goto back_ok;
 		}
 
-	      if (! fastmap[*p])
+	      if (!fastmap[*p])
 		break;
-	      if (! ASCII_CHAR_P (c))
+	      if (!ASCII_CHAR_P (c))
 		{
 		  /* See the comment in the previous similar code.  */
 		  for (i = 0; i < n_char_ranges; i += 2)
@@ -2167,7 +2167,7 @@ skip_syntaxes (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		  c = string_char_and_length (p, &nbytes);
 		else
 		  c = *p, nbytes = 1;
-		if (! fastmap[SYNTAX (c)])
+		if (!fastmap[SYNTAX (c)])
 		  goto done;
 		p += nbytes, pos++, pos_byte += nbytes;
 		rarely_quit (pos);
@@ -2200,10 +2200,10 @@ skip_syntaxes (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		unsigned char *prev_p = p;
 		do
 		  p--;
-		while (stop <= p && ! CHAR_HEAD_P (*p));
+		while (stop <= p && !CHAR_HEAD_P (*p));
 
 		c = STRING_CHAR (p);
-		if (! fastmap[SYNTAX (c)])
+		if (!fastmap[SYNTAX (c)])
 		  break;
 		pos--, pos_byte -= prev_p - p;
 		rarely_quit (pos);
@@ -2221,7 +2221,7 @@ skip_syntaxes (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		    stop = endp;
 		  }
 		UPDATE_SYNTAX_TABLE_BACKWARD (pos - 1);
-		if (! fastmap[SYNTAX (p[-1])])
+		if (!fastmap[SYNTAX (p[-1])])
 		  break;
 		p--, pos--, pos_byte--;
 		rarely_quit (pos);

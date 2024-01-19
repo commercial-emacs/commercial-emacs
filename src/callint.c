@@ -305,7 +305,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 
   /* Set SPECS to the interactive form, or barf if not interactive.  */
   Lisp_Object form = call1 (Qinteractive_form, function);
-  if (! CONSP (form))
+  if (!CONSP (form))
     wrong_type_argument (Qcommandp, function);
   Lisp_Object specs = Fcar (XCDR (form));
 
@@ -314,7 +314,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
      The feature is not fully implemented.  */
 
   /* If SPECS is not a string, invent one.  */
-  if (! STRINGP (specs))
+  if (!STRINGP (specs))
     {
       Lisp_Object funval = Findirect_function (function, Qt);
       uintmax_t events = num_input_events;
@@ -396,7 +396,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	      && (w = XCAR (w), WINDOWP (w)))
 	    {
 	      if (MINI_WINDOW_P (XWINDOW (w))
-		  && ! (minibuf_level > 0 && EQ (w, minibuf_window)))
+		  && !(minibuf_level > 0 && EQ (w, minibuf_window)))
 		error ("Attempt to select inactive minibuffer window");
 
 	      /* If the current buffer wants to clean up, let it.  */
@@ -486,7 +486,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	  args[i] = Fread_char (callint_message, Qnil, Qnil);
 	  message1_nolog (0);
 	  /* See bug#8479.  */
-	  if (! CHARACTERP (args[i]))
+	  if (!CHARACTERP (args[i]))
 	    error ("Non-character input-event");
 	  visargs[i] = Fchar_to_string (args[i]);
 	  break;
@@ -551,7 +551,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 		teml = Fget (teml, Qevent_symbol_elements);
 		/* Ignore first element, which is the base key.  */
 		Lisp_Object tem2 = Fmemq (Qdown, Fcdr (teml));
-		if (! NILP (tem2))
+		if (!NILP (tem2))
 		  up_event = Fread_event (Qnil, Qnil, Qnil);
 	      }
 	  }
@@ -581,7 +581,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 		teml = Fget (teml, Qevent_symbol_elements);
 		/* Ignore first element, which is the base key.  */
 		Lisp_Object tem2 = Fmemq (Qdown, Fcdr (teml));
-		if (! NILP (tem2))
+		if (!NILP (tem2))
 		  up_event = Fread_event (Qnil, Qnil, Qnil);
 	      }
 	  }
@@ -613,7 +613,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	    do
 	      next_event++;
 	    while (next_event < key_count
-		   && ! EVENT_HAS_PARAMETERS (AREF (keys, next_event)));
+		   && !EVENT_HAS_PARAMETERS (AREF (keys, next_event)));
 
 	  break;
 

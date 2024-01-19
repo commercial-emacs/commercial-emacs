@@ -163,7 +163,7 @@ inotifyevent_to_event (Lisp_Object watch, struct inotify_event const *ev)
   uint32_t mask;
   CONS_TO_INTEGER (Fnth (make_fixnum (3), watch), uint32_t, mask);
 
-  if (! (mask & ev->mask))
+  if (!(mask & ev->mask))
     return Qnil;
 
   if (ev->len > 0)
@@ -206,8 +206,8 @@ add_watch (int wd, Lisp_Object filename,
   else
     {
       /* Assign IDX to the first unused ordinal in WATCHES.  */
-      for (; ! NILP (XCDR (watches)); watches = XCDR (watches), idx++)
-	if (! EQ (XCAR (XCAR (XCDR (watches))), make_fixnum (idx)))
+      for (; !NILP (XCDR (watches)); watches = XCDR (watches), idx++)
+	if (!EQ (XCAR (XCAR (XCDR (watches))), make_fixnum (idx)))
 	  break;
       if (MOST_POSITIVE_FIXNUM < idx)
 	emacs_abort ();
@@ -261,7 +261,7 @@ static void
 remove_watch (Lisp_Object descriptor, Lisp_Object idx)
 {
   Lisp_Object prevtail = preceding_cons (descriptor);
-  if (! NILP (prevtail))
+  if (!NILP (prevtail))
     {
       /* ELT should be (DESCRIPTOR . WATCHES) */
       Lisp_Object elt = XCAR (CONSP (prevtail) ? XCDR (prevtail) : watches_alist);
@@ -314,14 +314,14 @@ inotify_callback (int fd, void *_)
       Lisp_Object descriptor = INT_TO_INTEGER (ev->wd);
       Lisp_Object prevtail = preceding_cons (descriptor);
 
-      if (! NILP (prevtail))
+      if (!NILP (prevtail))
         {
 	  Lisp_Object tail = CONSP (prevtail) ? XCDR (prevtail) : watches_alist;
 	  for (Lisp_Object watches = XCDR (XCAR (tail)); ! NILP (watches);
 	       watches = XCDR (watches))
             {
               event.arg = inotifyevent_to_event (XCAR (watches), ev);
-              if (! NILP (event.arg))
+              if (!NILP (event.arg))
                 kbd_buffer_store_event (&event);
             }
           if (ev->mask & IN_IGNORED)
@@ -454,7 +454,7 @@ it invalid.  */)
       if (! NILP (tail))
 	{
 	  Lisp_Object watch = assq_no_quit (XCDR (watch_descriptor), XCDR (tail));
-	  if (! NILP (watch))
+	  if (!NILP (watch))
 	    return Qt;
 	}
     }

@@ -1028,13 +1028,13 @@ tty_lookup_color (struct frame *f, Lisp_Object color, Emacs_Color *tty_color,
     {
       Lisp_Object rgb;
 
-      if (! FIXNUMP (XCAR (XCDR (color_desc))))
+      if (!FIXNUMP (XCAR (XCDR (color_desc))))
 	return false;
 
       tty_color->pixel = XFIXNUM (XCAR (XCDR (color_desc)));
 
       rgb = XCDR (XCDR (color_desc));
-      if (! parse_rgb_list (rgb, tty_color))
+      if (!parse_rgb_list (rgb, tty_color))
 	return false;
 
       /* Should we fill in STD_COLOR too?  */
@@ -1053,7 +1053,7 @@ tty_lookup_color (struct frame *f, Lisp_Object color, Emacs_Color *tty_color,
 	    {
 	      /* Look up STD_COLOR separately.  */
 	      rgb = call1 (Qtty_color_standard_values, color);
-	      if (! parse_rgb_list (rgb, std_color))
+	      if (!parse_rgb_list (rgb, std_color))
 		return false;
 	    }
 	}
@@ -1629,7 +1629,7 @@ the WIDTH times as wide as FACE on FRAME.  */)
   check_window_system (NULL);
   CHECK_STRING (pattern);
 
-  if (! NILP (maximum))
+  if (!NILP (maximum))
     CHECK_FIXNAT (maximum);
 
   if (!NILP (width))
@@ -1638,7 +1638,7 @@ the WIDTH times as wide as FACE on FRAME.  */)
   /* We can't simply call decode_window_system_frame because
      this function may be called before any frame is created.  */
   f = decode_live_frame (frame);
-  if (! FRAME_WINDOW_P (f))
+  if (!FRAME_WINDOW_P (f))
     {
       /* Perhaps we have not yet created any frame.  */
       f = NULL;
@@ -1690,7 +1690,7 @@ the WIDTH times as wide as FACE on FRAME.  */)
       font_entity = XCAR (tail);
       if ((NILP (AREF (font_entity, FONT_SIZE_INDEX))
 	   || XFIXNUM (AREF (font_entity, FONT_SIZE_INDEX)) == 0)
-	  && ! NILP (AREF (font_spec, FONT_SIZE_INDEX)))
+	  && !NILP (AREF (font_spec, FONT_SIZE_INDEX)))
 	{
 	  /* This is a scalable font.  For backward compatibility,
 	     we set the specified size. */
@@ -2029,7 +2029,7 @@ get_lface_attributes_no_remap (struct frame *f, Lisp_Object face_name,
 
   lface = lface_from_face_name_no_resolve (f, face_name, signal_p);
 
-  if (! NILP (lface))
+  if (!NILP (lface))
     memcpy (attrs, xvector_contents (lface),
 	    LFACE_VECTOR_SIZE * sizeof *attrs);
 
@@ -2137,17 +2137,17 @@ set_lface_from_font (struct frame *f, Lisp_Object lface,
   if (force_p || UNSPECIFIEDP (LFACE_WEIGHT (lface)))
     {
       val = FONT_WEIGHT_FOR_FACE (font_object);
-      ASET (lface, LFACE_WEIGHT_INDEX, ! NILP (val) ? val :Qnormal);
+      ASET (lface, LFACE_WEIGHT_INDEX, !NILP (val) ? val :Qnormal);
     }
   if (force_p || UNSPECIFIEDP (LFACE_SLANT (lface)))
     {
       val = FONT_SLANT_FOR_FACE (font_object);
-      ASET (lface, LFACE_SLANT_INDEX, ! NILP (val) ? val : Qnormal);
+      ASET (lface, LFACE_SLANT_INDEX, !NILP (val) ? val : Qnormal);
     }
   if (force_p || UNSPECIFIEDP (LFACE_SWIDTH (lface)))
     {
       val = FONT_WIDTH_FOR_FACE (font_object);
-      ASET (lface, LFACE_SWIDTH_INDEX, ! NILP (val) ? val : Qnormal);
+      ASET (lface, LFACE_SWIDTH_INDEX, !NILP (val) ? val : Qnormal);
     }
 
   ASET (lface, LFACE_FONT_INDEX, font_object);
@@ -2266,11 +2266,11 @@ merge_face_vectors (struct window *w,
 	to[LFACE_FOUNDRY_INDEX] = SYMBOL_NAME (AREF (font, FONT_FOUNDRY_INDEX));
       if (! NILP (AREF (font, FONT_FAMILY_INDEX)))
 	to[LFACE_FAMILY_INDEX] = SYMBOL_NAME (AREF (font, FONT_FAMILY_INDEX));
-      if (! NILP (AREF (font, FONT_WEIGHT_INDEX)))
+      if (!NILP (AREF (font, FONT_WEIGHT_INDEX)))
 	to[LFACE_WEIGHT_INDEX] = FONT_WEIGHT_FOR_FACE (font);
-      if (! NILP (AREF (font, FONT_SLANT_INDEX)))
+      if (!NILP (AREF (font, FONT_SLANT_INDEX)))
 	to[LFACE_SLANT_INDEX] = FONT_SLANT_FOR_FACE (font);
-      if (! NILP (AREF (font, FONT_WIDTH_INDEX)))
+      if (!NILP (AREF (font, FONT_WIDTH_INDEX)))
 	to[LFACE_SWIDTH_INDEX] = FONT_WIDTH_FOR_FACE (font);
       ASET (font, FONT_SIZE_INDEX, Qnil);
     }
@@ -2668,7 +2668,7 @@ merge_face_ref (struct window *w,
 		  Lisp_Object new_height =
 		    merge_face_heights (value, to[LFACE_HEIGHT_INDEX], Qnil);
 
-		  if (! NILP (new_height))
+		  if (!NILP (new_height))
 		    {
 		      to[LFACE_HEIGHT_INDEX] = new_height;
 		      font_clear_prop (to, FONT_SIZE_INDEX);
@@ -2803,11 +2803,11 @@ merge_face_ref (struct window *w,
 			 This is for when a face is specified like
 			 (:inherit FACE :extend t), but the parent
 			 FACE itself doesn't specify :extend.  */
-		      if (! merge_face_ref (w, f, value, to,
+		      if (!merge_face_ref (w, f, value, to,
 					    err_msgs, named_merge_points, 0))
 			err = true;
 		    }
-		  else if (! merge_face_ref (w, f, value, to,
+		  else if (!merge_face_ref (w, f, value, to,
 					     err_msgs, named_merge_points,
 					     attr_filter))
 		    err = true;
@@ -2838,11 +2838,11 @@ merge_face_ref (struct window *w,
 	     from the end backwards.  */
 	  Lisp_Object next = XCDR (face_ref);
 
-	  if (! NILP (next))
+	  if (!NILP (next))
 	    ok = merge_face_ref (w, f, next, to, err_msgs,
 	                         named_merge_points, attr_filter);
 
-	  if (! merge_face_ref (w, f, first, to, err_msgs,
+	  if (!merge_face_ref (w, f, first, to, err_msgs,
 	                        named_merge_points, attr_filter))
 	    ok = false;
 	}
@@ -3790,7 +3790,7 @@ set_font_frame_param (Lisp_Object frame, Lisp_Object lface)
       /* Don't do anything if the font is `unspecified'.  This can
 	 happen during frame creation.  */
       && (font = LFACE_FONT (lface),
-	  ! UNSPECIFIEDP (font)))
+	  !UNSPECIFIEDP (font)))
     {
       if (FONT_SPEC_P (font))
 	{
@@ -4190,13 +4190,13 @@ Default face attributes override any local face attributes.  */)
 	  vcopy (local_lface, 0, attrs, LFACE_VECTOR_SIZE);
 	  newface = realize_face (c, lvec, DEFAULT_FACE_ID);
 
-	  if ((! UNSPECIFIEDP (gvec[LFACE_FAMILY_INDEX])
-	       || ! UNSPECIFIEDP (gvec[LFACE_FOUNDRY_INDEX])
-	       || ! UNSPECIFIEDP (gvec[LFACE_HEIGHT_INDEX])
-	       || ! UNSPECIFIEDP (gvec[LFACE_WEIGHT_INDEX])
-	       || ! UNSPECIFIEDP (gvec[LFACE_SLANT_INDEX])
-	       || ! UNSPECIFIEDP (gvec[LFACE_SWIDTH_INDEX])
-	       || ! UNSPECIFIEDP (gvec[LFACE_FONT_INDEX]))
+	  if ((!UNSPECIFIEDP (gvec[LFACE_FAMILY_INDEX])
+	       || !UNSPECIFIEDP (gvec[LFACE_FOUNDRY_INDEX])
+	       || !UNSPECIFIEDP (gvec[LFACE_HEIGHT_INDEX])
+	       || !UNSPECIFIEDP (gvec[LFACE_WEIGHT_INDEX])
+	       || !UNSPECIFIEDP (gvec[LFACE_SLANT_INDEX])
+	       || !UNSPECIFIEDP (gvec[LFACE_SWIDTH_INDEX])
+	       || !UNSPECIFIEDP (gvec[LFACE_FONT_INDEX]))
 	      && newface->font)
 	    {
 	      Lisp_Object name = newface->font->props[FONT_NAME_INDEX];
@@ -4262,7 +4262,7 @@ is given, return the font name used by FACE for CHARACTER on FRAME.  */)
       int face_id = lookup_named_face (NULL, f, face, true);
       struct face *fface = FACE_FROM_ID_OR_NULL (f, face_id);
 
-      if (! fface)
+      if (!fface)
 	return Qnil;
 #ifdef HAVE_WINDOW_SYSTEM
       if (FRAME_WINDOW_P (f) && !NILP (character))
@@ -4440,7 +4440,7 @@ lface_same_font_attributes_p (Lisp_Object *lface1, Lisp_Object *lface2)
 	  && (EQ (lface1[LFACE_FONTSET_INDEX], lface2[LFACE_FONTSET_INDEX])
 	      || (STRINGP (lface1[LFACE_FONTSET_INDEX])
 		  && STRINGP (lface2[LFACE_FONTSET_INDEX])
-		  && ! xstrcasecmp (SSDATA (lface1[LFACE_FONTSET_INDEX]),
+		  && !xstrcasecmp (SSDATA (lface1[LFACE_FONTSET_INDEX]),
 				    SSDATA (lface2[LFACE_FONTSET_INDEX]))))
 	  );
 }
@@ -5245,16 +5245,16 @@ gui_supports_face_attributes_p (struct frame *f,
       face_id = lookup_face (f, merged_attrs);
       face = FACE_FROM_ID_OR_NULL (f, face_id);
 
-      if (! face)
+      if (!face)
 	error ("Cannot make face");
 
       /* If the font is the same, or no font is found, then not
 	 supported.  */
       if (face->font == def_face->font
-	  || ! face->font)
+	  || !face->font)
 	return false;
       for (int i = FONT_TYPE_INDEX; i <= FONT_SIZE_INDEX; i++)
-	if (! EQ (face->font->props[i], def_face->font->props[i]))
+	if (!EQ (face->font->props[i], def_face->font->props[i]))
 	  {
 	    Lisp_Object s1, s2;
 
@@ -5263,7 +5263,7 @@ gui_supports_face_attributes_p (struct frame *f,
 	      return true;
 	    s1 = SYMBOL_NAME (face->font->props[i]);
 	    s2 = SYMBOL_NAME (def_face->font->props[i]);
-	    if (! EQ (Fcompare_strings (s1, make_fixnum (0), Qnil,
+	    if (!EQ (Fcompare_strings (s1, make_fixnum (0), Qnil,
 					s2, make_fixnum (0), Qnil, Qt), Qt))
 	      return true;
 	  }
@@ -5402,7 +5402,7 @@ tty_supports_face_attributes_p (struct frame *f,
 
       if (face_attr_equal_p (fg, def_fg))
 	return false;		/* same as default */
-      else if (! tty_lookup_color (f, fg, &fg_tty_color, &fg_std_color))
+      else if (!tty_lookup_color (f, fg, &fg_tty_color, &fg_std_color))
 	return false;		/* not a valid color */
       else if (color_distance (&fg_tty_color, &fg_std_color)
 	       > TTY_SAME_COLOR_THRESHOLD)
@@ -5426,7 +5426,7 @@ tty_supports_face_attributes_p (struct frame *f,
 
       if (face_attr_equal_p (bg, def_bg))
 	return false;		/* same as default */
-      else if (! tty_lookup_color (f, bg, &bg_tty_color, &bg_std_color))
+      else if (!tty_lookup_color (f, bg, &bg_tty_color, &bg_std_color))
 	return false;		/* not a valid color */
       else if (color_distance (&bg_tty_color, &bg_std_color)
 	       > TTY_SAME_COLOR_THRESHOLD)
@@ -5969,7 +5969,7 @@ realize_non_ascii_face (struct frame *f, Lisp_Object font_object,
   *face = *base_face;
   face->gc = 0;
   face->overstrike
-    = (! NILP (font_object)
+    = (!NILP (font_object)
        && FONT_WEIGHT_NAME_NUMERIC (face->lface[LFACE_WEIGHT_INDEX]) > 100
        && FONT_WEIGHT_NUMERIC (font_object) <= 100);
 
@@ -6057,7 +6057,7 @@ realize_gui_face (struct face_cache *cache, Lisp_Object attrs[LFACE_VECTOR_SIZE]
 	  if (fontset == -1)
 	    emacs_abort ();
 	}
-      if (! FONT_OBJECT_P (attrs[LFACE_FONT_INDEX]))
+      if (!FONT_OBJECT_P (attrs[LFACE_FONT_INDEX]))
 	{
 	  Lisp_Object spec = copy_font_spec (attrs[LFACE_FONT_INDEX]);
 

@@ -212,7 +212,7 @@ nbytes_of (enum Space_Type xpntr_type, const void *xpntr)
     default:
       break;
     }
-  if (! result)
+  if (!result)
     emacs_abort ();
   return result;
 }
@@ -260,12 +260,12 @@ next_block (mgc_semispace *space)
   eassert ((int) space->current_block <= (int) space->nblocks);
 
   if (++space->current_block == space->nblocks)
-    q_error = ! realloc_semispace (space);
+    q_error = !realloc_semispace (space);
 
-  if (! q_error)
+  if (!q_error)
     {
       space->alloc_ptr = space->block_addrs[space->current_block];
-      if (! space->scan_ptr)
+      if (!space->scan_ptr)
 	space->scan_ptr = space->alloc_ptr;
       space->block_words_used = 0;
       for (int i = 0; i < MEM_TYPE_NTYPES; ++i)
@@ -302,7 +302,7 @@ bump_alloc_ptr (mgc_semispace *space, size_t nbytes, enum Space_Type xpntr_type)
   eassert (nbytes >= word_size);
   eassert ((int) space->current_block <= (int) space->nblocks);
 
-  if (! retval
+  if (!retval
       /* -1 so we've room for term_block_magic.  */
       || space->block_words_used + nwords > (MGC_BLOCK_NWORDS - 1))
     retval = next_block (space);
@@ -371,7 +371,7 @@ mgc_flip_space (void)
       size_t w = 0;
       for (void *xpntr = from->block_addrs[b];
 	   (xpntr != from->alloc_ptr
-	    && ! TERM_BLOCK_P (xpntr)
+	    && !TERM_BLOCK_P (xpntr)
 	    && (b != (int) from->current_block
 		|| w < from->block_words_used));
 	   (void) xpntr)
@@ -380,7 +380,7 @@ mgc_flip_space (void)
 	  enum Space_Type xpntr_type = xpntr_at (from, b, w, NULL);
 	  eassert (xpntr_type != Space_Type_Max);
 	  size_t bytespan = nbytes_of (xpntr_type, forwarded ? forwarded : xpntr);
-	  if (xpntr_type == Space_String && ! forwarded)
+	  if (xpntr_type == Space_String && !forwarded)
 	    {
 	      /* S goes to dead state.  */
 	      struct Lisp_String *s = (struct Lisp_String *) xpntr;

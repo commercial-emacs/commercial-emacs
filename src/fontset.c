@@ -303,7 +303,7 @@ fontset_ref (Lisp_Object fontset, int c)
   Lisp_Object elt;
 
   elt = CHAR_TABLE_REF (fontset, c);
-  if (NILP (elt) && ! EQ (fontset, Vdefault_fontset)
+  if (NILP (elt) && !EQ (fontset, Vdefault_fontset)
       /* Don't check Vdefault_fontset for a realized fontset.  */
       && NILP (FONTSET_BASE (fontset)))
     elt = CHAR_TABLE_REF (Vdefault_fontset, c);
@@ -412,15 +412,15 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
       int score = RFONT_DEF_SCORE (rfont_def) & 0xFF;
       Lisp_Object otf_spec = Ffont_get (font_spec, QCotf);
 
-      if (! NILP (otf_spec))
+      if (!NILP (otf_spec))
 	/* A font-spec with :otf is preferable regardless of encoding
 	   and language..  */
 	;
-      else if (! font_match_p (font_spec, font_object))
+      else if (!font_match_p (font_spec, font_object))
 	{
 	  Lisp_Object encoding = FONT_DEF_ENCODING (font_def);
 
-	  if (! NILP (encoding))
+	  if (!NILP (encoding))
 	    {
 	      /* This spec specifies an encoding by a charset set
 		 name.  Reflect the preference order of that charset
@@ -428,7 +428,7 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
 	      Lisp_Object tail;
 
 	      for (tail = Vcharset_ordered_list;
-		   ! EQ (tail, Vcharset_non_preferred_head) && CONSP (tail);
+		   !EQ (tail, Vcharset_non_preferred_head) && CONSP (tail);
 		   tail = XCDR (tail))
 		if (EQ (encoding, XCAR (tail)))
 		  break;
@@ -445,7 +445,7 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
 
 	      if (! NILP (lang)
 		  && ! EQ (lang, Vcurrent_iso639_language)
-		  && (! CONSP (Vcurrent_iso639_language)
+		  && (!CONSP (Vcurrent_iso639_language)
 		      || NILP (Fmemq (lang, Vcurrent_iso639_language))))
 		score |= 0x100;
 	    }
@@ -477,12 +477,12 @@ fontset_get_font_group (Lisp_Object fontset, int c)
   Lisp_Object base_fontset;
   int from = 0, to = MAX_CHAR, i;
 
-  eassert (! BASE_FONTSET_P (fontset));
+  eassert (!BASE_FONTSET_P (fontset));
   if (c >= 0)
     font_group = CHAR_TABLE_REF (fontset, c);
   else
     font_group = FONTSET_FALLBACK (fontset);
-  if (! NILP (font_group))
+  if (!NILP (font_group))
     /* We have already realized FONT-DEFs of this font group for C or
        for fallback (FONT_GROUP is a cons), or we have already found
        that no appropriate font was found (FONT_GROUP is t or 0).  */
@@ -516,7 +516,7 @@ fontset_get_font_group (Lisp_Object fontset, int c)
      fontset FONTSET. */
   font_group = Fcopy_sequence (font_group);
   for (i = 0; i < ASIZE (font_group); i++)
-    if (! NILP (AREF (font_group, i)))
+    if (!NILP (AREF (font_group, i)))
       {
 	Lisp_Object rfont_def;
 
@@ -626,7 +626,7 @@ fontset_find_font (Lisp_Object fontset, int c, struct face *face,
 	      rfont_def = AREF (vec, i + 1);
 	      if (NILP (rfont_def))
 		break;
-	      if (! EQ (RFONT_DEF_FONT_DEF (rfont_def), font_def))
+	      if (!EQ (RFONT_DEF_FONT_DEF (rfont_def), font_def))
 		break;
 	    }
 	  continue;
@@ -650,7 +650,7 @@ fontset_find_font (Lisp_Object fontset, int c, struct face *face,
 	{
 	  font_def = RFONT_DEF_FONT_DEF (rfont_def);
 
-	  if (! face)
+	  if (!face)
 	    /* We have not yet opened the font.  */
 	    return Qnil;
 	  /* Find a font best-matching with the spec without checking
@@ -691,10 +691,10 @@ fontset_find_font (Lisp_Object fontset, int c, struct face *face,
 	  rfont_def = AREF (vec, found_index + 1);
 	  if (NILP (rfont_def))
 	    break;
-	  if (! EQ (RFONT_DEF_FONT_DEF (rfont_def), font_def))
+	  if (!EQ (RFONT_DEF_FONT_DEF (rfont_def), font_def))
 	    break;
 	  font_object = RFONT_DEF_OBJECT (rfont_def);
-	  if (! NILP (font_object) && font_has_char (f, font_object, c))
+	  if (!NILP (font_object) && font_has_char (f, font_object, c))
 	    {
 	      found_index++;
 	      goto found;
@@ -704,7 +704,7 @@ fontset_find_font (Lisp_Object fontset, int c, struct face *face,
       /* Find a font-entity with the current spec and supporting C.  */
       font_entity = font_find_for_lface (f, face->lface,
 					 FONT_DEF_SPEC (font_def), c);
-      if (! NILP (font_entity))
+      if (!NILP (font_entity))
 	{
 	  /* We found a font.  Open it and insert a new element for
 	     that font in VEC.  */
@@ -771,7 +771,7 @@ fontset_font (Lisp_Object fontset, int c, struct face *face, int id)
 
   /* Try a font-group of the default fontset. */
   base_fontset = FONTSET_BASE (fontset);
-  if (! EQ (base_fontset, Vdefault_fontset))
+  if (!EQ (base_fontset, Vdefault_fontset))
     {
       if (NILP (FONTSET_DEFAULT (fontset)))
 	set_fontset_default
@@ -788,7 +788,7 @@ fontset_font (Lisp_Object fontset, int c, struct face *face, int id)
     }
 
   /* Try a fallback font-group of FONTSET. */
-  if (! EQ (rfont_def, Qt))
+  if (!EQ (rfont_def, Qt))
     {
       FONT_DEFERRED_LOG ("current fallback: font for", make_fixnum (c), Qnil);
       rfont_def = fontset_find_font (fontset, c, face, id, 1);
@@ -891,7 +891,7 @@ free_face_fontset (struct frame *f, struct face *face)
   fontset = FONTSET_FROM_ID (face->fontset);
   if (NILP (fontset))
     return;
-  eassert (! BASE_FONTSET_P (fontset));
+  eassert (!BASE_FONTSET_P (fontset));
   eassert (f == XFRAME (FONTSET_FRAME (fontset)));
   ASET (Vfontset_table, face->fontset, Qnil);
   if (face->fontset < next_fontset_id)
@@ -901,7 +901,7 @@ free_face_fontset (struct frame *f, struct face *face)
       int id = XFIXNUM (FONTSET_ID (FONTSET_DEFAULT (fontset)));
 
       fontset = AREF (Vfontset_table, id);
-      eassert (!NILP (fontset) && ! BASE_FONTSET_P (fontset));
+      eassert (!NILP (fontset) && !BASE_FONTSET_P (fontset));
       eassert (f == XFRAME (FONTSET_FRAME (fontset)));
       ASET (Vfontset_table, id, Qnil);
       if (id < next_fontset_id)
@@ -1531,15 +1531,15 @@ overwrites the previous settings.  */)
   else if (! NILP (font_spec))
     Fsignal (Qfont, list2 (build_string ("Invalid font-spec"), font_spec));
 
-  if (! NILP (font_spec))
+  if (!NILP (font_spec))
     {
       Lisp_Object encoding, repertory;
 
       family = AREF (font_spec, FONT_FAMILY_INDEX);
-      if (! NILP (family) )
+      if (!NILP (family) )
 	family = SYMBOL_NAME (family);
       registry = AREF (font_spec, FONT_REGISTRY_INDEX);
-      if (! NILP (registry))
+      if (!NILP (registry))
 	registry = Fdowncase (SYMBOL_NAME (registry));
       AUTO_STRING (dash, "-");
       encoding = find_font_encoding (concat3 (family, dash, registry));
@@ -1597,7 +1597,7 @@ overwrites the previous settings.  */)
 
       range_list = Qnil;
       script_list = XCHAR_TABLE (Vchar_script_table)->extras[0];
-      if (! NILP (Fmemq (characters, script_list)))
+      if (!NILP (Fmemq (characters, script_list)))
 	{
 	  if (EQ (characters, Qlatin))
 	    ascii_changed = 1;
@@ -1628,7 +1628,7 @@ overwrites the previous settings.  */)
       if (NILP (font_spec))
 	error ("Can't set ASCII font to nil");
       val = CHAR_TABLE_REF (fontset_obj, 0);
-      if (! NILP (val) && EQ (add, Qappend))
+      if (!NILP (val) && EQ (add, Qappend))
 	/* We are going to change just an additional font for ASCII.  */
 	ascii_changed = 0;
     }
@@ -1668,7 +1668,7 @@ overwrites the previous settings.  */)
 	    font_object = font_load_for_lface (f, face->lface, font_spec);
 	  else
 	    font_object = font_open_by_spec (f, font_spec);
-	  if (! NILP (font_object))
+	  if (!NILP (font_object))
 	    {
 	      update_auto_fontset_alist (font_object, fontset_obj);
 	      AUTO_FRAME_ARG (arg, Qfont, Fcons (fontset, font_object));
@@ -1815,7 +1815,7 @@ fontset_from_font (Lisp_Object font_object)
 
     if (CONSP (target))
       target = XCDR (target);
-    if (! CHARSETP (target))
+    if (!CHARSETP (target))
       target = Qlatin;
     Fset_fontset_font (name, target, font_spec, Qnil, Qnil);
     Fset_fontset_font (name, Qnil, font_spec, Qnil, Qnil);
@@ -1932,19 +1932,19 @@ format is the same as above.  */)
 
 	      /* At first, set ALIST to ((FONT-SPEC) ...).  */
 	      for (alist = Qnil, i = 0; i < ASIZE (val); i++)
-		if (! NILP (AREF (val, i)))
+		if (!NILP (AREF (val, i)))
 		  alist = Fcons (Fcons (FONT_DEF_SPEC (AREF (val, i)), Qnil),
 				 alist);
 	      alist = Fnreverse (alist);
 
 	      /* Then store opened font names to cdr of each elements.  */
-	      for (i = 0; ! NILP (realized[k][i]); i++)
+	      for (i = 0; !NILP (realized[k][i]); i++)
 		{
 		  if (c <= MAX_5_BYTE_CHAR)
 		    val = FONTSET_REF (realized[k][i], c);
 		  else
 		    val = FONTSET_FALLBACK (realized[k][i]);
-		  if (! CONSP (val) || ! VECTORP (XCDR (val)))
+		  if (!CONSP (val) || !VECTORP (XCDR (val)))
 		    continue;
 		  /* VAL: (int . [[FACE-ID FONT-DEF FONT-OBJECT int] ... ])  */
 		  val = XCDR (val);
@@ -2030,7 +2030,7 @@ patterns.  */)
 		{
 		  struct charset *charset = CHARSET_FROM_ID (XFIXNUM (repertory));
 
-		  if (! CHAR_CHARSET_P (c, charset))
+		  if (!CHAR_CHARSET_P (c, charset))
 		    continue;
 		}
 	      else if (CHAR_TABLE_P (repertory))
@@ -2041,10 +2041,10 @@ patterns.  */)
 	      val = AREF (val, 0);
 	      /* VAL is a FONT-SPEC */
 	      family = AREF (val, FONT_FAMILY_INDEX);
-	      if (! NILP (family))
+	      if (!NILP (family))
 		family = SYMBOL_NAME (family);
 	      registry = AREF (val, FONT_REGISTRY_INDEX);
-	      if (! NILP (registry))
+	      if (!NILP (registry))
 		registry = SYMBOL_NAME (registry);
 	      val = Fcons (family, registry);
 	      if (NILP (all))

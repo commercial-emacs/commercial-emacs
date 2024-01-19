@@ -597,7 +597,7 @@ directory_file_name (char *dst, char *src, ptrdiff_t srclen, bool multibyte)
   /* In Unix-like systems, just remove any final slashes.  However, if
      they are all slashes, leave "/" and "//" alone, and treat "///"
      and longer as if they were "/".  */
-  if (! (srclen == 2 && IS_DIRECTORY_SEP (src[0])))
+  if (!(srclen == 2 && IS_DIRECTORY_SEP (src[0])))
     while (srclen > 1
 #ifdef DOS_NT
 	   && !(srclen > 2 && IS_DEVICE_SEP (src[srclen - 2]))
@@ -1012,7 +1012,7 @@ the root directory.  */)
 	    }
 	}
     }
-  if (! STRINGP (default_directory))
+  if (!STRINGP (default_directory))
     default_directory = root;
 
   handler = Ffind_file_name_handler (default_directory, Qexpand_file_name);
@@ -1038,7 +1038,7 @@ the root directory.  */)
        Putting this call here avoids all that crud.
 
        The EQ test avoids infinite recursion.  */
-    if (! NILP (default_directory) && !EQ (default_directory, name)
+    if (!NILP (default_directory) && !EQ (default_directory, name)
 	/* Save time in some common cases - as long as default_directory
 	   is not relative, it can be canonicalized with name below (if it
 	   is needed at all) without requiring it to be expanded now.  */
@@ -1058,7 +1058,7 @@ the root directory.  */)
 #else /* not DOS_NT */
       /* Detect Unix absolute file names (/... alone is not absolute on
 	 DOS or Windows).  */
-	&& ! (IS_DIRECTORY_SEP (o[0]))
+	&& !(IS_DIRECTORY_SEP (o[0]))
 #endif /* not DOS_NT */
 	)
       {
@@ -1512,7 +1512,7 @@ the root directory.  */)
      just "/" or "//".  */
   length = newdirlim - newdir;
   while (length > 1 && IS_DIRECTORY_SEP (newdir[length - 1])
-	 && ! (length == 2 && IS_DIRECTORY_SEP (newdir[0])))
+	 && !(length == 2 && IS_DIRECTORY_SEP (newdir[0])))
     length--;
 
   /* Now concatenate the directory and name to new space in the stack frame.  */
@@ -1657,7 +1657,7 @@ the root directory.  */)
     {
       handled_name = call3 (handler, Qexpand_file_name,
 			    result, default_directory);
-      if (! STRINGP (handled_name))
+      if (!STRINGP (handled_name))
 	error ("Invalid handler in `file-name-handler-alist'");
       result = handled_name;
     }
@@ -1835,7 +1835,7 @@ splice_dir_file (char *buf, char const *dir, char const *file)
 {
   char *e = stpcpy (buf, dir);
   *e = DIRECTORY_SEP;
-  e += ! (buf < e && IS_DIRECTORY_SEP (e[-1]));
+  e += !(buf < e && IS_DIRECTORY_SEP (e[-1]));
   return stpcpy (e, file);
 }
 
@@ -2088,7 +2088,7 @@ barf_or_query_if_file_exists (Lisp_Object absname, bool known_to_exist,
 
   encoded_filename = ENCODE_FILE (absname);
 
-  if (! known_to_exist
+  if (!known_to_exist
       && (emacs_fstatat (AT_FDCWD, SSDATA (encoded_filename),
 			 &statbuf, AT_SYMLINK_NOFOLLOW)
 	  == 0))
@@ -3164,7 +3164,7 @@ file_accessible_directory_p (Lisp_Object file)
      as it's invalid.  Append only "." to the other two exceptions as
      "/" and "//" are distinct on some platforms, whereas "/", "///",
      "////", etc. are all equivalent.  */
-  if (! len)
+  if (!len)
     dir = data;
   else
     {
@@ -3362,7 +3362,7 @@ or if SELinux is disabled, or if Emacs lacks SELinux support.  */)
 	  context_free (context);
 	  freecon (con);
 	}
-      else if (! (errno == ENOENT || errno == ENOTDIR || errno == ENODATA
+      else if (!(errno == ENOENT || errno == ENOTDIR || errno == ENODATA
 		  || errno == ENOTSUP))
 	report_file_error ("getting SELinux context", absname);
     }
@@ -4028,7 +4028,7 @@ by calling `format-decode', which see.  */)
   ptrdiff_t same_at_end_charpos = ZV;
   bool seekable = true;
 
-  if (current_buffer->base_buffer && ! NILP (visit))
+  if (current_buffer->base_buffer && !NILP (visit))
     error ("Cannot do file visiting in an indirect buffer");
 
   if (!NILP (BVAR (current_buffer, read_only)))
@@ -4303,11 +4303,11 @@ by calling `format-decode', which see.  */)
      method and hope for the best.
      But if we discover the need for conversion, we give up on this method
      and let the following if-statement handle the replace job.  */
-  if (! NILP (replace)
-      && ! EQ (replace, Qunbound)
+  if (!NILP (replace)
+      && !EQ (replace, Qunbound)
       && BEGV < ZV
       && (NILP (coding_system)
-	  || ! CODING_REQUIRE_DECODING (&coding)))
+	  || !CODING_REQUIRE_DECODING (&coding)))
     {
       ptrdiff_t overlap;
       /* There is still a possibility we will find the need to do code
@@ -4416,7 +4416,7 @@ by calling `format-decode', which see.  */)
 		 we cannot use this method; giveup and try the other.  */
 	      if (same_at_end > same_at_start
 		  && FETCH_BYTE (same_at_end - 1) >= 0200
-		  && ! NILP (BVAR (current_buffer, enable_multibyte_characters))
+		  && !NILP (BVAR (current_buffer, enable_multibyte_characters))
 		  && (CODING_MAY_REQUIRE_DECODING (&coding)))
 		giveup_match_end = true;
 	      break;
@@ -4437,20 +4437,20 @@ by calling `format-decode', which see.  */)
              character boundary.  */
 	  if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	    while (same_at_start > BEGV_BYTE
-		   && ! CHAR_HEAD_P (FETCH_BYTE (same_at_start)))
+		   && !CHAR_HEAD_P (FETCH_BYTE (same_at_start)))
 	      same_at_start--;
 
 	  /* Extend the end of non-matching text area to multibyte
              character boundary.  */
-	  if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
+	  if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	    while (same_at_end < ZV_BYTE
-		   && ! CHAR_HEAD_P (FETCH_BYTE (same_at_end)))
+		   && !CHAR_HEAD_P (FETCH_BYTE (same_at_end)))
 	      same_at_end++;
 
 	  /* Don't try to reuse the same piece of text twice.  */
 	  overlap = (same_at_start - BEGV_BYTE
 		     - (same_at_end
-			+ (! NILP (end) ? end_offset : st.st_size) - ZV_BYTE));
+			+ (!NILP (end) ? end_offset : st.st_size) - ZV_BYTE));
 	  if (overlap > 0)
 	    same_at_end += overlap;
 	  same_at_end_charpos = BYTE_TO_CHAR (same_at_end);
@@ -4491,9 +4491,9 @@ by calling `format-decode', which see.  */)
      is needed, in a simple way that needs a lot of memory.
      The preceding if-statement handles the case of no conversion
      in a more optimized way.  */
-  if (! NILP (replace)
-      && ! EQ (replace, Qunbound)
-      && ! replace_handled
+  if (!NILP (replace)
+      && !EQ (replace, Qunbound)
+      && !replace_handled
       && BEGV < ZV)
     {
       ptrdiff_t same_at_start_charpos;
@@ -4505,7 +4505,7 @@ by calling `format-decode', which see.  */)
       ptrdiff_t this;
       specpdl_ref this_count = SPECPDL_INDEX ();
       bool multibyte
-	= ! NILP (BVAR (current_buffer, enable_multibyte_characters));
+	= !NILP (BVAR (current_buffer, enable_multibyte_characters));
       Lisp_Object conversion_buffer;
 
       conversion_buffer = code_conversion_save (1, multibyte);
@@ -4588,9 +4588,9 @@ by calling `format-decode', which see.  */)
 
       /* Extend the start of non-matching text area to the previous
 	 multibyte character boundary.  */
-      if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
+      if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	while (same_at_start > BEGV_BYTE
-	       && ! CHAR_HEAD_P (FETCH_BYTE (same_at_start)))
+	       && !CHAR_HEAD_P (FETCH_BYTE (same_at_start)))
 	  same_at_start--;
 
       /* Scan this bufferful from the end, comparing with
@@ -4605,9 +4605,9 @@ by calling `format-decode', which see.  */)
 
       /* Extend the end of non-matching text area to the next
 	 multibyte character boundary.  */
-      if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
+      if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	while (same_at_end < ZV_BYTE
-	       && ! CHAR_HEAD_P (FETCH_BYTE (same_at_end)))
+	       && !CHAR_HEAD_P (FETCH_BYTE (same_at_end)))
 	  same_at_end++;
 
       /* Don't try to reuse the same piece of text twice.  */
@@ -4953,13 +4953,13 @@ by calling `format-decode', which see.  */)
   if (set_coding_system)
     Vlast_coding_system_used = coding_system;
 
-  if (! NILP (Ffboundp (Qafter_insert_file_set_coding)))
+  if (!NILP (Ffboundp (Qafter_insert_file_set_coding)))
     {
       insval = call2 (Qafter_insert_file_set_coding, make_fixnum (inserted),
 		      visit);
-      if (! NILP (insval))
+      if (!NILP (insval))
 	{
-	  if (! RANGED_FIXNUMP (0, insval, ZV - PT))
+	  if (!RANGED_FIXNUMP (0, insval, ZV - PT))
 	    wrong_type_argument (Qinserted_chars, insval);
 	  inserted = XFIXNAT (insval);
 	}
@@ -4982,7 +4982,7 @@ by calling `format-decode', which see.  */)
 	{
 	  insval = call3 (Qformat_decode,
 			  Qnil, make_fixnum (inserted), visit);
-	  if (! RANGED_FIXNUMP (0, insval, ZV - PT))
+	  if (!RANGED_FIXNUMP (0, insval, ZV - PT))
 	    wrong_type_argument (Qinserted_chars, insval);
 	  inserted = XFIXNAT (insval);
 	}
@@ -5005,7 +5005,7 @@ by calling `format-decode', which see.  */)
 	  TEMP_SET_PT_BOTH (BEGV, BEGV_BYTE);
 	  insval = call3 (Qformat_decode,
 			  Qnil, make_fixnum (oinserted), visit);
-	  if (! RANGED_FIXNUMP (0, insval, ZV - PT))
+	  if (!RANGED_FIXNUMP (0, insval, ZV - PT))
 	    wrong_type_argument (Qinserted_chars, insval);
 	  if (ochars_modiff == CHARS_MODIFF)
 	    /* format_decode didn't modify buffer's characters => move
@@ -5028,7 +5028,7 @@ by calling `format-decode', which see.  */)
 	      insval = call1 (XCAR (p), make_fixnum (inserted));
 	      if (!NILP (insval))
 		{
-		  if (! RANGED_FIXNUMP (0, insval, ZV - PT))
+		  if (!RANGED_FIXNUMP (0, insval, ZV - PT))
 		    wrong_type_argument (Qinserted_chars, insval);
 		  inserted = XFIXNAT (insval);
 		}
@@ -5046,7 +5046,7 @@ by calling `format-decode', which see.  */)
 	      insval = call1 (XCAR (p), make_fixnum (oinserted));
 	      if (!NILP (insval))
 		{
-		  if (! RANGED_FIXNUMP (0, insval, ZV - PT))
+		  if (!RANGED_FIXNUMP (0, insval, ZV - PT))
 		    wrong_type_argument (Qinserted_chars, insval);
 		  if (ochars_modiff == CHARS_MODIFF)
 		    /* after_insert_file_functions didn't modify
@@ -5190,7 +5190,7 @@ choose_write_coding_system (Lisp_Object start, Lisp_Object end, Lisp_Object file
 	  using_default_coding = 1;
 	}
 
-      if (! NILP (val) && ! force_raw_text)
+      if (!NILP (val) && !force_raw_text)
 	{
 	  Lisp_Object spec, attrs;
 
@@ -5220,7 +5220,7 @@ choose_write_coding_system (Lisp_Object start, Lisp_Object end, Lisp_Object file
 	{
 	  Lisp_Object dflt = BVAR (&buffer_slot_defaults, buffer_file_coding_system);
 
-	  if (! NILP (dflt))
+	  if (!NILP (dflt))
 	    val = coding_inherit_eol_type (val, dflt);
 	}
 
@@ -5528,7 +5528,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
      above cannot possibly be closed anyway.  */
 
   if (timespec_valid_p (modtime)
-      && ! (valid_timestamp_file_system && st.st_dev == timestamp_file_system))
+      && !(valid_timestamp_file_system && st.st_dev == timestamp_file_system))
     {
       int desc1 = emacs_open (fn, O_WRONLY, 0);
       if (desc1 >= 0)
@@ -5597,12 +5597,12 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
       current_buffer->modtime_size = st.st_size;
     }
 
-  if (! ok)
+  if (!ok)
     report_file_errno ("Write error", filename, save_errno);
 
   bool auto_saving_into_visited_file =
     auto_saving
-    && ! NILP (Fstring_equal (BVAR (current_buffer, filename),
+    && !NILP (Fstring_equal (BVAR (current_buffer, filename),
 			      BVAR (current_buffer, auto_save_file_name)));
   if (visiting)
     {
@@ -5627,7 +5627,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
   if (!auto_saving && !noninteractive)
     message_with_string ((NUMBERP (append)
 			  ? "Updated %s"
-			  : ! NILP (append)
+			  : !NILP (append)
 			  ? "Added to %s"
 			  : "Wrote %s"),
 			 visit_file, 1);
@@ -6022,7 +6022,7 @@ auto_save_1 (void)
   auto_save_mode_bits = 0666;
 
   /* Get visited file's mode to become the auto save file's mode.  */
-  if (! NILP (BVAR (current_buffer, filename)))
+  if (!NILP (BVAR (current_buffer, filename)))
     {
       if (emacs_fstatat (AT_FDCWD, SSDATA (BVAR (current_buffer, filename)),
 			 &st, 0)

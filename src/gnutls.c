@@ -920,7 +920,7 @@ gnutls_make_error (int err)
 static void
 gnutls_deinit_certificates (struct Lisp_Process *p)
 {
-  if (! p->gnutls_certificates)
+  if (!p->gnutls_certificates)
     return;
 
   for (int i = 0; i < p->gnutls_certificates_length; i++)
@@ -1027,7 +1027,7 @@ Usage: (gnutls-error-fatalp ERROR)  */)
 	}
     }
 
-  if (! TYPE_RANGED_FIXNUMP (int, err))
+  if (!TYPE_RANGED_FIXNUMP (int, err))
     error ("Not an error symbol or code");
 
   if (0 == gnutls_error_is_fatal (XFIXNUM (err)))
@@ -1059,7 +1059,7 @@ usage: (gnutls-error-string ERROR)  */)
 	}
     }
 
-  if (! TYPE_RANGED_FIXNUMP (int, err))
+  if (!TYPE_RANGED_FIXNUMP (int, err))
     return build_string ("Not an error symbol or code");
 
   return build_string (emacs_gnutls_strerror (XFIXNUM (err)));
@@ -1566,7 +1566,7 @@ gnutls_ip_address_p (char *string)
   char c;
 
   while ((c = *string++) != 0)
-    if (! ((c == '.' || c == ':' || (c >= '0' && c <= '9'))))
+    if (!((c == '.' || c == ':' || (c >= '0' && c <= '9'))))
       return false;
 
   return true;
@@ -2049,7 +2049,7 @@ one trustfile (usually a CA bundle).  */)
 
   /* Always initialize globals.  */
   global_init = emacs_gnutls_global_init ();
-  if (! NILP (Fgnutls_errorp (global_init)))
+  if (!NILP (Fgnutls_errorp (global_init)))
     return global_init;
 
   /* Before allocating new credentials, deallocate any credentials

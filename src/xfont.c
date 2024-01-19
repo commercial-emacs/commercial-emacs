@@ -197,11 +197,11 @@ xfont_chars_supported (Lisp_Object chars, XFontStruct *xfont,
 
 	  if (code == CHARSET_INVALID_CODE (charset))
 	    break;
-	  if (! xfont)
+	  if (!xfont)
 	    continue;
 	  if (code >= 0x10000)
 	    break;
-	  if (! xfont_get_pcm (xfont, code))
+	  if (!xfont_get_pcm (xfont, code))
 	    break;
 	}
       return (NILP (chars));
@@ -217,7 +217,7 @@ xfont_chars_supported (Lisp_Object chars, XFontStruct *xfont,
 
 	  if (code == CHARSET_INVALID_CODE (charset))
 	    continue;
-	  if (! xfont)
+	  if (!xfont)
 	    break;
 	  if (code >= 0x10000)
 	    continue;
@@ -301,11 +301,11 @@ xfont_list_pattern (Display *display, const char *pattern,
   /* Large enough to decode the longest XLFD (255 bytes). */
   char buf[512];
 
-  if (! NILP (registry)
+  if (!NILP (registry)
       && font_registry_charsets (registry, &encoding, &repertory) < 0)
     /* Unknown REGISTRY, not supported.  */
     return Qnil;
-  if (! NILP (script))
+  if (!NILP (script))
     {
       chars = assq_no_quit (script, Vscript_representative_chars);
       if (NILP (chars))
@@ -314,7 +314,7 @@ xfont_list_pattern (Display *display, const char *pattern,
       chars = XCDR (chars);
       if (repertory)
 	{
-	  if (! xfont_chars_supported (chars, NULL, encoding, repertory))
+	  if (!xfont_chars_supported (chars, NULL, encoding, repertory))
 	    return Qnil;
 	  script = Qnil;
 	}
@@ -406,7 +406,7 @@ xfont_list_pattern (Display *display, const char *pattern,
 			    >= 0))
 		      break;
 		  }
-		if (! CONSP (tail))
+		if (!CONSP (tail))
 		  continue;
 	      }
 
@@ -415,7 +415,7 @@ xfont_list_pattern (Display *display, const char *pattern,
 	      continue;
 
 	    /* Update encoding and repertory if necessary.  */
-	    if (! EQ (registry, AREF (entity, FONT_REGISTRY_INDEX)))
+	    if (!EQ (registry, AREF (entity, FONT_REGISTRY_INDEX)))
 	      {
 		registry = AREF (entity, FONT_REGISTRY_INDEX);
 		if (font_registry_charsets (registry, &encoding, &repertory) < 0)
@@ -443,7 +443,7 @@ xfont_list_pattern (Display *display, const char *pattern,
 						   encoding);
 	      }
 	    if (NILP (script)
-		|| ! NILP (Fmemq (script, scripts)))
+		|| !NILP (Fmemq (script, scripts)))
 	      list = Fcons (entity, list), entity = Qnil;
 	  }
       XFreeFontNames (names);
@@ -469,10 +469,10 @@ xfont_list (struct frame *f, Lisp_Object spec)
   if (CONSP (extra))
     {
       val = assq_no_quit (QCotf, extra);
-      if (! NILP (val))
+      if (!NILP (val))
 	return Qnil;
       val = assq_no_quit (QClang, extra);
-      if (! NILP (val))
+      if (!NILP (val))
 	return Qnil;
     }
 
@@ -495,7 +495,7 @@ xfont_list (struct frame *f, Lisp_Object spec)
 	  list = xfont_list_pattern (display, name, Qiso10646_1, script);
 	}
     }
-  if (NILP (list) && ! NILP (registry))
+  if (NILP (list) && !NILP (registry))
     {
       /* Try alternate registries.  */
       Lisp_Object alter;
@@ -514,7 +514,7 @@ xfont_list (struct frame *f, Lisp_Object spec)
 	      {
 		lispstpcpy (r, XCAR (alter));
 		list = xfont_list_pattern (display, name, registry, script);
-		if (! NILP (list))
+		if (!NILP (list))
 		  break;
 	      }
 	}
@@ -546,7 +546,7 @@ xfont_match (struct frame *f, Lisp_Object spec)
 
   extra = AREF (spec, FONT_EXTRA_INDEX);
   val = assq_no_quit (QCname, extra);
-  if (! CONSP (val) || ! STRINGP (XCDR (val)))
+  if (!CONSP (val) || !STRINGP (XCDR (val)))
     {
       if (font_unparse_xlfd (spec, 0, name, 512) < 0)
 	return Qnil;
@@ -756,7 +756,7 @@ xfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   x_uncatch_errors ();
   unblock_input ();
 
-  if (! xfont)
+  if (!xfont)
     {
       FONT_ADD_LOG ("  x:open failed", build_string (name), Qnil);
       return Qnil;
@@ -919,7 +919,7 @@ xfont_has_char (Lisp_Object font, int c)
     return 0;
   if (ASCII_CHAR_P (c) && encoding->ascii_compatible_p)
     return 1;
-  if (! repertory)
+  if (!repertory)
     return -1;
   return (ENCODE_CHAR (repertory, c) != CHARSET_INVALID_CODE (repertory));
 }
@@ -959,7 +959,7 @@ xfont_text_extents (struct font *font, const unsigned int *code,
       if (code[i] >= 0x10000)
 	continue;
       pcm = xfont_get_pcm (xfont, code[i]);
-      if (! pcm)
+      if (!pcm)
 	continue;
       if (first)
 	{

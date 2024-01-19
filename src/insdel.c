@@ -616,7 +616,7 @@ copy_text (const unsigned char *from_addr, unsigned char *to_addr,
       while (bytes_left > 0)
 	{
 	  int thislen, c = string_char_and_length (from_addr, &thislen);
-	  if (! ASCII_CHAR_P (c))
+	  if (!ASCII_CHAR_P (c))
 	    c &= 0xFF;
 	  *to_addr++ = c;
 	  from_addr += thislen;
@@ -861,7 +861,7 @@ count_combining_after (const unsigned char *string,
 static void
 detect_bidi (struct buffer *buf, const unsigned char *string, ptrdiff_t nbytes)
 {
-  if (! NILP (BVAR (buf, enable_multibyte_characters)))
+  if (!NILP (BVAR (buf, enable_multibyte_characters)))
     for (int len, offset = 0;
 	 offset < nbytes && NILP (BVAR (buf, bidi_display_reordering));
 	 offset += len)
@@ -948,7 +948,7 @@ insert_1_both (const char *string,
 
   offset_intervals (current_buffer, PT, nchars);
 
-  if (! inherit && buffer_intervals (current_buffer))
+  if (!inherit && buffer_intervals (current_buffer))
     set_text_properties (make_fixnum (PT), make_fixnum (PT + nchars),
 			 Qnil, Qnil, Qnil);
 
@@ -1020,7 +1020,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     outgoing_nbytes = nchars;
-  else if (! STRING_MULTIBYTE (string))
+  else if (!STRING_MULTIBYTE (string))
     outgoing_nbytes
       = count_size_as_multibyte (SDATA (string) + pos_byte,
 				 nbytes);
@@ -1039,7 +1039,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
      between single-byte and multibyte.  */
   copy_text (SDATA (string) + pos_byte, GPT_ADDR, nbytes,
 	     STRING_MULTIBYTE (string),
-	     ! NILP (BVAR (current_buffer, enable_multibyte_characters)));
+	     !NILP (BVAR (current_buffer, enable_multibyte_characters)));
 
 #ifdef BYTE_COMBINING_DEBUG
   /* We have copied text into the gap, but we have not altered
@@ -1111,7 +1111,7 @@ insert_from_gap_1 (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
            ? nchars == nbytes : nchars <= nbytes);
 
   GAP_SIZE -= nbytes;
-  if (! text_at_gap_tail)
+  if (!text_at_gap_tail)
     {
       GPT += nchars;
       GPT_BYTE += nbytes;
@@ -1253,8 +1253,8 @@ insert_from_buffer_1 (struct buffer *buf,
       chunk_expanded
 	= copy_text (BUF_BYTE_ADDRESS (buf, from_byte),
 		     GPT_ADDR, chunk,
-		     ! NILP (BVAR (buf, enable_multibyte_characters)),
-		     ! NILP (BVAR (current_buffer, enable_multibyte_characters)));
+		     !NILP (BVAR (buf, enable_multibyte_characters)),
+		     !NILP (BVAR (current_buffer, enable_multibyte_characters)));
     }
   else
     chunk_expanded = chunk = 0;
@@ -1262,8 +1262,8 @@ insert_from_buffer_1 (struct buffer *buf,
   if (chunk < incoming_nbytes)
     copy_text (BUF_BYTE_ADDRESS (buf, from_byte + chunk),
 	       GPT_ADDR + chunk_expanded, incoming_nbytes - chunk,
-	       ! NILP (BVAR (buf, enable_multibyte_characters)),
-	       ! NILP (BVAR (current_buffer, enable_multibyte_characters)));
+	       !NILP (BVAR (buf, enable_multibyte_characters)),
+	       !NILP (BVAR (current_buffer, enable_multibyte_characters)));
 
 #ifdef BYTE_COMBINING_DEBUG
   /* We have copied text into the gap, but we have not altered
@@ -1296,7 +1296,7 @@ insert_from_buffer_1 (struct buffer *buf,
     END_UNCHANGED = Z - GPT;
 
   if (NILP (BVAR (current_buffer, bidi_display_reordering))
-      && ! NILP (BVAR (buf, bidi_display_reordering)))
+      && !NILP (BVAR (buf, bidi_display_reordering)))
     bset_bidi_display_reordering (buf, Qt);
 
   adjust_markers_for_insert (PT, PT_BYTE, PT + nchars,
@@ -1477,7 +1477,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
 
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     outgoing_insbytes = inschars;
-  else if (! STRING_MULTIBYTE (new))
+  else if (!STRING_MULTIBYTE (new))
     outgoing_insbytes
       = count_size_as_multibyte (SDATA (new), insbytes);
 
@@ -1490,7 +1490,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   /* Even if we don't record for undo, we must keep the original text
      because we may have to recover it because of inappropriate byte
      combining.  */
-  if (! EQ (BVAR (current_buffer, undo_list), Qt))
+  if (!EQ (BVAR (current_buffer, undo_list), Qt))
     deletion = make_buffer_string_both (from, from_byte, to, to_byte, 1);
 
   GAP_SIZE += nbytes_del;
@@ -1516,7 +1516,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
      between single-byte and multibyte.  */
   copy_text (SDATA (new), GPT_ADDR, insbytes,
 	     STRING_MULTIBYTE (new),
-	     ! NILP (BVAR (current_buffer, enable_multibyte_characters)));
+	     !NILP (BVAR (current_buffer, enable_multibyte_characters)));
 
 #ifdef BYTE_COMBINING_DEBUG
   /* We have copied text into the gap, but we have not marked
@@ -1918,7 +1918,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
     emacs_abort ();
 #endif
 
-  if (ret_string || ! EQ (BVAR (current_buffer, undo_list), Qt))
+  if (ret_string || !EQ (BVAR (current_buffer, undo_list), Qt))
     deletion = make_buffer_string_both (from, from_byte, to, to_byte, 1);
   else
     deletion = Qnil;
@@ -1948,7 +1948,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   Z -= nchars_del;
   GPT = from;
   GPT_BYTE = from_byte;
-  if (GAP_SIZE > 0 && ! current_buffer->text->inhibit_shrinking)
+  if (GAP_SIZE > 0 && !current_buffer->text->inhibit_shrinking)
     /* Put an anchor, unless called from decode_coding_object which
        needs to access the previous gap contents.  */
     *(GPT_ADDR) = 0;
@@ -2023,7 +2023,7 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
   Lisp_Object temp;
 
   XSETFASTINT (temp, start);
-  if (! NILP (BVAR (current_buffer, read_only)))
+  if (!NILP (BVAR (current_buffer, read_only)))
     Fbarf_if_buffer_read_only (temp);
 
   /* If we're about to modify a buffer the contents of which come from
@@ -2032,7 +2032,7 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
      forever.  */
   if (pdumper_object_p (BEG_ADDR))
     enlarge_buffer_text (current_buffer, 0);
-  eassert (! pdumper_object_p (BEG_ADDR));
+  eassert (!pdumper_object_p (BEG_ADDR));
 
   run_undoable_change();
 
@@ -2060,19 +2060,19 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
     ? current_buffer->base_buffer
     : current_buffer;
 
-  if (! NILP (BVAR (base_buffer, file_truename))
+  if (!NILP (BVAR (base_buffer, file_truename))
       /* Make binding buffer-file-name to nil effective.  */
-      && ! NILP (BVAR (base_buffer, filename))
+      && !NILP (BVAR (base_buffer, filename))
       && SAVE_MODIFF >= MODIFF)
     Flock_file (BVAR (base_buffer, file_truename));
 
-  if (! NILP (BVAR (current_buffer, mark_active))
+  if (!NILP (BVAR (current_buffer, mark_active))
       && XMARKER (BVAR (current_buffer, mark))->buffer
       && NILP (Vsaved_region_selection)
       && (EQ (Vselect_active_regions, Qonly)
 	  ? EQ (CAR_SAFE (Vtransient_mark_mode), Qonly)
-	  : (! NILP (Vselect_active_regions)
-	     && ! NILP (Vtransient_mark_mode))))
+	  : (!NILP (Vselect_active_regions)
+	     && !NILP (Vtransient_mark_mode))))
     /* If `select-active-regions' is non-nil, save the region text.  */
     Vsaved_region_selection
       = call1 (Vregion_extract_function, Qnil);
@@ -2168,10 +2168,10 @@ invalidate_buffer_caches (struct buffer *buf, ptrdiff_t start, ptrdiff_t end)
     end_marker = Fcopy_marker (end, Qnil);
 
 #define FETCH_START				\
-  (! NILP (start_marker) ? Fmarker_position (start_marker) : start)
+  (!NILP (start_marker) ? Fmarker_position (start_marker) : start)
 
 #define FETCH_END				\
-  (! NILP (end_marker) ? Fmarker_position (end_marker) : end)
+  (!NILP (end_marker) ? Fmarker_position (end_marker) : end)
 
 /* Set a variable to nil if an error occurred.
    Don't change the variable if there was no error.
@@ -2220,7 +2220,7 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
   /* If buffer is unmodified, run a special hook for that case.  The
      check for Vfirst_change_hook is just a minor optimization.  */
   if (SAVE_MODIFF >= MODIFF
-      && ! NILP (Vfirst_change_hook))
+      && !NILP (Vfirst_change_hook))
     {
       PRESERVE_VALUE;
       PRESERVE_START_END;

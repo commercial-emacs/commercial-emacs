@@ -215,7 +215,7 @@ parse_jch_list (Lisp_Object jch_list, cmsJCh *color)
   PARSE_JCH_LIST_FIELD (C);
   PARSE_JCH_LIST_FIELD (h);
 
-  if (! NILP (jch_list))
+  if (!NILP (jch_list))
     return false;
   return true;
 }
@@ -265,7 +265,7 @@ parse_viewing_conditions (Lisp_Object view, const cmsCIEXYZ *wp,
   PARSE_VIEW_CONDITION_INT (surround);
   PARSE_VIEW_CONDITION_FLOAT (D_value);
 
-  if (! NILP (view))
+  if (!NILP (view))
     return false;
 
   vc->whitePoint.X = wp->X;

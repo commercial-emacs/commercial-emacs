@@ -136,7 +136,7 @@ void
 compact_regexp_cache (void)
 {
   for (struct regexp_cache *cp = searchbuf_head; cp != NULL; cp = cp->next)
-    if (! cp->busy)
+    if (!cp->busy)
       {
         cp->buf.allocated = cp->buf.used;
         cp->buf.buffer = xrealloc (cp->buf.buffer, cp->buf.used);
@@ -552,7 +552,7 @@ fast_looking_at (Lisp_Object regexp, ptrdiff_t pos, ptrdiff_t pos_byte,
 	  s1 = ZV_BYTE - BEGV_BYTE;
 	  s2 = 0;
 	}
-      multibyte = ! NILP (BVAR (current_buffer, enable_multibyte_characters));
+      multibyte = !NILP (BVAR (current_buffer, enable_multibyte_characters));
     }
 
   struct regexp_cache *cache_entry =
@@ -657,7 +657,7 @@ find_newline (ptrdiff_t start, ptrdiff_t start_byte, ptrdiff_t end,
   struct region_cache *newline_cache;
   struct buffer *cache_buffer;
 
-  if (! end)
+  if (!end)
     {
       if (count > 0)
 	end = ZV, end_byte = ZV_BYTE;
@@ -791,7 +791,7 @@ find_newline (ptrdiff_t start, ptrdiff_t start_byte, ptrdiff_t end,
 		  lim_addr = BYTE_POS_ADDR (ceiling_byte) + 1;
 		}
 
-              if (! nl)
+              if (!nl)
 		break;
 	      next++;
 
@@ -899,7 +899,7 @@ find_newline (ptrdiff_t start, ptrdiff_t start_byte, ptrdiff_t end,
 		  ceiling_addr = BYTE_POS_ADDR (ceiling_byte);
 		}
 
-              if (! nl)
+              if (!nl)
 		break;
 
 	      if (++count >= 0)
@@ -1115,7 +1115,7 @@ trivial_regexp_p (Lisp_Object regexp)
 #define TRANSLATE(out, trt, d)			\
 do						\
   {						\
-    if (! NILP (trt))				\
+    if (!NILP (trt))				\
       {						\
 	Lisp_Object temp;			\
 	temp = Faref (trt, make_fixnum (d));	\
@@ -1532,7 +1532,7 @@ simple_search (EMACS_INT n, unsigned char *pat,
 	       ptrdiff_t pos, ptrdiff_t pos_byte,
 	       ptrdiff_t lim, ptrdiff_t lim_byte)
 {
-  bool multibyte = ! NILP (BVAR (current_buffer, enable_multibyte_characters));
+  bool multibyte = !NILP (BVAR (current_buffer, enable_multibyte_characters));
   bool forward = n > 0;
   /* Number of buffer bytes matched.  Note that this may be different
      from len_byte in a multibyte buffer.  */
@@ -1748,7 +1748,7 @@ boyer_moore (EMACS_INT n, unsigned char *base_pat,
   register ptrdiff_t i;
   register int j;
   unsigned char *pat, *pat_end;
-  bool multibyte = ! NILP (BVAR (current_buffer, enable_multibyte_characters));
+  bool multibyte = !NILP (BVAR (current_buffer, enable_multibyte_characters));
 
   unsigned char simple_translate[0400];
   /* These are set to the preceding bytes of a byte to be translated
@@ -1965,14 +1965,14 @@ boyer_moore (EMACS_INT n, unsigned char *base_pat,
 
 	    hit:
 	      i = dirlen - direction;
-	      if (! NILP (trt))
+	      if (!NILP (trt))
 		{
 		  while ((i -= direction) + direction != 0)
 		    {
 		      int ch;
 		      cursor -= direction;
 		      /* Translate only the last byte of a character.  */
-		      if (! multibyte
+		      if (!multibyte
 			  || ((cursor == tail_end_ptr
 			       || CHAR_HEAD_P (cursor[1]))
 			      && (CHAR_HEAD_P (cursor[0])
@@ -2085,7 +2085,7 @@ boyer_moore (EMACS_INT n, unsigned char *base_pat,
 		  pos_byte -= direction;
 		  ptr = BYTE_POS_ADDR (pos_byte);
 		  /* Translate only the last byte of a character.  */
-		  if (! multibyte
+		  if (!multibyte
 		      || ((ptr == tail_end_ptr
 			   || CHAR_HEAD_P (ptr[1]))
 			  && (CHAR_HEAD_P (ptr[0])
@@ -2383,7 +2383,7 @@ since only regular expressions have distinguished subexpressions.  */)
 
   CHECK_STRING (newtext);
 
-  if (! NILP (string))
+  if (!NILP (string))
     CHECK_STRING (string);
 
   /* Most replacement texts don't contain any backslash directives in
@@ -2406,7 +2406,7 @@ since only regular expressions have distinguished subexpressions.  */)
   eassert (sub_start <= sub_end);
 
   /* Check whether the text to replace is present in the buffer/string.  */
-  if (! (NILP (string)
+  if (!(NILP (string)
 	 ? BEGV <= sub_start && sub_end <= ZV
 	 : 0 <= sub_start && sub_end <= SCHARS (string)))
     {
@@ -2485,7 +2485,7 @@ since only regular expressions have distinguished subexpressions.  */)
 
       /* Convert to all caps if the old text is all caps
 	 and has at least one multiletter word.  */
-      if (! some_lowercase && some_multiletter_word)
+      if (!some_lowercase && some_multiletter_word)
 	case_action = all_caps;
       /* Capitalize each word, if the old text has all capitalized words.  */
       else if (!some_nonuppercase_initial && some_multiletter_word)
@@ -2875,7 +2875,7 @@ Return value is undefined if the last search failed.  */)
       if (start >= 0)
 	{
 	  if (EQ (last_thing_searched, Qt)
-	      || ! NILP (integers))
+	      || !NILP (integers))
 	    {
 	      XSETFASTINT (data[2 * i], start);
 	      XSETFASTINT (data[2 * i + 1], search_regs.end[i]);
@@ -2908,7 +2908,7 @@ Return value is undefined if the last search failed.  */)
     }
 
   /* If REUSE is not usable, cons up the values and return them.  */
-  if (! CONSP (reuse))
+  if (!CONSP (reuse))
     reuse = Flist (len, data);
   else
     {
@@ -3212,7 +3212,7 @@ find_newline1 (ptrdiff_t start, ptrdiff_t start_byte, ptrdiff_t end,
 	      unsigned char *nl = memchr (lim_addr + cursor, '\n', - cursor);
 	      next = nl ? nl - lim_addr : 0;
 
-              if (! nl)
+              if (!nl)
 		break;
 	      next++;
 
