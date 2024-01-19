@@ -2110,10 +2110,10 @@ the values STRING, PREDICATE and `lambda'.  */)
           goto found_matching_key;
         }
       else
-	for (i = 0; i < HASH_TABLE_SIZE (h); ++i)
+	DOHASH (h, j)
           {
+	    i = j;
             tem = HASH_KEY (h, i);
-            if (hash_unused_entry_key_p (tem)) continue;
             Lisp_Object strkey = (SYMBOLP (tem) ? Fsymbol_name (tem) : tem);
             if (!STRINGP (strkey)) continue;
             if (EQ (Fcompare_strings (string, Qnil, Qnil,
