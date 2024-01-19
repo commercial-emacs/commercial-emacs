@@ -1257,7 +1257,7 @@ dump_enqueue_object (struct dump_context *ctx,
                      struct link_weight weight)
 {
   /* Fixnums are bit-invariant, and don't need dumping.  */
-  if (!FIXNUMP (object) && !EQ (object, Qunbound))
+  if (!FIXNUMP (object))
     {
       dump_off state = dump_recall_object (ctx, object);
       bool already_dumped_object = state > DUMP_OBJECT_NOT_SEEN;
@@ -2400,19 +2400,6 @@ dump_symbol (struct dump_context *ctx,
     }
 
   return offset;
-}
-
-/* Give Qunbound its name.
-   All other symbols are dumped and loaded but not Qunbound because it
-   cannot be used as a key in a hash table.
-   FIXME: A better solution would be to use a value other than Qunbound
-   as a marker for unused entries in hash tables.  */
-static void
-pdumper_init_symbol_unbound (void)
-{
-  eassert (NILP (SYMBOL_NAME (Qunbound)));
-  const char *name = "unbound";
-  init_symbol (Qunbound, make_pure_c_string (name, strlen (name)));
 }
 
 static dump_off
@@ -5568,8 +5555,6 @@ pdumper_load (const char *dump_filename, char *argv0)
      initialization.  */
   for (int i = 0; i < nr_dump_hooks; ++i)
     dump_hooks[i] ();
-
-  pdumper_init_symbol_unbound ();
 
 #ifdef HAVE_NATIVE_COMP
   pdumper_set_emacs_execdir (argv0);

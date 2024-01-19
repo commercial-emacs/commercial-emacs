@@ -4974,6 +4974,9 @@ process_mark_stack (ptrdiff_t base_sp)
 		      struct Lisp_Hash_Table *h = (struct Lisp_Hash_Table *)ptr;
 		      set_vector_marked (ptr);
 		      if (h->weakness == Weak_None)
+			/* The values pushed here may include
+			   HASH_UNUSED_ENTRY_KEY, which this function must
+			   cope with.  */
 			mark_stack_push_n (h->key_and_value, 2 * h->table_size);
 		      else
 			{
@@ -5122,27 +5125,29 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_Float:
 	  {
 	    struct Lisp_Float *ptr = XFLOAT (*objp);
-	    if (pdumper_object_p (ptr))
-	      /* pdumper floats are "cold" and lack mark bits.  */
-	      eassert (pdumper_cold_object_p (ptr));
-	    else if (mgc_xpntr_p (ptr))
+	    if (ptr) /* else HASH_UNUSED_ENTRY_KEY */
 	      {
-		void *forwarded = mgc_fwd_xpntr (ptr);
-                if (forwarded)
-                  {
-                    XSETFLOAT (*objp, forwarded);
-                    eassert (!XFLOAT_MARKED_P (ptr));
-                    break; /* !!! */
-                  }
-                XSETFLOAT (*objp, mgc_flip_xpntr (ptr, Space_Float));
-		ptr = XFLOAT (*objp);  /* in case we do more with PTR */
-		(void) ptr;
-	      }
-	    else
-	      {
-		eassert (check_live (xpntr, MEM_TYPE_FLOAT));
-		if (!XFLOAT_MARKED_P (ptr))
-		  XFLOAT_MARK (ptr);
+		if (pdumper_object_p (ptr))
+		  /* pdumper floats are "cold" and lack mark bits.  */
+		  eassert (pdumper_cold_object_p (ptr));
+		else if (mgc_xpntr_p (ptr))
+		  {
+		    void *forwarded = mgc_fwd_xpntr (ptr);
+		    if (forwarded)
+		      {
+			XSETFLOAT (*objp, forwarded);
+			eassert (!XFLOAT_MARKED_P (ptr));
+			break; /* !!! */
+		      }
+		    XSETFLOAT (*objp, mgc_flip_xpntr (ptr, Space_Float));
+		    /* !!! reset ptr to XFLOAT (*objp) if more to do */
+		  }
+		else
+		  {
+		    eassert (check_live (xpntr, MEM_TYPE_FLOAT));
+		    if (!XFLOAT_MARKED_P (ptr))
+		      XFLOAT_MARK (ptr);
+		  }
 	      }
 	  }
 	  break;
