@@ -21,7 +21,7 @@
 # include <config.h>
 #endif
 
-#include <getopt.h>
+#include "getopt.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -223,9 +223,8 @@ process_long_option (int argc, char **argv, const char *optstring,
     {
       /* Didn't find an exact match, so look for abbreviations.  */
       unsigned char *ambig_set = NULL;
-      /* Use simpler fallback diagnostic if ambig_set == &ambig_fallback.  */
-      unsigned char ambig_fallback;
-      void *ambig_malloced = NULL;
+      int ambig_malloced = 0;
+      int ambig_fallback = 0;
       int indfound = -1;
 
       for (p = longopts, option_index = 0; p->name; p++, option_index++)
@@ -243,42 +242,39 @@ process_long_option (int argc, char **argv, const char *optstring,
 		     || pfound->val != p->val)
 	      {
 		/* Second or later nonexact match found.  */
-		if (ambig_set != &ambig_fallback)
+		if (!ambig_fallback)
 		  {
 		    if (!print_errors)
 		      /* Don't waste effort tracking the ambig set if
 			 we're not going to print it anyway.  */
-		      ambig_set = &ambig_fallback;
+		      ambig_fallback = 1;
 		    else if (!ambig_set)
 		      {
 			if (__libc_use_alloca (n_options))
 			  ambig_set = alloca (n_options);
+			else if ((ambig_set = malloc (n_options)) == NULL)
+			  /* Fall back to simpler error message.  */
+			  ambig_fallback = 1;
 			else
-			  {
-			    ambig_malloced = malloc (n_options);
-			    /* Fall back to simpler diagnostic if
-			       memory allocation fails.  */
-			    ambig_set = (ambig_malloced ? ambig_malloced
-					 : &ambig_fallback);
-			  }
+			  ambig_malloced = 1;
 
-			if (ambig_set != &ambig_fallback)
+			if (ambig_set)
 			  {
 			    memset (ambig_set, 0, n_options);
 			    ambig_set[indfound] = 1;
 			  }
 		      }
-		    if (ambig_set && ambig_set != &ambig_fallback)
+		    if (ambig_set)
 		      ambig_set[option_index] = 1;
 		  }
 	      }
 	  }
 
-      if (ambig_set)
+      if (ambig_set || ambig_fallback)
 	{
 	  if (print_errors)
 	    {
-	      if (ambig_set == &ambig_fallback)
+	      if (ambig_fallback)
 		fprintf (stderr, _("%s: option '%s%s' is ambiguous\n"),
 			 argv[0], prefix, d->__nextchar);
 	      else
@@ -300,7 +296,8 @@ process_long_option (int argc, char **argv, const char *optstring,
 		  funlockfile (stderr);
 		}
 	    }
-	  free (ambig_malloced);
+	  if (ambig_malloced)
+	    free (ambig_set);
 	  d->__nextchar += strlen (d->__nextchar);
 	  d->optind++;
 	  d->optopt = 0;

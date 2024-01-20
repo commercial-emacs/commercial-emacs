@@ -1,4 +1,4 @@
-# serial 36
+# serial 34
 
 # Copyright (C) 1997-2001, 2003-2024 Free Software Foundation, Inc.
 #
@@ -18,7 +18,7 @@ AC_DEFUN([gl_FUNC_LSTAT],
   if test $ac_cv_func_lstat = yes; then
     AC_REQUIRE([gl_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK])
     case $host_os,$gl_cv_func_lstat_dereferences_slashed_symlink in
-      darwin* | solaris* | *no)
+      solaris* | *no)
         REPLACE_LSTAT=1
         ;;
     esac
@@ -62,7 +62,7 @@ AC_DEFUN([gl_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK],
           *-gnu* | gnu*)
             # Guess yes on glibc systems.
             gl_cv_func_lstat_dereferences_slashed_symlink="guessing yes" ;;
-          mingw* | windows*)
+          mingw*)
             # Guess no on native Windows.
             gl_cv_func_lstat_dereferences_slashed_symlink="guessing no" ;;
           *)

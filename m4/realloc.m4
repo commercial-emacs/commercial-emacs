@@ -1,4 +1,4 @@
-# realloc.m4 serial 29
+# realloc.m4 serial 27
 dnl Copyright (C) 2007, 2009-2024 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
@@ -16,8 +16,7 @@ AC_DEFUN([_AC_FUNC_REALLOC_IF],
           [[#include <stdlib.h>
           ]],
           [[void *p = realloc (0, 0);
-            void * volatile vp = p;
-            int result = !vp;
+            int result = !p;
             free (p);
             return result;]])
        ],
@@ -27,7 +26,7 @@ AC_DEFUN([_AC_FUNC_REALLOC_IF],
           # Guess yes on platforms where we know the result.
           *-gnu* | freebsd* | netbsd* | openbsd* | bitrig* \
           | gnu* | *-musl* | midipix* | midnightbsd* \
-          | hpux* | solaris* | cygwin* | mingw* | windows* | msys* )
+          | hpux* | solaris* | cygwin* | mingw* | msys* )
             ac_cv_func_realloc_0_nonnull="guessing yes" ;;
           # If we don't know, obey --enable-cross-guesses.
           *) ac_cv_func_realloc_0_nonnull="$gl_cross_guess_normal" ;;

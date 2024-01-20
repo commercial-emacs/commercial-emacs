@@ -57,11 +57,7 @@
 
 #ifndef __THROW
 # if defined __cplusplus && (__GNUC_PREREQ (2,8) || __clang_major__ >= 4)
-#  if __cplusplus >= 201103L
-#   define __THROW      noexcept (true)
-#  else
-#   define __THROW      throw ()
-#  endif
+#  define __THROW       throw ()
 # else
 #  define __THROW
 # endif
