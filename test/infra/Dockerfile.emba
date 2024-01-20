@@ -60,10 +60,6 @@ RUN ./autogen.sh autoconf
 RUN ./configure WERROR_CFLAGS='-Werror' --with-file-notification=gfile
 RUN make bootstrap
 
-# Debian bullseye doesn't provide proper packages.  So we use Debian
-# sid for this.
-FROM debian:sid as emacs-eglot
-
 # This corresponds to emacs-base.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends -o=Dpkg::Use-Pty=0 \

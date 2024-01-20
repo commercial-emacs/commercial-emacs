@@ -820,11 +820,6 @@ it is disabled.
 (register-definition-prefixes "allout-widgets" '("allout-"))
 
 
-;;; Generated autoloads from cedet/semantic/analyze.el
-
-(register-definition-prefixes "semantic/analyze" '("semantic-a"))
-
-
 ;;; Generated autoloads from net/ange-ftp.el
 
 (define-obsolete-function-alias 'ange-ftp-re-read-dir #'ange-ftp-reread-dir "29.1")
@@ -1109,11 +1104,6 @@ archive.
 
 (fn &optional FORCE)")
 (register-definition-prefixes "arc-mode" '("arc"))
-
-
-;;; Generated autoloads from cedet/srecode/args.el
-
-(register-definition-prefixes "srecode/args" '("srecode-"))
 
 
 ;;; Generated autoloads from array.el
@@ -1478,20 +1468,6 @@ key2: value2
 (register-definition-prefixes "auth-source-pass" '("auth-source-pass-"))
 
 
-;;; Generated autoloads from cedet/ede/auto.el
-
-(autoload 'ede-add-project-autoload "ede/auto" "\
-Add PROJAUTO, an EDE autoload definition to `ede-project-class-files'.
-Optional argument FLAG indicates how this autoload should be
-added.  Possible values are:
-  `generic' - A generic project type.  Keep this at the very end.
-  `unique' - A unique project type for a specific project.  Keep at the very
-             front of the list so more generic projects don't get priority.
-
-(fn PROJAUTO &optional FLAG)")
-(register-definition-prefixes "ede/auto" '("ede-"))
-
-
 ;;; Generated autoloads from progmodes/autoconf.el
 
 (autoload 'autoconf-mode "autoconf" "\
@@ -1499,11 +1475,6 @@ Major mode for editing Autoconf configure.ac files.
 
 (fn)" t)
 (register-definition-prefixes "autoconf" '("autoconf-"))
-
-
-;;; Generated autoloads from cedet/ede/autoconf-edit.el
-
-(register-definition-prefixes "ede/autoconf-edit" '("autoconf-"))
 
 
 ;;; Generated autoloads from autoinsert.el
@@ -1671,11 +1642,6 @@ definition of \"random distance\".)
 Print a trace of Lisp function calls currently active.
 Output stream used is value of `standard-output'.")
 (register-definition-prefixes "backtrace" '("backtrace-"))
-
-
-;;; Generated autoloads from cedet/ede/base.el
-
-(register-definition-prefixes "ede/base" '("ede-"))
 
 
 ;;; Generated autoloads from progmodes/bat-mode.el
@@ -2321,11 +2287,6 @@ Incremental search of bookmarks, hiding the non-matches as we go." '(bookmark-bm
 (register-definition-prefixes "bookmark" '("bookmark-" "with-buffer-modified-unmodified"))
 
 
-;;; Generated autoloads from cedet/semantic/bovine.el
-
-(register-definition-prefixes "semantic/bovine" '("semantic-"))
-
-
 ;;; Generated autoloads from net/browse-url.el
 
 (defvar browse-url-browser-function 'browse-url-default-browser "\
@@ -2859,11 +2820,6 @@ and corresponding effects.
 
 (fn &optional ARG)")
 (register-definition-prefixes "bytecomp" '("batch-byte-compile-file" "byte" "displaying-byte-compile-warnings" "emacs-lisp-" "no-byte-compile"))
-
-
-;;; Generated autoloads from cedet/semantic/bovine/c.el
-
-(register-definition-prefixes "semantic/bovine/c" '("semantic"))
 
 
 ;;; Generated autoloads from calendar/cal-bahai.el
@@ -3977,32 +3933,6 @@ See the documentation of `define-ccl-program' for the detail of CCL program.
 (register-definition-prefixes "cdl" '("cdl-"))
 
 
-;;; Generated autoloads from cedet/cedet.el
-
-(push (purecopy '(cedet 2 0)) package--builtin-versions)
-(register-definition-prefixes "cedet" '("cedet-"))
-
-
-;;; Generated autoloads from cedet/cedet-cscope.el
-
-(register-definition-prefixes "cedet-cscope" '("cedet-cscope-"))
-
-
-;;; Generated autoloads from cedet/cedet-files.el
-
-(register-definition-prefixes "cedet-files" '("cedet-"))
-
-
-;;; Generated autoloads from cedet/cedet-global.el
-
-(register-definition-prefixes "cedet-global" '("cedet-g"))
-
-
-;;; Generated autoloads from cedet/cedet-idutils.el
-
-(register-definition-prefixes "cedet-idutils" '("cedet-idutils-"))
-
-
 ;;; Generated autoloads from progmodes/cfengine.el
 
 (push (purecopy '(cfengine 1 4)) package--builtin-versions)
@@ -4080,11 +4010,6 @@ which clearly shows what the constituent characters are.
 ;;; Generated autoloads from emacs-lisp/chart.el
 
 (register-definition-prefixes "chart" '("chart"))
-
-
-;;; Generated autoloads from cedet/semantic/chart.el
-
-(register-definition-prefixes "semantic/chart" '("semantic-chart-"))
 
 
 ;;; Generated autoloads from emacs-lisp/check-declare.el
@@ -4777,11 +4702,6 @@ variable \"NATIVE_DISABLED\" is set, only byte compile.")
 (register-definition-prefixes "comp" '("comp-" "native-comp" "no-native-compile"))
 
 
-;;; Generated autoloads from cedet/semantic/wisent/comp.el
-
-(register-definition-prefixes "semantic/wisent/comp" '("wisent-"))
-
-
 ;;; Generated autoloads from emacs-lisp/comp-common.el
 
 (autoload 'comp-function-type-spec "comp-common" "\
@@ -5089,21 +5009,6 @@ This is the value of `next-error-function' in Compilation buffers.
 (register-definition-prefixes "compile" '("compil" "define-compilation-mode" "kill-compilation" "recompile"))
 
 
-;;; Generated autoloads from cedet/srecode/compile.el
-
-(register-definition-prefixes "srecode/compile" '("srecode-"))
-
-
-;;; Generated autoloads from cedet/semantic/analyze/complete.el
-
-(register-definition-prefixes "semantic/analyze/complete" '("semantic-analyze-"))
-
-
-;;; Generated autoloads from cedet/semantic/complete.el
-
-(register-definition-prefixes "semantic/complete" '("semantic-"))
-
-
 ;;; Generated autoloads from completion.el
 
 (defvar dynamic-completion-mode nil "\
@@ -5343,11 +5248,6 @@ For details see `conf-mode'.
 (register-definition-prefixes "conf-mode" '("conf-"))
 
 
-;;; Generated autoloads from cedet/ede/config.el
-
-(register-definition-prefixes "ede/config" '("ede-"))
-
-
 ;;; Generated autoloads from play/cookie1.el
 
 (autoload 'cookie "cookie1" "\
@@ -5407,6 +5307,7 @@ If FIX is non-nil, run `copyright-fix-years' instead.
 
 ;;; Generated autoloads from progmodes/cperl-mode.el
 
+(put 'cperl-file-style 'safe-local-variable 'stringp)
 (put 'cperl-indent-level 'safe-local-variable 'integerp)
 (put 'cperl-brace-offset 'safe-local-variable 'integerp)
 (put 'cperl-continued-brace-offset 'safe-local-variable 'integerp)
@@ -5414,7 +5315,6 @@ If FIX is non-nil, run `copyright-fix-years' instead.
 (put 'cperl-continued-statement-offset 'safe-local-variable 'integerp)
 (put 'cperl-extra-newline-before-brace 'safe-local-variable 'booleanp)
 (put 'cperl-merge-trailing-else 'safe-local-variable 'booleanp)
-(put 'cperl-file-style 'safe-local-variable 'stringp)
 (autoload 'cperl-mode "cperl-mode" "\
 Major mode for editing Perl code.
 Expression and list commands understand all C brackets.
@@ -5605,16 +5505,6 @@ Edit display information for cpp conditionals." t)
 (register-definition-prefixes "cpp" '("cpp-"))
 
 
-;;; Generated autoloads from cedet/srecode/cpp.el
-
-(register-definition-prefixes "srecode/cpp" '("srecode-"))
-
-
-;;; Generated autoloads from cedet/ede/cpp-root.el
-
-(register-definition-prefixes "ede/cpp-root" '("ede-cpp-root-"))
-
-
 ;;; Generated autoloads from emacs-lisp/crm.el
 
 (autoload 'completing-read-multiple "crm" "\
@@ -5638,11 +5528,6 @@ with empty strings removed.
 
 (fn PROMPT TABLE &optional PREDICATE REQUIRE-MATCH INITIAL-INPUT HIST DEF INHERIT-INPUT-METHOD)")
 (register-definition-prefixes "crm" '("crm-"))
-
-
-;;; Generated autoloads from cedet/semantic/symref/cscope.el
-
-(register-definition-prefixes "semantic/symref/cscope" '("semantic-symref-cscope--line-re"))
 
 
 ;;; Generated autoloads from textmodes/css-mode.el
@@ -5683,16 +5568,6 @@ on what is seen near point.
 
 (fn SYMBOL)" t)
 (register-definition-prefixes "css-mode" '("css-" "scss-"))
-
-
-;;; Generated autoloads from cedet/srecode/ctxt.el
-
-(register-definition-prefixes "srecode/ctxt" '("srecode-"))
-
-
-;;; Generated autoloads from cedet/semantic/ctxt.el
-
-(register-definition-prefixes "semantic/ctxt" '("semantic-"))
 
 
 ;;; Generated autoloads from emulation/cua-base.el
@@ -6166,11 +6041,6 @@ omitted, a buffer named *Custom Themes* is used.
 (register-definition-prefixes "cus-theme" '("custom-" "describe-theme-"))
 
 
-;;; Generated autoloads from cedet/ede/custom.el
-
-(register-definition-prefixes "ede/custom" '("ede-"))
-
-
 ;;; Generated autoloads from vc/cvs-status.el
 
 (autoload 'cvs-status-mode "cvs-status" "\
@@ -6303,70 +6173,6 @@ See also `dabbrev-abbrev-char-regexp' and \\[dabbrev-completion].
 
 (fn ARG)" t)
 (register-definition-prefixes "dabbrev" '("dabbrev-"))
-
-
-;;; Generated autoloads from cedet/data-debug.el
-
-(autoload 'data-debug-new-buffer "data-debug" "\
-Create a new data-debug buffer with NAME.
-
-(fn NAME)")
-(register-definition-prefixes "data-debug" '("data-debug-"))
-
-
-;;; Generated autoloads from cedet/semantic/db.el
-
-(register-definition-prefixes "semantic/db" '("semanticdb-"))
-
-
-;;; Generated autoloads from cedet/semantic/db-debug.el
-
-(register-definition-prefixes "semantic/db-debug" '("semanticdb-"))
-
-
-;;; Generated autoloads from cedet/semantic/db-ebrowse.el
-
-(register-definition-prefixes "semantic/db-ebrowse" '("semanticdb-"))
-
-
-;;; Generated autoloads from cedet/semantic/db-el.el
-
-(register-definition-prefixes "semantic/db-el" '("semanticdb-"))
-
-
-;;; Generated autoloads from cedet/semantic/db-file.el
-
-(register-definition-prefixes "semantic/db-file" '("semanticdb-"))
-
-
-;;; Generated autoloads from cedet/semantic/db-find.el
-
-(register-definition-prefixes "semantic/db-find" '("semanticdb-"))
-
-
-;;; Generated autoloads from cedet/semantic/db-global.el
-
-(register-definition-prefixes "semantic/db-global" '("semanticdb-"))
-
-
-;;; Generated autoloads from cedet/semantic/db-javascript.el
-
-(register-definition-prefixes "semantic/db-javascript" '("semanticdb-"))
-
-
-;;; Generated autoloads from cedet/semantic/db-mode.el
-
-(register-definition-prefixes "semantic/db-mode" '("semanticdb-"))
-
-
-;;; Generated autoloads from cedet/semantic/db-ref.el
-
-(register-definition-prefixes "semantic/db-ref" '("semanticdb-ref-"))
-
-
-;;; Generated autoloads from cedet/semantic/db-typecache.el
-
-(register-definition-prefixes "semantic/db-typecache" '("semanticdb-"))
 
 
 ;;; Generated autoloads from net/dbus.el
@@ -6578,21 +6384,6 @@ To specify a nil argument interactively, exit with an empty minibuffer.
 (register-definition-prefixes "debug" '("debug" "inhibit-debug-on-entry"))
 
 
-;;; Generated autoloads from cedet/semantic/bovine/debug.el
-
-(register-definition-prefixes "semantic/bovine/debug" '("semantic-"))
-
-
-;;; Generated autoloads from cedet/semantic/analyze/debug.el
-
-(register-definition-prefixes "semantic/analyze/debug" '("semantic-analyze"))
-
-
-;;; Generated autoloads from cedet/semantic/debug.el
-
-(register-definition-prefixes "semantic/debug" '("semantic-debug-"))
-
-
 ;;; Generated autoloads from play/decipher.el
 
 (autoload 'decipher "decipher" "\
@@ -6615,11 +6406,6 @@ The most useful commands are:
 
 (fn)" t)
 (register-definition-prefixes "decipher" '("decipher-"))
-
-
-;;; Generated autoloads from cedet/semantic/decorate.el
-
-(register-definition-prefixes "semantic/decorate" '("semantic-"))
 
 
 ;;; Generated autoloads from delim-col.el
@@ -6705,11 +6491,6 @@ the active region is killed instead of deleted.
 
 (fn &optional KILLP)" t)
 (register-definition-prefixes "delsel" '("del" "minibuffer-keyboard-quit"))
-
-
-;;; Generated autoloads from cedet/semantic/dep.el
-
-(register-definition-prefixes "semantic/dep" '("defcustom-mode-local-semantic-dependency-system-include-path" "semantic-"))
 
 
 ;;; Generated autoloads from emacs-lisp/derived.el
@@ -7057,11 +6838,6 @@ Revert to the last loaded desktop." t)
 (register-definition-prefixes "desktop" '("desktop-"))
 
 
-;;; Generated autoloads from cedet/ede/detect.el
-
-(register-definition-prefixes "ede/detect" '("ede-"))
-
-
 ;;; Generated autoloads from gnus/deuglify.el
 
 (autoload 'gnus-article-outlook-unwrap-lines "deuglify" "\
@@ -7216,11 +6992,6 @@ the word at mouse click.
 (register-definition-prefixes "dictionary" '("dictionary-" "global-dictionary-tooltip-mode" "help-word"))
 
 
-;;; Generated autoloads from cedet/srecode/dictionary.el
-
-(register-definition-prefixes "srecode/dictionary" '("srecode-"))
-
-
 ;;; Generated autoloads from net/dictionary-connection.el
 
 (register-definition-prefixes "dictionary-connection" '("dictionary-connection-"))
@@ -7354,11 +7125,6 @@ If given a \\[universal-argument] \\[universal-argument] prefix, also prompt for
 
 (fn DOMAIN &optional QUERY-TYPE QUERY-CLASS QUERY-OPTION DIG-OPTION SERVER)" t)
 (register-definition-prefixes "dig" '("dig-"))
-
-
-;;; Generated autoloads from cedet/ede/dired.el
-
-(register-definition-prefixes "ede/dired" '("ede-dired-"))
 
 
 ;;; Generated autoloads from dired.el
@@ -7960,11 +7726,6 @@ Locate SOA record and increment the serial field." t)
 (register-definition-prefixes "dns-mode" '("dns-mode-"))
 
 
-;;; Generated autoloads from cedet/semantic/doc.el
-
-(register-definition-prefixes "semantic/doc" '("semantic-doc"))
-
-
 ;;; Generated autoloads from doc-view.el
 
 (autoload 'doc-view-mode-p "doc-view" "\
@@ -8018,11 +7779,6 @@ it is disabled.
 (autoload 'doctor "doctor" "\
 Switch to *doctor* buffer and start giving psychotherapy." t)
 (register-definition-prefixes "doctor" '("doc"))
-
-
-;;; Generated autoloads from cedet/srecode/document.el
-
-(register-definition-prefixes "srecode/document" '("srecode-document-"))
 
 
 ;;; Generated autoloads from dom.el
@@ -8655,46 +8411,6 @@ Read the .ecompleterc file.")
 (register-definition-prefixes "ecomplete" '("ecomplete-"))
 
 
-;;; Generated autoloads from cedet/ede.el
-
-(push (purecopy '(ede 2 0)) package--builtin-versions)
-(defvar global-ede-mode nil "\
-Non-nil if Global Ede mode is enabled.
-See the `global-ede-mode' command
-for a description of this minor mode.
-Setting this variable directly does not take effect;
-either customize it (see the info node `Easy Customization')
-or call the function `global-ede-mode'.")
-(custom-autoload 'global-ede-mode "ede" nil)
-(autoload 'global-ede-mode "ede" "\
-Toggle global EDE (Emacs Development Environment) mode.
-
-This global minor mode enables `ede-minor-mode' in all buffers in
-an EDE controlled project.
-
-This is a global minor mode.  If called interactively, toggle the
-`Global Ede mode' mode.  If the prefix argument is positive,
-enable the mode, and if it is zero or negative, disable the mode.
-
-If called from Lisp, toggle the mode if ARG is `toggle'.  Enable
-the mode if ARG is nil, omitted, or is a positive number.
-Disable the mode if ARG is a negative number.
-
-To check whether the minor mode is enabled in the current buffer,
-evaluate `(default-value \\='global-ede-mode)'.
-
-The mode's hook is called both when the mode is enabled and when
-it is disabled.
-
-(fn &optional ARG)" t)
-(register-definition-prefixes "ede" '("ede" "global-ede-mode-map" "project-try-ede"))
-
-
-;;; Generated autoloads from cedet/semantic/ede-grammar.el
-
-(register-definition-prefixes "semantic/ede-grammar" '("semantic-ede-"))
-
-
 ;;; Generated autoloads from emacs-lisp/edebug.el
 
 (defvar edebug-all-defs nil "\
@@ -9078,11 +8794,6 @@ To change the default, set the variable `ediff-use-toolbar-p', which see." t)
 (register-definition-prefixes "ediff-wind" '("ediff-"))
 
 
-;;; Generated autoloads from cedet/semantic/edit.el
-
-(register-definition-prefixes "semantic/edit" '("semantic-"))
-
-
 ;;; Generated autoloads from edmacro.el
 
 (autoload 'edit-kbd-macro "edmacro" "\
@@ -9158,74 +8869,6 @@ Turn on EDT Emulation." t)
 ;;; Generated autoloads from emulation/edt-vt100.el
 
 (register-definition-prefixes "edt-vt100" '("edt-set-term-width-"))
-
-
-;;; Generated autoloads from progmodes/eglot.el
-
-(push (purecopy '(eglot 1 16)) package--builtin-versions)
-(define-obsolete-function-alias 'eglot-update #'eglot-upgrade-eglot "29.1")
-(autoload 'eglot "eglot" "\
-Start LSP server for PROJECT's buffers under MANAGED-MAJOR-MODES.
-
-This starts a Language Server Protocol (LSP) server suitable for
-the buffers of PROJECT whose `major-mode' is among
-MANAGED-MAJOR-MODES.  CLASS is the class of the LSP server to
-start and CONTACT specifies how to connect to the server.
-
-Interactively, the command attempts to guess MANAGED-MAJOR-MODES,
-CLASS, CONTACT, and LANGUAGE-IDS from `eglot-server-programs',
-according to the current buffer's `major-mode'.  PROJECT is
-guessed from `project-find-functions'.  The search for active
-projects in this context binds `eglot-lsp-context' (which see).
-
-If it can't guess, it prompts the user for the mode and the
-server.  With a single \\[universal-argument] prefix arg, it
-always prompts for COMMAND.  With two \\[universal-argument], it
-also always prompts for MANAGED-MAJOR-MODE.
-
-The LSP server of CLASS is started (or contacted) via CONTACT.
-If this operation is successful, current *and future* file
-buffers of MANAGED-MAJOR-MODE inside PROJECT become \"managed\"
-by the LSP server, meaning the information about their contents is
-exchanged periodically with the server to provide enhanced
-code-analysis via `xref-find-definitions', `flymake-mode',
-`eldoc-mode', and `completion-at-point', among others.
-
-PROJECT is a project object as returned by `project-current'.
-
-CLASS is a subclass of `eglot-lsp-server'.
-
-CONTACT specifies how to contact the server.  It is a
-keyword-value plist used to initialize CLASS or a plain list as
-described in `eglot-server-programs', which see.
-
-LANGUAGE-IDS is a list of language ID string to send to the
-server for each element in MANAGED-MAJOR-MODES.
-
-INTERACTIVE is ignored and provided for backward compatibility.
-
-(fn MANAGED-MAJOR-MODES PROJECT CLASS CONTACT LANGUAGE-IDS &optional INTERACTIVE)" t)
-(autoload 'eglot-ensure "eglot" "\
-Start Eglot session for current buffer if there isn't one.
-
-Only use this function (in major mode hooks, etc) if you are
-confident that Eglot can be started safely and efficiently for
-*every* buffer visited where these hooks may execute.
-
-Since it is difficult to establish this confidence fully, it's
-often wise to use the interactive command `eglot' instead.  This
-command only needs to be invoked once per project, as all other
-files of a given major mode visited within the same project will
-automatically become managed with no further user intervention
-needed.")
-(autoload 'eglot-upgrade-eglot "eglot" "\
-Update Eglot to latest version.
-
-(fn &rest _)" t)
-(put 'eglot-workspace-configuration 'safe-local-variable #'listp)
-(put 'eglot--debbugs-or-github-bug-uri 'bug-reference-url-format t)
-(defun eglot--debbugs-or-github-bug-uri nil (format (if (string= (match-string 2) "github") "https://github.com/joaotavora/eglot/issues/%s" "https://debbugs.gnu.org/%s") (match-string 3)))
-(register-definition-prefixes "eglot" '("eglot-"))
 
 
 ;;; Generated autoloads from ehelp.el
@@ -9310,11 +8953,6 @@ Optional argument GROUP is the sub-group of slots to display.
 (register-definition-prefixes "eieio-custom" '("eieio-"))
 
 
-;;; Generated autoloads from emacs-lisp/eieio-datadebug.el
-
-(register-definition-prefixes "eieio-datadebug" '("data-debug-insert-object-"))
-
-
 ;;; Generated autoloads from emacs-lisp/eieio-opt.el
 
 (autoload 'eieio-browse "eieio-opt" "\
@@ -9335,16 +8973,6 @@ Describe CTR if it is a class constructor.
 ;;; Generated autoloads from emacs-lisp/eieio-speedbar.el
 
 (register-definition-prefixes "eieio-speedbar" '("eieio-speedbar"))
-
-
-;;; Generated autoloads from cedet/srecode/el.el
-
-(register-definition-prefixes "srecode/el" '("srecode-semantic-apply-tag-to-dict"))
-
-
-;;; Generated autoloads from cedet/semantic/bovine/el.el
-
-(register-definition-prefixes "semantic/bovine/el" '("semantic-"))
 
 
 ;;; Generated autoloads from emacs-lisp/eldoc.el
@@ -9613,11 +9241,6 @@ again." :tag "External pipelines" :group 'eshell-module)
 ;;; Generated autoloads from eshell/em-xtra.el
 
 (register-definition-prefixes "em-xtra" '("eshell/"))
-
-
-;;; Generated autoloads from cedet/ede/emacs.el
-
-(register-definition-prefixes "ede/emacs" '("ede-emacs-"))
 
 
 ;;; Generated autoloads from textmodes/emacs-authors-mode.el
@@ -10151,83 +9774,71 @@ Look at CONFIG and try to expand GROUP.
 
 (push (purecopy '(erc 5 6 -4)) package--builtin-versions)
 (autoload 'erc-select-read-args "erc" "\
-Prompt the user for values of nick, server, port, and password.
-With prefix arg, also prompt for user and full name.")
+Prompt for connection parameters and return them in a plist.
+By default, collect `:server', `:port', `:nickname', and
+`:password'.  With a non-nil prefix argument, also prompt for
+`:user' and `:full-name'.  Also return various environmental
+properties needed by entry-point commands, like `erc-tls'.")
 (autoload 'erc-server-select "erc" "\
 Interactively connect to a server from `erc-server-alist'." t)
 (make-obsolete 'erc-server-select 'erc-tls "30.1")
 (autoload 'erc "erc" "\
-ERC is a powerful, modular, and extensible IRC client.
-This function is the main entry point for ERC.
+Connect to an Internet Relay Chat SERVER on a non-TLS PORT.
+Use NICK and USER, when non-nil, to inform the IRC commands of
+the same name, possibly factoring in a non-nil FULL-NAME as well.
+When PASSWORD is non-nil, also send an opening server password
+via the \"PASS\" command.  Interactively, prompt for SERVER,
+PORT, NICK, and PASSWORD, along with USER and FULL-NAME when
+given a prefix argument.  Non-interactively, expect the rarely
+needed ID parameter, when non-nil, to be a symbol or a string for
+naming the server buffer and identifying the connection
+unequivocally.  (See Info node `(erc) Connecting' for details
+about all mentioned parameters.)
 
-It allows selecting connection parameters, and then starts ERC.
+Together with `erc-tls', this command serves as the main entry
+point for ERC, the powerful, modular, and extensible IRC client.
+Non-interactively, both commands accept the following keyword
+arguments, with their defaults supplied by the indicated
+\"compute\" functions:
 
-Non-interactively, it takes the keyword arguments
-   (server (erc-compute-server))
-   (port   (erc-compute-port))
-   (nick   (erc-compute-nick))
-   (user   (erc-compute-user))
-   password
-   (full-name (erc-compute-full-name))
-   id
+  :server    `erc-compute-server'
+  :port      `erc-compute-port'
+  :nick      `erc-compute-nick'
+  :user      `erc-compute-user'
+  :password   N/A
+  :full-name `erc-compute-full-name'
+  :id'        N/A
 
-That is, if called with
+For example, when called in the following manner
 
    (erc :server \"irc.libera.chat\" :full-name \"J. Random Hacker\")
 
-then the server and full-name will be set to those values,
-whereas `erc-compute-port' and `erc-compute-nick' will be invoked
-for the values of the other parameters.
-
-See `erc-tls' for the meaning of ID.
+ERC assigns SERVER and FULL-NAME the associated keyword values
+and defers to `erc-compute-port', `erc-compute-user', and
+`erc-compute-nick' for those respective parameters.
 
 (fn &key SERVER PORT NICK USER PASSWORD FULL-NAME ID)" '((let ((erc--display-context `((erc-interactive-display . erc) ,@erc--display-context))) (erc-select-read-args))))
 (defalias 'erc-select #'erc)
 (autoload 'erc-tls "erc" "\
-ERC is a powerful, modular, and extensible IRC client.
-This function is the main entry point for ERC over TLS.
+Connect to an IRC server over a TLS-encrypted connection.
+Interactively, prompt for SERVER, PORT, NICK, and PASSWORD, along
+with USER and FULL-NAME when given a prefix argument.
+Non-interactively, also accept a CLIENT-CERTIFICATE, which should
+be a list containing the file name of the certificate's key
+followed by that of the certificate itself.  Alternatively,
+accept a value of t instead of a list, to tell ERC to query
+`auth-source' for the certificate's details.
 
-It allows selecting connection parameters, and then starts ERC
-over TLS.
-
-Non-interactively, it takes the keyword arguments
-   (server (erc-compute-server))
-   (port   (erc-compute-port))
-   (nick   (erc-compute-nick))
-   (user   (erc-compute-user))
-   password
-   (full-name (erc-compute-full-name))
-   client-certificate
-   id
-
-That is, if called with
-
-   (erc-tls :server \"irc.libera.chat\" :full-name \"J. Random Hacker\")
-
-then the server and full-name will be set to those values,
-whereas `erc-compute-port' and `erc-compute-nick' will be invoked
-for the values of their respective parameters.
-
-CLIENT-CERTIFICATE, if non-nil, should either be a list where the
-first element is the certificate key file name, and the second
-element is the certificate file name itself, or t, which means
-that `auth-source' will be queried for the key and the
-certificate.  Authenticating using a TLS client certificate is
-also referred to as \"CertFP\" (Certificate Fingerprint)
-authentication by various IRC networks.
-
-Example usage:
+Example client certificate (CertFP) usage:
 
     (erc-tls :server \"irc.libera.chat\" :port 6697
              :client-certificate
              \\='(\"/home/bandali/my-cert.key\"
                \"/home/bandali/my-cert.crt\"))
 
-When present, ID should be a symbol or a string to use for naming
-the server buffer and identifying the connection unequivocally.
-See Info node `(erc) Network Identifier' for details.  Like
-CLIENT-CERTIFICATE, this parameter cannot be specified
-interactively.
+See the alternative entry-point command `erc' as well as Info
+node `(erc) Connecting' for a fuller description of the various
+parameters, like ID.
 
 (fn &key SERVER PORT NICK USER PASSWORD FULL-NAME CLIENT-CERTIFICATE ID)" '((let ((erc-default-port erc-default-port-tls) (erc--display-context `((erc-interactive-display . erc-tls) ,@erc--display-context))) (erc-select-read-args))))
 (autoload 'erc-handle-irc-url "erc" "\
@@ -10494,6 +10105,46 @@ Display the documentation for TEST-OR-TEST-NAME (a symbol or ert-test).
 
 (fn TEST-OR-TEST-NAME)" t)
 (register-definition-prefixes "ert" '("ert-"))
+
+
+;;; Generated autoloads from emacs-lisp/ert-font-lock.el
+
+(autoload 'ert-font-lock-deftest "ert-font-lock" "\
+Define test NAME (a symbol) using assertions from TEST-STR.
+
+Other than MAJOR-MODE and TEST-STR parameters, this macro accepts
+the same parameters and keywords as `ert-deftest' and is intended
+to be used through `ert'.
+
+(fn NAME () [DOCSTRING] [:expected-result RESULT-TYPE] [:tags \\='(TAG...)] MAJOR-MODE TEST-STR)" nil t)
+(function-put 'ert-font-lock-deftest 'doc-string-elt 3)
+(function-put 'ert-font-lock-deftest 'lisp-indent-function 2)
+(autoload 'ert-font-lock-deftest-file "ert-font-lock" "\
+Define test NAME (a symbol) using assertions from FILE.
+
+FILE - path to a file with assertions in ERT resource director as
+return by `ert-resource-directory'.
+
+Other than MAJOR-MODE and FILE parameters, this macro accepts the
+same parameters and keywords as `ert-deftest' and is intended to
+be used through `ert'.
+
+(fn NAME () [DOCSTRING] [:expected-result RESULT-TYPE] [:tags \\='(TAG...)] MAJOR-MODE FILE)" nil t)
+(function-put 'ert-font-lock-deftest-file 'doc-string-elt 3)
+(function-put 'ert-font-lock-deftest-file 'lisp-indent-function 2)
+(autoload 'ert-font-lock-test-string "ert-font-lock" "\
+Check font faces in TEST-STRING set by MODE.
+
+The function is meant to be run from within an ERT test.
+
+(fn TEST-STRING MODE)")
+(autoload 'ert-font-lock-test-file "ert-font-lock" "\
+Check font faces in FILENAME set by MODE.
+
+The function is meant to be run from within an ERT test.
+
+(fn FILENAME MODE)")
+(register-definition-prefixes "ert-font-lock" '("ert-font-lock--"))
 
 
 ;;; Generated autoloads from emacs-lisp/ert-x.el
@@ -10879,6 +10530,49 @@ The string to complete is chosen in the same way as the default
 for \\[find-tag] (which see)." t)
 (autoload 'etags--xref-backend "etags")
 (register-definition-prefixes "etags" '("default-tags-table-function" "etags-" "file-of-tag" "find-tag-" "goto-tag-location-function" "initialize-new-tags-table" "last-tag" "list-tags-function" "select-tags-table-" "snarf-tag-function" "tag" "verify-tags-table-function"))
+
+
+;;; Generated autoloads from progmodes/etags-regen.el
+
+(put 'etags-regen-regexp-alist 'safe-local-variable (lambda (value) (and (listp value) (seq-every-p (lambda (group) (and (consp group) (listp (car group)) (listp (cdr group)) (seq-every-p #'stringp (car group)) (seq-every-p #'stringp (cdr group)))) value))))
+(put 'etags-regen-file-extensions 'safe-local-variable (lambda (value) (and (listp value) (seq-every-p #'stringp value))))
+(put 'etags-regen-ignores 'safe-local-variable (lambda (value) (and (listp value) (seq-every-p #'stringp value))))
+(defvar etags-regen-mode nil "\
+Non-nil if Etags-Regen mode is enabled.
+See the `etags-regen-mode' command
+for a description of this minor mode.
+Setting this variable directly does not take effect;
+either customize it (see the info node `Easy Customization')
+or call the function `etags-regen-mode'.")
+(custom-autoload 'etags-regen-mode "etags-regen" nil)
+(autoload 'etags-regen-mode "etags-regen" "\
+Minor mode to automatically generate and update tags tables.
+
+This minor mode generates the tags table automatically based on
+the current project configuration, and later updates it as you
+edit the files and save the changes.
+
+If you select a tags table manually (for example, using
+\\[visit-tags-table]), then this mode will be effectively
+disabled for the entire session.  Use \\[tags-reset-tags-tables]
+to countermand the effect of a previous \\[visit-tags-table].
+
+This is a global minor mode.  If called interactively, toggle the
+`Etags-Regen mode' mode.  If the prefix argument is positive,
+enable the mode, and if it is zero or negative, disable the mode.
+
+If called from Lisp, toggle the mode if ARG is `toggle'.  Enable
+the mode if ARG is nil, omitted, or is a positive number.
+Disable the mode if ARG is a negative number.
+
+To check whether the minor mode is enabled in the current buffer,
+evaluate `(default-value \\='etags-regen-mode)'.
+
+The mode's hook is called both when the mode is enabled and when
+it is disabled.
+
+(fn &optional ARG)" t)
+(register-definition-prefixes "etags-regen" '("etags-regen-"))
 
 
 ;;; Generated autoloads from language/ethio-util.el
@@ -11439,20 +11133,10 @@ This is used only in conjunction with `expand-add-abbrevs'." t)
 (register-definition-prefixes "expand" '("expand-"))
 
 
-;;; Generated autoloads from cedet/srecode/expandproto.el
-
-(register-definition-prefixes "srecode/expandproto" '("srecode-"))
-
-
 ;;; Generated autoloads from external-completion.el
 
 (push (purecopy '(external-completion 0 1)) package--builtin-versions)
 (register-definition-prefixes "external-completion" '("external-completion-"))
-
-
-;;; Generated autoloads from cedet/srecode/extract.el
-
-(register-definition-prefixes "srecode/extract" '("srecode-extract"))
 
 
 ;;; Generated autoloads from ezimage.el
@@ -11793,11 +11477,6 @@ FUNCTION must return an explanation when the test fails and
 (register-definition-prefixes "faceup" '("faceup-"))
 
 
-;;; Generated autoloads from cedet/semantic/analyze/fcn.el
-
-(register-definition-prefixes "semantic/analyze/fcn" '("semantic-analyze-"))
-
-
 ;;; Generated autoloads from mail/feedmail.el
 
 (push (purecopy '(feedmail 11)) package--builtin-versions)
@@ -11907,11 +11586,6 @@ Evaluate the forms in variable `ffap-bindings'." t)
 (register-definition-prefixes "ffap" '("dired-at-point-" "ffap-" "find-file-literally-at-point"))
 
 
-;;; Generated autoloads from cedet/srecode/fields.el
-
-(register-definition-prefixes "srecode/fields" '("srecode-"))
-
-
 ;;; Generated autoloads from filecache.el
 
 (autoload 'file-cache-add-directory "filecache" "\
@@ -12005,11 +11679,6 @@ Call NOTIFY's callback on NOTIFY's event.
 (fn NOTIFY)" t)
 (function-put 'file-notify-handle-event 'completion-predicate #'ignore)
 (register-definition-prefixes "filenotify" '("file-notify-"))
-
-
-;;; Generated autoloads from cedet/ede/files.el
-
-(register-definition-prefixes "ede/files" '("ede-"))
 
 
 ;;; Generated autoloads from files-x.el
@@ -12169,12 +11838,14 @@ earlier in the `setq-connection-local'.  The return value of the
 (fn [VARIABLE VALUE]...)" nil t)
 (autoload 'connection-local-p "files-x" "\
 Non-nil if VARIABLE has a connection-local binding in `default-directory'.
+`default-directory' must be a remote file name.
 If APPLICATION is nil, the value of
 `connection-local-default-application' is used.
 
 (fn VARIABLE &optional APPLICATION)" nil t)
 (autoload 'connection-local-value "files-x" "\
 Return connection-local VARIABLE for APPLICATION in `default-directory'.
+`default-directory' must be a remote file name.
 If APPLICATION is nil, the value of
 `connection-local-default-application' is used.
 If VARIABLE does not have a connection-local binding, the return
@@ -12194,26 +11865,6 @@ The connection-local value of `null-device'.")
 Filesets initialization.
 Set up hooks, load the cache file -- if existing -- and build the menu.")
 (register-definition-prefixes "filesets" '("filesets-"))
-
-
-;;; Generated autoloads from cedet/semantic/symref/filter.el
-
-(register-definition-prefixes "semantic/symref/filter" '("semantic-symref-"))
-
-
-;;; Generated autoloads from cedet/srecode/filters.el
-
-(register-definition-prefixes "srecode/filters" '("srecode-comment-prefix"))
-
-
-;;; Generated autoloads from cedet/srecode/find.el
-
-(register-definition-prefixes "srecode/find" '("srecode-"))
-
-
-;;; Generated autoloads from cedet/semantic/find.el
-
-(register-definition-prefixes "semantic/find" '("semantic-"))
 
 
 ;;; Generated autoloads from find-cmd.el
@@ -12964,11 +12615,6 @@ it is disabled.
 (register-definition-prefixes "footnote" '("footnote-"))
 
 
-;;; Generated autoloads from cedet/semantic/format.el
-
-(register-definition-prefixes "semantic/format" '("semantic-"))
-
-
 ;;; Generated autoloads from format-spec.el
 
 (autoload 'format-spec "format-spec" "\
@@ -13375,11 +13021,6 @@ If BITMAP already exists, the existing definition is replaced."))
 (register-definition-prefixes "fringe" '("fringe-" "set-fringe-"))
 
 
-;;; Generated autoloads from cedet/semantic/fw.el
-
-(register-definition-prefixes "semantic/fw" '("semantic"))
-
-
 ;;; Generated autoloads from play/gamegrid.el
 
 (register-definition-prefixes "gamegrid" '("gamegrid-"))
@@ -13388,11 +13029,6 @@ If BITMAP already exists, the existing definition is replaced."))
 ;;; Generated autoloads from play/gametree.el
 
 (register-definition-prefixes "gametree" '("gametree-"))
-
-
-;;; Generated autoloads from cedet/semantic/bovine/gcc.el
-
-(register-definition-prefixes "semantic/bovine/gcc" '("semantic-"))
 
 
 ;;; Generated autoloads from progmodes/gdb-mi.el
@@ -13570,16 +13206,6 @@ regular expression that can be used as an element of
 (register-definition-prefixes "generic" '("generic-"))
 
 
-;;; Generated autoloads from cedet/ede/generic.el
-
-(register-definition-prefixes "ede/generic" '("ede-generic-"))
-
-
-;;; Generated autoloads from cedet/srecode/getset.el
-
-(register-definition-prefixes "srecode/getset" '("srecode-"))
-
-
 ;;; Generated autoloads from progmodes/glasses.el
 
 (autoload 'glasses-mode "glasses" "\
@@ -13604,11 +13230,6 @@ it is disabled.
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "glasses" '("glasses-"))
-
-
-;;; Generated autoloads from cedet/semantic/symref/global.el
-
-(register-definition-prefixes "semantic/symref/global" '("semantic-symref-global--line-re"))
 
 
 ;;; Generated autoloads from textmodes/glyphless-mode.el
@@ -14558,29 +14179,6 @@ it is disabled.
 (register-definition-prefixes "goto-addr" '("goto-addr"))
 
 
-;;; Generated autoloads from cedet/semantic/wisent/grammar.el
-
-(autoload 'wisent-grammar-mode "semantic/wisent/grammar" "\
-Major mode for editing Wisent grammars.
-
-(fn)" t)
-(register-definition-prefixes "semantic/wisent/grammar" '("semantic-grammar-" "wisent-"))
-
-
-;;; Generated autoloads from cedet/semantic/bovine/grammar.el
-
-(autoload 'bovine-grammar-mode "semantic/bovine/grammar" "\
-Major mode for editing Bovine grammars.
-
-(fn)" t)
-(register-definition-prefixes "semantic/bovine/grammar" '("bovine-" "semantic-grammar-"))
-
-
-;;; Generated autoloads from cedet/semantic/grammar.el
-
-(register-definition-prefixes "semantic/grammar" '("semantic-"))
-
-
 ;;; Generated autoloads from image/gravatar.el
 
 (autoload 'gravatar-retrieve "gravatar" "\
@@ -14796,11 +14394,6 @@ command before it's run.
 (fn REGEXP &optional FILES DIR CONFIRM TEMPLATE)" t)
 (defalias 'rzgrep #'zrgrep)
 (register-definition-prefixes "grep" '("grep-" "kill-grep" "rgrep-"))
-
-
-;;; Generated autoloads from cedet/semantic/symref/grep.el
-
-(register-definition-prefixes "semantic/symref/grep" '("semantic-symref-"))
 
 
 ;;; Generated autoloads from gnus/gssapi.el
@@ -15861,7 +15454,7 @@ it is disabled.
 
 ;;; Generated autoloads from progmodes/hideshow.el
 
-(defvar hs-special-modes-alist (mapcar #'purecopy '((c-mode "{" "}" "/[*/]" nil nil) (c-ts-mode "{" "}" "/[*/]" nil nil) (c++-mode "{" "}" "/[*/]" nil nil) (c++-ts-mode "{" "}" "/[*/]" nil nil) (bibtex-mode ("@\\S(*\\(\\s(\\)" 1)) (java-mode "{" "}" "/[*/]" nil nil) (java-ts-mode "{" "}" "/[*/]" nil nil) (js-mode "{" "}" "/[*/]" nil) (js-ts-mode "{" "}" "/[*/]" nil) (lua-ts-mode "{\\|\\[\\[" "}\\|\\]\\]" "--" nil) (mhtml-mode "{\\|<[^/>]*?" "}\\|</[^/>]*[^/]>" "<!--" mhtml-forward nil))) "\
+(defvar hs-special-modes-alist (mapcar #'purecopy '((c-mode "{" "}" "/[*/]" nil nil) (c-ts-mode "{" "}" "/[*/]" nil nil) (c++-mode "{" "}" "/[*/]" nil nil) (c++-ts-mode "{" "}" "/[*/]" nil nil) (bibtex-mode ("@\\S(*\\(\\s(\\)" 1)) (java-mode "{" "}" "/[*/]" nil nil) (java-ts-mode "{" "}" "/[*/]" nil nil) (js-mode "{" "}" "/[*/]" nil) (js-ts-mode "{" "}" "/[*/]" nil) (mhtml-mode "{\\|<[^/>]*?" "}\\|</[^/>]*[^/]>" "<!--" mhtml-forward nil))) "\
 Alist for initializing the hideshow variables for different modes.
 Each element has the form
   (MODE START END COMMENT-START FORWARD-SEXP-FUNC ADJUST-BEG-FUNC
@@ -16256,11 +15849,6 @@ values.
 (register-definition-prefixes "holidays" '("calendar-" "holiday-"))
 
 
-;;; Generated autoloads from cedet/semantic/html.el
-
-(register-definition-prefixes "semantic/html" '("semantic-"))
-
-
 ;;; Generated autoloads from htmlfontify.el
 
 (push (purecopy '(htmlfontify 0 21)) package--builtin-versions)
@@ -16291,16 +15879,6 @@ You may also want to set `hfy-page-header' and `hfy-page-footer'.
 
 (fn SRCDIR DSTDIR &optional F-EXT L-EXT)" t)
 (register-definition-prefixes "htmlfontify" '("hfy-" "htmlfontify-"))
-
-
-;;; Generated autoloads from cedet/semantic/ia.el
-
-(register-definition-prefixes "semantic/ia" '("semantic-ia-"))
-
-
-;;; Generated autoloads from cedet/semantic/ia-sb.el
-
-(register-definition-prefixes "semantic/ia-sb" '("semantic-ia-s"))
 
 
 ;;; Generated autoloads from ibuf-ext.el
@@ -16676,11 +16254,6 @@ Pop to a buffer to describe ICON.
 
 (fn ICON)" t)
 (register-definition-prefixes "icons" '("button" "define-icon" "icon"))
-
-
-;;; Generated autoloads from cedet/semantic/idle.el
-
-(register-definition-prefixes "semantic/idle" '("define-semantic-idle-service" "global-semantic-idle-summary-mode" "semantic-"))
 
 
 ;;; Generated autoloads from progmodes/idlw-complete-structtag.el
@@ -17076,11 +16649,6 @@ DEF, if non-nil, is the default value.
 
 (fn PROMPT CHOICES &optional PREDICATE REQUIRE-MATCH INITIAL-INPUT HIST DEF INHERIT-INPUT-METHOD)")
 (register-definition-prefixes "ido" '("ido-"))
-
-
-;;; Generated autoloads from cedet/semantic/symref/idutils.el
-
-(register-definition-prefixes "semantic/symref/idutils" '("semantic-symref-idutils--line-re"))
 
 
 ;;; Generated autoloads from ielm.el
@@ -17673,11 +17241,6 @@ A non-image major mode displays an image file as text.")
 (register-definition-prefixes "imap" '("imap-"))
 
 
-;;; Generated autoloads from cedet/semantic/imenu.el
-
-(register-definition-prefixes "semantic/imenu" '("semantic-"))
-
-
 ;;; Generated autoloads from imenu.el
 
 (defvar imenu-sort-function nil "\
@@ -17806,11 +17369,6 @@ for more information.
 
 (fn INDEX-ITEM)" t)
 (register-definition-prefixes "imenu" '("imenu-"))
-
-
-;;; Generated autoloads from cedet/semantic/decorate/include.el
-
-(register-definition-prefixes "semantic/decorate/include" '("semantic-decoration-"))
 
 
 ;;; Generated autoloads from language/ind-util.el
@@ -18263,11 +17821,6 @@ See Info node `(elisp)Defining Functions' for more details.
 (register-definition-prefixes "inline" '("inline-"))
 
 
-;;; Generated autoloads from cedet/srecode/insert.el
-
-(register-definition-prefixes "srecode/insert" '("srecode-"))
-
-
 ;;; Generated autoloads from leim/quail/ipa.el
 
 (register-definition-prefixes "quail/ipa" '("ipa-x-sampa-"))
@@ -18677,21 +18230,6 @@ If non-nil, second arg INITIAL-INPUT is a string to insert before reading.
 (register-definition-prefixes "quail/japanese" '("quail-japanese-"))
 
 
-;;; Generated autoloads from cedet/semantic/java.el
-
-(register-definition-prefixes "semantic/java" '("semantic-"))
-
-
-;;; Generated autoloads from cedet/semantic/wisent/java-tags.el
-
-(register-definition-prefixes "semantic/wisent/java-tags" '("semantic-" "wisent-java-parse-error"))
-
-
-;;; Generated autoloads from cedet/semantic/wisent/javascript.el
-
-(register-definition-prefixes "semantic/wisent/javascript" '("semantic-" "wisent-javascript-jv-expand-tag"))
-
-
 ;;; Generated autoloads from jka-compr.el
 
 (defvar jka-compr-inhibit nil "\
@@ -18748,7 +18286,7 @@ one of the aforementioned options instead of using this mode.
 
 ;;; Generated autoloads from jsonrpc.el
 
-(push (purecopy '(jsonrpc 1 0 23)) package--builtin-versions)
+(push (purecopy '(jsonrpc 1 0 20)) package--builtin-versions)
 (register-definition-prefixes "jsonrpc" '("jsonrpc-"))
 
 
@@ -19161,16 +18699,6 @@ the following form evaluates to nil:
 (register-definition-prefixes "let-alist" '("let-alist--"))
 
 
-;;; Generated autoloads from cedet/semantic/lex.el
-
-(register-definition-prefixes "semantic/lex" '("define-lex" "semantic-"))
-
-
-;;; Generated autoloads from cedet/semantic/lex-spp.el
-
-(register-definition-prefixes "semantic/lex-spp" '("define-lex-spp-" "semantic-lex-"))
-
-
 ;;; Generated autoloads from play/life.el
 
 (autoload 'life "life" "\
@@ -19187,19 +18715,9 @@ sleep in seconds.
 (register-definition-prefixes "life" '("life-"))
 
 
-;;; Generated autoloads from cedet/ede/linux.el
-
-(register-definition-prefixes "ede/linux" '("ede-linux-" "project-linux-"))
-
-
 ;;; Generated autoloads from emacs-lisp/lisp-mnt.el
 
 (register-definition-prefixes "lisp-mnt" '("lm-"))
-
-
-;;; Generated autoloads from cedet/semantic/symref/list.el
-
-(register-definition-prefixes "semantic/symref/list" '("semantic-symref-"))
 
 
 ;;; Generated autoloads from emacs-lisp/loaddefs-gen.el
@@ -19271,11 +18789,6 @@ something strange, such as redefining an Emacs function.
 
 (fn FEATURE &optional FORCE)" t)
 (register-definition-prefixes "loadhist" '("feature-" "file-" "loadhist-unload-filename" "read-feature" "unload-"))
-
-
-;;; Generated autoloads from cedet/ede/locate.el
-
-(register-definition-prefixes "ede/locate" '("ede-locate-"))
 
 
 ;;; Generated autoloads from locate.el
@@ -19493,19 +19006,6 @@ Non-nil means ls-lisp treats file patterns as shell wildcards.
 Otherwise they are treated as Emacs regexps (for backward compatibility).")
 (custom-autoload 'ls-lisp-support-shell-wildcards "ls-lisp" t)
 (register-definition-prefixes "ls-lisp" '("ls-lisp-"))
-
-
-;;; Generated autoloads from progmodes/lua-ts-mode.el
-
-(autoload 'lua-ts-inferior-lua "lua-ts-mode" "\
-Run a Lua interpreter in an inferior process." t)
-(autoload 'lua-ts-mode "lua-ts-mode" "\
-Major mode for editing Lua files, powered by tree-sitter.
-
-\\{lua-ts-mode-map}
-
-(fn)" t)
-(register-definition-prefixes "lua-ts-mode" '("lua-ts-"))
 
 
 ;;; Generated autoloads from calendar/lunar.el
@@ -19902,16 +19402,6 @@ Mairix will be called asynchronously unless
 (register-definition-prefixes "mairix" '("mairix-"))
 
 
-;;; Generated autoloads from cedet/semantic/bovine/make.el
-
-(register-definition-prefixes "semantic/bovine/make" '("semantic-"))
-
-
-;;; Generated autoloads from cedet/ede/make.el
-
-(register-definition-prefixes "ede/make" '("ede-"))
-
-
 ;;; Generated autoloads from progmodes/make-mode.el
 
 (autoload 'makefile-mode "make-mode" "\
@@ -19994,11 +19484,6 @@ An adapted `makefile-mode' that knows about imake.
 (register-definition-prefixes "make-mode" '("makefile-"))
 
 
-;;; Generated autoloads from cedet/ede/makefile-edit.el
-
-(register-definition-prefixes "ede/makefile-edit" '("makefile-"))
-
-
 ;;; Generated autoloads from textmodes/makeinfo.el
 
 (register-definition-prefixes "makeinfo" '("makeinfo-"))
@@ -20073,11 +19558,6 @@ Populate MENU with commands that open a man page at point.
 
 (push (purecopy '(map 3 3 1)) package--builtin-versions)
 (register-definition-prefixes "map" '("map-"))
-
-
-;;; Generated autoloads from cedet/srecode/map.el
-
-(register-definition-prefixes "srecode/map" '("srecode-"))
 
 
 ;;; Generated autoloads from master.el
@@ -21020,17 +20500,7 @@ will be computed and used.
 (register-definition-prefixes "mml2015" '("mml2015-"))
 
 
-;;; Generated autoloads from cedet/srecode/mode.el
-
-(register-definition-prefixes "srecode/mode" '("srecode-"))
-
-
-;;; Generated autoloads from cedet/semantic/decorate/mode.el
-
-(register-definition-prefixes "semantic/decorate/mode" '("define-semantic-decoration-style" "semantic-"))
-
-
-;;; Generated autoloads from cedet/mode-local.el
+;;; Generated autoloads from mode-local.el
 
 (put 'define-overloadable-function 'doc-string-elt 3)
 (register-definition-prefixes "mode-local" '("def" "describe-mode-local-bindings" "fetch-overload" "get-mode-local-parent" "make-obsolete-overload" "mode-local-" "setq-mode-local" "with-mode-local" "xref-mode-local-"))
@@ -21151,11 +20621,6 @@ Main entry point for MPC." t)
 (autoload 'mpuz "mpuz" "\
 Multiplication puzzle with GNU Emacs." t)
 (register-definition-prefixes "mpuz" '("mpuz-"))
-
-
-;;; Generated autoloads from cedet/semantic/mru-bookmark.el
-
-(register-definition-prefixes "semantic/mru-bookmark" '("global-semantic-mru-bookmark-mode" "semantic-"))
 
 
 ;;; Generated autoloads from msb.el
@@ -22497,7 +21962,7 @@ Coloring:
 
 ;;; Generated autoloads from org/org.el
 
-(push (purecopy '(org 9 6 13)) package--builtin-versions)
+(push (purecopy '(org 9 6 15)) package--builtin-versions)
 (autoload 'org-babel-do-load-languages "org" "\
 Load the languages defined in `org-babel-load-languages'.
 
@@ -24267,11 +23732,6 @@ Setup `shell-mode' to use pcomplete.")
 (register-definition-prefixes "pcomplete" '("pcomplete-"))
 
 
-;;; Generated autoloads from cedet/ede/pconf.el
-
-(register-definition-prefixes "ede/pconf" '("ede-pconf-create-file-query"))
-
-
 ;;; Generated autoloads from vc/pcvs.el
 
 (autoload 'cvs-checkout "pcvs" "\
@@ -24507,11 +23967,6 @@ they are not by default assigned to keys." t)
 (register-definition-prefixes "picture" '("picture-"))
 
 
-;;; Generated autoloads from language/pinyin.el
-
-(register-definition-prefixes "pinyin" '("pinyin-character-map"))
-
-
 ;;; Generated autoloads from textmodes/pixel-fill.el
 
 (register-definition-prefixes "pixel-fill" '("pixel-fill-"))
@@ -24560,11 +24015,6 @@ Major mode for editing plstore files.
 
 (fn)" t)
 (register-definition-prefixes "plstore" '("plstore-"))
-
-
-;;; Generated autoloads from cedet/ede/pmake.el
-
-(register-definition-prefixes "ede/pmake" '("ede-pmake-"))
 
 
 ;;; Generated autoloads from textmodes/po.el
@@ -25185,64 +24635,9 @@ Open profile FILENAME.
 (register-definition-prefixes "profiler" '("profiler-"))
 
 
-;;; Generated autoloads from cedet/ede/proj.el
-
-(register-definition-prefixes "ede/proj" '("ede-proj-"))
-
-
-;;; Generated autoloads from cedet/ede/proj-archive.el
-
-(register-definition-prefixes "ede/proj-archive" '("ede-"))
-
-
-;;; Generated autoloads from cedet/ede/proj-aux.el
-
-(register-definition-prefixes "ede/proj-aux" '("ede-"))
-
-
-;;; Generated autoloads from cedet/ede/proj-comp.el
-
-(register-definition-prefixes "ede/proj-comp" '("ede-" "proj-comp-insert-variable-once"))
-
-
-;;; Generated autoloads from cedet/ede/proj-elisp.el
-
-(register-definition-prefixes "ede/proj-elisp" '("ede-"))
-
-
-;;; Generated autoloads from cedet/ede/proj-info.el
-
-(register-definition-prefixes "ede/proj-info" '("ede-"))
-
-
-;;; Generated autoloads from cedet/ede/proj-misc.el
-
-(register-definition-prefixes "ede/proj-misc" '("ede-"))
-
-
-;;; Generated autoloads from cedet/ede/proj-obj.el
-
-(register-definition-prefixes "ede/proj-obj" '("ede-"))
-
-
-;;; Generated autoloads from cedet/ede/proj-prog.el
-
-(register-definition-prefixes "ede/proj-prog" '("ede-proj-target-makefile-program"))
-
-
-;;; Generated autoloads from cedet/ede/proj-scheme.el
-
-(register-definition-prefixes "ede/proj-scheme" '("ede-proj-target-scheme"))
-
-
-;;; Generated autoloads from cedet/ede/proj-shared.el
-
-(register-definition-prefixes "ede/proj-shared" '("ede-"))
-
-
 ;;; Generated autoloads from progmodes/project.el
 
-(push (purecopy '(project 0 9 8)) package--builtin-versions)
+(push (purecopy '(project 0 10 0)) package--builtin-versions)
 (autoload 'project-get-project "project" "\
 Return the project for DIRECTORY, and mark as most recently used.
 DIRECTORY defaults to `default-directory'.  If no project obtains
@@ -25262,7 +24657,7 @@ Under MAYBE-PROMPT, calls `project-get-project'.
 (put 'project-vc-include-untracked 'safe-local-variable #'booleanp)
 (put 'project-vc-name 'safe-local-variable #'stringp)
 (put 'project-vc-extra-root-markers 'safe-local-variable (lambda (val) (and (listp val) (not (memq nil (mapcar #'stringp val))))))
-(defvar project-prefix-map (let ((map (make-sparse-keymap (lambda nil (when-let ((pr (project-most-recent-project))) (format "[%s]" (project-name pr))))))) (define-key map "!" 'project-shell-command) (define-key map "&" 'project-async-shell-command) (define-key map "f" 'project-find-file) (define-key map "F" 'project-or-external-find-file) (define-key map "b" 'project-switch-to-buffer) (define-key map "s" 'project-shell) (define-key map "D" 'project-find-dir) (define-key map "d" 'project-dired) (define-key map "v" 'project-vc-dir) (define-key map "c" 'project-compile) (define-key map "e" 'project-eshell) (define-key map "k" 'project-kill-buffers) (define-key map "p" 'project-switch-project) (define-key map "g" 'project-find-regexp) (define-key map "G" 'project-or-external-find-regexp) (define-key map "r" 'project-query-replace-regexp) (define-key map "x" 'project-execute-extended-command) (define-key map "\2" 'project-list-buffers) map) "\
+(defvar project-prefix-map (let ((map (make-sparse-keymap (lambda nil (when-let ((pr (project--most-recent-project))) (format "[%s]" (project-name pr))))))) (define-key map "!" 'project-shell-command) (define-key map "&" 'project-async-shell-command) (define-key map "f" 'project-find-file) (define-key map "F" 'project-or-external-find-file) (define-key map "b" 'project-switch-to-buffer) (define-key map "s" 'project-shell) (define-key map "D" 'project-find-dir) (define-key map "d" 'project-dired) (define-key map "v" 'project-vc-dir) (define-key map "c" 'project-compile) (define-key map "e" 'project-eshell) (define-key map "k" 'project-kill-buffers) (define-key map "p" 'project-switch-project) (define-key map "g" 'project-find-regexp) (define-key map "G" 'project-or-external-find-regexp) (define-key map "r" 'project-query-replace-regexp) (define-key map "x" 'project-execute-extended-command) (define-key map "o" 'project-any-command) (define-key map "\2" 'project-list-buffers) map) "\
 Keymap for project commands.")
  (define-key ctl-x-map "p" project-prefix-map)
 (autoload 'project-other-window-command "project" "\
@@ -25494,11 +24889,6 @@ This feature requires the presence of the following item in
 is part of the default mode line beginning with Emacs 30.")
 (custom-autoload 'project-mode-line "project" t)
 (register-definition-prefixes "project" '("project-"))
-
-
-;;; Generated autoloads from cedet/ede/project-am.el
-
-(register-definition-prefixes "ede/project-am" '("project-am-"))
 
 
 ;;; Generated autoloads from progmodes/prolog.el
@@ -25759,7 +25149,7 @@ If EXTENSION is any other symbol, it is ignored.
 (register-definition-prefixes "ps-samp" '("ps-"))
 
 
-;;; Generated autoloads from cedet/pulse.el
+;;; Generated autoloads from pulse.el
 
 (push (purecopy '(pulse 1 0)) package--builtin-versions)
 (autoload 'pulse-momentary-highlight-one-line "pulse" "\
@@ -25845,11 +25235,6 @@ Major mode for editing Python files.
 (fn)" t)
 (add-to-list 'auto-mode-alist '("/\\(?:Pipfile\\|\\.?flake8\\)\\'" . conf-mode))
 (register-definition-prefixes "python" '("inferior-python-mode" "python-" "run-python-internal"))
-
-
-;;; Generated autoloads from cedet/semantic/wisent/python.el
-
-(register-definition-prefixes "semantic/wisent/python" '("semantic-" "wisent-python-"))
 
 
 ;;; Generated autoloads from mail/qp.el
@@ -26400,11 +25785,6 @@ it is disabled.
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "refill" '("refill-"))
-
-
-;;; Generated autoloads from cedet/semantic/analyze/refs.el
-
-(register-definition-prefixes "semantic/analyze/refs" '("semantic-"))
 
 
 ;;; Generated autoloads from textmodes/reftex.el
@@ -27900,11 +27280,6 @@ it is disabled.
 (register-definition-prefixes "saveplace" '("save-place"))
 
 
-;;; Generated autoloads from cedet/semantic/sb.el
-
-(register-definition-prefixes "semantic/sb" '("semantic-sb-"))
-
-
 ;;; Generated autoloads from progmodes/scheme.el
 
 (autoload 'scheme-mode "scheme" "\
@@ -27940,16 +27315,6 @@ that variable's value is a string.
 
 (fn)" t)
 (register-definition-prefixes "scheme" '("dsssl-" "scheme-"))
-
-
-;;; Generated autoloads from cedet/semantic/bovine/scm.el
-
-(register-definition-prefixes "semantic/bovine/scm" '("semantic-"))
-
-
-;;; Generated autoloads from cedet/semantic/scope.el
-
-(register-definition-prefixes "semantic/scope" '("semantic-"))
 
 
 ;;; Generated autoloads from gnus/score-mode.el
@@ -28039,79 +27404,6 @@ it is disabled.
 (when (featurep 'dbusbind)
  (autoload 'secrets-show-secrets "secrets" nil t))
 (register-definition-prefixes "secrets" '("secrets-"))
-
-
-;;; Generated autoloads from cedet/srecode/semantic.el
-
-(register-definition-prefixes "srecode/semantic" '("srecode-semantic-"))
-
-
-;;; Generated autoloads from cedet/semantic.el
-
-(push (purecopy '(semantic 2 2)) package--builtin-versions)
-(defvar semantic-default-submodes '(global-semantic-idle-scheduler-mode global-semanticdb-minor-mode) "\
-List of auxiliary Semantic minor modes enabled by `semantic-mode'.
-The possible elements of this list include the following:
-
- `global-semanticdb-minor-mode'        - Maintain tag database.
- `global-semantic-idle-scheduler-mode' - Reparse buffer when idle.
- `global-semantic-idle-summary-mode'   - Show summary of tag at point.
- `global-semantic-idle-completions-mode' - Show completions when idle.
- `global-semantic-decoration-mode'     - Additional tag decorations.
- `global-semantic-highlight-func-mode' - Highlight the current tag.
- `global-semantic-stickyfunc-mode'     - Show current fun in header line.
- `global-semantic-mru-bookmark-mode'   - Provide `switch-to-buffer'-like
-                                         keybinding for tag names.
- `global-semantic-idle-local-symbol-highlight-mode' - Highlight references
-                                         of the symbol under point.
-The following modes are more targeted at people who want to see
- some internal information of the semantic parser in action:
- `global-semantic-highlight-edits-mode' - Visualize incremental parser by
-                                         highlighting not-yet parsed changes.
- `global-semantic-show-unmatched-syntax-mode' - Highlight unmatched lexical
-                                         syntax tokens.
- `global-semantic-show-parser-state-mode' - Display the parser cache state.")
-(custom-autoload 'semantic-default-submodes "semantic" t)
-(defvar semantic-mode nil "\
-Non-nil if Semantic mode is enabled.
-See the `semantic-mode' command
-for a description of this minor mode.
-Setting this variable directly does not take effect;
-either customize it (see the info node `Easy Customization')
-or call the function `semantic-mode'.")
-(custom-autoload 'semantic-mode "semantic" nil)
-(autoload 'semantic-mode "semantic" "\
-Toggle parser features (Semantic mode).
-
-In Semantic mode, Emacs parses the buffers you visit for their
-semantic content.  This information is used by a variety of
-auxiliary minor modes, listed in `semantic-default-submodes';
-all the minor modes in this list are also enabled when you enable
-Semantic mode.
-
-\\{semantic-mode-map}
-
-This is a global minor mode.  If called interactively, toggle the
-`Semantic mode' mode.  If the prefix argument is positive, enable
-the mode, and if it is zero or negative, disable the mode.
-
-If called from Lisp, toggle the mode if ARG is `toggle'.  Enable
-the mode if ARG is nil, omitted, or is a positive number.
-Disable the mode if ARG is a negative number.
-
-To check whether the minor mode is enabled in the current buffer,
-evaluate `(default-value \\='semantic-mode)'.
-
-The mode's hook is called both when the mode is enabled and when
-it is disabled.
-
-(fn &optional ARG)" t)
-(register-definition-prefixes "semantic" '("bovinate" "semantic-"))
-
-
-;;; Generated autoloads from cedet/semantic/senator.el
-
-(register-definition-prefixes "semantic/senator" '("semantic-up-reference" "senator-"))
 
 
 ;;; Generated autoloads from mail/sendmail.el
@@ -28688,11 +27980,6 @@ Set up file shadowing." t)
 (register-definition-prefixes "shadowfile" '("shadow"))
 
 
-;;; Generated autoloads from cedet/ede/shell.el
-
-(register-definition-prefixes "ede/shell" '("ede-shell-run-command"))
-
-
 ;;; Generated autoloads from shell.el
 
 (defvar shell-dumb-shell-regexp (purecopy "cmd\\(proxy\\)?\\.exe") "\
@@ -28878,11 +28165,6 @@ Turning on Sieve mode runs `sieve-mode-hook'.
 
 (fn)" t)
 (register-definition-prefixes "sieve-mode" '("sieve-"))
-
-
-;;; Generated autoloads from cedet/ede/simple.el
-
-(register-definition-prefixes "ede/simple" '("ede-simple-"))
 
 
 ;;; Generated autoloads from progmodes/simula.el
@@ -29404,11 +28686,6 @@ Pick your favorite shortcuts:
 (register-definition-prefixes "solitaire" '("solitaire-"))
 
 
-;;; Generated autoloads from cedet/semantic/sort.el
-
-(register-definition-prefixes "semantic/sort" '("semantic-"))
-
-
 ;;; Generated autoloads from sort.el
 
 (put 'sort-fold-case 'safe-local-variable 'booleanp)
@@ -29584,11 +28861,6 @@ is non-nil, it also prints a message describing the number of deletions.
 (register-definition-prefixes "soundex" '("soundex"))
 
 
-;;; Generated autoloads from cedet/ede/source.el
-
-(register-definition-prefixes "ede/source" '("ede-source"))
-
-
 ;;; Generated autoloads from gnus/spam.el
 
 (autoload 'spam-initialize "spam" "\
@@ -29643,11 +28915,6 @@ Spam reports will be queued with the method used when
 ;;; Generated autoloads from gnus/spam-wash.el
 
 (register-definition-prefixes "spam-wash" '("spam-"))
-
-
-;;; Generated autoloads from cedet/ede/speedbar.el
-
-(register-definition-prefixes "ede/speedbar" '("ede-"))
 
 
 ;;; Generated autoloads from speedbar.el
@@ -30173,32 +29440,6 @@ Browse the contents of an sqlite file.
 (register-definition-prefixes "sqlite-mode" '("sqlite-"))
 
 
-;;; Generated autoloads from cedet/ede/srecode.el
-
-(register-definition-prefixes "ede/srecode" '("ede-srecode-"))
-
-
-;;; Generated autoloads from cedet/srecode.el
-
-(push (purecopy '(srecode 1 2)) package--builtin-versions)
-(register-definition-prefixes "srecode" '("srecode-version"))
-
-
-;;; Generated autoloads from cedet/srecode/srt.el
-
-(register-definition-prefixes "srecode/srt" '("srecode-read-"))
-
-
-;;; Generated autoloads from cedet/srecode/srt-mode.el
-
-(autoload 'srecode-template-mode "srecode/srt-mode" "\
-Major-mode for writing SRecode macros.
-
-(fn)" t)
-(defalias 'srt-mode #'srecode-template-mode)
-(register-definition-prefixes "srecode/srt-mode" '("semantic-" "srecode-"))
-
-
 ;;; Generated autoloads from textmodes/string-edit.el
 
 (autoload 'string-edit "string-edit" "\
@@ -30565,11 +29806,6 @@ and `sc-post-hook' is run after the guts of this function.")
 
 (push (purecopy '(svg 1 1)) package--builtin-versions)
 (register-definition-prefixes "svg" '("svg-"))
-
-
-;;; Generated autoloads from cedet/semantic/symref.el
-
-(register-definition-prefixes "semantic/symref" '("semantic-symref-"))
 
 
 ;;; Generated autoloads from t-mouse.el
@@ -31228,34 +30464,9 @@ converts a table into plain text without frames.  It is a companion to
 (register-definition-prefixes "table" '("*table--" "table-"))
 
 
-;;; Generated autoloads from cedet/srecode/table.el
-
-(register-definition-prefixes "srecode/table" '("srecode-"))
-
-
 ;;; Generated autoloads from emacs-lisp/tabulated-list.el
 
 (push (purecopy '(tabulated-list 1 0)) package--builtin-versions)
-
-
-;;; Generated autoloads from cedet/semantic/tag.el
-
-(register-definition-prefixes "semantic/tag" '("semantic-"))
-
-
-;;; Generated autoloads from cedet/semantic/tag-file.el
-
-(register-definition-prefixes "semantic/tag-file" '("semantic-prototype-file"))
-
-
-;;; Generated autoloads from cedet/semantic/tag-ls.el
-
-(register-definition-prefixes "semantic/tag-ls" '("semantic-"))
-
-
-;;; Generated autoloads from cedet/semantic/tag-write.el
-
-(register-definition-prefixes "semantic/tag-write" '("semantic-tag-write-"))
 
 
 ;;; Generated autoloads from talk.el
@@ -31363,11 +30574,6 @@ Normally input is edited in Emacs and sent a line at a time.
 (fn HOST)" t)
 (make-obsolete 'rsh 'nil "29.1")
 (register-definition-prefixes "telnet" '("send-process-next-char" "telnet-"))
-
-
-;;; Generated autoloads from cedet/srecode/template.el
-
-(register-definition-prefixes "srecode/template" '("semantic-tag-components"))
 
 
 ;;; Generated autoloads from tempo.el
@@ -31705,16 +30911,6 @@ Major mode to edit DocTeX files.
 
 (fn)" t)
 (register-definition-prefixes "tex-mode" '("doctex-font-lock-" "latex-" "plain-tex-mode-map" "tex-"))
-
-
-;;; Generated autoloads from cedet/srecode/texi.el
-
-(register-definition-prefixes "srecode/texi" '("semantic-insert-foreign-tag" "srecode-texi-"))
-
-
-;;; Generated autoloads from cedet/semantic/texi.el
-
-(register-definition-prefixes "semantic/texi" '("semantic-"))
 
 
 ;;; Generated autoloads from textmodes/texinfmt.el
@@ -32858,7 +32054,7 @@ Add archive file name handler to `file-name-handler-alist'." (when (and tramp-ar
 
 ;;; Generated autoloads from net/trampver.el
 
-(push (purecopy '(tramp 2 7 0 -1)) package--builtin-versions)
+(push (purecopy '(tramp 2 7 1 -1)) package--builtin-versions)
 (register-definition-prefixes "trampver" '("tramp-"))
 
 
@@ -32962,7 +32158,7 @@ See info node `(transient)Modifying Existing Transients'.
 
 ;;; Generated autoloads from tree-sitter.el
 
-(defvar tree-sitter-resources-dir (if-let ((interactive (not noninteractive)) (proper-dir (ignore-errors (file-name-directory (directory-file-name (with-temp-buffer (let ((proc (start-process "tree-sitter-resources-dir" (current-buffer) "tree-sitter" "dump-libpath"))) (cl-loop repeat 10 while (process-live-p proc) do (sleep-for 0 100) finally (when (process-live-p proc) (kill-process proc))) (car (split-string (buffer-substring-no-properties (point-min) (point-max))))))))))) proper-dir (concat (file-name-as-directory (or (getenv "XDG_CACHE_HOME") (expand-file-name ".cache" "~"))) "tree-sitter")) "\
+(defvar tree-sitter-resources-dir (if-let ((interactive (not noninteractive)) (proper-dir (ignore-errors (file-name-directory (directory-file-name (with-temp-buffer (let ((proc (start-process "tree-sitter-resources-dir" (current-buffer) "tree-sitter" "dump-libpath"))) (cl-loop repeat 10 while (process-live-p proc) do (sleep-for 0.1) finally (when (process-live-p proc) (kill-process proc))) (car (split-string (buffer-substring-no-properties (point-min) (point-max))))))))))) proper-dir (concat (file-name-as-directory (or (getenv "XDG_CACHE_HOME") (expand-file-name ".cache" "~"))) "tree-sitter")) "\
 Follows dirs::cache_dir in the Rust dirs crate.
 On Linux systems this is $XDG_CACHE_HOME/tree-sitter.")
 (custom-autoload 'tree-sitter-resources-dir "tree-sitter" t)
@@ -34143,7 +33339,6 @@ Normalize arguments to delight.
 
 ;;; Generated autoloads from use-package/use-package-ensure-system-package.el
 
-(push (purecopy '(use-package-ensure-system-package 0 2)) package--builtin-versions)
 (autoload 'use-package-normalize/:ensure-system-package "use-package-ensure-system-package" "\
 Turn ARGS into a list of conses of the form (PACKAGE-NAME . INSTALL-COMMAND).
 
@@ -34239,21 +33434,6 @@ Encode UTF-7 STRING.  Use IMAP modification if FOR-IMAP is non-nil.
 
 (fn STRING &optional FOR-IMAP)")
 (register-definition-prefixes "utf7" '("utf7-"))
-
-
-;;; Generated autoloads from cedet/semantic/util.el
-
-(register-definition-prefixes "semantic/util" '("semantic-"))
-
-
-;;; Generated autoloads from cedet/ede/util.el
-
-(register-definition-prefixes "ede/util" '("ede-make-buffer-writable"))
-
-
-;;; Generated autoloads from cedet/semantic/util-modes.el
-
-(register-definition-prefixes "semantic/util-modes" '("semantic-"))
 
 
 ;;; Generated autoloads from mail/uudecode.el
@@ -34857,6 +34037,25 @@ case, and the process object in the asynchronous case.
       (progn
         (load "vc-git" nil t)
         (vc-git-registered file))))
+(autoload 'vc-git-grep "vc-git" "\
+Run git grep, searching for REGEXP in FILES in directory DIR.
+The search is limited to file names matching shell pattern FILES.
+FILES may use abbreviations defined in `grep-files-aliases', e.g.
+entering `ch' is equivalent to `*.[ch]'.  As whitespace triggers
+completion when entering a pattern, including it requires
+quoting, e.g. `\\[quoted-insert]<space>'.
+
+With \\[universal-argument] prefix, you can edit the constructed shell command line
+before it is executed.
+With two \\[universal-argument] prefixes, directly edit and run `grep-command'.
+
+Collect output in a buffer.  While git grep runs asynchronously, you
+can use \\[next-error] (`next-error'), or \\<grep-mode-map>\\[compile-goto-error] in the grep output buffer,
+to go to the lines where grep found matches.
+
+This command shares argument histories with \\[rgrep] and \\[grep].
+
+(fn REGEXP &optional FILES DIR)" t)
 (register-definition-prefixes "vc-git" '("vc-"))
 
 
@@ -36897,16 +36096,6 @@ it is disabled.
 (register-definition-prefixes "winner" '("winner-"))
 
 
-;;; Generated autoloads from cedet/semantic/wisent/wisent.el
-
-(register-definition-prefixes "semantic/wisent/wisent" '("$action" "$nterm" "$region" "wisent-"))
-
-
-;;; Generated autoloads from cedet/semantic/wisent.el
-
-(register-definition-prefixes "semantic/wisent" '("define-wisent-lexer" "wisent-"))
-
-
 ;;; Generated autoloads from woman.el
 
 (defvar woman-locale nil "\
@@ -37306,102 +36495,6 @@ run a specific program.  The program must be a member of
 
 (fn &optional PGM)" t)
 (register-definition-prefixes "zone" '("zone-"))
-
-
-;;; Generated autoloads from emacs-lisp/ert-font-lock.el
-
-(autoload 'ert-font-lock-deftest "ert-font-lock" "\
-Define test NAME (a symbol) using assertions from TEST-STR.
-
-Other than MAJOR-MODE and TEST-STR parameters, this macro accepts
-the same parameters and keywords as `ert-deftest' and is intended
-to be used through `ert'.
-
-(fn NAME () [DOCSTRING] [:expected-result RESULT-TYPE] [:tags \\='(TAG...)] MAJOR-MODE TEST-STR)" nil t)
-(function-put 'ert-font-lock-deftest 'doc-string-elt 3)
-(function-put 'ert-font-lock-deftest 'lisp-indent-function 2)
-(autoload 'ert-font-lock-deftest-file "ert-font-lock" "\
-Define test NAME (a symbol) using assertions from FILE.
-
-FILE - path to a file with assertions in ERT resource director as
-return by `ert-resource-directory'.
-
-Other than MAJOR-MODE and FILE parameters, this macro accepts the
-same parameters and keywords as `ert-deftest' and is intended to
-be used through `ert'.
-
-(fn NAME () [DOCSTRING] [:expected-result RESULT-TYPE] [:tags \\='(TAG...)] MAJOR-MODE FILE)" nil t)
-(function-put 'ert-font-lock-deftest-file 'doc-string-elt 3)
-(function-put 'ert-font-lock-deftest-file 'lisp-indent-function 2)
-(autoload 'ert-font-lock-test-string "ert-font-lock" "\
-Check font faces in TEST-STRING set by MODE.
-
-The function is meant to be run from within an ERT test.
-
-(fn TEST-STRING MODE)")
-(autoload 'ert-font-lock-test-file "ert-font-lock" "\
-Check font faces in FILENAME set by MODE.
-
-The function is meant to be run from within an ERT test.
-
-(fn FILENAME MODE)")
-(register-definition-prefixes "ert-font-lock" '("ert-font-lock--"))
-
-
-;;; Generated autoloads from touch-screen.el
-
-(autoload 'touch-screen-hold "touch-screen" "\
-Handle a long press EVENT.
-Ding and select the window at EVENT, then activate the mark.  If
-`touch-screen-word-select' is enabled, try to select the whole
-word around EVENT; otherwise, set point to the location of EVENT.
-
-(fn EVENT)" t)
-(autoload 'touch-screen-track-tap "touch-screen" "\
-Track a single tap starting from EVENT.
-EVENT should be a `touchscreen-begin' event.
-
-Read touch screen events until a `touchscreen-end' event is
-received with the same ID as in EVENT.  If UPDATE is non-nil and
-a `touchscreen-update' event is received in the mean time and
-contains a touch point with the same ID as in EVENT, call UPDATE
-with that event and DATA.
-
-If THRESHOLD is non-nil, enforce a threshold of movement that is
-either itself or 10 pixels when it is not a number.  If the
-aforementioned touch point moves beyond that threshold on any
-axis, return nil immediately, and further resume mouse event
-translation for the touch point at hand.
-
-Return nil immediately if any other kind of event is received;
-otherwise, return t once the `touchscreen-end' event arrives.
-
-(fn EVENT &optional UPDATE DATA THRESHOLD)")
-(autoload 'touch-screen-track-drag "touch-screen" "\
-Track a single drag starting from EVENT.
-EVENT should be a `touchscreen-begin' event.
-
-Read touch screen events until a `touchscreen-end' event is
-received with the same ID as in EVENT.  For each
-`touchscreen-update' event received in the mean time containing a
-touch point with the same ID as in EVENT, call UPDATE with the
-touch point in event and DATA, once the touch point has moved
-significantly by at least 5 pixels from where it was in EVENT.
-
-Return nil immediately if any other kind of event is received;
-otherwise, return either t or `no-drag' once the
-`touchscreen-end' event arrives; return `no-drag' returned if the
-touch point in EVENT did not move significantly, and t otherwise.
-
-(fn EVENT UPDATE &optional DATA)")
-(autoload 'touch-screen-inhibit-drag "touch-screen" "\
-Inhibit subsequent `touchscreen-drag' events from being sent.
-Prevent `touchscreen-drag' and translated mouse events from being
-sent until the touch sequence currently being translated ends.
-Must be called from a command bound to a `touchscreen-hold' or
-`touchscreen-drag' event.")
-(register-definition-prefixes "touch-screen" '("touch-screen-"))
-
 
 ;;; End of scraped data
 

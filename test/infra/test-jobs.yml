@@ -350,9 +350,7 @@ test-lisp-progmodes-inotify:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: never
     - changes:
-        - lisp/progmodes/eglot.el
         - lisp/progmodes/*-ts-mode.el
-        - test/lisp/progmodes/eglot-tests.el
         - test/lisp/progmodes/*-ts-mode-resources/**
         - test/lisp/progmodes/*-ts-mode-tests.el
       when: never

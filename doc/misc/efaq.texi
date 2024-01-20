@@ -964,13 +964,6 @@ On X window system, Emacs now supports the XInput2 specification for
 input events.
 
 @item
-Emacs now comes with a client library for using Language Server
-Protocol (@acronym{LSP}) servers.  This library, named @file{eglot.el}
-(the name stands for ``Emacs polyGlot'') provides LSP support for
-various software development and maintenance features, such as
-@code{xref}, Imenu, ElDoc, etc.
-
-@item
 Emacs can now cope with files with very long lines much better.  It no
 longer hangs when displaying such long lines, and allows
 reasonably-responsive editing when such lines are present in the

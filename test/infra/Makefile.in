@@ -63,9 +63,7 @@ define subdir_template
     endef
     else ifeq ($(findstring progmodes, $(1)), progmodes)
     define changes
-	@echo '        - $(1)/eglot.el' >>$(FILE)
 	@echo '        - $(1)/*-ts-mode.el' >>$(FILE)
-	@echo '        - test/$(1)/eglot-tests.el' >>$(FILE)
 	@echo '        - test/$(1)/*-ts-mode-resources/**' >>$(FILE)
 	@echo '        - test/$(1)/*-ts-mode-tests.el' >>$(FILE)
 	@echo '      when: never' >>$(FILE)
