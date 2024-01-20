@@ -404,7 +404,7 @@ hbfont_shape (Lisp_Object lgstring, Lisp_Object direction)
   /* Cache the HarfBuzz buffer for better performance and less allocations.
    * We intentionally never destroy the buffer. */
   static hb_buffer_t *hb_buffer = NULL;
-  if (! hb_buffer)
+  if (!hb_buffer)
     {
       hb_buffer = hb_buffer_create ();
       hb_unicode_funcs_t* ufuncs = get_hb_unicode_funcs();

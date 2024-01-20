@@ -992,7 +992,7 @@ dump_queue_enqueue (struct dump_queue *dump_queue,
         }
     }
 
-  if (! EQ (weights, orig_weights))
+  if (!EQ (weights, orig_weights))
     Fputhash (object, weights, dump_queue->link_weights);
 }
 
@@ -1025,7 +1025,7 @@ dump_queue_compute_score (struct dump_queue *dump_queue,
     Fgethash (object, dump_queue->link_weights, Qnil);
   if (EQ (object_link_weights, Qt))
     object_link_weights = Qnil;
-  while (! NILP (object_link_weights))
+  while (!NILP (object_link_weights))
     {
       Lisp_Object basis_weight_pair = dump_pop (&object_link_weights);
       dump_off link_basis = dump_off_from_lisp (XCAR (basis_weight_pair));
@@ -1056,7 +1056,7 @@ dump_queue_scan_fancy (struct dump_queue *dump_queue,
   float highest_score = -INFINITY;
   bool first = true;
 
-  while (! NILP (*cons_ptr))
+  while (!NILP (*cons_ptr))
     {
       Lisp_Object queued_object = XCAR (*cons_ptr);
       float score = dump_queue_compute_score (dump_queue, queued_object, basis);
@@ -1230,7 +1230,7 @@ dump_queue_dequeue (struct dump_queue *dump_queue, dump_off basis)
 
   {
     Lisp_Object weights = Fgethash (result, dump_queue->link_weights, Qnil);
-    while (! NILP (weights) && CONSP (weights))
+    while (!NILP (weights) && CONSP (weights))
       {
         Lisp_Object basis_weight_pair = dump_pop (&weights);
         dump_off link_basis =
@@ -1257,7 +1257,7 @@ dump_enqueue_object (struct dump_context *ctx,
                      struct link_weight weight)
 {
   /* Fixnums are bit-invariant, and don't need dumping.  */
-  if (! FIXNUMP (object) && ! EQ (object, Qunbound))
+  if (!FIXNUMP (object) && !EQ (object, Qunbound))
     {
       dump_off state = dump_recall_object (ctx, object);
       bool already_dumped_object = state > DUMP_OBJECT_NOT_SEEN;
@@ -3239,7 +3239,7 @@ dump_drain_copied_objects (struct dump_context *ctx)
      The overall result is that to the greatest extent possible while
      maintaining strictly increasing address order, we copy into Emacs
      in nice big chunks.  */
-  while (! NILP (copied_queue))
+  while (!NILP (copied_queue))
     {
       Lisp_Object copied = dump_pop (&copied_queue);
       void *optr = dump_object_emacs_ptr (copied);
@@ -3370,7 +3370,7 @@ dump_drain_cold_data (struct dump_context *ctx)
   /* Actually dump cold objects instead of deferring them.  */
   ctx->flags.defer_cold_objects = false;
 
-  while (! NILP (cold_queue))
+  while (!NILP (cold_queue))
     {
       Lisp_Object item = dump_pop (&cold_queue);
       enum cold_op op = (enum cold_op) XFIXNUM (XCAR (item));
@@ -3875,7 +3875,7 @@ dump_do_fixups (struct dump_context *ctx)
                               Qdump_emacs_portable__sort_predicate);
   Lisp_Object prev_fixup = Qnil;
   ctx->fixups = Qnil;
-  while (! NILP (fixups))
+  while (!NILP (fixups))
     {
       Lisp_Object fixup = dump_pop (&fixups);
       dump_do_fixup (ctx, fixup, prev_fixup);
@@ -3901,7 +3901,7 @@ dump_drain_deferred_hash_tables (struct dump_context *ctx)
 
   Lisp_Object deferred_hash_tables = Fnreverse (ctx->deferred_hash_tables);
   ctx->deferred_hash_tables = Qnil;
-  while (! NILP (deferred_hash_tables))
+  while (!NILP (deferred_hash_tables))
     dump_object (ctx, dump_pop (&deferred_hash_tables));
   ctx->flags = old_flags;
 }
@@ -3916,7 +3916,7 @@ dump_drain_deferred_symbols (struct dump_context *ctx)
 
   Lisp_Object deferred_symbols = Fnreverse (ctx->deferred_symbols);
   ctx->deferred_symbols = Qnil;
-  while (! NILP (deferred_symbols))
+  while (!NILP (deferred_symbols))
     dump_object (ctx, dump_pop (&deferred_symbols));
   ctx->flags = old_flags;
 }

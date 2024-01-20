@@ -760,7 +760,7 @@ If TYPE is nil, it means the marker stays behind when you insert text at it.  */
 {
   CHECK_MARKER (marker);
 
-  XMARKER (marker)->insertion_type = ! NILP (type);
+  XMARKER (marker)->insertion_type = !NILP (type);
   return type;
 }
 

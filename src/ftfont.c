@@ -319,7 +319,7 @@ ftfont_resolve_generic_family (Lisp_Object family, FcPattern *pattern)
   if (!EQ (XCDR (slot), Qt))
     return XCDR (slot);
   pattern = FcPatternDuplicate (pattern);
-  if (! pattern)
+  if (!pattern)
     goto err;
   FcPatternDel (pattern, FC_FOUNDRY);
   FcPatternDel (pattern, FC_FAMILY);
@@ -418,10 +418,10 @@ ftfont_lookup_cache (Lisp_Object key, enum ftfont_cache_for cache_for)
 
 	  pat = FcPatternBuild (0, FC_FILE, FcTypeString, (FcChar8 *) filename,
 				FC_INDEX, FcTypeInteger, idx, NULL);
-	  if (! pat)
+	  if (!pat)
 	    goto finish;
 	  objset = FcObjectSetBuild (FC_CHARSET, FC_STYLE, NULL);
-	  if (! objset)
+	  if (!objset)
 	    goto finish;
 	  fontset = FcFontList (NULL, pat, objset);
 	  if (!fontset)
@@ -513,17 +513,17 @@ ftfont_get_charset (Lisp_Object registry)
 	 strlen (fc_charset_table[i].name)) >= 0)
       break;
   SAFE_FREE ();
-  if (! fc_charset_table[i].name)
+  if (!fc_charset_table[i].name)
     return -1;
-  if (! fc_charset_table[i].fc_charset)
+  if (!fc_charset_table[i].fc_charset)
     {
       FcCharSet *charset = FcCharSetCreate ();
       int *uniquifier = fc_charset_table[i].uniquifier;
 
-      if (! charset)
+      if (!charset)
 	return -1;
       for (j = 0; uniquifier[j]; j++)
-	if (! FcCharSetAddChar (charset, uniquifier[j]))
+	if (!FcCharSetAddChar (charset, uniquifier[j]))
 	  {
 	    FcCharSetDestroy (charset);
 	    return -1;
@@ -730,19 +730,19 @@ ftfont_spec_pattern (Lisp_Object spec, char *otlayout,
 	}
       else if (EQ (key, QClang))
 	{
-	  if (! langset)
+	  if (!langset)
 	    langset = FcLangSetCreate ();
-	  if (! langset)
+	  if (!langset)
 	    goto err;
 	  if (SYMBOLP (val))
 	    {
-	      if (! FcLangSetAdd (langset, SYMBOL_FcChar8 (val)))
+	      if (!FcLangSetAdd (langset, SYMBOL_FcChar8 (val)))
 		goto err;
 	    }
 	  else
 	    for (; CONSP (val); val = XCDR (val))
 	      if (SYMBOLP (XCAR (val))
-		  && ! FcLangSetAdd (langset, SYMBOL_FcChar8 (XCAR (val))))
+		  && !FcLangSetAdd (langset, SYMBOL_FcChar8 (XCAR (val))))
 		goto err;
 	}
       else if (EQ (key, QCotf))
@@ -770,21 +770,21 @@ ftfont_spec_pattern (Lisp_Object spec, char *otlayout,
       if (CONSP (chars) && CONSP (CDR (chars)))
 	{
 	  charset = FcCharSetCreate ();
-	  if (! charset)
+	  if (!charset)
 	    goto err;
 	  for (chars = XCDR (chars); CONSP (chars); chars = XCDR (chars))
 	    if (CHARACTERP (XCAR (chars))
-		&& ! FcCharSetAddChar (charset, XFIXNAT (XCAR (chars))))
+		&& !FcCharSetAddChar (charset, XFIXNAT (XCAR (chars))))
 	      goto err;
 	}
     }
 
   pattern = FcPatternCreate ();
-  if (! pattern)
+  if (!pattern)
     goto err;
   tmp = AREF (spec, FONT_FOUNDRY_INDEX);
-  if (! NILP (tmp)
-      && ! FcPatternAddString (pattern, FC_FOUNDRY, SYMBOL_FcChar8 (tmp)))
+  if (!NILP (tmp)
+      && !FcPatternAddString (pattern, FC_FOUNDRY, SYMBOL_FcChar8 (tmp)))
     goto err;
   tmp = AREF (spec, FONT_FAMILY_INDEX);
   if (!NILP (tmp)
@@ -853,7 +853,7 @@ ftfont_list (struct frame *f, Lisp_Object spec)
   int spacing = -1;
   const char *langname = NULL;
 
-  if (! fc_initialized)
+  if (!fc_initialized)
     {
       FcInit ();
       fc_initialized = 1;
@@ -876,15 +876,15 @@ ftfont_list (struct frame *f, Lisp_Object spec)
   if (FIXNUMP (AREF (spec, FONT_SPACING_INDEX)))
     spacing = XFIXNUM (AREF (spec, FONT_SPACING_INDEX));
   family = AREF (spec, FONT_FAMILY_INDEX);
-  if (! NILP (family))
+  if (!NILP (family))
     {
       Lisp_Object resolved;
 
       resolved = ftfont_resolve_generic_family (family, pattern);
-      if (! NILP (resolved))
+      if (!NILP (resolved))
 	{
 	  FcPatternDel (pattern, FC_FAMILY);
-	  if (! FcPatternAddString (pattern, FC_FAMILY,
+	  if (!FcPatternAddString (pattern, FC_FAMILY,
 				    SYMBOL_FcChar8 (resolved)))
 	    goto err;
 	}
@@ -908,9 +908,9 @@ ftfont_list (struct frame *f, Lisp_Object spec)
 			     FC_VARIABLE,
 #endif	/* FC_VARIABLE */
 			     NULL);
-  if (! objset)
+  if (!objset)
     goto err;
-  if (! NILP (chars))
+  if (!NILP (chars))
     FcObjectSetAdd (objset, FC_CHARSET);
 
   fontset = FcFontList (NULL, pattern, objset);
@@ -1080,7 +1080,7 @@ ftfont_match (struct frame *f, Lisp_Object spec)
   struct OpenTypeSpec *otspec = NULL;
   const char *langname = NULL;
 
-  if (! fc_initialized)
+  if (!fc_initialized)
     {
       FcInit ();
       fc_initialized = 1;
@@ -1125,7 +1125,7 @@ ftfont_match2 (struct frame *f, Lisp_Object spec, Lisp_Object type)
 {
   Lisp_Object entity = ftfont_match (f, spec);
 
-  if (! NILP (entity))
+  if (!NILP (entity))
     ASET (entity, FONT_TYPE_INDEX, type);
   return entity;
 }
@@ -1139,17 +1139,17 @@ ftfont_list_family (struct frame *f)
   FcObjectSet *objset = NULL;
   int i;
 
-  if (! fc_initialized)
+  if (!fc_initialized)
     {
       FcInit ();
       fc_initialized = 1;
     }
 
   pattern = FcPatternCreate ();
-  if (! pattern)
+  if (!pattern)
     goto finish;
   objset = FcObjectSetBuild (FC_FAMILY, NULL);
-  if (! objset)
+  if (!objset)
     goto finish;
   fontset = FcFontList (NULL, pattern, objset);
   if (!fontset)

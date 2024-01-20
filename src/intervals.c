@@ -626,7 +626,7 @@ find_interval (register INTERVAL tree, register ptrdiff_t position)
 	{
 	  tree = tree->left;
 	}
-      else if (! NULL_RIGHT_CHILD (tree)
+      else if (!NULL_RIGHT_CHILD (tree)
 	       && relative_position >= (TOTAL_LENGTH (tree)
 					- RIGHT_TOTAL_LENGTH (tree)))
 	{
@@ -659,10 +659,10 @@ next_interval (register INTERVAL interval)
     return NULL;
   next_position = interval->position + LENGTH (interval);
 
-  if (! NULL_RIGHT_CHILD (i))
+  if (!NULL_RIGHT_CHILD (i))
     {
       i = i->right;
-      while (! NULL_LEFT_CHILD (i))
+      while (!NULL_LEFT_CHILD (i))
 	i = i->left;
 
       i->position = next_position;
@@ -699,7 +699,7 @@ previous_interval (register INTERVAL interval)
   if (!NULL_LEFT_CHILD (interval))
     {
       i = interval->left;
-      while (! NULL_RIGHT_CHILD (i))
+      while (!NULL_RIGHT_CHILD (i))
 	i = i->right;
 
       i->position = interval->position - LENGTH (i);
@@ -707,7 +707,7 @@ previous_interval (register INTERVAL interval)
     }
 
   i = interval;
-  while (! NULL_PARENT (i))
+  while (!NULL_PARENT (i))
     {
       if (AM_RIGHT_CHILD (i))
 	{
@@ -874,7 +874,7 @@ adjust_intervals_for_insertion (INTERVAL tree,
 	}
 
     check_done:
-      if (! NILP (tail))
+      if (!NILP (tail))
 	{
 	  temp = split_interval_right (i, position - i->position);
 	  copy_properties (i, temp);
@@ -882,7 +882,7 @@ adjust_intervals_for_insertion (INTERVAL tree,
 	}
     }
 
-  if (position != i->position && ! eobp)
+  if (position != i->position && !eobp)
     {
       /* Just extend the interval.  */
       for (temp = i; temp; temp = INTERVAL_PARENT_OR_NULL (temp))
@@ -1019,7 +1019,7 @@ merge_properties_sticky (Lisp_Object pleft, Lisp_Object pright)
       /* Indicate whether the property is explicitly defined on the left.
 	 (We know it is defined explicitly on the right
 	 because otherwise we don't get here.)  */
-      lpresent = ! NILP (tail2);
+      lpresent = !NILP (tail2);
       lval = (NILP (tail2) ? Qnil : Fcar (Fcdr (tail2)));
 
       /* Even if lrear or rfront say nothing about the stickiness of
@@ -1073,7 +1073,7 @@ merge_properties_sticky (Lisp_Object pleft, Lisp_Object pright)
       for (tail1 = pright; CONSP (tail1); tail1 = Fcdr (XCDR (tail1)))
 	if (EQ (sym, XCAR (tail1)))
 	  break;
-      if (! NILP (tail1))
+      if (!NILP (tail1))
 	continue;
 
       lval = Fcar (XCDR (tail2));
@@ -1104,11 +1104,11 @@ merge_properties_sticky (Lisp_Object pleft, Lisp_Object pright)
     props = Fcons (Qrear_nonsticky, Fcons (Fnreverse (rear), props));
 
   cat = textget (props, Qcategory);
-  if (! NILP (front)
+  if (!NILP (front)
       &&
       /* If we have inherited a front-stick category property that is t,
 	 we don't need to set up a detailed one.  */
-      ! (! NILP (cat) && SYMBOLP (cat)
+      !(!NILP (cat) && SYMBOLP (cat)
 	 && EQ (Fget (cat, Qfront_sticky), Qt)))
     props = Fcons (Qfront_sticky, Fcons (Fnreverse (front), props));
   return props;
@@ -1347,11 +1347,11 @@ merge_interval_right (register INTERVAL i)
   register INTERVAL successor;
 
   /* Find the succeeding interval.  */
-  if (! NULL_RIGHT_CHILD (i))      /* It's below us.  Add absorb
+  if (!NULL_RIGHT_CHILD (i))      /* It's below us.  Add absorb
 				      as we descend.  */
     {
       successor = i->right;
-      while (! NULL_LEFT_CHILD (successor))
+      while (!NULL_LEFT_CHILD (successor))
 	{
 	  successor->total_length += absorb;
 	  eassert (LENGTH (successor) > 0);
@@ -1403,11 +1403,11 @@ merge_interval_left (register INTERVAL i)
   register INTERVAL predecessor;
 
   /* Find the preceding interval.  */
-  if (! NULL_LEFT_CHILD (i))	/* It's below us. Go down,
+  if (!NULL_LEFT_CHILD (i))	/* It's below us. Go down,
 				   adding ABSORB as we go.  */
     {
       predecessor = i->left;
-      while (! NULL_RIGHT_CHILD (predecessor))
+      while (!NULL_RIGHT_CHILD (predecessor))
 	{
 	  predecessor->total_length += absorb;
 	  eassert (LENGTH (predecessor) > 0);
@@ -1691,11 +1691,11 @@ lookup_char_property (Lisp_Object plist, Lisp_Object prop, bool textprop)
 	}
     }
 
-  if (! NILP (fallback))
+  if (!NILP (fallback))
     return fallback;
   /* Check for alternative properties.  */
   tail = Fassq (prop, Vchar_property_alias_alist);
-  if (! NILP (tail))
+  if (!NILP (tail))
     {
       tail = XCDR (tail);
       for (; NILP (fallback) && CONSP (tail); tail = XCDR (tail))
@@ -1912,7 +1912,7 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
 
 	  intangible_propval = Fget_char_property (pos, Qintangible, Qnil);
 
-	  if (! NILP (intangible_propval))
+	  if (!NILP (intangible_propval))
 	    {
 	      while (XFIXNUM (pos) > BEGV
 		     && EQ (Fget_char_property (make_fixnum (XFIXNUM (pos) - 1),
@@ -1945,7 +1945,7 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
 	  intangible_propval = Fget_char_property (make_fixnum (charpos - 1),
 						   Qintangible, Qnil);
 
-	  if (! NILP (intangible_propval))
+	  if (!NILP (intangible_propval))
 	    {
 	      while (XFIXNUM (pos) < ZV
 		     && EQ (Fget_char_property (pos, Qintangible, Qnil),
@@ -2052,7 +2052,7 @@ move_if_not_intangible (ptrdiff_t position)
 
       /* If following char is intangible,
 	 skip back over all chars with matching intangible property.  */
-      if (! NILP (intangible_propval))
+      if (!NILP (intangible_propval))
 	while (XFIXNUM (pos) > BEGV
 	       && EQ (Fget_char_property (make_fixnum (XFIXNUM (pos) - 1),
 					  Qintangible, Qnil),
@@ -2068,7 +2068,7 @@ move_if_not_intangible (ptrdiff_t position)
 
       /* If following char is intangible,
 	 skip forward over all chars with matching intangible property.  */
-      if (! NILP (intangible_propval))
+      if (!NILP (intangible_propval))
 	while (XFIXNUM (pos) < ZV
 	       && EQ (Fget_char_property (pos, Qintangible, Qnil),
 		      intangible_propval))

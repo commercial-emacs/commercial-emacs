@@ -390,7 +390,7 @@ tty_cursor_to (struct frame *f, int vpos, int hpos)
 
   /* Detect the case where we are called from reset_sys_modes
      and the costs have never been calculated.  Do nothing.  */
-  if (! tty->costs_set)
+  if (!tty->costs_set)
     return;
 
   if (curY (tty) == vpos
@@ -477,7 +477,7 @@ tty_clear_end_of_line (struct frame *f, int first_unused_hpos)
 
   /* Detect the case where we are called from reset_sys_modes
      and the costs have never been calculated.  Do nothing.  */
-  if (! tty->costs_set)
+  if (!tty->costs_set)
     return;
 
   if (curX (tty) >= first_unused_hpos)
@@ -582,7 +582,7 @@ encode_terminal_code (struct glyph *src, int src_len,
 		Lisp_Object g = LGSTRING_GLYPH (gstring, i);
 		int c = LGLYPH_CHAR (g);
 
-		if (! char_charset (c, charset_list, NULL))
+		if (!char_charset (c, charset_list, NULL))
 		  c = '?';
 		buf += CHAR_STRING (c, buf);
 		nchars++;
@@ -4018,7 +4018,7 @@ init_tty (const char *name, const char *terminal_type, bool must_succeed)
     int flags = O_RDWR | O_NOCTTY | (ctty ? 0 : O_IGNORE_CTTY);
     int fd = emacs_open (name, flags, 0);
     tty->input = tty->output
-      = ((fd < 0 || ! isatty (fd))
+      = ((fd < 0 || !isatty (fd))
 	 ? NULL
 	 : fdopen (fd, "w+"));
 

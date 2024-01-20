@@ -1799,7 +1799,7 @@ gnutls_handshake_and_verify(Lisp_Object proc,
 			    Lisp_Object proplist,
 			    Lisp_Object blocking)
 {
-  int ret = emacs_gnutls_handshake (XPROCESS (proc), ! NILP (blocking));
+  int ret = emacs_gnutls_handshake (XPROCESS (proc), !NILP (blocking));
   if (ret < GNUTLS_E_SUCCESS)
     return gnutls_make_error (ret);
   return gnutls_verify_boot (proc, proplist);

@@ -395,7 +395,7 @@ discard_tty_input (void)
 void
 stuff_char (char c)
 {
-  if (! (FRAMEP (selected_frame)
+  if (!(FRAMEP (selected_frame)
 	 && FRAME_LIVE_P (XFRAME (selected_frame))
 	 && FRAME_TERMCAP_P (XFRAME (selected_frame))))
     return;
@@ -1112,7 +1112,7 @@ init_sys_modes (struct tty_display_info *tty_out)
 
   narrow_foreground_group (fileno (tty_out->input));
 
-  if (! tty_out->old_tty)
+  if (!tty_out->old_tty)
     tty_out->old_tty = xmalloc (sizeof *tty_out->old_tty);
 
   emacs_get_tty (fileno (tty_out->input), tty_out->old_tty);
@@ -1684,7 +1684,7 @@ emacs_sigaction_init (struct sigaction *action, signal_handler_t handler)
 #ifdef SIGWINCH
   sigaddset (&action->sa_mask, SIGWINCH);
 #endif
-  if (! noninteractive)
+  if (!noninteractive)
     {
       sigaddset (&action->sa_mask, SIGINT);
       sigaddset (&action->sa_mask, SIGQUIT);
@@ -1739,7 +1739,7 @@ deliver_thread_signal (int sig, signal_handler_t handler)
   int old_errno = errno;
 
 #ifdef HAVE_PTHREAD
-  if (! pthread_equal (pthread_self (), main_thread_id))
+  if (!pthread_equal (pthread_self (), main_thread_id))
     {
       thread_backtrace_npointers
 	= backtrace (thread_backtrace_buffer, BACKTRACE_LIMIT_MAX);
@@ -1959,7 +1959,7 @@ init_signals (void)
   /* Emacs checks for write errors, so it can safely ignore SIGPIPE.
      However, in batch mode leave SIGPIPE alone, as that causes Emacs
      to behave more like typical batch applications do.  */
-  if (! noninteractive)
+  if (!noninteractive)
     signal (SIGPIPE, SIG_IGN);
 
   sigaction (SIGQUIT, &process_fatal_action, 0);
@@ -2638,7 +2638,7 @@ safe_strsignal (int code)
 {
   char const *signame = sigdescr_np (code);
 
-  if (! signame)
+  if (!signame)
     signame = "Unknown signal";
 
   return signame;
@@ -4404,7 +4404,7 @@ str_collate (Lisp_Object s1, Lisp_Object s2,
       if (!loc)
 	error ("Invalid locale %s: %s", SSDATA (locale), emacs_strerror (errno));
 
-      if (! NILP (ignore_case))
+      if (!NILP (ignore_case))
 	for (int i = 1; i < 3; i++)
 	  {
 	    wchar_t *p = (i == 1) ? p1 : p2;

@@ -350,7 +350,7 @@ mgc_flip_xpntr (void *xpntr, enum Space_Type xpntr_type)
   mgc_semispace *from = space_in_use,
     *to = (from == &space0) ? &space1 : &space0;
   void *ret = FORWARD_XPNTR_GET (xpntr);
-  if (! ret)
+  if (!ret)
     {
       size_t nbytes = nbytes_of (xpntr_type, xpntr);
       ret = bump_alloc_ptr (to, nbytes, xpntr_type);
@@ -585,7 +585,7 @@ bool
 mgc_handle_sigsegv (void *const fault_address)
 {
 #if HAVE_MPROTECT && ! WINDOWSNT
-  if (! NILP (Vmemory__protect_p))
+  if (!NILP (Vmemory__protect_p))
     {
       Vmemory__protect_p = Qnil;
       if (mem_find (current_thread, fault_address))
@@ -628,7 +628,7 @@ usage: (bool-vector &rest OBJECTS)  */)
   static_vector_allocator = &allocate_vector;
   val = unbind_to (count, make_bool_vector (nargs));
   for (ptrdiff_t i = 0; i < nargs; i++)
-    bool_vector_set (val, i, ! NILP (args[i]));
+    bool_vector_set (val, i, !NILP (args[i]));
   return val;
 }
 
@@ -642,7 +642,7 @@ DEFUN ("mgc-counts", Fmgc_counts, Smgc_counts, 0, 0, 0,
       size_t w = 0;
       for (void *xpntr = space_in_use->block_addrs[b];
 	   (xpntr != space_in_use->alloc_ptr
-	    && ! TERM_BLOCK_P (xpntr)
+	    && !TERM_BLOCK_P (xpntr)
 	    && (b != (int) space_in_use->current_block
 		|| w < space_in_use->block_words_used));
 	   (void) xpntr)

@@ -421,7 +421,7 @@ xfont_list_pattern (Display *display, const char *pattern,
 		if (font_registry_charsets (registry, &encoding, &repertory) < 0)
 		  encoding = NULL;
 	      }
-	    if (! encoding)
+	    if (!encoding)
 	      /* Unknown REGISTRY, not supported.  */
 	      continue;
 	    if (repertory)
@@ -433,7 +433,7 @@ xfont_list_pattern (Display *display, const char *pattern,
 	      }
 	    if (memcmp (props, aref_addr (entity, FONT_FOUNDRY_INDEX),
 			word_size * 7)
-		|| ! EQ (AREF (entity, FONT_SPACING_INDEX), props[7]))
+		|| !EQ (AREF (entity, FONT_SPACING_INDEX), props[7]))
 	      {
 		vcopy (xfont_scratch_props, 0,
 		       aref_addr (entity, FONT_FOUNDRY_INDEX), 7);
@@ -623,11 +623,11 @@ xfont_list_family (struct frame *f)
 
       p0++;			/* skip the leading '-' */
       while (*p0 && *p0 != '-') p0++; /* skip foundry */
-      if (! *p0)
+      if (!*p0)
 	continue;
       p1 = ++p0;
       while (*p1 && *p1 != '-') p1++; /* find the end of family */
-      if (! *p1 || p1 == p0)
+      if (!*p1 || p1 == p0)
 	continue;
       if (last_len == p1 - p0
 	  && memcmp (last_family, p0, last_len) == 0)
@@ -697,7 +697,7 @@ xfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
       x_clear_errors (display);
       xfont = NULL;
     }
-  else if (! xfont)
+  else if (!xfont)
     {
       /* Some version of X lists:
 	   -misc-fixed-medium-r-normal--20-*-75-75-c-100-iso8859-1

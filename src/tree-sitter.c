@@ -519,7 +519,7 @@ DEFUN ("tree-sitter-root-node",
       if (tree != NULL)
 	{
 	  TSNode root_node = ts_tree_root_node (tree);
-	  if (! ts_node_is_null (root_node))
+	  if (!ts_node_is_null (root_node))
 	    retval = make_node (root_node);
 	}
     }
@@ -563,30 +563,30 @@ DEFUN ("tree-sitter-ppss",
 	   make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (parent))));
 
   for (TSNode j = node;
-       ! ts_node_is_null (j);
+       !ts_node_is_null (j);
        j = ts_node_parent (j), depth++)
     {
       if (NILP (Fnth (make_fixnum (2), retval)))
 	{
 	  TSNode sibling = ts_node_prev_sibling (j);
-	  if (! ts_node_is_null (sibling))
+	  if (!ts_node_is_null (sibling))
 	    Fsetcar (Fnthcdr (make_fixnum (2), retval),
 		     make_fixnum (SITTER_TO_BUFFER (ts_node_start_byte (sibling))));
 	}
 
-      if (! NILP (Fstring_match (build_string ("\\bstring"),
+      if (!NILP (Fstring_match (build_string ("\\bstring"),
 				 build_string (ts_node_type (j)), Qnil, Qnil)))
 	/* best efforts regex for strings */
 	Fsetcar (Fnthcdr (make_fixnum (3), retval),
 		 make_fixnum (FETCH_CHAR (SITTER_TO_BUFFER
 					  (ts_node_start_byte (j)))));
 
-      if (! NILP (Fstring_match (build_string ("\\bcomment"),
+      if (!NILP (Fstring_match (build_string ("\\bcomment"),
 				 build_string (ts_node_type (j)), Qnil, Qnil)))
 	/* best efforts regex for comments */
 	Fsetcar (Fnthcdr (make_fixnum (4), retval), Qt);
 
-      if (! NILP (Fstring_match (build_string ("\\bescape"),
+      if (!NILP (Fstring_match (build_string ("\\bescape"),
 				 build_string (ts_node_type (j)), Qnil, Qnil))
 	  && (BUFFER_TO_SITTER (XFIXNUM (pos)) == ts_node_start_byte (j) + 1))
 	/* best efforts regex for escapes */
@@ -733,7 +733,7 @@ If PRECISE is non-nil, return nil if POS falls outside any node's range.  */)
 
   node = ts_tree_node_at (tree, BUFFER_TO_SITTER (XFIXNUM (pos)));
   return (ts_node_is_null (node)
-	  || (! NILP (precise)
+	  || (!NILP (precise)
 	      && (XFIXNUM (pos) < SITTER_TO_BUFFER (ts_node_start_byte (node))
 		  || XFIXNUM (pos) >= SITTER_TO_BUFFER (ts_node_end_byte (node)))))
     ? Qnil : make_node (node);
@@ -1254,7 +1254,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
     Fcdr_safe (Fassq (XTREE_SITTER (sitter)->progmode,
 		      Fsymbol_value (Qtree_sitter_indent_alist)));
   if (NILP (indents_scm))
-    indents_scm = concat2 (! NILP (fstyle)
+    indents_scm = concat2 (!NILP (fstyle)
 			   ? fstyle : build_string ("indents"),
 			   build_string (".scm"));
   if (NILP (Ffile_name_absolute_p (indents_scm)))
@@ -1278,7 +1278,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
       TSQuery *query;
       char *query_buf = NULL;
 
-      while (! NILP (stack))
+      while (!NILP (stack))
 	{
 	  if (NILP (XCDR (XCAR (stack))))
 	    {
@@ -1492,7 +1492,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 		  const ptrdiff_t capture_end =
 		    SITTER_TO_BUFFER (ts_node_end_byte (slice.captures[slice_index].node));
 
-		  if (! same_line (capture_beg, node_beg))
+		  if (!same_line (capture_beg, node_beg))
 		    /* capture not relevant to NODE.  */
 		    goto next_parent;
 
@@ -1544,7 +1544,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 						    obarray),
 				      capture_name_to_tsnode,
 				      Qnil);
-			  if (! NILP (captured))
+			  if (!NILP (captured))
 			    {
 			      CHECK_TREE_SITTER_NODE (captured);
 			      const char *node_type =
@@ -1666,7 +1666,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 				    stack = XCDR (stack);
 				}
 			    }
-			  if (! NILP (stack))
+			  if (!NILP (stack))
 			    {
 			      specpdl_ref count = SPECPDL_INDEX ();
 			      record_unwind_protect_excursion ();

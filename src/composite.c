@@ -483,7 +483,7 @@ update_compositions (ptrdiff_t from, ptrdiff_t to, int check_mask)
     return;
 
   /* If FROM and TO are not in a valid range, do nothing.  */
-  if (! (BEGV <= from && from <= to && to <= ZV))
+  if (!(BEGV <= from && from <= to && to <= ZV))
     return;
 
   if (check_mask & CHECK_HEAD)
@@ -702,12 +702,12 @@ composition_gstring_p (Lisp_Object gstring)
   Lisp_Object header;
   ptrdiff_t i;
 
-  if (! VECTORP (gstring) || ASIZE (gstring) < 2)
+  if (!VECTORP (gstring) || ASIZE (gstring) < 2)
     return 0;
   header = LGSTRING_HEADER (gstring);
-  if (! VECTORP (header) || ASIZE (header) < 2)
+  if (!VECTORP (header) || ASIZE (header) < 2)
     return 0;
-  if (! NILP (LGSTRING_FONT (gstring))
+  if (!NILP (LGSTRING_FONT (gstring))
       && (!FONT_OBJECT_P (LGSTRING_FONT (gstring))
 	  && !CODING_SYSTEM_P (LGSTRING_FONT (gstring))))
     return 0;
@@ -721,7 +721,7 @@ composition_gstring_p (Lisp_Object gstring)
       Lisp_Object glyph = LGSTRING_GLYPH (gstring, i);
       if (NILP (glyph))
 	break;
-      if (! VECTORP (glyph) || ASIZE (glyph) != LGLYPH_SIZE)
+      if (!VECTORP (glyph) || ASIZE (glyph) != LGLYPH_SIZE)
 	return 0;
     }
   return 1;
@@ -935,7 +935,7 @@ autocmp_chars (Lisp_Object rule, ptrdiff_t charpos, ptrdiff_t bytepos,
   re = AREF (rule, 0);
   if (NILP (re))
     len = 1;
-  else if (! STRINGP (re))
+  else if (!STRINGP (re))
     return unbind_to (count, Qnil);
   else if ((len = fast_looking_at (re, charpos, bytepos, limit, -1, string))
 	   > 0)
@@ -954,8 +954,8 @@ autocmp_chars (Lisp_Object rule, ptrdiff_t charpos, ptrdiff_t bytepos,
   if (FRAME_WINDOW_P (f))
     {
       font_object = font_range (charpos, bytepos, &to, win, face, string, ch);
-      if (! FONT_OBJECT_P (font_object)
-	  || (! NILP (re)
+      if (!FONT_OBJECT_P (font_object)
+	  || (!NILP (re)
 	      && to < limit
 	      && (fast_looking_at (re, charpos, bytepos, to, -1, string) <= 0)))
 	return unbind_to (count, Qnil);
@@ -1249,8 +1249,8 @@ composition_reseat_it (struct composition_it *cmp_it, ptrdiff_t charpos,
 	  for (; CONSP (val); val = XCDR (val))
 	    {
 	      elt = XCAR (val);
-	      if (! VECTORP (elt) || ASIZE (elt) != 3
-		  || ! FIXNUMP (AREF (elt, 1)))
+	      if (!VECTORP (elt) || ASIZE (elt) != 3
+		  || !FIXNUMP (AREF (elt, 1)))
 		continue;
 	      if (XFIXNAT (AREF (elt, 1)) != cmp_it->lookback)
 		goto no_composition;
@@ -1482,7 +1482,7 @@ struct position_record
     do {					\
       (POSITION).pos_byte--;			\
       (POSITION).p--;				\
-    } while (! CHAR_HEAD_P (*((POSITION).p)));	\
+    } while (!CHAR_HEAD_P (*((POSITION).p)));	\
     (POSITION).pos--;				\
   } while (0)
 
@@ -1557,7 +1557,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
 		  return false;
 		BACKWARD_CHAR (cur, stop);
 		c = STRING_CHAR (cur.p);
-	      } while (! char_composable_p (c));
+	      } while (!char_composable_p (c));
 	      tail = cur.pos + 1;
 	    }
 	}
@@ -1569,7 +1569,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
 	   cur = candidate)
 	{
 	  BACKWARD_CHAR (candidate, stop);
-	  if (! char_composable_p (STRING_CHAR (candidate.p)))
+	  if (!char_composable_p (STRING_CHAR (candidate.p)))
 	    break;
 	}
 
@@ -1635,7 +1635,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
       BACKWARD_CHAR (cur, stop);
       /* only need to iterate cases (1) and (3) */
     } while (pos < limit && NILP (*gstring) && cur.pos >= head);
-  return ! NILP (*gstring);
+  return !NILP (*gstring);
 }
 
 ptrdiff_t
@@ -1731,7 +1731,7 @@ should be ignored.  */)
   Lisp_Object gstring, header;
   ptrdiff_t frompos, frombyte, topos;
 
-  if (! FONT_OBJECT_P (font_object))
+  if (!FONT_OBJECT_P (font_object))
     {
       struct coding_system *coding;
       struct terminal *terminal = decode_live_terminal (font_object);

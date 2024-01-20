@@ -245,7 +245,7 @@ This function can be called only in unibyte buffers.  */)
 
   validate_region (&start, &end);
 
-  if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
+  if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
     error ("This function can be called only in unibyte buffers");
 
 #ifdef WINDOWSNT

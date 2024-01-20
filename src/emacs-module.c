@@ -466,7 +466,7 @@ module_free_global_ref (emacs_env *env, emacs_value global_value)
   if (module_assertions)
     {
       ptrdiff_t n = 0;
-      if (! module_global_reference_p (global_value, &n))
+      if (!module_global_reference_p (global_value, &n))
         module_abort ("Global value was not found in list of %"pD"d globals",
                       n);
     }
@@ -569,7 +569,7 @@ module_make_function (emacs_env *env, ptrdiff_t min_arity, ptrdiff_t max_arity,
 {
   MODULE_FUNCTION_BEGIN (NULL);
 
-  if (! (0 <= min_arity
+  if (!(0 <= min_arity
 	 && (max_arity < 0
 	     ? (min_arity <= MOST_POSITIVE_FIXNUM
 		&& max_arity == emacs_variadic_function)
@@ -684,7 +684,7 @@ static bool
 module_is_not_nil (emacs_env *env, emacs_value arg)
 {
   MODULE_FUNCTION_BEGIN_NO_CATCH (false);
-  return ! NILP (value_to_lisp (arg));
+  return !NILP (value_to_lisp (arg));
 }
 
 static bool
@@ -701,7 +701,7 @@ module_extract_integer (emacs_env *env, emacs_value arg)
   Lisp_Object lisp = value_to_lisp (arg);
   CHECK_INTEGER (lisp);
   intmax_t i;
-  if (! integer_to_intmax (lisp, &i))
+  if (!integer_to_intmax (lisp, &i))
     xsignal1 (Qoverflow_error, lisp);
   return i;
 }
@@ -780,7 +780,7 @@ static emacs_value
 module_make_string (emacs_env *env, const char *str, ptrdiff_t len)
 {
   MODULE_FUNCTION_BEGIN (NULL);
-  if (! (0 <= len && len <= STRING_BYTES_BOUND))
+  if (!(0 <= len && len <= STRING_BYTES_BOUND))
     overflow_error ();
   Lisp_Object lstr
     = len == 0 ? empty_multibyte_string : module_decode_utf_8 (str, len);
@@ -791,7 +791,7 @@ static emacs_value
 module_make_unibyte_string (emacs_env *env, const char *str, ptrdiff_t length)
 {
   MODULE_FUNCTION_BEGIN (NULL);
-  if (! (0 <= length && length <= STRING_BYTES_BOUND))
+  if (!(0 <= length && length <= STRING_BYTES_BOUND))
     overflow_error ();
   Lisp_Object lstr
     = length == 0 ? empty_unibyte_string : make_unibyte_string (str, length);
@@ -846,7 +846,7 @@ static void
 check_vec_index (Lisp_Object lvec, ptrdiff_t i)
 {
   CHECK_VECTOR (lvec);
-  if (! (0 <= i && i < ASIZE (lvec)))
+  if (!(0 <= i && i < ASIZE (lvec)))
     args_out_of_range_3 (INT_TO_INTEGER (i),
 			 make_fixnum (0), make_fixnum (ASIZE (lvec) - 1));
 }
@@ -1149,7 +1149,7 @@ funcall_module (Lisp_Object function, ptrdiff_t nargs, Lisp_Object *arglist)
 {
   const struct Lisp_Module_Function *func = XMODULE_FUNCTION (function);
   eassume (0 <= func->min_arity);
-  if (! (func->min_arity <= nargs
+  if (!(func->min_arity <= nargs
 	 && (func->max_arity < 0 || nargs <= func->max_arity)))
     xsignal2 (Qwrong_number_of_arguments, function, make_fixnum (nargs));
 
@@ -1164,7 +1164,7 @@ funcall_module (Lisp_Object function, ptrdiff_t nargs, Lisp_Object *arglist)
   for (ptrdiff_t i = 0; i < nargs; ++i)
     {
       args[i] = lisp_to_value (env, arglist[i]);
-      if (! args[i])
+      if (!args[i])
 	memory_full (sizeof *args[i]);
     }
 

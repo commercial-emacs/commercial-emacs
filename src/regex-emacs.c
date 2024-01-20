@@ -1865,7 +1865,7 @@ regex_compile (re_char *pattern, ptrdiff_t size,
 	  }
 
 	case '^':
-	  if (! (p == pattern + 1 || at_begline_loc_p (pattern, p)))
+	  if (!(p == pattern + 1 || at_begline_loc_p (pattern, p)))
 	    goto normal_char;
 	  /* Special case for compatibility: postfix ops after ^ become
 	     literals.  */
@@ -1874,7 +1874,7 @@ regex_compile (re_char *pattern, ptrdiff_t size,
 	  break;
 
 	case '$':
-	  if (! (p == pend || at_endline_loc_p (p, pend)))
+	  if (!(p == pend || at_endline_loc_p (p, pend)))
 	    goto normal_char;
 	  laststart = b;
 	  BUF_PUSH (endline);
@@ -1908,7 +1908,7 @@ regex_compile (re_char *pattern, ptrdiff_t size,
 		    many_times_ok |= c != '?';
 		  }
 
-		if (! (p < pend && (*p == '*' || *p == '+' || *p == '?')))
+		if (!(p < pend && (*p == '*' || *p == '+' || *p == '?')))
 		  break;
 		/* If we get here, we found another repeat character.  */
 		c = *p++;
@@ -2125,7 +2125,7 @@ regex_compile (re_char *pattern, ptrdiff_t size,
 		    PATFETCH (c1);
 
 		    if (CHAR_BYTE8_P (c1)
-			&& ! ASCII_CHAR_P (c) && ! CHAR_BYTE8_P (c))
+			&& !ASCII_CHAR_P (c) && !CHAR_BYTE8_P (c))
 		      /* Treat the range from a multibyte character to
 			 raw-byte character as empty.  */
 		      c = c1 + 1;
@@ -2654,7 +2654,7 @@ regex_compile (re_char *pattern, ptrdiff_t size,
 	    else
 	      {
 		c1 = RE_CHAR_TO_MULTIBYTE (c);
-		if (! CHAR_BYTE8_P (c1))
+		if (!CHAR_BYTE8_P (c1))
 		  {
 		    int c2 = TRANSLATE (c1);
 

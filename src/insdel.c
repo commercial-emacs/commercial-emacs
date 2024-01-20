@@ -692,7 +692,7 @@ insert_char (int c)
   unsigned char str[MAX_MULTIBYTE_LENGTH];
   int len;
 
-  if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
+  if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
     len = CHAR_STRING (c, str);
   else
     {
@@ -1533,7 +1533,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
      the deletion will be undone first.  Thus, undo
      will insert before deleting, and thus will keep
      the markers before and after this text separate.  */
-  if (! NILP (deletion))
+  if (!NILP (deletion))
     {
       record_insert (from + SCHARS (deletion), inschars);
       record_delete (from, deletion, false);
@@ -1591,7 +1591,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   if (adjust_match_data)
     update_search_regs (from, to, from + SCHARS (new));
 
-  if (! inhibit_mod_hooks)
+  if (!inhibit_mod_hooks)
     {
       signal_after_change (from, nchars_del, GPT - from);
       update_compositions (from, GPT, CHECK_BORDER);
@@ -1680,7 +1680,7 @@ replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   eassert (GPT <= GPT_BYTE);
 
   /* Adjust markers for the deletion and the insertion.  */
-  if (! (nchars_del == 1 && inschars == 1 && nbytes_del == insbytes))
+  if (!(nchars_del == 1 && inschars == 1 && nbytes_del == insbytes))
     {
       if (markers)
 	adjust_markers_for_replace (from, from_byte, nchars_del, nbytes_del,
@@ -2155,7 +2155,7 @@ invalidate_buffer_caches (struct buffer *buf, ptrdiff_t start, ptrdiff_t end)
     preserve_marker = Fcopy_marker (make_fixnum (*preserve_ptr), Qnil)
 
 #define RESTORE_VALUE						\
-  if (! NILP (preserve_marker))					\
+  if (!NILP (preserve_marker))					\
     {								\
       *preserve_ptr = marker_position (preserve_marker);	\
       unchain_marker (XMARKER (preserve_marker));		\
@@ -2228,7 +2228,7 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
     }
 
   /* Now run the before-change-functions if any.  */
-  if (! NILP (Vbefore_change_functions))
+  if (!NILP (Vbefore_change_functions))
     {
       rvoe_arg.location = &Vbefore_change_functions;
       rvoe_arg.errorp = 1;
@@ -2254,9 +2254,9 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
 				   FETCH_START, FETCH_END, Qnil);
     }
 
-  if (! NILP (start_marker))
+  if (!NILP (start_marker))
     detach_marker (start_marker);
-  if (! NILP (end_marker))
+  if (!NILP (end_marker))
     detach_marker (end_marker);
   RESTORE_VALUE;
 
@@ -2284,7 +2284,7 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
 
   specbind (Qinhibit_modification_hooks, Qt);
 
-  if (! NILP (Vafter_change_functions))
+  if (!NILP (Vafter_change_functions))
     {
       rvoe_arg.location = &Vafter_change_functions;
       rvoe_arg.errorp = 1;

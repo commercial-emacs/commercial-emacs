@@ -2297,7 +2297,7 @@ buffer, whether or not it is currently displayed in some window.  */)
 	  overshoot_handled = true;
 	}
 
-      if (! NILP (lcols))
+      if (!NILP (lcols))
 	to_x = window_column_x (w, window, XFLOATINT (lcols), lcols)
 	  + lnum_pixel_width;
 
@@ -2318,7 +2318,7 @@ buffer, whether or not it is currently displayed in some window.  */)
 	}
       else if (it_start < ZV)
 	{
-	  while ((! it.bidi_p || it.bidi_it.scan_dir > 0)
+	  while ((!it.bidi_p || it.bidi_it.scan_dir > 0)
 		 ? IT_CHARPOS (it) <= it_start
 		 : IT_CHARPOS (it) >= it_start)
 	    {

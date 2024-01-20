@@ -255,7 +255,7 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
       int this_width = ftcrfont_glyph_extents (font, stack_glyph.index, NULL);
       if (this_width > 0)
 	{
-	  if (! font->min_width || font->min_width > this_width)
+	  if (!font->min_width || font->min_width > this_width)
 	    font->min_width = this_width;
 	  if (this_width > font->max_width)
 	    font->max_width = this_width;

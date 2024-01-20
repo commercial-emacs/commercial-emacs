@@ -3150,7 +3150,7 @@ frame_name_fnn_p (char *str, ptrdiff_t len)
 static void
 set_term_frame_name (struct frame *f, Lisp_Object name)
 {
-  f->explicit_name = ! NILP (name);
+  f->explicit_name = !NILP (name);
 
   /* If NAME is nil, set the name to F<num>.  */
   if (NILP (name))
@@ -4809,7 +4809,7 @@ gui_set_font_backend (struct frame *f, Lisp_Object new_value, Lisp_Object old_va
       new_value = Qnil;
       while (*p0)
 	{
-	  while (*p1 && ! c_isspace (*p1) && *p1 != ',') p1++;
+	  while (*p1 && !c_isspace (*p1) && *p1 != ',') p1++;
 	  if (p0 < p1)
 	    new_value = Fcons (Fintern (make_string (p0, p1 - p0), Qnil),
 			       new_value);
@@ -5240,7 +5240,7 @@ validate_x_resource_name (void)
       for (i = 0; i < len; i++)
 	{
 	  int c = p[i];
-	  if (! ((c >= 'a' && c <= 'z')
+	  if (!((c >= 'a' && c <= 'z')
 		 || (c >= 'A' && c <= 'Z')
 		 || (c >= '0' && c <= '9')
 		 || c == '-' || c == '_'))
@@ -5273,7 +5273,7 @@ validate_x_resource_name (void)
   for (i = 0; i < len; i++)
     {
       int c = SREF (new, i);
-      if (! ((c >= 'a' && c <= 'z')
+      if (!((c >= 'a' && c <= 'z')
 	     || (c >= 'A' && c <= 'Z')
 	     || (c >= '0' && c <= '9')
 	     || c == '-' || c == '_'))
@@ -5815,7 +5815,7 @@ gui_figure_window_size (struct frame *f, Lisp_Object parms, bool tabbar_p,
   width = gui_display_get_arg (dpyinfo, parms, Qwidth, 0, 0, RES_TYPE_NUMBER);
   if (!EQ (width, Qunbound) || !EQ (height, Qunbound))
     {
-      if (! EQ (width, Qunbound))
+      if (!EQ (width, Qunbound))
 	{
 	  if (CONSP (width) && EQ (XCAR (width), Qtext_pixels))
 	    {

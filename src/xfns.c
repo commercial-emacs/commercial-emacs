@@ -327,7 +327,7 @@ x_real_pos_and_offsets (struct frame *f,
       win = wm_window;
     }
 
-  if (! had_errors)
+  if (!had_errors)
     {
 #ifdef USE_XCB
       xcb_get_geometry_cookie_t geom_cookie;
@@ -1118,7 +1118,7 @@ xg_set_icon (struct frame *f, Lisp_Object file)
 
   found = image_find_image_file (file);
 
-  if (! NILP (found))
+  if (!NILP (found))
     {
       GdkPixbuf *pixbuf;
       GError *err = NULL;
@@ -4578,7 +4578,7 @@ x_icon_verify (struct frame *f, Lisp_Object parms)
       CHECK_FIXNUM (icon_x);
       CHECK_FIXNUM (icon_y);
     }
-  else if (! EQ (icon_x, Qunbound) || !EQ (icon_y, Qunbound))
+  else if (!EQ (icon_x, Qunbound) || !EQ (icon_y, Qunbound))
     error ("Both left and top icon corners of icon must be specified");
 }
 
@@ -4827,7 +4827,7 @@ x_default_font_parameter (struct frame *f, Lisp_Object parms)
       for (i = 0; names[i]; i++)
 	{
 	  font = font_open_by_name (f, build_unibyte_string (names[i]));
-	  if (! NILP (font))
+	  if (!NILP (font))
 	    break;
 	}
       if (NILP (font))
@@ -4940,7 +4940,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
                                 RES_TYPE_NUMBER);
   if (EQ (parent, Qunbound))
     parent = Qnil;
-  if (! NILP (parent))
+  if (!NILP (parent))
     CHECK_FIXNUM (parent);
 
   frame = Qnil;
@@ -5736,7 +5736,7 @@ If omitted or nil, that stands for the selected frame's display.  */)
   struct x_display_info *dpyinfo = check_x_display_info (terminal);
   const char *vendor = ServerVendor (dpyinfo->display);
 
-  if (! vendor) vendor = "";
+  if (!vendor) vendor = "";
   return build_string (vendor);
 }
 
@@ -7130,7 +7130,7 @@ Some window managers may refuse to restack windows.  */)
   struct frame *f1 = decode_live_frame (frame1);
   struct frame *f2 = decode_live_frame (frame2);
 
-  if (! (FRAME_OUTER_WINDOW (f1) && FRAME_OUTER_WINDOW (f2)))
+  if (!(FRAME_OUTER_WINDOW (f1) && FRAME_OUTER_WINDOW (f2)))
     error ("Cannot restack frames");
   x_frame_restack (f1, f2, !NILP (above));
   return Qt;
@@ -7578,7 +7578,7 @@ terminate Emacs if we can't open the connection.
   struct x_display_info *dpyinfo;
 
   CHECK_STRING (display);
-  if (! NILP (xrm_string))
+  if (!NILP (xrm_string))
     CHECK_STRING (xrm_string);
 
   xrm_option = NILP (xrm_string) ? 0 : SSDATA (xrm_string);
@@ -7769,7 +7769,7 @@ silently ignored.  */)
   if (!NILP (window_id))
     {
       CONS_TO_INTEGER (window_id, Window, target_window);
-      if (! target_window)
+      if (!target_window)
         target_window = dpyinfo->root_window;
     }
   else
@@ -7870,7 +7870,7 @@ silently ignored.  */)
   if (!NILP (window_id))
     {
       CONS_TO_INTEGER (window_id, Window, target_window);
-      if (! target_window)
+      if (!target_window)
         target_window = FRAME_DISPLAY_INFO (f)->root_window;
     }
 
@@ -8022,7 +8022,7 @@ if PROP has no value of TYPE (always a string in the MS Windows case). */)
   if (!NILP (window_id))
     {
       CONS_TO_INTEGER (window_id, Window, target_window);
-      if (! target_window)
+      if (!target_window)
         target_window = FRAME_DISPLAY_INFO (f)->root_window;
     }
 
@@ -8100,10 +8100,10 @@ Otherwise, the return value is a vector with the following fields:
 
   CHECK_STRING (prop);
 
-  if (! NILP (window_id))
+  if (!NILP (window_id))
     {
       CONS_TO_INTEGER (window_id, Window, target_window);
-      if (! target_window)
+      if (!target_window)
 	target_window = FRAME_DISPLAY_INFO (f)->root_window;
     }
 

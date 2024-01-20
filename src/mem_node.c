@@ -274,7 +274,7 @@ mem_delete (struct mem_node *z, struct mem_node **root)
 {
   struct mem_node *x, *y;
 
-  if (! z || z == mem_nil)
+  if (!z || z == mem_nil)
     return;
 
   if (z->left == mem_nil || z->right == mem_nil)

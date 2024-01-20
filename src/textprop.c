@@ -385,7 +385,7 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 	}
 
       Lisp_Object this_cdr = CDR_SAFE (tail2);
-      if (! CONSP (tail2) || ! EQ (val1, Fcar (this_cdr)))
+      if (!CONSP (tail2) || !EQ (val1, Fcar (this_cdr)))
 	{
 	  Lisp_Object buf = BUFFERP (object) ? object : Fcurrent_buffer ();
 	  changed = true;
@@ -417,10 +417,10 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 		{
 		  struct frame *f = SELECTED_FRAME ();
 		  Lisp_Object lface = Fgethash (val1, f->face_hash_table, Qnil);
-		  if (! NILP (lface))
+		  if (!NILP (lface))
 		    {
 		      Lisp_Object *attrs = xvector_contents (lface);
-		      if (! UNSPECIFIEDP (*(attrs + LFACE_HEIGHT_INDEX))
+		      if (!UNSPECIFIEDP (*(attrs + LFACE_HEIGHT_INDEX))
 			  || !UNSPECIFIEDP (*(attrs + LFACE_FONT_INDEX))
 			  || !UNSPECIFIEDP (*(attrs + LFACE_SWIDTH_INDEX)))
 			{
@@ -513,7 +513,7 @@ remove_properties (Lisp_Object plist, Lisp_Object list, INTERVAL i, Lisp_Object 
 
       /* Go through I's plist, looking for SYM.  */
       Lisp_Object tail2 = current_plist;
-      while (! NILP (tail2))
+      while (!NILP (tail2))
 	{
 	  Lisp_Object this = XCDR (XCDR (tail2));
 	  if (CONSP (this) && EQ (sym, XCAR (this)))
@@ -660,7 +660,7 @@ get_char_property_and_overlay (Lisp_Object position, register Lisp_Object prop, 
       struct sortvec *result = NULL;
       Lisp_Object result_tem = Qnil;
 
-      if (! (BUF_BEGV (b) <= pos
+      if (!(BUF_BEGV (b) <= pos
 	     && pos <= BUF_ZV (b)))
 	xsignal1 (Qargs_out_of_range, position);
 
@@ -671,12 +671,12 @@ get_char_property_and_overlay (Lisp_Object position, register Lisp_Object prop, 
           struct sortvec *this;
 
 	  if (NILP (tem) || node->end < pos + 1
-	      || (w && ! overlay_matches_window (w, node->data)))
+	      || (w && !overlay_matches_window (w, node->data)))
 	    continue;
 
           this = (result == items ? items + 1 : items);
           make_sortvec_item (this, node->data);
-          if (! result || (compare_overlays (result, this) < 0))
+          if (!result || (compare_overlays (result, this) < 0))
             {
               result = this;
               result_tem = tem;
@@ -753,7 +753,7 @@ before LIMIT.  LIMIT is a no-op if it is greater than (point-max).  */)
   Lisp_Object temp;
 
   temp = Fnext_overlay_change (position);
-  if (! NILP (limit))
+  if (!NILP (limit))
     {
       CHECK_FIXNUM_COERCE_MARKER (limit);
       if (XFIXNUM (limit) < XFIXNUM (temp))
@@ -779,7 +779,7 @@ before LIMIT.  LIMIT is a no-op if it is less than (point-min).  */)
   Lisp_Object temp;
 
   temp = Fprevious_overlay_change (position);
-  if (! NILP (limit))
+  if (!NILP (limit))
     {
       CHECK_FIXNUM_COERCE_MARKER (limit);
       if (XFIXNUM (limit) > XFIXNUM (temp))
@@ -827,7 +827,7 @@ The property values are compared with `eq'.  */)
       Lisp_Object initial_value, value;
       specpdl_ref count = SPECPDL_INDEX ();
 
-      if (! NILP (object))
+      if (!NILP (object))
 	CHECK_BUFFER (object);
 
       if (BUFFERP (object) && current_buffer != XBUFFER (object))
@@ -914,7 +914,7 @@ first valid position in OBJECT.  */)
     {
       specpdl_ref count = SPECPDL_INDEX ();
 
-      if (! NILP (object))
+      if (!NILP (object))
 	CHECK_BUFFER (object);
 
       if (BUFFERP (object) && current_buffer != XBUFFER (object))
@@ -1996,8 +1996,8 @@ copy_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object src,
       ptrdiff_t len = e2 - s;
 
       Lisp_Object plist = i->plist;
-      if (! NILP (prop))
-	while (! NILP (plist))
+      if (!NILP (prop))
+	while (!NILP (plist))
 	  {
 	    if (EQ (Fcar (plist), prop))
 	      {
@@ -2006,7 +2006,7 @@ copy_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object src,
 	      }
 	    plist = Fcdr (Fcdr (plist));
 	  }
-      if (! NILP (plist))
+      if (!NILP (plist))
 	/* Must defer modifications to the interval tree in case
 	   src and dest refer to the same string or buffer.  */
 	stuff = Fcons (list3 (make_fixnum (p), make_fixnum (p + len), plist),
@@ -2022,7 +2022,7 @@ copy_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object src,
 
   bool modified = false;
 
-  while (! NILP (stuff))
+  while (!NILP (stuff))
     {
       Lisp_Object res = Fcar (stuff);
       res = Fadd_text_properties (Fcar (res), Fcar (Fcdr (res)),
@@ -2247,7 +2247,7 @@ verify_interval_modification (struct buffer *buf,
 		  /* If interval I is read-only and read-only is
 		     front-sticky, inhibit insertion.
 		     Check for read-only as well as category.  */
-		  if (! NILP (after)
+		  if (!NILP (after)
 		      && NILP (Fmemq (after, Vinhibit_read_only)))
 		    {
 		      Lisp_Object tem;
@@ -2267,13 +2267,13 @@ verify_interval_modification (struct buffer *buf,
 		  /* If interval PREV is read-only and read-only isn't
 		     rear-nonsticky, inhibit insertion.
 		     Check for read-only as well as category.  */
-		  if (! NILP (before)
+		  if (!NILP (before)
 		      && NILP (Fmemq (before, Vinhibit_read_only)))
 		    {
 		      Lisp_Object tem;
 
 		      tem = textget (prev->plist, Qrear_nonsticky);
-		      if (! TMEM (Qread_only, tem)
+		      if (!TMEM (Qread_only, tem)
 			  && (!NILP (plist_get (prev->plist,Qread_only))
 			      || !TMEM (Qcategory, tem)))
 			text_read_only (before);
@@ -2287,7 +2287,7 @@ verify_interval_modification (struct buffer *buf,
 	      /* If interval I is read-only and read-only is
 		 front-sticky, inhibit insertion.
 		 Check for read-only as well as category.  */
-	      if (! NILP (after) && NILP (Fmemq (after, Vinhibit_read_only)))
+	      if (!NILP (after) && NILP (Fmemq (after, Vinhibit_read_only)))
 		{
 		  Lisp_Object tem;
 
@@ -2298,7 +2298,7 @@ verify_interval_modification (struct buffer *buf,
 		    text_read_only (after);
 
 		  tem = textget (prev->plist, Qrear_nonsticky);
-		  if (! TMEM (Qread_only, tem)
+		  if (!TMEM (Qread_only, tem)
 		      && (!NILP (plist_get (prev->plist, Qread_only))
 			  || !TMEM (Qcategory, tem)))
 		    text_read_only (after);
@@ -2322,13 +2322,13 @@ verify_interval_modification (struct buffer *buf,
       i = find_interval (intervals, start);
       do
 	{
-	  if (! INTERVAL_WRITABLE_P (i))
+	  if (!INTERVAL_WRITABLE_P (i))
 	    text_read_only (textget (i->plist, Qread_only));
 
 	  if (!inhibit_modification_hooks)
 	    {
 	      mod_hooks = textget (i->plist, Qmodification_hooks);
-	      if (! NILP (mod_hooks) && ! EQ (mod_hooks, prev_mod_hooks))
+	      if (!NILP (mod_hooks) && !EQ (mod_hooks, prev_mod_hooks))
 		{
 		  hooks = Fcons (mod_hooks, hooks);
 		  prev_mod_hooks = mod_hooks;
@@ -2348,7 +2348,7 @@ verify_interval_modification (struct buffer *buf,
       if (!inhibit_modification_hooks)
 	{
 	  hooks = Fnreverse (hooks);
-	  while (! NILP (hooks))
+	  while (!NILP (hooks))
 	    {
 	      call_mod_hooks (Fcar (hooks), make_fixnum (start),
 			      make_fixnum (end));
@@ -2366,10 +2366,10 @@ verify_interval_modification (struct buffer *buf,
 void
 report_interval_modification (Lisp_Object start, Lisp_Object end)
 {
-  if (! NILP (interval_insert_behind_hooks))
+  if (!NILP (interval_insert_behind_hooks))
     call_mod_hooks (interval_insert_behind_hooks, start, end);
-  if (! NILP (interval_insert_in_front_hooks)
-      && ! EQ (interval_insert_in_front_hooks,
+  if (!NILP (interval_insert_in_front_hooks)
+      && !EQ (interval_insert_in_front_hooks,
 	       interval_insert_behind_hooks))
     call_mod_hooks (interval_insert_in_front_hooks, start, end);
 }

@@ -1337,7 +1337,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
   Lisp_Object symbol = make_lisp_ptr (xsymbol, Lisp_Symbol);
   struct buffer *b = xbuffer ? xbuffer : current_buffer;
 
-  if (! NILP (current_thread->obarray))
+  if (!NILP (current_thread->obarray))
     {
       eassert (!main_thread_p (current_thread));
       Lisp_Object found = oblookup (current_thread->obarray,
@@ -1454,7 +1454,7 @@ void
 set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object obuf,
               enum Set_Internal_Bind bindflag)
 {
-  Lisp_Object buf = ! NILP (obuf) ? obuf : Fcurrent_buffer();
+  Lisp_Object buf = !NILP (obuf) ? obuf : Fcurrent_buffer();
   struct Lisp_Symbol *xsymbol;
   CHECK_SYMBOL (symbol);
   xsymbol = XSYMBOL (symbol);
@@ -1648,7 +1648,7 @@ notify_variable_watchers (Lisp_Object symbol,
   set_symbol_trapped_write (symbol, SYMBOL_UNTRAPPED_WRITE);
 
   if (NILP (buffer)
-      && ! EQ (operation, Qset_default) && !EQ (operation, Qmakunbound)
+      && !EQ (operation, Qset_default) && !EQ (operation, Qmakunbound)
       && !NILP (Flocal_variable_if_set_p (symbol, Fcurrent_buffer ())))
     {
       XSETBUFFER (buffer, current_buffer);
@@ -1748,7 +1748,7 @@ local bindings in certain buffers.  */)
   (Lisp_Object symbol)
 {
   Lisp_Object value = default_value (symbol);
-  if (! EQ (value, Qunbound))
+  if (!EQ (value, Qunbound))
     return value;
   xsignal1 (Qvoid_variable, symbol);
 }
@@ -2179,7 +2179,7 @@ or a byte-code object.  IDX starts at 0.  */)
 
       if (idxval < 0 || idxval >= SCHARS (array))
 	args_out_of_range (array, idx);
-      if (! STRING_MULTIBYTE (array))
+      if (!STRING_MULTIBYTE (array))
 	return make_fixnum ((unsigned char) SREF (array, idxval));
       idxval_byte = string_char_to_byte (array, idxval);
 
@@ -2197,7 +2197,7 @@ or a byte-code object.  IDX starts at 0.  */)
       CHECK_CHARACTER (idx);
       return CHAR_TABLE_REF (array, idxval);
     }
-  else if (! VECTORP (array) && ! COMPILEDP (array) && ! RECORDP (array))
+  else if (!VECTORP (array) && !COMPILEDP (array) && !RECORDP (array))
     wrong_type_argument (Qarrayp, array);
   else
     {
@@ -2218,7 +2218,7 @@ bool-vector.  IDX starts at 0.  */)
 
   CHECK_FIXNUM (idx);
   idxval = XFIXNUM (idx);
-  if (! RECORDP (array))
+  if (!RECORDP (array))
     CHECK_ARRAY (array, Qarrayp);
 
   if (VECTORP (array))
@@ -2697,7 +2697,7 @@ If the base used is not 10, STRING is always parsed as an integer.  */)
   else
     {
       CHECK_FIXNUM (base);
-      if (! (XFIXNUM (base) >= 2 && XFIXNUM (base) <= 16))
+      if (!(XFIXNUM (base) >= 2 && XFIXNUM (base) <= 16))
 	xsignal1 (Qargs_out_of_range, base);
       b = XFIXNUM (base);
     }
@@ -2751,7 +2751,7 @@ floatop_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	case Asub : accum -= next; break;
 	case Amult: accum *= next; break;
 	case Adiv:
-	  if (! IEEE_FLOATING_POINT && next == 0)
+	  if (!IEEE_FLOATING_POINT && next == 0)
 	    xsignal0 (Qarith_error);
 	  accum /= next;
 	  break;
@@ -2857,7 +2857,7 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 
 	/* Set NEXT to the next value if it fits, else exit the loop.  */
 	intmax_t next;
-	if (! (INTEGERP (val) && integer_to_intmax (val, &next)))
+	if (!(INTEGERP (val) && integer_to_intmax (val, &next)))
 	  break;
 
 	/* Set ACCUM to the next operation's result if it fits,
@@ -2956,7 +2956,7 @@ usage: (/ NUMBER &rest DIVISORS)  */)
 	}
       if (FLOATP (a))
 	{
-	  if (! IEEE_FLOATING_POINT && XFLOAT_DATA (a) == 0)
+	  if (!IEEE_FLOATING_POINT && XFLOAT_DATA (a) == 0)
 	    xsignal0 (Qarith_error);
 	  return make_float (1 / XFLOAT_DATA (a));
 	}
@@ -3162,7 +3162,7 @@ discarding bits.  */)
   CHECK_INTEGER (value);
   CHECK_INTEGER (count);
 
-  if (! FIXNUMP (count))
+  if (!FIXNUMP (count))
     {
       if (EQ (value, make_fixnum (0)))
 	return value;

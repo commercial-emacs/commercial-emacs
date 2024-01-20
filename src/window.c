@@ -874,7 +874,7 @@ total height of WINDOW.  */)
 {
   struct window *w = decode_valid_window (window);
 
-  if (! EQ (round, Qfloor) && !EQ (round, Qceiling))
+  if (!EQ (round, Qfloor) && !EQ (round, Qceiling))
     return make_fixnum (w->total_lines);
   else
     {
@@ -911,7 +911,7 @@ total width of WINDOW.  */)
 {
   struct window *w = decode_valid_window (window);
 
-  if (! EQ (round, Qfloor) && !EQ (round, Qceiling))
+  if (!EQ (round, Qfloor) && !EQ (round, Qceiling))
     return make_fixnum (w->total_cols);
   else
     {
@@ -5925,7 +5925,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       vscrolled = true;
     }
 
-  if (! vscrolled)
+  if (!vscrolled)
     {
       ptrdiff_t pos = IT_CHARPOS (it);
       ptrdiff_t bytepos;

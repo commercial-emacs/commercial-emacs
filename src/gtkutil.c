@@ -397,7 +397,7 @@ xg_get_pixbuf_from_pix_and_mask (struct frame *f,
 			   ~0, XYPixmap);
   if (xim)
     {
-      XImage *xmm = (! mask ? 0
+      XImage *xmm = (!mask ? 0
 		     : XGetImage (FRAME_X_DISPLAY (f), mask, 0, 0,
 				  width, height, ~0, XYPixmap));
       icon_buf = gdk_pixbuf_new (GDK_COLORSPACE_RGB, TRUE, 8, width, height);
@@ -549,7 +549,7 @@ xg_get_image_for_pixmap (struct frame *f,
   if (surface)
     {
 #ifdef HAVE_GTK3
-      if (! old_widget)
+      if (!old_widget)
         old_widget = GTK_IMAGE (gtk_image_new_from_surface (surface));
       else
         gtk_image_set_from_surface (old_widget, surface);
@@ -675,7 +675,7 @@ get_utf8_string (const char *str)
       char *cp, *up;
       GError *err = NULL;
 
-      while (! (cp = g_locale_to_utf8 ((char *)p, -1, &bytes_read,
+      while (!(cp = g_locale_to_utf8 ((char *)p, -1, &bytes_read,
                                        &bytes_written, &err))
              && err->code == G_CONVERT_ERROR_ILLEGAL_SEQUENCE)
         {
@@ -1599,7 +1599,7 @@ xg_create_frame_widgets (struct frame *f)
   /* If this frame has a title or name, set it in the title bar.  */
   if (!NILP (f->title))
     title = SSDATA (ENCODE_UTF_8 (f->title));
-  else if (! NILP (f->name))
+  else if (!NILP (f->name))
     title = SSDATA (ENCODE_UTF_8 (f->name));
 
   if (title)
@@ -1754,7 +1754,7 @@ xg_create_frame_widgets (struct frame *f)
   {
     GtkSettings *gs = gtk_settings_get_for_screen (screen);
     /* Only connect this signal once per screen.  */
-    if (! g_signal_handler_find (G_OBJECT (gs),
+    if (!g_signal_handler_find (G_OBJECT (gs),
                                  G_SIGNAL_MATCH_FUNC,
                                  0, 0, 0,
                                  (gpointer) G_CALLBACK (style_changed_cb),
@@ -3106,7 +3106,7 @@ menuitem_highlight_callback (GtkWidget *w,
   data = g_object_get_data (G_OBJECT (subwidget), XG_ITEM_DATA);
   if (data)
     {
-      if (! NILP (data->help) && data->cl_data->highlight_cb)
+      if (!NILP (data->help) && data->cl_data->highlight_cb)
         {
           gpointer call_data = event->type == GDK_LEAVE_NOTIFY ? 0 : data;
           GtkCallback func = (GtkCallback) data->cl_data->highlight_cb;
@@ -3190,7 +3190,7 @@ make_menu_item (const char *utf8_label,
      This will lead to this function being called with a NULL utf8_label.
      GTK crashes on that so we set a blank label.  Why there is a NULL
      name remains to be investigated.  */
-  if (! utf8_label) utf8_label = " ";
+  if (!utf8_label) utf8_label = " ";
 
   if (utf8_key)
     wtoadd = make_widget_for_menu_item (utf8_label, utf8_key);
@@ -3218,7 +3218,7 @@ make_menu_item (const char *utf8_label,
     }
 
   if (wtoadd) gtk_container_add (GTK_CONTAINER (w), wtoadd);
-  if (! item->enabled) gtk_widget_set_sensitive (w, FALSE);
+  if (!item->enabled) gtk_widget_set_sensitive (w, FALSE);
 
 #ifdef HAVE_PGTK
   if (!NILP (item->help))
@@ -3346,9 +3346,9 @@ create_menus (widget_value *data,
   GtkWidget *wmenu = topmenu;
   GSList *group = NULL;
 
-  if (! topmenu)
+  if (!topmenu)
     {
-      if (! menu_bar_p)
+      if (!menu_bar_p)
       {
         wmenu = gtk_menu_new ();
         xg_set_screen (wmenu, f);
@@ -3843,7 +3843,7 @@ xg_update_menu_item (widget_value *val,
 
   if (!val->enabled && gtk_widget_get_sensitive (w))
     gtk_widget_set_sensitive (w, FALSE);
-  else if (val->enabled && ! gtk_widget_get_sensitive (w))
+  else if (val->enabled && !gtk_widget_get_sensitive (w))
     gtk_widget_set_sensitive (w, TRUE);
 
   cb_data = g_object_get_data (G_OBJECT (w), XG_ITEM_DATA);
@@ -3854,7 +3854,7 @@ xg_update_menu_item (widget_value *val,
       cb_data->cl_data = cl_data;
 
       /* We assume the callback functions don't change.  */
-      if (val->call_data && ! val->contents)
+      if (val->call_data && !val->contents)
         {
           /* This item shall have a select callback.  */
           if (!cb_data->select_id)
@@ -3936,7 +3936,7 @@ xg_update_submenu (GtkWidget *submenu,
 
     if (GTK_IS_SEPARATOR_MENU_ITEM (w))
       {
-        if (! menu_separator_name_p (cur->name))
+        if (!menu_separator_name_p (cur->name))
           break;
       }
     else if (GTK_IS_CHECK_MENU_ITEM (w))
@@ -3965,7 +3965,7 @@ xg_update_submenu (GtkWidget *submenu,
         xg_update_menu_item (cur, w, select_cb, highlight_cb, cl_data);
 
         sub = gtk_menu_item_get_submenu (witem);
-        if (sub && ! cur->contents)
+        if (sub && !cur->contents)
           {
             /* Not a submenu anymore.  */
             g_object_ref (G_OBJECT (sub));
@@ -4040,7 +4040,7 @@ xg_modify_menubar_widgets (GtkWidget *menubar, struct frame *f,
   xg_menu_cb_data *cl_data;
   GList *list = gtk_container_get_children (GTK_CONTAINER (menubar));
 
-  if (! list) return;
+  if (!list) return;
 
   cl_data = g_object_get_data (G_OBJECT (menubar), XG_FRAME_DATA);
 
@@ -4197,13 +4197,13 @@ xg_event_is_for_menubar (struct frame *f, const XEvent *event)
   GdkEvent gevent;
   GtkWidget *gwdesc;
 
-  if (! x->menubar_widget) return 0;
+  if (!x->menubar_widget) return 0;
 
 #ifdef HAVE_XINPUT2
   XIDeviceEvent *xev = (XIDeviceEvent *) event->xcookie.data;
   if (event->type == GenericEvent) /* XI_ButtonPress or XI_ButtonRelease or a touch event.  */
     {
-      if (! (xev->event_x >= 0
+      if (!(xev->event_x >= 0
 	     && xev->event_x < FRAME_PIXEL_WIDTH (f)
 	     && xev->event_y >= 0
 	     && xev->event_y < FRAME_MENUBAR_HEIGHT (f)))
@@ -4225,18 +4225,18 @@ xg_event_is_for_menubar (struct frame *f, const XEvent *event)
   else
 #endif
     gw = gdk_x11_window_lookup_for_display (gdpy, event->xbutton.window);
-  if (! gw) return 0;
+  if (!gw) return 0;
   gevent.any.window = gw;
   gevent.any.type = GDK_NOTHING;
   gwdesc = gtk_get_event_widget (&gevent);
-  if (! gwdesc) return 0;
+  if (!gwdesc) return 0;
   if (!GTK_IS_MENU_BAR (gwdesc)
       && !GTK_IS_MENU_ITEM (gwdesc)
       && !gtk_widget_is_ancestor (x->menubar_widget, gwdesc))
     return 0;
 
   list = gtk_container_get_children (GTK_CONTAINER (x->menubar_widget));
-  if (! list) return 0;
+  if (!list) return 0;
   int scale = xg_get_scale (f);
 #ifdef HAVE_XINPUT2
   if (event->type == GenericEvent)
@@ -5281,7 +5281,7 @@ xg_tool_bar_callback (GtkWidget *w, gpointer client_data)
   struct input_event event;
   EVENT_INIT (event);
 
-  if (! f || ! f->n_tool_bar_items || NILP (f->tool_bar_items))
+  if (!f || !f->n_tool_bar_items || NILP (f->tool_bar_items))
     return;
 
   idx *= TOOL_BAR_ITEM_NSLOTS;
@@ -5825,7 +5825,7 @@ update_frame_tool_bar (struct frame *f)
   hmargin = max (0, hmargin - DEFAULT_TOOL_BAR_BUTTON_MARGIN);
   vmargin = max (0, vmargin - DEFAULT_TOOL_BAR_BUTTON_MARGIN);
 
-  if (! x->toolbar_widget)
+  if (!x->toolbar_widget)
     xg_create_tool_bar (f);
 
   wtoolbar = GTK_TOOLBAR (x->toolbar_widget);
@@ -6077,7 +6077,7 @@ update_frame_tool_bar (struct frame *f)
 
   if (f->n_tool_bar_items != 0)
     {
-      if (! x->toolbar_is_packed)
+      if (!x->toolbar_is_packed)
         xg_pack_tool_bar (f, FRAME_TOOL_BAR_POSITION (f));
       gtk_widget_show_all (x->toolbar_widget);
       if (xg_update_tool_bar_sizes (f))

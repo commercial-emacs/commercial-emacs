@@ -230,7 +230,7 @@ static Lisp_Object
 preceding_cons (Lisp_Object descriptor)
 {
   Lisp_Object tail, prevtail = Qt;
-  for (tail = watches_alist; ! NILP (tail); prevtail = tail, tail = XCDR (tail))
+  for (tail = watches_alist; !NILP (tail); prevtail = tail, tail = XCDR (tail))
     if (equal_no_quit (XCAR (XCAR (tail)), descriptor))
       return prevtail;
   return Qnil;
@@ -265,7 +265,7 @@ remove_watch (Lisp_Object descriptor, Lisp_Object idx)
     {
       /* ELT should be (DESCRIPTOR . WATCHES) */
       Lisp_Object elt = XCAR (CONSP (prevtail) ? XCDR (prevtail) : watches_alist);
-      for (Lisp_Object prev = elt; ! NILP (XCDR (prev)); prev = XCDR (prev))
+      for (Lisp_Object prev = elt; !NILP (XCDR (prev)); prev = XCDR (prev))
 	if (EQ (idx, XCAR (XCAR (XCDR (prev)))))
 	  {
 	    XSETCDR (prev, XCDR (XCDR (prev))); /* unsplice */
@@ -317,7 +317,7 @@ inotify_callback (int fd, void *_)
       if (!NILP (prevtail))
         {
 	  Lisp_Object tail = CONSP (prevtail) ? XCDR (prevtail) : watches_alist;
-	  for (Lisp_Object watches = XCDR (XCAR (tail)); ! NILP (watches);
+	  for (Lisp_Object watches = XCDR (XCAR (tail)); !NILP (watches);
 	       watches = XCDR (watches))
             {
               event.arg = inotifyevent_to_event (XCAR (watches), ev);
@@ -427,7 +427,7 @@ See inotify_rm_watch(2) for more information.  */)
 
   Lisp_Object descriptor, id;
 
-  if (! valid_watch_descriptor (watch_descriptor))
+  if (!valid_watch_descriptor (watch_descriptor))
     report_file_notify_error ("Invalid descriptor ", watch_descriptor);
 
   descriptor = XCAR (watch_descriptor);
@@ -451,7 +451,7 @@ it invalid.  */)
   if (valid_watch_descriptor (watch_descriptor))
     {
       Lisp_Object tail = assoc_no_quit (XCAR (watch_descriptor), watches_alist);
-      if (! NILP (tail))
+      if (!NILP (tail))
 	{
 	  Lisp_Object watch = assq_no_quit (XCDR (watch_descriptor), XCDR (tail));
 	  if (!NILP (watch))

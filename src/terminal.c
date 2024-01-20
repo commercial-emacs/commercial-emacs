@@ -596,7 +596,7 @@ terminal_glyph_code (struct terminal *t, int ch)
       if (NILP (t->glyph_code_table) || ch == MAX_CHAR)
 	calculate_glyph_code_table (t);
 
-      if (! EQ (t->glyph_code_table, Qt))
+      if (!EQ (t->glyph_code_table, Qt))
 	return char_table_ref (t->glyph_code_table, ch);
     }
 #endif

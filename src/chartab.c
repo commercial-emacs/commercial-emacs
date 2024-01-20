@@ -153,10 +153,10 @@ char_table_ascii (Lisp_Object table)
   Lisp_Object sub, val;
 
   sub = XCHAR_TABLE (table)->contents[0];
-  if (! SUB_CHAR_TABLE_P (sub))
+  if (!SUB_CHAR_TABLE_P (sub))
     return sub;
   sub = XSUB_CHAR_TABLE (sub)->contents[0];
-  if (! SUB_CHAR_TABLE_P (sub))
+  if (!SUB_CHAR_TABLE_P (sub))
     return sub;
   val = XSUB_CHAR_TABLE (sub)->contents[0];
   if (UNIPROP_TABLE_P (table) && UNIPROP_COMPRESSED_FORM_P (val))
@@ -287,7 +287,7 @@ sub_char_table_ref_and_range (Lisp_Object table, int c, int *from, int *to,
 	= char_table_ref_simple (table, idx, c, from, to,
 				 defalt, is_uniprop, true);
 
-      if (! EQ (this_val, val))
+      if (!EQ (this_val, val))
 	{
 	  *from = c + 1;
 	  break;
@@ -302,7 +302,7 @@ sub_char_table_ref_and_range (Lisp_Object table, int c, int *from, int *to,
 	= char_table_ref_simple (table, chartab_idx, c, from, to,
 				 defalt, is_uniprop, true);
 
-      if (! EQ (this_val, val))
+      if (!EQ (this_val, val))
 	{
 	  *to = c - 1;
 	  break;
@@ -343,7 +343,7 @@ char_table_ref_and_range (Lisp_Object table, int c, int *from, int *to)
 	= char_table_ref_simple (table, idx, c, from, to,
 				 tbl->defalt, is_uniprop, false);
 
-      if (! EQ (this_val, val))
+      if (!EQ (this_val, val))
 	{
 	  *from = c + 1;
 	  break;
@@ -357,7 +357,7 @@ char_table_ref_and_range (Lisp_Object table, int c, int *from, int *to)
 	= char_table_ref_simple (table, chartab_idx, c, from, to,
 				 tbl->defalt, is_uniprop, false);
 
-      if (! EQ (this_val, val))
+      if (!EQ (this_val, val))
 	{
 	  *to = c - 1;
 	  break;
@@ -1021,7 +1021,7 @@ map_char_table_for_charset (void (*c_function) (Lisp_Object, Lisp_Object),
 					range, charset, from, to);
       else
 	{
-	  if (! NILP (XCAR (range)))
+	  if (!NILP (XCAR (range)))
 	    {
 	      XSETCDR (range, make_fixnum (c - 1));
 	      if (c_function)
@@ -1032,7 +1032,7 @@ map_char_table_for_charset (void (*c_function) (Lisp_Object, Lisp_Object),
 	  XSETCAR (range, Qnil);
 	}
     }
-  if (! NILP (XCAR (range)))
+  if (!NILP (XCAR (range)))
     {
       XSETCDR (range, make_fixnum (c - 1));
       if (c_function)
@@ -1322,7 +1322,7 @@ CHAR-TABLE must be what returned by `unicode-property-table-internal'. */)
 {
   CHECK_CHAR_TABLE (char_table);
   CHECK_CHARACTER (ch);
-  if (! UNIPROP_TABLE_P (char_table))
+  if (!UNIPROP_TABLE_P (char_table))
     error ("Invalid Unicode property table");
   return get_unicode_property (char_table, XFIXNUM (ch));
 }
@@ -1337,7 +1337,7 @@ CHAR-TABLE must be what returned by `unicode-property-table-internal'. */)
 
   CHECK_CHAR_TABLE (char_table);
   CHECK_CHARACTER (ch);
-  if (! UNIPROP_TABLE_P (char_table))
+  if (!UNIPROP_TABLE_P (char_table))
     error ("Invalid Unicode property table");
   encoder = uniprop_get_encoder (char_table);
   if (encoder)

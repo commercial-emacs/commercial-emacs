@@ -187,7 +187,7 @@ x_menu_wait_for_event (void *data)
 #if defined USE_X_TOOLKIT
          ! (data ? XPending (data) : XtAppPending (Xt_app_con))
 #elif defined USE_GTK
-         ! gtk_events_pending ()
+         !gtk_events_pending ()
 #else
          ! XPending (data)
 #endif
@@ -652,7 +652,7 @@ x_activate_menubar (struct frame *f)
     return;
 
 #ifdef USE_GTK
-  if (! xg_win_to_widget (FRAME_X_DISPLAY (f),
+  if (!xg_win_to_widget (FRAME_X_DISPLAY (f),
                           f->output_data.x->saved_menu_event->xany.window))
     return;
 #endif
@@ -752,7 +752,7 @@ menu_highlight_callback (GtkWidget *widget, gpointer call_data)
   Lisp_Object help;
 
   cb_data = g_object_get_data (G_OBJECT (widget), XG_ITEM_DATA);
-  if (! cb_data) return;
+  if (!cb_data) return;
 
   help = call_data ? cb_data->help : Qnil;
 

@@ -1493,7 +1493,7 @@ wait_for_property_change (struct property_change *change)
       TRACE2 ("  Waiting %"PRIdMAX" secs, %d nsecs", secs, nsecs);
       for (struct timespec at = timespec_add (current_timespec (),
 					      make_timespec (secs, nsecs));
-	   (! change->arrived
+	   (!change->arrived
 	    && 0 <= timespec_cmp (at, current_timespec ()));
 	   (void) at)
 	wait_reading_process_output (0, 20 * 1000 * 1000, 0, false, NULL, 0);
@@ -1516,7 +1516,7 @@ x_handle_property_notify (const XPropertyEvent *event)
 
   for (rest = pending_property_changes; rest; rest = rest->next)
     {
-      if (! rest->arrived
+      if (!rest->arrived
 	  && rest->property == event->atom
 	  && rest->window == event->window
 	  && rest->display == event->display
@@ -1866,7 +1866,7 @@ receive_incremental_selection (struct x_display_info *dpyinfo,
 	  TRACE1 ("Done reading incrementally; total bytes: %"pD"d",
 		  *size_bytes_ret);
 
-	  if (! waiting_for_other_props_on_window (display, window))
+	  if (!waiting_for_other_props_on_window (display, window))
 	    XSelectInput (display, window, STANDARD_EVENT_SET);
 	  /* Use xfree, not XFree, because x_get_window_property
 	     calls xmalloc itself.  */
@@ -2330,7 +2330,7 @@ lisp_data_to_selection_data (struct x_display_info *dpyinfo,
 	  if (NILP (type)) type = QINTEGER;
 	  for (i = 0; i < size; i++)
 	    {
-	      if (! RANGED_FIXNUMP (X_SHRT_MIN, AREF (obj, i),
+	      if (!RANGED_FIXNUMP (X_SHRT_MIN, AREF (obj, i),
 				     X_SHRT_MAX))
 		{
 		  /* Use sizeof (long) even if it is more than 32 bits.

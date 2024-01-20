@@ -374,7 +374,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	      if (!NILP (record_flag))
 		{
 		  for (char *p = string + 1; p < string_end; p++)
-		    if (! (*p == 'r' || *p == 'p' || *p == 'P' || *p == '\n'))
+		    if (!(*p == 'r' || *p == 'p' || *p == 'P' || *p == '\n'))
 		      Fbarf_if_buffer_read_only (Qnil);
 		  record_then_fail = true;
 		}

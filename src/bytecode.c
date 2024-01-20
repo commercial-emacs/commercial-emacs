@@ -311,7 +311,7 @@ the third, MAXDEPTH, the maximum stack depth used in this function.
 If the third argument is incorrect, Emacs may crash.  */)
   (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth)
 {
-  if (! STRINGP (bytestr) || ! VECTORP (vector) || ! FIXNATP (maxdepth))
+  if (!STRINGP (bytestr) || !VECTORP (vector) || !FIXNATP (maxdepth))
     error ("Invalid byte-code");
 
   if (STRING_MULTIBYTE (bytestr))

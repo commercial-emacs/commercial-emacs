@@ -443,8 +443,8 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
 		 larger.  */
 	      Lisp_Object lang = Ffont_get (font_spec, QClang);
 
-	      if (! NILP (lang)
-		  && ! EQ (lang, Vcurrent_iso639_language)
+	      if (!NILP (lang)
+		  && !EQ (lang, Vcurrent_iso639_language)
 		  && (!CONSP (Vcurrent_iso639_language)
 		      || NILP (Fmemq (lang, Vcurrent_iso639_language))))
 		score |= 0x100;
@@ -558,7 +558,7 @@ fontset_find_font (Lisp_Object fontset, int c, struct face *face,
   Lisp_Object rfont_def;
 
   font_group = fontset_get_font_group (fontset, fallback ? -1 : c);
-  if (! CONSP (font_group))
+  if (!CONSP (font_group))
     return font_group;
   vec = XCDR (font_group);
   if (ASIZE (vec) == 0)
@@ -799,8 +799,8 @@ fontset_font (Lisp_Object fontset, int c, struct face *face, int id)
     }
 
   /* Try a fallback font-group of the default fontset. */
-  if (! EQ (base_fontset, Vdefault_fontset)
-      && ! EQ (default_rfont_def, Qt))
+  if (!EQ (base_fontset, Vdefault_fontset)
+      && !EQ (default_rfont_def, Qt))
     {
       FONT_DEFERRED_LOG ("default fallback: font for", make_fixnum (c), Qnil);
       rfont_def = fontset_find_font (FONTSET_DEFAULT (fontset), c, face, id, 1);
@@ -896,7 +896,7 @@ free_face_fontset (struct frame *f, struct face *face)
   ASET (Vfontset_table, face->fontset, Qnil);
   if (face->fontset < next_fontset_id)
     next_fontset_id = face->fontset;
-  if (! NILP (FONTSET_DEFAULT (fontset)))
+  if (!NILP (FONTSET_DEFAULT (fontset)))
     {
       int id = XFIXNUM (FONTSET_ID (FONTSET_DEFAULT (fontset)));
 
@@ -1528,7 +1528,7 @@ overwrites the previous settings.  */)
     }
   else if (FONT_SPEC_P (font_spec))
     fontname = Ffont_xlfd_name (font_spec, Qnil, Qt);
-  else if (! NILP (font_spec))
+  else if (!NILP (font_spec))
     Fsignal (Qfont, list2 (build_string ("Invalid font-spec"), font_spec));
 
   if (!NILP (font_spec))
@@ -1557,7 +1557,7 @@ overwrites the previous settings.  */)
 	  encoding = XCAR (encoding);
 	  CHECK_CHARSET (encoding);
 	  encoding = CHARSET_SYMBOL_ID (encoding);
-	  if (! NILP (repertory) && SYMBOLP (repertory))
+	  if (!NILP (repertory) && SYMBOLP (repertory))
 	    {
 	      CHECK_CHARSET (repertory);
 	      repertory = CHARSET_SYMBOL_ID (repertory);
@@ -1892,10 +1892,10 @@ format is the same as above.  */)
     }
   realized[0][j] = Qnil;
 
-  for (i = j = 0; ! NILP (realized[0][i]); i++)
+  for (i = j = 0; !NILP (realized[0][i]); i++)
     {
       elt = FONTSET_DEFAULT (realized[0][i]);
-      if (! NILP (elt))
+      if (!NILP (elt))
 	realized[1][j++] = elt;
     }
   realized[1][j] = Qnil;

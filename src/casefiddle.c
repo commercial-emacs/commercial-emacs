@@ -266,13 +266,13 @@ do_casify_natnum (struct casing_context *ctx, Lisp_Object obj)
   bool multibyte = (ch >= 256
 		    || !NILP (BVAR (current_buffer,
 				    enable_multibyte_characters)));
-  if (! multibyte)
+  if (!multibyte)
     ch = make_char_multibyte (ch);
   int cased = case_single_character (ctx, ch);
   if (cased == ch)
     return obj;
 
-  if (! multibyte)
+  if (!multibyte)
     cased = make_char_unibyte (cased);
   return make_fixed_natnum (cased | flags);
 }

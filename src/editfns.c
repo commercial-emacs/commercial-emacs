@@ -218,7 +218,7 @@ DEFUN ("push-global-mark", Fpush_global_mark, Spush_global_mark, 0, 0, "",
 	  {
 	    Lisp_Object tem = Fnthcdr (make_fixnum (global_mark_ring_max - 2),
 				       Vglobal_mark_ring);
-	    if (! NILP (tem))
+	    if (!NILP (tem))
 	      Fsetcdr (tem, Qnil);
 	  }
       }
@@ -1874,7 +1874,7 @@ determines whether case is significant or ignored.  */)
 	 characters, not just the bytes.  */
       int c1, c2;
 
-      if (! NILP (BVAR (bp1, enable_multibyte_characters)))
+      if (!NILP (BVAR (bp1, enable_multibyte_characters)))
 	{
 	  c1 = BUF_FETCH_MULTIBYTE_CHAR (bp1, i1_byte);
 	  i1_byte += buf_next_char_len (bp1, i1_byte);
@@ -2002,7 +2002,7 @@ nil.  */)
   if (NILP (source_buffer))
     nsberror (source);
   struct buffer *b = XBUFFER (source_buffer);
-  if (! BUFFER_LIVE_P (b))
+  if (!BUFFER_LIVE_P (b))
     error ("Selecting deleted buffer");
   if (a == b)
     error ("Cannot replace a buffer with itself");
@@ -2376,7 +2376,7 @@ Both characters must have the same length of multi-byte form.  */)
 	      changed = -1;
 	      modify_text (pos, XFIXNUM (end));
 
-	      if (! NILP (noundo))
+	      if (!NILP (noundo))
 		{
 		  modiff_count m = MODIFF;
 		  if (SAVE_MODIFF == m - 1)
@@ -2478,10 +2478,10 @@ check_translation (ptrdiff_t pos, ptrdiff_t pos_byte, ptrdiff_t end,
       ptrdiff_t len, i;
 
       elt = XCAR (val);
-      if (! CONSP (elt))
+      if (!CONSP (elt))
 	continue;
       elt = XCAR (elt);
-      if (! VECTORP (elt))
+      if (!VECTORP (elt))
 	continue;
       len = ASIZE (elt);
       if (len <= end - pos)
@@ -2582,7 +2582,7 @@ It returns the number of characters changed.  */)
 	      else
 		{
 		  nc = tt[oc];
-		  if (! ASCII_CHAR_P (nc) && multibyte)
+		  if (!ASCII_CHAR_P (nc) && multibyte)
 		    {
 		      str_len = BYTE8_STRING (nc, buf);
 		      str = buf;
@@ -3323,8 +3323,8 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	    }
 
 	  /* Ignore flags when sprintf ignores them.  */
-	  space_flag &= ! plus_flag;
-	  zero_flag &= ! minus_flag;
+	  space_flag &= !plus_flag;
+	  zero_flag &= !minus_flag;
 
 	  num = str2num (format, &num_end);
 	  if (max_bufsize <= num)
@@ -3375,7 +3375,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		{
 		  Lisp_Object noescape = conversion == 'S' ? Qnil : Qt;
 		  spec->argument = arg = Fprin1_to_string (arg, noescape, Qnil);
-		  if (STRING_MULTIBYTE (arg) && ! multibyte)
+		  if (STRING_MULTIBYTE (arg) && !multibyte)
 		    {
 		      multibyte = true;
 		      goto retry;
@@ -3403,7 +3403,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	  if (SYMBOLP (arg))
 	    {
 	      spec->argument = arg = SYMBOL_NAME (arg);
-	      if (STRING_MULTIBYTE (arg) && ! multibyte)
+	      if (STRING_MULTIBYTE (arg) && !multibyte)
 		{
 		  multibyte = true;
 		  goto retry;
@@ -3549,7 +3549,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	      *f = '#'; f += sharp_flag;
 	      *f++ = '.';
 	      *f++ = '*';
-	      if (! (float_conversion || conversion == 'c'))
+	      if (!(float_conversion || conversion == 'c'))
 		{
 		  memcpy (f, PRIdMAX, pMlen);
 		  f += pMlen;
@@ -3859,7 +3859,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	  if ((format_char == '`' || format_char == '\'')
 	      && EQ (quoting_style, Qcurve))
 	    {
-	      if (! multibyte)
+	      if (!multibyte)
 		{
 		  multibyte = true;
 		  goto retry;
@@ -3884,7 +3884,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		      && !CHAR_HEAD_P (format_char))
 		    maybe_combine_byte = true;
 
-		  while (! CHAR_HEAD_P (*format))
+		  while (!CHAR_HEAD_P (*format))
 		    format++;
 
 		  convbytes = format - format0;
@@ -4001,7 +4001,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		 up to this position.  */
 	      for (; position < pos; bytepos++)
 		{
-		  if (! discarded[bytepos])
+		  if (!discarded[bytepos])
 		    position++, translated++;
 		  else if (discarded[bytepos] == 1)
 		    {
@@ -4023,7 +4023,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 
 	      for (; position < pos; bytepos++)
 		{
-		  if (! discarded[bytepos])
+		  if (!discarded[bytepos])
 		    position++, translated++;
 		  else if (discarded[bytepos] == 1)
 		    {

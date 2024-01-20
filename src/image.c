@@ -1432,7 +1432,7 @@ image_spec_value (Lisp_Object spec, Lisp_Object key, bool *found)
 	  return XCAR (XCDR (tail));
 	}
       tail = XCDR (tail);
-      if (! CONSP (tail))
+      if (!CONSP (tail))
 	break;
     }
 
@@ -2974,7 +2974,7 @@ lookup_image (struct frame *f, Lisp_Object spec, int face_id)
       img->face_font_size = font_size;
       img->face_font_family = xmalloc (strlen (font_family) + 1);
       strcpy (img->face_font_family, font_family);
-      img->load_failed_p = ! img->type->load_img (f, img);
+      img->load_failed_p = !img->type->load_img (f, img);
 
       /* If we can't load the image, and we don't have a width and
 	 height, use some arbitrary width and height so that we can
@@ -3175,7 +3175,7 @@ anim_get_animation_cache (Lisp_Object spec)
   while (1)
     {
       cache = *pcache;
-      if (! cache)
+      if (!cache)
 	{
           *pcache = cache = anim_create_cache (spec);
           break;
@@ -3202,7 +3202,7 @@ mark_image (struct image *img)
   mark_object (&img->spec);
   mark_object (&img->dependencies);
 
-  if (! NILP (img->lisp_data))
+  if (!NILP (img->lisp_data))
     mark_object (&img->lisp_data);
 }
 
@@ -3280,7 +3280,7 @@ x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
       return 0;
     }
 
-  if (! x_check_image_size (*ximg, width, height))
+  if (!x_check_image_size (*ximg, width, height))
     {
       x_destroy_x_image (*ximg);
       *ximg = NULL;
@@ -7608,7 +7608,7 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   png_get_IHDR (png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
 		&interlace_type, NULL, NULL);
 
-  if (! (width <= INT_MAX && height <= INT_MAX
+  if (!(width <= INT_MAX && height <= INT_MAX
 	 && check_image_size (f, width, height)))
     {
       image_size_error ();
@@ -8741,7 +8741,7 @@ tiff_load (struct frame *f, struct image *img)
   if (FIXNUMP (image))
     {
       EMACS_INT ino = XFIXNAT (image);
-      if (! (TYPE_MINIMUM (tdir_t) <= ino && ino <= TYPE_MAXIMUM (tdir_t)
+      if (!(TYPE_MINIMUM (tdir_t) <= ino && ino <= TYPE_MAXIMUM (tdir_t)
 	     && TIFFSetDirectory (tiff, ino)))
 	{
 	  image_error ("Invalid image number `%s' in image `%s'",
@@ -9113,7 +9113,7 @@ gif_load (struct frame *f, struct image *img)
     }
 
   /* If we don't have a cached entry, read the image.  */
-  if (! gif)
+  if (!gif)
     {
       if (NILP (specified_data))
 	{
@@ -9750,7 +9750,7 @@ webp_load (struct frame *f, struct image *img)
   /* Validate the WebP image header.  */
   if (!WebPGetInfo (contents, size, NULL, NULL))
     {
-      if (! NILP (file))
+      if (!NILP (file))
 	image_error ("Not a WebP file: `%s'", file);
       else
 	image_error ("Invalid header in WebP image data");
@@ -9776,7 +9776,7 @@ webp_load (struct frame *f, struct image *img)
     case VP8_STATUS_USER_ABORT:
     default:
       /* Error out in all other cases.  */
-      if (! NILP (file))
+      if (!NILP (file))
 	image_error ("Error when interpreting WebP image data: `%s'", file);
       else
 	image_error ("Error when interpreting WebP image data");
@@ -11463,7 +11463,7 @@ svg_load_image (struct frame *f, struct image *img, char *contents,
   height = viewbox_height;
 #endif
 
-  if (! check_image_size (f, width, height))
+  if (!check_image_size (f, width, height))
     {
       image_size_error ();
       goto done_error;

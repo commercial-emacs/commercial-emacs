@@ -298,7 +298,7 @@ usage: (call-process PROGRAM &optional INFILE DESTINATION DISPLAY &rest ARGS)  *
   int filefd;
   specpdl_ref count = SPECPDL_INDEX ();
 
-  if (nargs >= 2 && ! NILP (args[1]))
+  if (nargs >= 2 && !NILP (args[1]))
     {
       /* Expand infile relative to the current buffer's current
 	 directory, or its unhandled equivalent ("~").  */
@@ -450,7 +450,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 	  buffer = Qnil;
 	}
 
-      if (! (NILP (buffer) || EQ (buffer, Qt) || FIXNUMP (buffer)))
+      if (!(NILP (buffer) || EQ (buffer, Qt) || FIXNUMP (buffer)))
 	{
 	  Lisp_Object spec_buffer = buffer;
 	  buffer = Fget_buffer_create (buffer, Qnil);
@@ -1969,12 +1969,12 @@ init_callproc (void)
   if (!will_dump_p ())
     {
       tempdir = Fdirectory_file_name (Vexec_directory);
-      if (! file_accessible_directory_p (tempdir))
+      if (!file_accessible_directory_p (tempdir))
 	dir_warning ("arch-dependent data dir", Vexec_directory);
     }
 
   tempdir = Fdirectory_file_name (Vdata_directory);
-  if (! file_accessible_directory_p (tempdir))
+  if (!file_accessible_directory_p (tempdir))
     dir_warning ("arch-independent data dir", Vdata_directory);
 
   sh = getenv ("SHELL");

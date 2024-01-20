@@ -155,7 +155,7 @@ print_prepare (Lisp_Object printcharfun)
     }
   if (MARKERP (printcharfun))
     {
-      if (! XMARKER (printcharfun)->buffer)
+      if (!XMARKER (printcharfun)->buffer)
 	error ("Marker does not point anywhere");
       if (XMARKER (printcharfun)->buffer != current_buffer)
 	set_buffer_internal (XMARKER (printcharfun)->buffer);
@@ -953,7 +953,7 @@ append to existing target file.  */)
   static int stderr_dup = STDERR_FILENO;
   int fd = stderr_dup;
 
-  if (! NILP (file))
+  if (!NILP (file))
     {
       file = Fexpand_file_name (file, Qnil);
 
@@ -1299,7 +1299,7 @@ print (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	   || CHAR_TABLE_P (obj) || SUB_CHAR_TABLE_P (obj) \
 	   || HASH_TABLE_P (obj) || FONTP (obj)		   \
 	   || RECORDP (obj)))				   \
-   || (! NILP (Vprint_gensym)				   \
+   || (!NILP (Vprint_gensym)				   \
        && SYMBOLP (obj)					   \
        && !SYMBOL_INTERNED_P (obj)			   \
        && !hash_unused_entry_key_p (obj)))
@@ -1432,7 +1432,7 @@ print_preprocess (Lisp_Object obj)
 		  break;
 
 		case Lisp_Cons:
-		  if (! NILP (XCDR (obj)))
+		  if (!NILP (XCDR (obj)))
 		    pp_stack_push_value (XCDR (obj));
 		  obj = XCAR (obj);
 		  continue;
@@ -1502,7 +1502,7 @@ print_check_string_charset_prop (INTERVAL interval, void *pstring)
       || (print_check_string_result == (PRINT_STRING_NON_CHARSET_FOUND
 					| PRINT_STRING_UNSAFE_CHARSET_FOUND)))
     return;
-  for (val = interval->plist; CONSP (val) && ! EQ (XCAR (val), Qcharset);
+  for (val = interval->plist; CONSP (val) && !EQ (XCAR (val), Qcharset);
        val = XCDR (XCDR (val)));
   if (!CONSP (val))
     {
@@ -1695,7 +1695,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
       /* Do you think this is necessary?  */
       if (XMARKER (obj)->insertion_type != 0)
 	print_c_string ("(moves after insertion) ", printcharfun);
-      if (! XMARKER (obj)->buffer)
+      if (!XMARKER (obj)->buffer)
 	print_c_string ("in no buffer", printcharfun);
       else
 	{

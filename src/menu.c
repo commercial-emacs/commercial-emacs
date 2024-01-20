@@ -592,7 +592,7 @@ make_widget_value (const char *name, char *value,
 void
 free_menubar_widget_value_tree (widget_value *wv)
 {
-  if (! wv) return;
+  if (!wv) return;
 
   wv->name = wv->value = wv->key = (char *) 0xDEADBEEF;
 
@@ -735,7 +735,7 @@ digest_single_submenu (int start, int end, bool top_level_items)
 	  Lisp_Object help;
 
 	  /* All items should be contained in panes.  */
-	  if (! panes_seen)
+	  if (!panes_seen)
 	    emacs_abort ();
 
 	  item_name = AREF (menu_items, i + MENU_ITEMS_ITEM_NAME);

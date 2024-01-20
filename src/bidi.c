@@ -957,7 +957,7 @@ bidi_initialize (void)
 bidi_type_t
 bidi_get_type (int ch, bidi_dir_t override)
 {
-  if (! bidi_initialize ())
+  if (!bidi_initialize ())
     return NEUTRAL_B;
 
   bidi_type_t default_type;

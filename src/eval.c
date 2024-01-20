@@ -456,7 +456,7 @@ usage: (setq [SYM VAL]...)  */)
     {
       Lisp_Object sym = XCAR (tail);
       tail = XCDR (tail);
-      if (! CONSP (tail))
+      if (!CONSP (tail))
 	xsignal2 (Qwrong_number_of_arguments, Qsetq, make_fixnum (nargs + 1));
       Lisp_Object arg = XCAR (tail);
       tail = XCDR (tail);
@@ -485,7 +485,7 @@ of unexpected results when a quoted object is modified.
 usage: (quote ARG)  */)
   (Lisp_Object args)
 {
-  if (! NILP (XCDR (args)))
+  if (!NILP (XCDR (args)))
     xsignal2 (Qwrong_number_of_arguments, Qquote, Flength (args));
   return XCAR (args);
 }
@@ -496,7 +496,7 @@ usage: (function ARG)  */)
   (Lisp_Object args)
 {
   Lisp_Object quoted = XCAR (args);
-  if (! NILP (XCDR (args)))
+  if (!NILP (XCDR (args)))
     xsignal2 (Qwrong_number_of_arguments, Qfunction, Flength (args));
 
   if (!NILP (current_thread->lexical_environment)
@@ -683,9 +683,9 @@ value.  */)
   (Lisp_Object symbol, Lisp_Object doc)
 {
   XSYMBOL (symbol)->u.s.declared_special = true;
-  if (! NILP (doc))
+  if (!NILP (doc))
     {
-      if (! NILP (Vloadup_pure_table))
+      if (!NILP (Vloadup_pure_table))
 	doc = Fpurecopy (doc);
       Fput (symbol, Qvariable_documentation, doc);
     }
@@ -758,15 +758,15 @@ usage: (defvar SYMBOL &optional INITVALUE DOCSTRING)  */)
 
   if (NILP (tail)) /* a pithy (defvar FOO) */
     {
-      if (! NILP (current_thread->lexical_environment)
-	  && ! XSYMBOL (sym)->u.s.declared_special)
+      if (!NILP (current_thread->lexical_environment)
+	  && !XSYMBOL (sym)->u.s.declared_special)
 	/* Make a special variable for duration of environment.  */
 	current_thread->lexical_environment = Fcons (sym, current_thread->lexical_environment);
       /* Otherwise (defvar FOO) is a no-op.  */
     }
   else
     {
-      if (! NILP (XCDR (tail)) && ! NILP (XCDR (XCDR (tail))))
+      if (!NILP (XCDR (tail)) && !NILP (XCDR (XCDR (tail))))
 	error ("Too many arguments");
       Lisp_Object exp = XCAR (tail);
       tail = XCDR (tail);
@@ -806,7 +806,7 @@ usage: (defconst SYMBOL INITVALUE [DOCSTRING])  */)
   sym = XCAR (args);
   CHECK_SYMBOL (sym);
   Lisp_Object docstring = Qnil;
-  if (! NILP (XCDR (XCDR (args))))
+  if (!NILP (XCDR (XCDR (args))))
     {
       if (!NILP (XCDR (XCDR (XCDR (args)))))
 	error ("Too many arguments");
@@ -824,7 +824,7 @@ More specifically, behaves like (defconst SYM 'INITVALUE DOCSTRING).  */)
   CHECK_SYMBOL (sym);
   Lisp_Object tem = initvalue;
   Finternal__define_uninitialized_variable (sym, docstring);
-  if (! NILP (Vloadup_pure_table))
+  if (!NILP (Vloadup_pure_table))
     tem = Fpurecopy (tem);
   Fset_default (sym, tem);      /* FIXME: set-default-toplevel-value? */
   Fput (sym, Qrisky_local_variable, Qt); /* FIXME: Why?  */
@@ -920,7 +920,7 @@ eval_let (Lisp_Object args, bool nested_envs)
       else
 	{
 	  var = CAR (bind);
-	  if (! NILP (CDR (XCDR (bind))))
+	  if (!NILP (CDR (XCDR (bind))))
 	    signal_error ("`let' bindings can have only one value-form", bind);
 	  val = eval_form (CAR (XCDR (bind)));
 	}
@@ -1202,7 +1202,7 @@ Both TAG and VALUE are evalled.  */
        attributes: noreturn)
   (register Lisp_Object tag, Lisp_Object value)
 {
-  if (! NILP (tag))
+  if (!NILP (tag))
     for (size_t count = exception_stack_count (current_thread);
 	 count > 0;
 	 --count)
@@ -1633,7 +1633,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
 	      FOR_EACH_TAIL_SAFE (tail)
 		{
 		  Lisp_Object errsym = XCAR (tail);
-		  if (! NILP (Fmemq (errsym, errsyms)) || EQ (errsym, Qt))
+		  if (!NILP (Fmemq (errsym, errsyms)) || EQ (errsym, Qt))
 		    {
 		      handler = h;
 		      break;
@@ -1643,7 +1643,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
 	}
     }
 
-  if ((! NILP (Vdebug_on_signal)
+  if ((!NILP (Vdebug_on_signal)
        || !handler
        /* Clause containing special 'debug symbol */
        || (CONSP (handler->what) && !NILP (Fmemq (Qdebug, handler->what)))
@@ -2137,7 +2137,7 @@ node `(elisp)Eval' for its form.  */)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   record_lexical_environment ();
-  current_thread->lexical_environment = ! NILP (Flistp (lexical))
+  current_thread->lexical_environment = !NILP (Flistp (lexical))
     ? lexical /* dynamic if LEXICAL is nil, bespoke otherwise */
     : list_of_t /* No bespoke environment but still lexical.  */
     ;
@@ -2213,12 +2213,12 @@ eval_form (Lisp_Object form)
     retry:
       /* Optimize for no indirection.  */
       fun = original_fun;
-      if (! SYMBOLP (fun))
+      if (!SYMBOLP (fun))
 	fun = Ffunction (list1 (fun));
-      else if (! NILP (fun) && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
+      else if (!NILP (fun) && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
 	fun = indirect_function (fun);
 
-      if (SUBRP (fun) && ! SUBR_NATIVE_COMPILED_DYNP (fun))
+      if (SUBRP (fun) && !SUBR_NATIVE_COMPILED_DYNP (fun))
 	{
 	  const ptrdiff_t nargs = list_length (args);
 	  if (nargs < XSUBR (fun)->min_args
@@ -2337,14 +2337,14 @@ eval_form (Lisp_Object form)
 	  /* Apprise macro of any defvar declarations in scope. */
 	  Lisp_Object dynvars = Vmacroexp__dynvars;
 	  for (Lisp_Object p = current_thread->lexical_environment;
-	       ! NILP (p);
+	       !NILP (p);
 	       p = XCDR(p))
 	    {
 	      Lisp_Object defvar = XCAR (p);
 	      if (SYMBOLP (defvar))
 		dynvars = Fcons(defvar, dynvars);
 	    }
-	  if (! EQ (dynvars, Vmacroexp__dynvars))
+	  if (!EQ (dynvars, Vmacroexp__dynvars))
 	    specbind (Qmacroexp__dynvars, dynvars);
 
 	  exp = apply1 (CDR (fun), args);
@@ -2685,7 +2685,7 @@ FUNCTIONP (Lisp_Object object)
 	  for (int i = 0; i < 4 && CONSP (object); i++)
 	    object = XCDR (object);
 
-	  return ! (CONSP (object) && !NILP (XCAR (object)));
+	  return !(CONSP (object) && !NILP (XCAR (object)));
 	}
     }
 
@@ -2903,7 +2903,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
       if (EQ (XCAR (fun), Qclosure))
 	{
 	  Lisp_Object cdr = XCDR (fun);	/* Drop 'closure.  */
-	  if (! CONSP (cdr))
+	  if (!CONSP (cdr))
 	    xsignal1 (Qinvalid_function, fun);
 	  fun = cdr;
 	  lexenv = XCAR (fun);
@@ -2937,7 +2937,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
   FOR_EACH_TAIL (args)
     {
       Lisp_Object sym = XCAR (args);
-      if (! SYMBOLP (sym))
+      if (!SYMBOLP (sym))
 	xsignal1 (Qinvalid_function, fun);
 
       if (EQ (sym, Qand_rest))
@@ -3096,7 +3096,7 @@ lambda_arity (Lisp_Object fun)
   for (; CONSP (syms_left); syms_left = XCDR (syms_left))
     {
       Lisp_Object sym = XCAR (syms_left);
-      if (! SYMBOLP (sym))
+      if (!SYMBOLP (sym))
 	xsignal1 (Qinvalid_function, fun);
 
       if (EQ (sym, Qand_rest))
@@ -3129,7 +3129,7 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
       if (CONSP (AREF (object, COMPILED_BYTECODE)))
 	{
 	  tem = read_doc_string (AREF (object, COMPILED_BYTECODE));
-	  if (! (CONSP (tem) && STRINGP (XCAR (tem))
+	  if (!(CONSP (tem) && STRINGP (XCAR (tem))
 		 && VECTORP (XCDR (tem))))
 	    {
 	      tem = AREF (object, COMPILED_BYTECODE);
@@ -3512,7 +3512,7 @@ get_backtrace_starting_at (Lisp_Object base)
         }
       base = Findirect_function (base, Qt);
       while (backtrace_valid_p (current_thread, pdl)
-             && ! EQ (base, Findirect_function (backtrace_function (pdl), Qt)))
+             && !EQ (base, Findirect_function (backtrace_function (pdl), Qt)))
         pdl = backtrace_next (current_thread, pdl);
       while (backtrace_valid_p (current_thread, pdl) && offset-- > 0)
         pdl = backtrace_next (current_thread, pdl);
@@ -3561,7 +3561,7 @@ if FLAG is nil.  */)
   CHECK_FIXNAT (level);
   union specbinding *pdl = get_backtrace_frame (base, XFIXNAT (level));
   if (backtrace_valid_p (current_thread, pdl))
-    set_backtrace_debug_on_exit (pdl, ! NILP (flag));
+    set_backtrace_debug_on_exit (pdl, !NILP (flag));
   return flag;
 }
 

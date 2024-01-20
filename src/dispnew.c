@@ -4256,7 +4256,7 @@ update_window_line (struct window *w, int vpos, bool *mouse_face_overwritten_p)
 	}
 
       /* Update display of the right margin area.  */
-      if (! desired_row->full_width_p && w->right_margin_cols > 0)
+      if (!desired_row->full_width_p && w->right_margin_cols > 0)
 	{
 	  changed_p = true;
 	  update_marginal_area (w, desired_row, RIGHT_MARGIN_AREA, vpos);
@@ -4535,7 +4535,7 @@ scrolling_window (struct window *w, int tab_line_p)
 #endif
 
   /* Give up if some rows in the desired matrix are not enabled.  */
-  if (! MATRIX_ROW_ENABLED_P (desired_matrix, i))
+  if (!MATRIX_ROW_ENABLED_P (desired_matrix, i))
     return -1;
 
   first_old = first_new = i;
@@ -5851,7 +5851,7 @@ FILE = nil means just close any termscript file currently open.  */)
       unblock_input ();
     }
 
-  if (! NILP (file))
+  if (!NILP (file))
     {
       file = Fexpand_file_name (file, Qnil);
       tty->termscript = emacs_fopen (SSDATA (file), "w");
@@ -6129,11 +6129,11 @@ pass nil for VARIABLE.  */)
   Lisp_Object state, tail, frame, buf;
   ptrdiff_t n, idx;
 
-  if (! NILP (variable))
+  if (!NILP (variable))
     {
       CHECK_SYMBOL (variable);
       state = Fsymbol_value (variable);
-      if (! VECTORP (state))
+      if (!VECTORP (state))
 	goto changed;
     }
   else
@@ -6312,7 +6312,7 @@ init_display_interactive (void)
      reporting that -nw will be simulated.  */
 
 #ifdef HAVE_X_WINDOWS
-  if (! inhibit_window_system && ! display_arg)
+  if (!inhibit_window_system && !display_arg)
     {
       char *display;
       display = getenv ("DISPLAY");
@@ -6372,7 +6372,7 @@ init_display_interactive (void)
 #endif
 
   /* If no window system has been specified, try to use the terminal.  */
-  if (! isatty (STDIN_FILENO))
+  if (!isatty (STDIN_FILENO))
     fatal ("standard input is not a tty");
 
 #ifdef WINDOWSNT

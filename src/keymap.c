@@ -1476,7 +1476,7 @@ silly_event_symbol_error (Lisp_Object c)
   /* This alist includes elements such as ("RET" . "\\r").  */
   Lisp_Object assoc = Fassoc (name, exclude_keys, Qnil);
 
-  if (! NILP (assoc))
+  if (!NILP (assoc))
     {
       char new_mods[sizeof ("\\A-\\C-\\H-\\M-\\S-\\s-")];
       char *p = new_mods;
@@ -1645,7 +1645,7 @@ click_position (Lisp_Object position)
   EMACS_INT pos = (FIXNUMP (position) ? XFIXNUM (position)
 		   : MARKERP (position) ? marker_position (position)
 		   : PT);
-  if (! (BEGV <= pos && pos <= ZV))
+  if (!(BEGV <= pos && pos <= ZV))
     args_out_of_range (Fcurrent_buffer (), position);
   return pos;
 }

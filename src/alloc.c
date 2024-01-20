@@ -314,7 +314,7 @@ void *
 xmalloc (size_t size)
 {
   void *val = lmalloc (size, false);
-  if (! val)
+  if (!val)
     memory_full (size);
   MALLOC_PROBE (size);
   return val;
@@ -326,7 +326,7 @@ void *
 xzalloc (size_t size)
 {
   void *val = lmalloc (size, true);
-  if (! val)
+  if (!val)
     memory_full (size);
   MALLOC_PROBE (size);
   return val;
@@ -339,7 +339,7 @@ xrealloc (void *block, size_t size)
 {
   /* We can but won't assume realloc (NULL, size) works.  */
   void *val = block ? lrealloc (block, size) : lmalloc (size, false);
-  if (! val)
+  if (!val)
     memory_full (size);
   MALLOC_PROBE (size);
   return val;
@@ -350,7 +350,7 @@ xrealloc (void *block, size_t size)
 void
 xfree (void *block)
 {
-  if (block && ! pdumper_object_p (block))
+  if (block && !pdumper_object_p (block))
     free (block);
 }
 
@@ -640,7 +640,7 @@ lisp_align_malloc (struct thread_state *thr, size_t nbytes, enum mem_type type)
       if (base != abase)
 	eassert (abase > base);
 #endif
-      if (! base) memory_full (sizeof (struct ablocks));
+      if (!base) memory_full (sizeof (struct ablocks));
 
       /* Like string blocks, begin ablock's life on free list.  */
       for (int i = 0; i < ABLOCKS_NBLOCKS; ++i)
@@ -836,7 +836,7 @@ mark_interval_tree (INTERVAL *i)
       */
       traverse_intervals_noorder (i, mark_interval_tree_functor_mgc, NULL);
     }
-  else if (! interval_marked_p (*i))
+  else if (!interval_marked_p (*i))
     traverse_intervals_noorder (i, mark_interval_tree_functor, NULL);
 }
 
@@ -1462,7 +1462,7 @@ usage: (bool-vector &rest OBJECTS)  */)
 
   vector = make_bool_vector (nargs);
   for (i = 0; i < nargs; ++i)
-    bool_vector_set (vector, i, ! NILP (args[i]));
+    bool_vector_set (vector, i, !NILP (args[i]));
 
   return vector;
 }
@@ -2371,7 +2371,7 @@ allocate_vector (ptrdiff_t len, bool q_clear)
 	    }
 	}
 
-      if (! p)
+      if (!p)
 	{
 	  /* Need new block */
 	  p = (struct Lisp_Vector *) allocate_vector_block ()->data;
@@ -2518,11 +2518,11 @@ and the R bit flags the presence of &rest arguments.
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   Lisp_Object val;
-  if (! ((FIXNUMP (args[COMPILED_ARGLIST])
+  if (!((FIXNUMP (args[COMPILED_ARGLIST])
 	  || CONSP (args[COMPILED_ARGLIST])
 	  || NILP (args[COMPILED_ARGLIST]))
 	 && STRINGP (args[COMPILED_BYTECODE])
-	 && ! STRING_MULTIBYTE (args[COMPILED_BYTECODE])
+	 && !STRING_MULTIBYTE (args[COMPILED_BYTECODE])
 	 && VECTORP (args[COMPILED_CONSTANTS])
 	 && FIXNATP (args[COMPILED_STACK_DEPTH])))
     error ("Invalid byte-code object");
@@ -2866,7 +2866,7 @@ run_finalizers (struct Lisp_Finalizer *finalizers)
       finalizer = finalizers->next;
       unchain_finalizer (finalizer);
       function = finalizer->function;
-      if (! NILP (function))
+      if (!NILP (function))
 	{
 	  finalizer_run = true;
 	  finalizer->function = Qnil;
@@ -2934,7 +2934,7 @@ vectorlike_marked_p (const union vectorlike_header *header)
 static void
 set_vectorlike_marked (union vectorlike_header *header)
 {
-  if (! vectorlike_marked_p (header))
+  if (!vectorlike_marked_p (header))
     set_vector_marked ((struct Lisp_Vector *) header);
 }
 
@@ -3016,7 +3016,7 @@ memory_full (size_t nbytes)
 {
   const size_t enough = (1 << 14);
 
-  if (! initialized)
+  if (!initialized)
     fatal ("memory exhausted");
 
   Vmemory_full = Qt;
@@ -3106,7 +3106,7 @@ live_cons_holding (struct thread_state *thr, struct mem_node *m, void *p)
 	  if (__asan_region_is_poisoned (s, sizeof (*s)))
 	    return NULL;
 #endif
-	  if (! deadp (s->u.s.car))
+	  if (!deadp (s->u.s.car))
 	    return s;
 	}
     }
@@ -3151,7 +3151,7 @@ live_symbol_holding (struct thread_state *thr, struct mem_node *m, void *p)
 	  if (__asan_region_is_poisoned (s, sizeof (*s)))
 	    return NULL;
 #endif
-	  if (! deadp (s->u.s.function))
+	  if (!deadp (s->u.s.function))
 	    return s;
 	}
     }
@@ -3923,7 +3923,7 @@ static Lisp_Object
 purecopy (Lisp_Object obj)
 {
   if (FIXNUMP (obj)
-      || (! SYMBOLP (obj) && PURE_P (XPNTR (obj)))
+      || (!SYMBOLP (obj) && PURE_P (XPNTR (obj)))
       || SUBRP (obj))
     return obj;    /* Already pure.  */
 
@@ -3931,10 +3931,10 @@ purecopy (Lisp_Object obj)
     message_with_string ("Dropping text-properties while making string `%s' pure",
 			 obj, true);
 
-  if (! NILP (Vloadup_pure_table)) /* Hash consing.  */
+  if (!NILP (Vloadup_pure_table)) /* Hash consing.  */
     {
       Lisp_Object tmp = Fgethash (obj, Vloadup_pure_table, Qnil);
-      if (! NILP (tmp))
+      if (!NILP (tmp))
 	return tmp;
     }
 
@@ -4071,7 +4071,7 @@ compact_font_cache_entry (Lisp_Object entry)
       /* Consider OBJ if it is (font-spec . [font-entity font-entity ...]).  */
       if (CONSP (obj)
 	  && GC_FONT_SPEC_P (XCAR (obj))
-	  && ! vectorlike_marked_p (&GC_XFONT_SPEC (XCAR (obj))->header)
+	  && !vectorlike_marked_p (&GC_XFONT_SPEC (XCAR (obj))->header)
 	  && VECTORP (XCDR (obj)))
 	{
 	  ptrdiff_t i, size = ASIZE (XCDR (obj));
@@ -4094,7 +4094,7 @@ compact_font_cache_entry (Lisp_Object entry)
                   Lisp_Object val = XCAR (objlist);
                   struct font *font = GC_XFONT_OBJECT (val);
 
-                  if (! NILP (AREF (val, FONT_TYPE_INDEX))
+                  if (!NILP (AREF (val, FONT_TYPE_INDEX))
                       && vectorlike_marked_p (&font->header))
                     break;
                 }
@@ -4126,7 +4126,7 @@ mark_font_caches (void)
   for (struct terminal *t = terminal_list; t != NULL; t = t->next_terminal)
     {
       Lisp_Object cache = TERMINAL_FONT_CACHE (t);
-      if (! inhibit_compacting_font_caches && CONSP (cache))
+      if (!inhibit_compacting_font_caches && CONSP (cache))
 	/* compact before marking */
 	for (Lisp_Object entry = XCDR (cache); CONSP (entry); entry = XCDR (entry))
 	  XSETCAR (entry, compact_font_cache_entry (XCAR (entry)));
@@ -4459,7 +4459,7 @@ mark_buffer (struct buffer *buffer)
      Note: this later processing is only done for live buffers, so
      for dead buffers, the undo_list should be nil (set by Fkill_buffer),
      but just to be on the safe side, we mark it here.  */
-  if (! BUFFER_LIVE_P (buffer))
+  if (!BUFFER_LIVE_P (buffer))
       mark_object (&BVAR (buffer, undo_list));
 
   if (!itree_empty_p (buffer->overlays))
@@ -4813,7 +4813,7 @@ garbage_collect (void)
 	malloc_probe (min (tot_before - tot_after, SIZE_MAX));
     }
 
-  if (! NILP (Vpost_gc_hook))
+  if (!NILP (Vpost_gc_hook))
     {
       specpdl_ref gc_count = inhibit_garbage_collection ();
       safe_run_hooks (Qpost_gc_hook);
@@ -5857,7 +5857,7 @@ system, and non-nil if some memory could be returned.  */)
 {
   int pad = 0;
 
-  if (! NILP (leave_padding))
+  if (!NILP (leave_padding))
     {
       CHECK_FIXNAT (leave_padding);
       pad = XFIXNUM (leave_padding);
@@ -5878,10 +5878,10 @@ symbol_uses_obj (Lisp_Object symbol, Lisp_Object obj)
   Lisp_Object val = find_symbol_value (sym, NULL);
   return (EQ (val, obj)
 	  || EQ (sym->u.s.function, obj)
-	  || (! NILP (sym->u.s.function)
+	  || (!NILP (sym->u.s.function)
 	      && COMPILEDP (sym->u.s.function)
 	      && EQ (AREF (sym->u.s.function, COMPILED_BYTECODE), obj))
-	  || (! NILP (val)
+	  || (!NILP (val)
 	      && COMPILEDP (val)
 	      && EQ (AREF (val, COMPILED_BYTECODE), obj)));
 }
@@ -5896,7 +5896,7 @@ which_symbols (Lisp_Object obj, EMACS_INT find_max)
    specpdl_ref gc_count = inhibit_garbage_collection ();
    Lisp_Object found = Qnil;
 
-   if (! deadp (obj))
+   if (!deadp (obj))
      {
        for (int i = 0; i < ARRAYELTS (lispsym); ++i)
 	 {

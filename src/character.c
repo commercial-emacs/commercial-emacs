@@ -52,7 +52,7 @@ EMACS_INT
 char_resolve_modifier_mask (EMACS_INT c)
 {
   /* A non-ASCII character can't reflect modifier bits to the code.  */
-  if (! ASCII_CHAR_P ((c & ~CHAR_MODIFIER_MASK)))
+  if (!ASCII_CHAR_P ((c & ~CHAR_MODIFIER_MASK)))
     return c;
 
   /* For Meta, Shift, and Control modifiers, we need special care.  */
@@ -916,7 +916,7 @@ character is not ASCII nor 8-bit character, an error is signaled.  */)
       else
 	{
 	  EMACS_INT fixed_pos = fix_position (position);
-	  if (! (BEGV <= fixed_pos && fixed_pos < ZV))
+	  if (!(BEGV <= fixed_pos && fixed_pos < ZV))
 	    args_out_of_range_3 (position, make_fixnum (BEGV), make_fixnum (ZV));
 	  pos = fixed_pos;
 	  p = CHAR_POS_ADDR (pos);
@@ -939,13 +939,13 @@ character is not ASCII nor 8-bit character, an error is signaled.  */)
 	  pos = XFIXNAT (position);
 	  p = SDATA (string) + string_char_to_byte (string, pos);
 	}
-      if (! STRING_MULTIBYTE (string))
+      if (!STRING_MULTIBYTE (string))
 	return make_fixnum (*p);
     }
   c = STRING_CHAR (p);
   if (CHAR_BYTE8_P (c))
     c = CHAR_TO_BYTE8 (c);
-  else if (! ASCII_CHAR_P (c))
+  else if (!ASCII_CHAR_P (c))
     error ("Not an ASCII nor an 8-bit character: %d", c);
   return make_fixnum (c);
 }

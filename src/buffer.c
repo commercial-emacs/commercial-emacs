@@ -717,7 +717,7 @@ clone_per_buffer_values (struct buffer *from, struct buffer *to)
 static void
 record_buffer_markers (struct buffer *b)
 {
-  if (! NILP (BVAR (b, pt_marker)))
+  if (!NILP (BVAR (b, pt_marker)))
     {
       Lisp_Object buffer;
 
@@ -1127,7 +1127,7 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
     {
       int idx = PER_BUFFER_IDX (offset);
       if (idx > 0
-	  && (ignore_perm || ! buffer_permanent_local_flags[idx]))
+	  && (ignore_perm || !buffer_permanent_local_flags[idx]))
 	set_per_buffer_value (b, offset, per_buffer_default (offset));
     }
 }
@@ -1304,7 +1304,7 @@ No argument or nil as argument means use current buffer as BUFFER.  */)
   FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
     {
       Lisp_Object tem = buffer_local_variables_1 (b, offset, Qnil);
-      if (! NILP (tem))
+      if (!NILP (tem))
 	result = Fcons (tem, result);
     }
 
@@ -1345,7 +1345,7 @@ header lines.  This function also forces recomputation of the
 menu bar menus and the frame title.  */)
      (Lisp_Object all)
 {
-  if (! NILP (all))
+  if (!NILP (all))
     {
       update_mode_lines = 10;
       /* FIXME: This can't be right.  */
@@ -1409,7 +1409,7 @@ state of the current buffer.  Use with care.  */)
     ? current_buffer->base_buffer
     : current_buffer;
 
-  if (! inhibit_modification_hooks)
+  if (!inhibit_modification_hooks)
     {
       Lisp_Object fn = BVAR (b, file_truename);
       /* Test buffer-file-name so that binding it to nil is effective.  */
@@ -2263,7 +2263,7 @@ validate_region (Lisp_Object *b, Lisp_Object *e)
       EMACS_INT tem = beg;  beg = end;  end = tem;
     }
 
-  if (! (BEGV <= beg && end <= ZV))
+  if (!(BEGV <= beg && end <= ZV))
     args_out_of_range_3 (Fcurrent_buffer (), *b, *e);
 
   *b = make_fixnum (beg);
@@ -3100,7 +3100,7 @@ sort_overlays (Lisp_Object *overlay_vec, ptrdiff_t noverlays, struct window *w)
 	{
           /* If we're interested in a specific window, then ignore
              overlays that are limited to some other window.  */
-          if (w && ! overlay_matches_window (w, overlay))
+          if (w && !overlay_matches_window (w, overlay))
             continue;
           make_sortvec_item (sortvec + j, overlay);
 	  j++;
@@ -3343,7 +3343,7 @@ adjust_overlays_for_delete_in_buffer (struct buffer * buf,
   ITREE_FOREACH (node, buf->overlays, pos, pos, ASCENDING)
     {
       if (node->end == pos && node->begin == pos
-          && ! NILP (Foverlay_get (node->data, Qevaporate)))
+          && !NILP (Foverlay_get (node->data, Qevaporate)))
         hit_list = Fcons (node->data, hit_list);
     }
 
@@ -4670,7 +4670,7 @@ init_buffer (void)
       /* Add /: to the front of the name
          if it would otherwise be treated as magic.  */
       temp = Ffind_file_name_handler (BVAR (current_buffer, directory), Qt);
-      if (! NILP (temp)
+      if (!NILP (temp)
           /* If the default dir is just /, TEMP is non-nil
              because of the ange-ftp completion handler.
              However, it is not necessary to turn / into /:/.

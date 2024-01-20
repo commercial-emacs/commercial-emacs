@@ -417,7 +417,7 @@ terminate_due_to_signal (int sig, int backtrace_limit)
   if (attempt_orderly_shutdown_on_fatal_signal)
     {
       /* If fatal error occurs in code below, avoid infinite recursion.  */
-      if (! fatal_error_in_progress)
+      if (!fatal_error_in_progress)
         {
           fatal_error_in_progress = 1;
 
@@ -487,7 +487,7 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
   /* Add /: to the front of the name
      if it would otherwise be treated as magic.  */
   handler = Ffind_file_name_handler (raw_name, Qt);
-  if (! NILP (handler))
+  if (!NILP (handler))
     raw_name = concat2 (slash_colon, raw_name);
 
   Vinvocation_name = Ffile_name_nondirectory (raw_name);
@@ -505,7 +505,7 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 	  /* Add /: to the front of the name
 	     if it would otherwise be treated as magic.  */
 	  handler = Ffind_file_name_handler (found, Qt);
-	  if (! NILP (handler))
+	  if (!NILP (handler))
 	    found = concat2 (slash_colon, found);
 	  Vinvocation_directory = Ffile_name_directory (found);
 	}
@@ -524,7 +524,7 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 
   Vinstallation_directory = Qnil;
 
-  if (! NILP (Vinvocation_directory))
+  if (!NILP (Vinvocation_directory))
     {
       dir = Vinvocation_directory;
 #ifdef WINDOWSNT
@@ -566,11 +566,11 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 	  info_exists = Qnil;
 #endif
 
-	  if (! NILP (lib_src_exists) || ! NILP (info_exists))
+	  if (!NILP (lib_src_exists) || !NILP (info_exists))
 	    {
 	      tem = Fexpand_file_name (build_string ("etc"), dir);
 	      etc_exists = Ffile_exists_p (tem);
-	      if (! NILP (etc_exists))
+	      if (!NILP (etc_exists))
 		{
                   Vinstallation_directory = Ffile_name_as_directory (dir);
 		  break;
@@ -590,11 +590,11 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 	  info_exists = Qnil;
 #endif
 
-	  if (! NILP (lib_src_exists) || ! NILP (info_exists))
+	  if (!NILP (lib_src_exists) || !NILP (info_exists))
 	    {
 	      tem = Fexpand_file_name (build_string ("../etc"), dir);
 	      etc_exists = Ffile_exists_p (tem);
-	      if (! NILP (etc_exists))
+	      if (!NILP (etc_exists))
 		{
 		  tem = Fexpand_file_name (build_string (".."), dir);
                   Vinstallation_directory = Ffile_name_as_directory (tem);
@@ -754,7 +754,7 @@ find_emacs_executable (char const *argv0, ptrdiff_t *candidate_size)
   ptrdiff_t argv0_length = strlen (argv0);
 
   const char *path = getenv ("PATH");
-  if (! path)
+  if (!path)
     {
       /* Default PATH is implementation-defined, so we don't know how
          to conduct the search.  */
@@ -1202,7 +1202,7 @@ maybe_load_seccomp (int argc, char **argv)
     }
   if (file == NULL)
     return;
-  if (! load_seccomp (file))
+  if (!load_seccomp (file))
     fatal ("cannot enable seccomp filter from %s", file);
 }
 
@@ -1601,7 +1601,7 @@ main (int argc, char **argv)
 	      fprintf (stderr, "%s: %s: %s\n", argv[0], term, errstring);
 	      exit (EXIT_FAILURE);
 	    }
-	  if (! isatty (STDIN_FILENO))
+	  if (!isatty (STDIN_FILENO))
 	    {
 	      fprintf (stderr, "%s: %s: not a tty\n", argv[0], term);
 	      exit (EXIT_FAILURE);
@@ -2845,7 +2845,7 @@ killed.  */
 #ifndef WINDOWSNT
   /* Do some checking before shutting down Emacs, because errors
      can't be meaningfully reported afterwards.  */
-  if (! NILP (restart))
+  if (!NILP (restart))
     {
       /* This is very unlikely, but it's possible to execute a binary
 	 (on some systems) with no argv.  */
@@ -2853,10 +2853,10 @@ killed.  */
 	error ("No command line arguments known; unable to re-execute Emacs");
 
       /* Check that the binary hasn't gone away.  */
-      if (! initial_emacs_executable)
+      if (!initial_emacs_executable)
 	error ("Unknown Emacs executable");
 
-      if (! file_access_p (initial_emacs_executable, F_OK))
+      if (!file_access_p (initial_emacs_executable, F_OK))
 	error ("Emacs executable \"%s\" can't be found", initial_argv[0]);
     }
 #endif
@@ -3199,11 +3199,11 @@ decode_env_path (const char *evarname, const char *defalt, bool empty)
   while (1)
     {
       p = strchr (path, SEPCHAR);
-      if (! p)
+      if (!p)
 	p = path + strlen (path);
       element = ((p - path) ? make_unibyte_string (path, p - path)
 		 : empty_element);
-      if (! NILP (element))
+      if (!NILP (element))
         {
 #ifdef WINDOWSNT
           /* Relative file names in the default path are interpreted as
@@ -3231,7 +3231,7 @@ decode_env_path (const char *evarname, const char *defalt, bool empty)
                 tem = Qnil;
             }
 
-          if (! NILP (tem))
+          if (!NILP (tem))
 	    {
 	      AUTO_STRING (slash_colon, "/:");
 	      element = concat2 (slash_colon, element);

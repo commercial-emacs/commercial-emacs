@@ -2242,7 +2242,7 @@ merge_face_vectors (struct window *w,
 	    to[i] = merge_face_heights (from[i], to[i], to[i]);
 	    font_clear_prop (to, FONT_SIZE_INDEX);
 	  }
-	else if (i != LFACE_FONT_INDEX && ! EQ (to[i], from[i]))
+	else if (i != LFACE_FONT_INDEX && !EQ (to[i], from[i]))
 	  {
 	    to[i] = from[i];
 	    if (i >= LFACE_FAMILY_INDEX && i <= LFACE_SLANT_INDEX)
@@ -2262,9 +2262,9 @@ merge_face_vectors (struct window *w,
 
   if (!NILP (font))
     {
-      if (! NILP (AREF (font, FONT_FOUNDRY_INDEX)))
+      if (!NILP (AREF (font, FONT_FOUNDRY_INDEX)))
 	to[LFACE_FOUNDRY_INDEX] = SYMBOL_NAME (AREF (font, FONT_FOUNDRY_INDEX));
-      if (! NILP (AREF (font, FONT_FAMILY_INDEX)))
+      if (!NILP (AREF (font, FONT_FAMILY_INDEX)))
 	to[LFACE_FAMILY_INDEX] = SYMBOL_NAME (AREF (font, FONT_FAMILY_INDEX));
       if (!NILP (AREF (font, FONT_WEIGHT_INDEX)))
 	to[LFACE_WEIGHT_INDEX] = FONT_WEIGHT_FOR_FACE (font);
@@ -3478,7 +3478,7 @@ FRAME 0 means change the face on all frames, and change the default
 	      struct frame *f1;
 
 	      old_value = LFACE_FONT (lface);
-	      if (! FONTP (value))
+	      if (!FONTP (value))
 		{
 		  if (STRINGP (value))
 		    {
@@ -3506,7 +3506,7 @@ FRAME 0 means change the face on all frames, and change the default
                  For a daemon, frame may be an initial frame (Bug#18869).  */
               if (FRAME_WINDOW_P (f1))
                 {
-                  if (! FONT_OBJECT_P (value))
+                  if (!FONT_OBJECT_P (value))
                     {
                       Lisp_Object *attrs = XVECTOR (lface)->contents;
                       Lisp_Object font_object;
@@ -4166,7 +4166,7 @@ Default face attributes override any local face attributes.  */)
   for (int i = 1; i < LFACE_VECTOR_SIZE; ++i)
     if (IGNORE_DEFFACE_P (gvec[i]))
       ASET (local_lface, i, Qunspecified);
-    else if (! UNSPECIFIEDP (gvec[i]))
+    else if (!UNSPECIFIEDP (gvec[i]))
       ASET (local_lface, i, AREF (global_lface, i));
 
   /* If the default face was changed, update the face cache and the
@@ -4947,7 +4947,7 @@ lookup_named_face (struct window *w, struct frame *f,
       default_face = FACE_FROM_ID (f, DEFAULT_FACE_ID);
     }
 
-  if (! get_lface_attributes (w, f, symbol, symbol_attrs, signal_p, 0))
+  if (!get_lface_attributes (w, f, symbol, symbol_attrs, signal_p, 0))
     return -1;
 
   memcpy (attrs, default_face->lface, sizeof attrs);
@@ -5527,7 +5527,7 @@ face for italic.  */)
   def_face = FACE_FROM_ID_OR_NULL (f, DEFAULT_FACE_ID);
   if (def_face == NULL)
     {
-      if (! realize_basic_faces (f))
+      if (!realize_basic_faces (f))
 	error ("Cannot realize default face");
       def_face = FACE_FROM_ID (f, DEFAULT_FACE_ID);
     }

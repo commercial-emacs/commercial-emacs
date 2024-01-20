@@ -1478,7 +1478,7 @@ scan_words (ptrdiff_t from, EMACS_INT count)
 	      ch1 = FETCH_CHAR_AS_MULTIBYTE (from_byte);
 	      code = SYNTAX (ch1);
 	      if ((code != Sword
-		   && (! words_include_escapes
+		   && (!words_include_escapes
 		       || (code != Sescape && code != Scharquote)))
 		  || word_boundary_p (ch0, ch1))
 		break;
@@ -1842,7 +1842,7 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		    fastmap[c++] = 1;
 		  leading_code = CHAR_LEADING_CODE (c);
 		}
-	      if (! ASCII_CHAR_P (c))
+	      if (!ASCII_CHAR_P (c))
 		{
 		  int lim2 = leading_code2 + 1;
 		  while (leading_code < lim2)
@@ -1871,7 +1871,7 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
 	 chars, arrange fastmap for the corresponding unibyte
 	 chars.  */
 
-      if (! multibyte && n_char_ranges > 0)
+      if (!multibyte && n_char_ranges > 0)
 	{
 	  memset (fastmap + 0200, 0, 0200);
 	  for (i = 0; i < n_char_ranges; i += 2)
@@ -1892,7 +1892,7 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
   /* If ^ was the first character, complement the fastmap.  */
   if (negate)
     {
-      if (! multibyte)
+      if (!multibyte)
 	for (i = 0; i < sizeof fastmap; i++)
 	  fastmap[i] ^= 1;
       else
@@ -2890,7 +2890,7 @@ scan_lists (EMACS_INT from0, EMACS_INT count, EMACS_INT depth, bool sexpflag)
 		      UPDATE_SYNTAX_TABLE_BACKWARD (from - 1);
 		    }
 		  c1 = FETCH_CHAR_AS_MULTIBYTE (temp_pos);
-		  if (! quoted)
+		  if (!quoted)
 		    switch (syntax_multibyte (c1, multibyte_symbol_p))
 		      {
 		      case Sword: case Ssymbol: case Squote: break;
@@ -3567,7 +3567,7 @@ the end of that comment or string.  */)
 
   validate_region (&from, &to);
 
-  if (! NILP (targetdepth))
+  if (!NILP (targetdepth))
     {
       CHECK_FIXNUM (targetdepth);
       target = XFIXNUM (targetdepth);
@@ -3575,7 +3575,7 @@ the end of that comment or string.  */)
 
   internalize_parse_state (oldstate, &state);
   scan_sexps_forward (&state, XFIXNUM (from), CHAR_TO_BYTE (XFIXNUM (from)),
-		      XFIXNUM (to), target, ! NILP (stopbefore),
+		      XFIXNUM (to), target, !NILP (stopbefore),
 		      (NILP (commentstop)
 		       ? 0 : (EQ (commentstop, Qsyntax_table) ? -1 : 1)));
 

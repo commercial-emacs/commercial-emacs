@@ -156,8 +156,8 @@ tm_diff (struct tm *a, struct tm *b)
   /* Compute intervening leap days correctly even if year is negative.
      Take care to avoid int overflow in leap day calculations,
      but it's OK to assume that A and B are close to each other.  */
-  int a4 = (a->tm_year >> 2) + (TM_YEAR_BASE >> 2) - ! (a->tm_year & 3);
-  int b4 = (b->tm_year >> 2) + (TM_YEAR_BASE >> 2) - ! (b->tm_year & 3);
+  int a4 = (a->tm_year >> 2) + (TM_YEAR_BASE >> 2) - !(a->tm_year & 3);
+  int b4 = (b->tm_year >> 2) + (TM_YEAR_BASE >> 2) - !(b->tm_year & 3);
   int a100 = a4 / 25 - (a4 % 25 < 0);
   int b100 = b4 / 25 - (b4 % 25 < 0);
   int a400 = a100 >> 2;
@@ -1329,7 +1329,7 @@ format_time_string (char const *format, ptrdiff_t formatlen,
      expects a pointer to time_t value.  */
   time_t tsec = t.tv_sec;
   tmp = emacs_localtime_rz (tz, &tsec, tmp);
-  if (! tmp)
+  if (!tmp)
     {
       int localtime_errno = errno;
       xtzfree (tz);
@@ -1494,7 +1494,7 @@ usage: (decode-time &optional TIME ZONE FORM)  */)
   /* Compute broken-down local time LOCAL_TM from SPECIFIED_TIME and ZONE.  */
   struct lisp_time lt = lisp_time_struct (specified_time, 0);
   struct timespec ts = lisp_to_timespec (lt);
-  if (! timespec_valid_p (ts))
+  if (!timespec_valid_p (ts))
     time_overflow ();
   time_t time_spec = ts.tv_sec;
   struct tm local_tm, gmt_tm;
@@ -1643,7 +1643,7 @@ usage: (encode-time TIME &rest OBSOLESCENT-ARGUMENTS)  */)
       mdayarg = XCAR (a); a = XCDR (a);
       monarg = XCAR (a); a = XCDR (a);
       yeararg = XCAR (a); a = XCDR (a);
-      if (! NILP (a))
+      if (!NILP (a))
 	{
 	  CHECK_CONS (a);
 	  a = XCDR (a);

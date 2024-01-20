@@ -376,7 +376,7 @@ returns, COND's mutex will again be locked by this thread.  */)
   cvar = XCONDVAR (cond);
 
   mutex = XMUTEX (cvar->mutex);
-  if (! lisp_mutex_owned_p (&mutex->mutex))
+  if (!lisp_mutex_owned_p (&mutex->mutex))
     error ("Condition variable's mutex is not held by current thread");
 
   with_flushed_stack (condition_wait_callback, cvar);
@@ -432,11 +432,11 @@ thread.  */)
   cvar = XCONDVAR (cond);
 
   mutex = XMUTEX (cvar->mutex);
-  if (! lisp_mutex_owned_p (&mutex->mutex))
+  if (!lisp_mutex_owned_p (&mutex->mutex))
     error ("Condition variable's mutex is not held by current thread");
 
   args.cvar = cvar;
-  args.all = ! NILP (all);
+  args.all = !NILP (all);
   with_flushed_stack (condition_notify_callback, &args);
 
   return Qnil;
@@ -767,10 +767,10 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   const ptrdiff_t init_pdl = 50;
 
   /* Can't start a thread in temacs.  */
-  if (! initialized)
+  if (!initialized)
     emacs_abort ();
 
-  if (! NILP (name))
+  if (!NILP (name))
     CHECK_STRING (name);
 
   new_thread = ALLOCATE_ZEROED_PSEUDOVECTOR (struct thread_state,
@@ -784,7 +784,7 @@ A non-nil UNCOOPERATIVE halts and catches fire.
   new_thread->cooperative = NILP (uncooperative);
 #else
   new_thread->cooperative = true;
-  if (! NILP (uncooperative))
+  if (!NILP (uncooperative))
     error ("No gcc tls support");
 #endif
   new_thread->m_current_buffer = current_thread->m_current_buffer;

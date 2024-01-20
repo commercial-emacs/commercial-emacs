@@ -120,7 +120,7 @@ xg_select (int fds_lim, fd_set *rfds, fd_set *wfds, fd_set *efds,
     {
       tmo = make_timespec (tmo_in_millisec / 1000,
 			   1000 * 1000 * (tmo_in_millisec % 1000));
-      if (! timeout
+      if (!timeout
 	  /* See point (1) in header comment.  */
 	  || timespec_cmp (tmo, *timeout) < 0)
 	tmop = &tmo;

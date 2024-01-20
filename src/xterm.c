@@ -1886,7 +1886,7 @@ xm_setup_dnd_targets (struct x_display_info *dpyinfo,
   /* Now rc means whether or not the target lists weren't updated and
      shouldn't be written to the drag window.  */
 
-  if (! rc)
+  if (!rc)
     {
       header.byte_order = XM_BYTE_ORDER_CUR_FIRST;
       header.protocol = XM_DRAG_PROTOCOL_VERSION;
@@ -16820,7 +16820,7 @@ XTjudge_scroll_bars (struct frame *f)
      more events on the hapless scroll bars.  */
   fset_condemned_scroll_bars (f, Qnil);
 
-  for (; ! NILP (bar); bar = next)
+  for (; !NILP (bar); bar = next)
     {
       struct scroll_bar *b = XSCROLL_BAR (bar);
 
@@ -26756,7 +26756,7 @@ x_calc_absolute_position (struct frame *f)
 
   /* We have nothing to do if the current position
      is already for the top-left corner.  */
-  if (! ((flags & XNegative) || (flags & YNegative)))
+  if (!((flags & XNegative) || (flags & YNegative)))
     return;
 
   /* Treat negative positions as relative to the leftmost bottommost
@@ -27336,7 +27336,7 @@ x_get_current_wm_state (struct frame *f,
 #endif
 
   unblock_input ();
-  return ! is_hidden;
+  return !is_hidden;
 }
 
 /* Do fullscreen as specified in extended window manager hints */
@@ -28374,7 +28374,7 @@ x_make_frame_visible (struct frame *f)
   dpyinfo = FRAME_DISPLAY_INFO (f);
 #endif
 
-  if (! FRAME_VISIBLE_P (f))
+  if (!FRAME_VISIBLE_P (f))
     {
       /* We test asked_for_visible here to make sure we don't
          call x_set_offset a second time
@@ -28406,7 +28406,7 @@ x_make_frame_visible (struct frame *f)
 
       f->output_data.x->asked_for_visible = true;
 
-      if (! EQ (Vx_no_window_manager, Qt))
+      if (!EQ (Vx_no_window_manager, Qt))
 	x_wm_set_window_state (f, NormalState);
 #ifdef USE_X_TOOLKIT
       if (FRAME_X_EMBEDDED_P (f))
@@ -29621,7 +29621,7 @@ same_x_server (const char *name1, const char *name2)
 {
   bool seen_colon = false;
   Lisp_Object sysname = Fsystem_name ();
-  if (! STRINGP (sysname))
+  if (!STRINGP (sysname))
     sysname = empty_unibyte_string;
   const char *system_name = SSDATA (sysname);
   ptrdiff_t system_name_length = SBYTES (sysname);
@@ -29632,22 +29632,22 @@ same_x_server (const char *name1, const char *name2)
     length_until_period++;
 
   /* Treat `unix' like an empty host name.  */
-  if (! strncmp (name1, "unix:", 5))
+  if (!strncmp (name1, "unix:", 5))
     name1 += 4;
-  if (! strncmp (name2, "unix:", 5))
+  if (!strncmp (name2, "unix:", 5))
     name2 += 4;
   /* Treat this host's name like an empty host name.  */
-  if (! strncmp (name1, system_name, system_name_length)
+  if (!strncmp (name1, system_name, system_name_length)
       && name1[system_name_length] == ':')
     name1 += system_name_length;
-  if (! strncmp (name2, system_name, system_name_length)
+  if (!strncmp (name2, system_name, system_name_length)
       && name2[system_name_length] == ':')
     name2 += system_name_length;
   /* Treat this host's domainless name like an empty host name.  */
-  if (! strncmp (name1, system_name, length_until_period)
+  if (!strncmp (name1, system_name, length_until_period)
       && name1[length_until_period] == ':')
     name1 += length_until_period;
-  if (! strncmp (name2, system_name, length_until_period)
+  if (!strncmp (name2, system_name, length_until_period)
       && name2[length_until_period] == ':')
     name2 += length_until_period;
 
@@ -30053,7 +30053,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
       {
 	terminal->kboard = allocate_kboard (Qx);
 
-	if (! EQ (XSYMBOL (Qvendor_specific_keysyms)->u.s.function,
+	if (!EQ (XSYMBOL (Qvendor_specific_keysyms)->u.s.function,
 		  Qunbound))
 	  {
 	    char *vendor = ServerVendor (dpy);

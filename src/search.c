@@ -1823,7 +1823,7 @@ boyer_moore (EMACS_INT n, unsigned char *base_pat,
     {
       unsigned char *ptr = base_pat + i;
       i += direction;
-      if (! NILP (trt))
+      if (!NILP (trt))
 	{
 	  /* If the byte currently looking at is the last of a
 	     character to check case-equivalents, set CH to that
@@ -1831,14 +1831,14 @@ boyer_moore (EMACS_INT n, unsigned char *base_pat,
 	     matching with CHAR_BASE are to be checked.  */
 	  int ch = -1;
 
-	  if (ASCII_CHAR_P (*ptr) || ! multibyte)
+	  if (ASCII_CHAR_P (*ptr) || !multibyte)
 	    ch = *ptr;
 	  else if (char_base
 		   && ((pat_end - ptr) == 1 || CHAR_HEAD_P (ptr[1])))
 	    {
 	      unsigned char *charstart = ptr - 1;
 
-	      while (! (CHAR_HEAD_P (*charstart)))
+	      while (!(CHAR_HEAD_P (*charstart)))
 		charstart--;
 	      ch = STRING_CHAR (charstart);
 	      if (char_base != (ch & ~0x3F))

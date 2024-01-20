@@ -324,7 +324,7 @@ use the standard functions without calling themselves recursively.  */)
 
 	  if (STRINGP (string)
 	      && (match_pos = fast_string_match (string, filename)) > pos
-	      && (NILP (operations) || ! NILP (Fmemq (operation, operations))))
+	      && (NILP (operations) || !NILP (Fmemq (operation, operations))))
 	    {
 	      Lisp_Object tem;
 
@@ -2101,7 +2101,7 @@ barf_or_query_if_file_exists (Lisp_Object absname, bool known_to_exist,
 
   if (known_to_exist)
     {
-      if (! interactive)
+      if (!interactive)
 	xsignal2 (Qfile_already_exists,
 		  build_string ("File already exists"), absname);
       AUTO_STRING (format, "File %s already exists; %s anyway? ");
@@ -4426,7 +4426,7 @@ by calling `format-decode', which see.  */)
 	    break;
 	}
 
-      if (! giveup_match_end)
+      if (!giveup_match_end)
 	{
 	  ptrdiff_t temp;
           specpdl_ref this_count = SPECPDL_INDEX ();
@@ -4435,7 +4435,7 @@ by calling `format-decode', which see.  */)
 
 	  /* Extend the start of non-matching text area to multibyte
              character boundary.  */
-	  if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
+	  if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	    while (same_at_start > BEGV_BYTE
 		   && !CHAR_HEAD_P (FETCH_BYTE (same_at_start)))
 	      same_at_start--;
@@ -4826,7 +4826,7 @@ by calling `format-decode', which see.  */)
           /* Make the text read part of the buffer.  */
           insert_from_gap_1 (inserted, inserted, false);
 
-	  if (inserted > 0 && ! NILP (Vset_auto_coding_function))
+	  if (inserted > 0 && !NILP (Vset_auto_coding_function))
 	    {
 	      coding_system = call2 (Vset_auto_coding_function,
 				     filename, make_fixnum (inserted));
@@ -5216,7 +5216,7 @@ choose_write_coding_system (Lisp_Object start, Lisp_Object end, Lisp_Object file
 
       /* If the decided coding-system doesn't specify end-of-line
 	 format, we use that of `buffer-file-coding-system'.  */
-      if (! using_default_coding)
+      if (!using_default_coding)
 	{
 	  Lisp_Object dflt = BVAR (&buffer_slot_defaults, buffer_file_coding_system);
 
@@ -5757,7 +5757,7 @@ a_write (int desc, Lisp_Object string, ptrdiff_t pos,
 
       /* If there are no more annotations in this range,
 	 output the rest of the range all at once.  */
-      if (! (nextpos >= pos && nextpos <= lastpos))
+      if (!(nextpos >= pos && nextpos <= lastpos))
 	return e_write (desc, string, pos, lastpos, coding);
 
       /* Output buffer text up to the next annotation's position.  */

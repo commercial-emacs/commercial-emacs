@@ -1451,7 +1451,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		    if (!VECTORP (Vcode_conversion_map_vector)) continue;
 		    size = ASIZE (Vcode_conversion_map_vector);
 		    point = XFIXNUM (ccl_prog[ic++]);
-		    if (! (0 <= point && point < size)) continue;
+		    if (!(0 <= point && point < size)) continue;
 		    map = AREF (Vcode_conversion_map_vector, point);
 
 		    /* Check map validity.  */
@@ -1503,7 +1503,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		      {
 			attrib = XCAR (content);
 			value = XCDR (content);
-			if (! (FIXNUMP (attrib) && FIXNUMP (value)
+			if (!(FIXNUMP (attrib) && FIXNUMP (value)
 			       && IN_INT_RANGE (XFIXNUM (value))))
 			  continue;
 			reg[RRR] = i;
@@ -2001,7 +2001,7 @@ ccl_get_compiled_code (Lisp_Object ccl_prog, ptrdiff_t *idx)
 bool
 setup_ccl_program (struct ccl_program *ccl, Lisp_Object ccl_prog)
 {
-  if (! NILP (ccl_prog))
+  if (!NILP (ccl_prog))
     {
       struct Lisp_Vector *vp;
 
@@ -2073,7 +2073,7 @@ programs.  */)
   struct ccl_program ccl;
   int i;
 
-  if (! setup_ccl_program (&ccl, ccl_prog))
+  if (!setup_ccl_program (&ccl, ccl_prog))
     error ("Invalid CCL program");
 
   CHECK_VECTOR (reg);
@@ -2139,7 +2139,7 @@ usage: (ccl-execute-on-string CCL-PROGRAM STATUS STRING &optional CONTINUE UNIBY
   ptrdiff_t consumed_chars, consumed_bytes, produced_chars;
   int buf_magnification;
 
-  if (! setup_ccl_program (&ccl, ccl_prog))
+  if (!setup_ccl_program (&ccl, ccl_prog))
     error ("Invalid CCL program");
 
   CHECK_VECTOR (status);
@@ -2330,7 +2330,7 @@ Return index number of the registered map.  */)
 
   CHECK_SYMBOL (symbol);
   CHECK_VECTOR (map);
-  if (! VECTORP (Vcode_conversion_map_vector))
+  if (!VECTORP (Vcode_conversion_map_vector))
     error ("Invalid code-conversion-map-vector");
 
   len = ASIZE (Vcode_conversion_map_vector);

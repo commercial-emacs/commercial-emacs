@@ -388,13 +388,13 @@ parse_sound (Lisp_Object sound, Lisp_Object *attrs)
       if (FIXNUMP (attrs[SOUND_VOLUME]))
 	{
 	  EMACS_INT volume = XFIXNUM (attrs[SOUND_VOLUME]);
-	  if (! (0 <= volume && volume <= 100))
+	  if (!(0 <= volume && volume <= 100))
 	    return 0;
 	}
       else if (FLOATP (attrs[SOUND_VOLUME]))
 	{
 	  double volume = XFLOAT_DATA (attrs[SOUND_VOLUME]);
-	  if (! (0 <= volume && volume <= 1))
+	  if (!(0 <= volume && volume <= 1))
 	    return 0;
 	}
       else

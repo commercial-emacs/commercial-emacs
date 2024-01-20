@@ -103,7 +103,7 @@ open_directory (Lisp_Object dirname, Lisp_Object encoded_dirname, int *fdp)
     {
       d = fdopendir (fd);
       opendir_errno = errno;
-      if (! d)
+      if (!d)
 	emacs_close (fd);
     }
 #endif
@@ -265,7 +265,7 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
 	    continue;
 	}
 
-      if (! NILP (full))
+      if (!NILP (full))
 	{
 	  ptrdiff_t name_nbytes = SBYTES (name);
 	  ptrdiff_t nbytes = directory_nbytes + needsep + name_nbytes;

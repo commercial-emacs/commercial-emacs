@@ -384,7 +384,7 @@ mpz_get_d_rounded (mpz_t const num)
   /* Use mpz_get_d as a shortcut for a bignum so small that rounding
      errors cannot occur, which is possible if EMACS_INT (not counting
      sign) has fewer bits than a double significand.  */
-  if (! ((FLT_RADIX == 2 && DBL_MANT_DIG <= FIXNUM_BITS - 1)
+  if (!((FLT_RADIX == 2 && DBL_MANT_DIG <= FIXNUM_BITS - 1)
 	 || (FLT_RADIX == 16 && DBL_MANT_DIG * 4 <= FIXNUM_BITS - 1))
       && size <= DBL_DIG + 2)
     return mpz_get_d (num);

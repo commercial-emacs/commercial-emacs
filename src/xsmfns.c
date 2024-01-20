@@ -171,7 +171,7 @@ smc_save_yourself_CB (SmcConn smcConn,
   Lisp_Object user_login_name = Fuser_login_name (Qnil);
 
   /* Must have these.  */
-  if (! STRINGP (Vinvocation_name) || !STRINGP (user_login_name))
+  if (!STRINGP (Vinvocation_name) || !STRINGP (user_login_name))
     return;
 
   /* How to start a new instance of Emacs.  */

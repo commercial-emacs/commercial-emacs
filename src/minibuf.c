@@ -246,7 +246,7 @@ without invoking the usual minibuffer commands.  */)
   (Lisp_Object window)
 {
   CHECK_WINDOW (window);
-  if (! MINI_WINDOW_P (XWINDOW (window)))
+  if (!MINI_WINDOW_P (XWINDOW (window)))
     error ("Window is not a minibuffer window");
 
   minibuf_window = window;

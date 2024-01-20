@@ -635,7 +635,7 @@ load_charset (struct charset *charset, int control_flag)
     map = CHARSET_MAP (charset);
   else
     {
-      if (! CHARSET_UNIFIED_P (charset))
+      if (!CHARSET_UNIFIED_P (charset))
 	emacs_abort ();
       map = CHARSET_UNIFY_MAP (charset);
     }
@@ -677,7 +677,7 @@ map_charset_for_dump (void (*c_function) (Lisp_Object, Lisp_Object),
 	  if (NILP (XCAR (range)))
 	    XSETCAR (range, make_fixnum (c));
 	}
-      else if (! NILP (XCAR (range)))
+      else if (!NILP (XCAR (range)))
 	{
 	  XSETCDR (range, make_fixnum (c - 1));
 	  if (c_function)
@@ -690,7 +690,7 @@ map_charset_for_dump (void (*c_function) (Lisp_Object, Lisp_Object),
 	{
 	  if (c == temp_charset_work->max_char)
 	    {
-	      if (! NILP (XCAR (range)))
+	      if (!NILP (XCAR (range)))
 		{
 		  XSETCDR (range, make_fixnum (c));
 		  if (c_function)
@@ -1020,13 +1020,13 @@ usage: (define-charset-internal ...)  */)
       if (charset.code_offset == 0 && charset.max_char >= 0x80)
 	charset.ascii_compatible_p = 1;
     }
-  else if (! NILP (args[charset_arg_map]))
+  else if (!NILP (args[charset_arg_map]))
     {
       val = args[charset_arg_map];
       ASET (attrs, charset_map, val);
       charset.method = CHARSET_METHOD_MAP;
     }
-  else if (! NILP (args[charset_arg_subset]))
+  else if (!NILP (args[charset_arg_subset]))
     {
       Lisp_Object parent;
       Lisp_Object parent_min_code, parent_max_code, parent_code_offset;
@@ -1352,7 +1352,7 @@ Optional third argument DEUNIFY, if non-nil, means to de-unify CHARSET.  */)
 	unify_map = CHARSET_UNIFY_MAP (cs);
       else
 	{
-	  if (! STRINGP (unify_map) && ! VECTORP (unify_map))
+	  if (!STRINGP (unify_map) && !VECTORP (unify_map))
 	    signal_error ("Bad unify-map", unify_map);
 	  set_charset_attr (cs, charset_unify_map, unify_map);
 	}
@@ -1619,7 +1619,7 @@ maybe_unify_char (int c, Lisp_Object val)
   if (!inhibit_load_charset_map)
     {
       val = CHAR_TABLE_REF (Vchar_unify_table, c);
-      if (! NILP (val))
+      if (!NILP (val))
 	c = XFIXNAT (val);
     }
   else
@@ -1690,7 +1690,7 @@ decode_char (struct charset *charset, unsigned int code)
 	  Lisp_Object decoder;
 
 	  decoder = CHARSET_DECODER (charset);
-	  if (! VECTORP (decoder))
+	  if (!VECTORP (decoder))
 	    {
 	      load_charset (charset, 1);
 	      decoder = CHARSET_DECODER (charset);
@@ -1735,7 +1735,7 @@ encode_char (struct charset *charset, int c)
       int code_index = -1;
 
       deunifier = CHARSET_DEUNIFIER (charset);
-      if (! CHAR_TABLE_P (deunifier))
+      if (!CHAR_TABLE_P (deunifier))
 	{
 	  load_charset (charset, 2);
 	  deunifier = CHARSET_DEUNIFIER (charset);
@@ -1799,7 +1799,7 @@ encode_char (struct charset *charset, int c)
       Lisp_Object val;
 
       encoder = CHARSET_ENCODER (charset);
-      if (! CHAR_TABLE_P (CHARSET_ENCODER (charset)))
+      if (!CHAR_TABLE_P (CHARSET_ENCODER (charset)))
 	{
 	  load_charset (charset, 2);
 	  encoder = CHARSET_ENCODER (charset);
@@ -2011,7 +2011,7 @@ CH in the charset.  */)
   CHECK_CHARACTER (ch);
   c = XFIXNAT (ch);
   charset = CHAR_CHARSET (c);
-  if (! charset)
+  if (!charset)
     emacs_abort ();
   code = ENCODE_CHAR (charset, c);
   if (code == CHARSET_INVALID_CODE (charset))
@@ -2076,7 +2076,7 @@ If POS is out of range, the value is nil.  */)
   struct charset *charset;
 
   ch = Fchar_after (pos);
-  if (! FIXNUMP (ch))
+  if (!FIXNUMP (ch))
     return ch;
   charset = CHAR_CHARSET (XFIXNUM (ch));
   return (CHARSET_NAME (charset));
@@ -2156,7 +2156,7 @@ usage: (set-charset-priority &rest charsets)  */)
   for (i = 0; i < nargs; i++)
     {
       CHECK_CHARSET_GET_ID (args[i], id);
-      if (! NILP (Fmemq (make_fixnum (id), old_list)))
+      if (!NILP (Fmemq (make_fixnum (id), old_list)))
 	{
 	  old_list = Fdelq (make_fixnum (id), old_list);
 	  new_head = Fcons (make_fixnum (id), new_head);
@@ -2274,7 +2274,7 @@ init_charset (void)
 {
   Lisp_Object tempdir;
   tempdir = Fexpand_file_name (build_string ("charsets"), Vdata_directory);
-  if (! file_accessible_directory_p (tempdir))
+  if (!file_accessible_directory_p (tempdir))
     {
       /* This used to be non-fatal (dir_warning), but it should not
          happen, and if it does sooner or later it will cause some

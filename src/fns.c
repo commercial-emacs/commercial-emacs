@@ -409,7 +409,7 @@ If string STR1 is greater, the value is a positive number N;
       if (c1 == c2)
 	continue;
 
-      if (! NILP (ignore_case))
+      if (!NILP (ignore_case))
 	{
 	  c1 = XFIXNUM (Fupcase (make_fixnum (c1)));
 	  c2 = XFIXNUM (Fupcase (make_fixnum (c2)));
@@ -621,7 +621,7 @@ case-sensitive `string-lessp' and IGNORE-CASE argument is ignored.  */)
     s2 = SYMBOL_NAME (s2);
   CHECK_STRING (s1);
   CHECK_STRING (s2);
-  if (! NILP (locale))
+  if (!NILP (locale))
     CHECK_STRING (locale);
 
   return (str_collate (s1, s2, locale, ignore_case) < 0) ? Qt : Qnil;
@@ -670,7 +670,7 @@ Do NOT use this function to compare file names for equality.  */)
     s2 = SYMBOL_NAME (s2);
   CHECK_STRING (s1);
   CHECK_STRING (s2);
-  if (! NILP (locale))
+  if (!NILP (locale))
     CHECK_STRING (locale);
 
   return (str_collate (s1, s2, locale, ignore_case) == 0) ? Qt : Qnil;
@@ -892,7 +892,7 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
       for (ptrdiff_t i = 0; i < nargs; i++)
 	{
 	  Lisp_Object arg = args[i];
-	  if (STRINGP (arg) && ! STRING_MULTIBYTE (arg))
+	  if (STRINGP (arg) && !STRING_MULTIBYTE (arg))
 	    {
 	      ptrdiff_t bytes = SCHARS (arg);
 	      const unsigned char *s = SDATA (arg);
@@ -969,7 +969,7 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	    }
 	}
       else
-	for (Lisp_Object tail = arg; ! NILP (tail); tail = XCDR (tail))
+	for (Lisp_Object tail = arg; !NILP (tail); tail = XCDR (tail))
 	  {
 	    int c = XFIXNAT (XCAR (tail));
 	    if (dest_multibyte)
@@ -1332,7 +1332,7 @@ string_make_unibyte (Lisp_Object string)
   Lisp_Object ret;
   USE_SAFE_ALLOCA;
 
-  if (! STRING_MULTIBYTE (string))
+  if (!STRING_MULTIBYTE (string))
     return string;
 
   nchars = SCHARS (string);
@@ -1428,7 +1428,7 @@ If you're not sure, whether to use `string-as-multibyte' or
 {
   CHECK_STRING (string);
 
-  if (! STRING_MULTIBYTE (string))
+  if (!STRING_MULTIBYTE (string))
     {
       Lisp_Object new_string;
       ptrdiff_t nchars, nbytes;
@@ -1511,7 +1511,7 @@ Elements of ALIST that are not conses are also shared.  */)
   if (NILP (alist))
     return alist;
   alist = Fcopy_sequence (alist);
-  for (Lisp_Object tem = alist; ! NILP (tem); tem = XCDR (tem))
+  for (Lisp_Object tem = alist; !NILP (tem); tem = XCDR (tem))
     {
       Lisp_Object car = XCAR (tem);
       if (CONSP (car))
@@ -1758,7 +1758,7 @@ DEFUN ("nthcdr", Fnthcdr, Snthcdr, 2, 2, 0,
       if (num <= SMALL_LIST_LEN_MAX)
 	{
 	  for (; 0 < num; num--, tail = XCDR (tail))
-	    if (! CONSP (tail))
+	    if (!CONSP (tail))
 	      {
 		CHECK_LIST_END (tail, list);
 		return Qnil;
@@ -1790,7 +1790,7 @@ DEFUN ("nthcdr", Fnthcdr, Snthcdr, 2, 2, 0,
     }
 
   tail = saved_tail;
-  if (! CONSP (tail))
+  if (!CONSP (tail))
     {
       CHECK_LIST_END (tail, list);
       return Qnil;
@@ -1799,7 +1799,7 @@ DEFUN ("nthcdr", Fnthcdr, Snthcdr, 2, 2, 0,
   /* TAIL is part of a cycle.  Reduce NUM modulo the cycle length to
      avoid going around this cycle repeatedly.  */
   intptr_t cycle_length = tortoise_num - num;
-  if (! FIXNUMP (n))
+  if (!FIXNUMP (n))
     {
       /* Undo any error introduced when LARGE_NUM was substituted for
 	 N, by adding N - LARGE_NUM to NUM, using arithmetic modulo
@@ -1888,7 +1888,7 @@ The value is actually the tail of LIST whose car is ELT.  */)
     return Fmemq (elt, list);
   Lisp_Object tail = list;
   FOR_EACH_TAIL (tail)
-    if (! NILP (Fequal (elt, XCAR (tail))))
+    if (!NILP (Fequal (elt, XCAR (tail))))
       return tail;
   CHECK_LIST_END (tail, list);
   return Qnil;
@@ -1960,7 +1960,7 @@ Elements of ALIST that are not conses are ignored.  */)
 Lisp_Object
 assq_no_quit (Lisp_Object key, Lisp_Object alist)
 {
-  for (; ! NILP (alist); alist = XCDR (alist))
+  for (; !NILP (alist); alist = XCDR (alist))
     if (CONSP (XCAR (alist)) && EQ (XCAR (XCAR (alist)), key))
       return XCAR (alist);
   return Qnil;
@@ -1996,9 +1996,9 @@ TESTFN is called with 2 arguments: a car of an alist element and KEY.  */)
       Lisp_Object car = XCAR (tail);
       if (CONSP (car)
 	  && (NILP (testfn)
-	      ? (EQ (XCAR (car), key) || ! NILP (Fequal
+	      ? (EQ (XCAR (car), key) || !NILP (Fequal
 						(XCAR (car), key)))
-	      : ! NILP (call2 (testfn, XCAR (car), key))))
+	      : !NILP (call2 (testfn, XCAR (car), key))))
 	return car;
     }
   CHECK_LIST_END (tail, alist);
@@ -2047,7 +2047,7 @@ The value is actually the first element of ALIST whose cdr equals KEY.  */)
     {
       Lisp_Object car = XCAR (tail);
       if (CONSP (car)
-	  && (EQ (XCDR (car), key) || ! NILP (Fequal (XCDR (car), key))))
+	  && (EQ (XCDR (car), key) || !NILP (Fequal (XCDR (car), key))))
 	return car;
     }
   CHECK_LIST_END (tail, alist);
@@ -2397,7 +2397,7 @@ the second.  */)
     seq = sort_list (seq, predicate);
   else if (VECTORP (seq))
     sort_vector (seq, predicate);
-  else if (! NILP (seq))
+  else if (!NILP (seq))
     wrong_type_argument (Qlist_or_vector_p, seq);
   return seq;
 }
@@ -2428,7 +2428,7 @@ merge (Lisp_Object org_l1, Lisp_Object org_l2, Lisp_Object pred)
 	}
 
       Lisp_Object tem;
-      if (! NILP (call2 (pred, Fcar (l1), Fcar (l2))))
+      if (!NILP (call2 (pred, Fcar (l1), Fcar (l2))))
 	{
 	  tem = l1;
 	  l1 = Fcdr (l1);
@@ -2515,7 +2515,7 @@ This function doesn't signal an error if PLIST is invalid.  */)
   Lisp_Object tail = plist;
   FOR_EACH_TAIL_SAFE (tail)
     {
-      if (! CONSP (XCDR (tail)))
+      if (!CONSP (XCDR (tail)))
 	break;
       if (!NILP (call2 (predicate, XCAR (tail), prop)))
 	return XCAR (XCDR (tail));
@@ -2532,7 +2532,7 @@ plist_get (Lisp_Object plist, Lisp_Object prop)
   Lisp_Object tail = plist;
   FOR_EACH_TAIL_SAFE (tail)
     {
-      if (! CONSP (XCDR (tail)))
+      if (!CONSP (XCDR (tail)))
 	break;
       if (EQ (XCAR (tail), prop))
 	return XCAR (XCDR (tail));
@@ -2572,7 +2572,7 @@ The PLIST is modified by side effects.  */)
   Lisp_Object prev = Qnil, tail = plist;
   FOR_EACH_TAIL (tail)
     {
-      if (! CONSP (XCDR (tail)))
+      if (!CONSP (XCDR (tail)))
 	break;
 
       if (!NILP (call2 (predicate, XCAR (tail), prop)))
@@ -2600,7 +2600,7 @@ plist_put (Lisp_Object plist, Lisp_Object prop, Lisp_Object val)
   Lisp_Object prev = Qnil, tail = plist;
   FOR_EACH_TAIL (tail)
     {
-      if (! CONSP (XCDR (tail)))
+      if (!CONSP (XCDR (tail)))
 	break;
 
       if (EQ (XCAR (tail), prop))
@@ -2670,7 +2670,7 @@ plist_member (Lisp_Object plist, Lisp_Object prop)
       if (EQ (XCAR (tail), prop))
 	return tail;
       tail = XCDR (tail);
-      if (! CONSP (tail))
+      if (!CONSP (tail))
 	break;
     }
   CHECK_TYPE (NILP (tail), Qplistp, plist);
@@ -2763,7 +2763,7 @@ internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
 	    if (i >= 0)
 	      { /* O1 was seen already.  */
 		Lisp_Object o2s = HASH_VALUE (h, i);
-		if (! NILP (Fmemq (o2, o2s)))
+		if (!NILP (Fmemq (o2, o2s)))
 		  return true;
 		else
 		  set_hash_value_slot (h, i, Fcons (o2, o2s));
@@ -3302,7 +3302,7 @@ SUBFEATURE can be used to check a specific subfeature of FEATURE.  */)
   register Lisp_Object tem;
   CHECK_SYMBOL (feature);
   tem = Fmemq (feature, Vfeatures);
-  if (! NILP (tem) && ! NILP (subfeature))
+  if (!NILP (tem) && !NILP (subfeature))
     tem = Fmember (subfeature, Fget (feature, Qsubfeatures));
   return (NILP (tem)) ? Qnil : Qt;
 }
@@ -3316,13 +3316,13 @@ particular subfeatures supported in this version of FEATURE.  */)
   register Lisp_Object tem;
   CHECK_SYMBOL (feature);
   CHECK_LIST (subfeatures);
-  if (! NILP (Vautoload_queue))
+  if (!NILP (Vautoload_queue))
     Vautoload_queue = Fcons (Fcons (make_fixnum (0), Vfeatures),
 			     Vautoload_queue);
   tem = Fmemq (feature, Vfeatures);
   if (NILP (tem))
     Vfeatures = Fcons (feature, Vfeatures);
-  if (! NILP (subfeatures))
+  if (!NILP (subfeatures))
     Fput (feature, Qsubfeatures, subfeatures);
   LOADHIST_ATTACH (Fcons (Qprovide, feature));
 
@@ -4059,7 +4059,7 @@ ignored instead of signaling an error.  */)
     decoded_string = Qnil;
 
   SAFE_FREE ();
-  if (! STRINGP (decoded_string))
+  if (!STRINGP (decoded_string))
     error ("Invalid base64 data");
 
   return decoded_string;
@@ -4957,7 +4957,7 @@ sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
                       marked = true;
 		    }
 
-		  if (! value_known_to_survive_p)
+		  if (!value_known_to_survive_p)
 		    {
 		      mark_object (hash_value_addr (h, i));
                       marked = true;
@@ -5042,7 +5042,7 @@ sxhash_list (Lisp_Object list, int depth)
 	hash = sxhash_combine (hash, hash2);
       }
 
-  if (! NILP (list))
+  if (!NILP (list))
     {
       EMACS_UINT hash2 = sxhash_obj (list, depth + 1);
       hash = sxhash_combine (hash, hash2);
@@ -5740,7 +5740,7 @@ extract_data_from_object (Lisp_Object spec,
 	{
 	  /* Invalid coding system.  */
 
-	  if (! NILP (noerror))
+	  if (!NILP (noerror))
 	    coding_system = Qraw_text;
 	  else
 	    xsignal1 (Qcoding_system_error, coding_system);
@@ -5800,7 +5800,7 @@ extract_data_from_object (Lisp_Object spec,
 		    force_raw_text = true;
 		}
 
-	      if (NILP (coding_system) && ! NILP (Fbuffer_file_name (object)))
+	      if (NILP (coding_system) && !NILP (Fbuffer_file_name (object)))
 		{
 		  /* Check file-coding-system-alist.  */
 		  Lisp_Object val = CALLN (Ffind_operation_coding_system,
@@ -5834,7 +5834,7 @@ extract_data_from_object (Lisp_Object spec,
 	    {
 	      /* Invalid coding system.  */
 
-	      if (! NILP (noerror))
+	      if (!NILP (noerror))
 		coding_system = Qraw_text;
 	      else
 		xsignal1 (Qcoding_system_error, coding_system);
@@ -5857,7 +5857,7 @@ extract_data_from_object (Lisp_Object spec,
     {
       /* Format: (iv-auto REQUIRED-LENGTH).  */
 
-      if (! FIXNATP (start))
+      if (!FIXNATP (start))
         error ("Without a length, `iv-auto' can't be used; see ELisp manual");
       else
         {
@@ -6163,7 +6163,7 @@ Case is always significant and text properties are ignored. */)
   CHECK_STRING (needle);
   CHECK_STRING (haystack);
 
-  if (! NILP (start_pos))
+  if (!NILP (start_pos))
     {
       CHECK_FIXNUM (start_pos);
       start = XFIXNUM (start_pos);
