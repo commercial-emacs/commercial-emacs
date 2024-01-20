@@ -56,7 +56,8 @@
              (bound-and-true-p mouse-wheel-mode))
     (mouse-wheel-mode 1)))
 
-(defcustom mouse-wheel-down-event
+(defvar mouse-wheel-obey-old-style-wheel-buttons
+  ;; FIXME: Yuck!
   (if (or (featurep 'w32-win) (featurep 'ns-win)
           (featurep 'haiku-win) (featurep 'pgtk-win))
       'wheel-up
@@ -74,8 +75,7 @@
   "Alternative wheel down event to consider."
   :group 'mouse
   :type 'symbol
-  :version "29.1"
-  :set 'mouse-wheel-change-button)
+  :set #'mouse-wheel-change-button)
 
 (defcustom mouse-wheel-up-event
   (if (or (featurep 'w32-win) (featurep 'ns-win)
@@ -95,8 +95,7 @@
   "Alternative wheel up event to consider."
   :group 'mouse
   :type 'symbol
-  :version "29.1"
-  :set 'mouse-wheel-change-button)
+  :set #'mouse-wheel-change-button)
 
 (defcustom mouse-wheel-click-event 'mouse-2
   "Event that should be temporarily inhibited after mouse scrolling.
@@ -106,7 +105,7 @@ scrolling with the mouse wheel.  To prevent that, this variable can be
 set to the event sent when clicking on the mouse wheel button."
   :group 'mouse
   :type 'symbol
-  :set 'mouse-wheel-change-button)
+  :set #'mouse-wheel-change-button)
 
 (defcustom mouse-wheel-inhibit-click-time 0.35
   "Time in seconds to inhibit clicking on mouse wheel button after scroll."
@@ -163,7 +162,7 @@ information, see `text-scale-adjust' and `global-text-scale-adjust'."
                     (const :tag "Scroll horizontally" :value hscroll)
                     (const :tag "Change buffer face size" :value text-scale)
                     (const :tag "Change global face size" :value global-text-scale)))))
-  :set 'mouse-wheel-change-button
+  :set #'mouse-wheel-change-button
   :version "28.1")
 
 (defcustom mouse-wheel-progressive-speed t
@@ -214,15 +213,9 @@ Also see `mouse-wheel-tilt-scroll'."
   :type 'boolean
   :version "26.1")
 
-(defun mwheel-event-button (event)
-  (let ((x (event-basic-type event)))
-    ;; Map mouse-wheel events to appropriate buttons
-    (if (eq 'mouse-wheel x)
-        (let ((amount (car (cdr (cdr (cdr event))))))
-          (if (< amount 0)
-              mouse-wheel-up-event
-            mouse-wheel-down-event))
-      x)))
+;; This function used to handle the `mouse-wheel` event which was
+;; removed in 2003 by commit 9eb28007fb27, thus making it obsolete.
+(define-obsolete-function-alias 'mwheel-event-button #'event-basic-type "30.1")
 
 (defun mwheel-event-window (event)
   (posn-window (event-start event)))
@@ -307,6 +300,15 @@ active window."
                frame nil t)))))
       (mwheel-event-window event)))
 
+(defmacro mwheel--is-dir-p (dir button)
+  (declare (debug (sexp form)))
+  (let ((custom-var (intern (format "mouse-wheel-%s-event" dir)))
+        (event (intern (format "wheel-%s" dir))))
+    (macroexp-let2 nil butsym button
+      `(or (eq ,butsym ',event)
+           ;; We presume here `button' is never nil.
+           (eq ,butsym ,custom-var)))))
+
 (defun mwheel-scroll (event &optional arg)
   "Scroll up or down according to the EVENT.
 This should be bound only to mouse buttons 4, 5, 6, and 7 on
@@ -343,18 +345,17 @@ value of ARG, and the command uses it in subsequent scrolls."
     (when (numberp amt) (setq amt (* amt (event-line-count event))))
     (condition-case nil
         (unwind-protect
-	    (let ((button (mwheel-event-button event)))
-              (cond ((and (eq amt 'hscroll) (memq button (list mouse-wheel-down-event
-                                                               mouse-wheel-down-alternate-event)))
+	    (let ((button (event-basic-type event)))
+              (cond ((and (eq amt 'hscroll) (mwheel--is-dir-p down button))
                      (when (and (natnump arg) (> arg 0))
                        (setq mouse-wheel-scroll-amount-horizontal arg))
                      (funcall (if mouse-wheel-flip-direction
                                   mwheel-scroll-left-function
                                 mwheel-scroll-right-function)
                               mouse-wheel-scroll-amount-horizontal))
-                    ((memq button (list mouse-wheel-down-event
-                                        mouse-wheel-down-alternate-event))
-                     (condition-case nil (funcall mwheel-scroll-down-function amt)
+                    ((mwheel--is-dir-p down button)
+                     (condition-case nil
+                         (funcall mwheel-scroll-down-function amt)
                        ;; Make sure we do indeed scroll to the beginning of
                        ;; the buffer.
                        (beginning-of-buffer
@@ -368,31 +369,30 @@ value of ARG, and the command uses it in subsequent scrolls."
                           ;; for a reason that escapes me.  This problem seems
                           ;; to only affect scroll-down.  --Stef
                           (set-window-start (selected-window) (point-min))))))
-                    ((and (eq amt 'hscroll) (memq button (list mouse-wheel-up-event
-                                                               mouse-wheel-up-alternate-event)))
+                    ((and (eq amt 'hscroll) (mwheel--is-dir-p up button))
                      (when (and (natnump arg) (> arg 0))
                        (setq mouse-wheel-scroll-amount-horizontal arg))
                      (funcall (if mouse-wheel-flip-direction
                                   mwheel-scroll-right-function
                                 mwheel-scroll-left-function)
                               mouse-wheel-scroll-amount-horizontal))
-                    ((memq button (list mouse-wheel-up-event
-                                        mouse-wheel-up-alternate-event))
+                    ((mwheel--is-dir-p up button)
                      (condition-case nil (funcall mwheel-scroll-up-function amt)
                        ;; Make sure we do indeed scroll to the end of the buffer.
-                       (end-of-buffer (while t (funcall mwheel-scroll-up-function)))))
-                    ((memq button (list mouse-wheel-left-event
-                                        mouse-wheel-left-alternate-event)) ; for tilt scroll
+                       (end-of-buffer
+                        (while t (funcall mwheel-scroll-up-function)))))
+                    ((mwheel--is-dir-p left button) ; for tilt scroll
                      (when mouse-wheel-tilt-scroll
                        (funcall (if mouse-wheel-flip-direction
                                     mwheel-scroll-right-function
-                                  mwheel-scroll-left-function) amt)))
-                    ((memq button (list mouse-wheel-right-event
-                                        mouse-wheel-right-alternate-event)) ; for tilt scroll
+                                  mwheel-scroll-left-function)
+                                amt)))
+                    ((mwheel--is-dir-p right button) ; for tilt scroll
                      (when mouse-wheel-tilt-scroll
                        (funcall (if mouse-wheel-flip-direction
                                     mwheel-scroll-left-function
-                                  mwheel-scroll-right-function) amt)))
+                                  mwheel-scroll-right-function)
+                                amt)))
 		    (t (error "Bad binding in mwheel-scroll"))))
           (if (eq scroll-window selected-window)
               ;; If there is a temporarily active region, deactivate it if
@@ -430,14 +430,12 @@ See also `text-scale-adjust'."
   (interactive (list last-input-event))
   (let ((selected-window (selected-window))
         (scroll-window (mouse-wheel--get-scroll-window event))
-        (button (mwheel-event-button event)))
+        (button (event-basic-type event)))
     (select-window scroll-window 'mark-for-redisplay)
     (unwind-protect
-        (cond ((memq button (list mouse-wheel-down-event
-                                  mouse-wheel-down-alternate-event))
+        (cond ((mwheel--is-dir-p down button)
                (text-scale-increase 1))
-              ((memq button (list mouse-wheel-up-event
-                                  mouse-wheel-up-alternate-event))
+              ((mwheel--is-dir-p up button)
                (text-scale-decrease 1)))
       (select-window selected-window))))
 
@@ -446,12 +444,10 @@ See also `text-scale-adjust'."
   "Increase or decrease the global font size according to the EVENT.
 This invokes `global-text-scale-adjust', which see."
   (interactive (list last-input-event))
-  (let ((button (mwheel-event-button event)))
-    (cond ((memq button (list mouse-wheel-down-event
-                              mouse-wheel-down-alternate-event))
+  (let ((button (event-basic-type event)))
+    (cond ((mwheel--is-dir-p down button)
            (global-text-scale-adjust 1))
-          ((memq button (list mouse-wheel-up-event
-                              mouse-wheel-up-alternate-event))
+          ((mwheel--is-dir-p up button)
            (global-text-scale-adjust -1)))))
 
 (defun mouse-wheel--add-binding (key fun)
@@ -503,15 +499,13 @@ an event used for scrolling, such as `mouse-wheel-down-event'."
      ;; Bindings for changing font size.
      ((and (consp binding) (eq (cdr binding) 'text-scale))
       (dolist (event (list mouse-wheel-down-event mouse-wheel-up-event
-                           mouse-wheel-down-alternate-event
-                           mouse-wheel-up-alternate-event))
+                           'wheel-down 'wheel-up))
         (when event
           (mouse-wheel--add-binding `[,(append (car binding) (list event))]
                                     'mouse-wheel-text-scale))))
      ((and (consp binding) (eq (cdr binding) 'global-text-scale))
       (dolist (event (list mouse-wheel-down-event mouse-wheel-up-event
-                           mouse-wheel-down-alternate-event
-                           mouse-wheel-up-alternate-event))
+                           'wheel-down 'wheel-up))
         (when event
           (mouse-wheel--add-binding `[,(append (car binding) (list event))]
                                     'mouse-wheel-global-text-scale))))
@@ -519,10 +513,7 @@ an event used for scrolling, such as `mouse-wheel-down-event'."
      (t
       (dolist (event (list mouse-wheel-down-event mouse-wheel-up-event
                            mouse-wheel-left-event mouse-wheel-right-event
-                           mouse-wheel-down-alternate-event
-                           mouse-wheel-up-alternate-event
-                           mouse-wheel-left-alternate-event
-                           mouse-wheel-right-alternate-event))
+                           'wheel-down 'wheel-up 'wheel-left 'wheel-right))
         (when event
           (dolist (key (mouse-wheel--create-scroll-keys binding event))
             (mouse-wheel--add-binding key 'mwheel-scroll))))))))
