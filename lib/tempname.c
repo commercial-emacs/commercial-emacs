@@ -248,7 +248,7 @@ try_tempname_len (char *tmpl, int suffixlen, void *args,
   char *XXXXXX;
   unsigned int count;
   int fd = -1;
-  int save_errno = errno;
+  int saved_errno = errno;
 
   /* A lower bound on the number of temporary files to attempt to
      generate.  The maximum total number of temporary file names that

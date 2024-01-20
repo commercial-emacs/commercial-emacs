@@ -21,7 +21,7 @@ AC_DEFUN([gl_FUNC_NANOSLEEP],
 
  AC_CHECK_DECLS_ONCE([alarm])
 
- nanosleep_save_libs=$LIBS
+ gl_saved_LIBS=$LIBS
 
  # Solaris 2.5.1 needs -lposix4 to get the nanosleep function.
  # Solaris 7 prefers the library name -lrt to the obsolescent name -lposix4.
@@ -111,9 +111,11 @@ AC_DEFUN([gl_FUNC_NANOSLEEP],
        [case "$host_os" in dnl ((
           linux*) # Guess it halfway works when the kernel is Linux.
             gl_cv_func_nanosleep='guessing no (mishandles large arguments)' ;;
-          mingw*) # Guess no on native Windows.
+            # Guess no on native Windows.
+          mingw* | windows*)
             gl_cv_func_nanosleep='guessing no' ;;
-          *)      # If we don't know, obey --enable-cross-guesses.
+            # If we don't know, obey --enable-cross-guesses.
+          *)
             gl_cv_func_nanosleep="$gl_cross_guess_normal" ;;
         esac
        ])
@@ -133,7 +135,7 @@ AC_DEFUN([gl_FUNC_NANOSLEEP],
  else
    HAVE_NANOSLEEP=0
  fi
- LIBS=$nanosleep_save_libs
+ LIBS=$gl_saved_LIBS
 
  # For backward compatibility.
  LIB_NANOSLEEP="$NANOSLEEP_LIB"
