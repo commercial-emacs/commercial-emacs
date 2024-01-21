@@ -1275,15 +1275,9 @@ print (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	{ /* Remove unnecessary objects, which appear only once in OBJ;
 	     that is, whose status is Qt.  */
 	  struct Lisp_Hash_Table *h = XHASH_TABLE (Vprint_number_table);
-	  ptrdiff_t i;
-
-	  for (i = 0; i < HASH_TABLE_SIZE (h); ++i)
-            {
-              Lisp_Object key =  HASH_KEY (h, i);
-	      if (!hash_unused_entry_key_p (key)
-		  && EQ (HASH_VALUE (h, i), Qt))
-	        Fremhash (key, Vprint_number_table);
-            }
+	  DOHASH (h, i)
+	    if (EQ (HASH_VALUE (h, i), Qt))
+	      Fremhash (HASH_KEY (h, i), Vprint_number_table);
 	}
     }
 
@@ -1301,8 +1295,7 @@ print (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	   || RECORDP (obj)))				   \
    || (!NILP (Vprint_gensym)				   \
        && SYMBOLP (obj)					   \
-       && !SYMBOL_INTERNED_P (obj)			   \
-       && !hash_unused_entry_key_p (obj)))
+       && !SYMBOL_INTERNED_P (obj)))
 
 /* The print preprocess stack, used to traverse data structures.  */
 
@@ -1388,6 +1381,9 @@ static void
 print_preprocess (Lisp_Object obj)
 {
   eassert (!NILP (Vprint_circle));
+  /* The ppstack may contain HASH_UNUSED_ENTRY_KEY which is an invalid
+     Lisp value.  Make sure that our filter stops us from traversing it.  */
+  eassert (!PRINT_CIRCLE_CANDIDATE_P (HASH_UNUSED_ENTRY_KEY));
   ptrdiff_t base_sp = ppstack.sp;
 
   for (;;)
@@ -1449,6 +1445,8 @@ print_preprocess (Lisp_Object obj)
 		    if (HASH_TABLE_P (obj))
 		      {
 			struct Lisp_Hash_Table *h = XHASH_TABLE (obj);
+			/* The values pushed here may include
+			   HASH_UNUSED_ENTRY_KEY; see top of this function.  */
 			pp_stack_push_values (h->key_and_value,
 					      2 * h->table_size);
 		      }

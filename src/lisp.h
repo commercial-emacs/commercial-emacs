@@ -2244,8 +2244,13 @@ struct Lisp_Hash_Table
   struct Lisp_Hash_Table *next_weak;
 } GCALIGNED_STRUCT;
 
+/* A specific Lisp_Object that is not a valid Lisp value.
+   We need to be careful not to leak this value into machinery
+   where it may be treated as one; we'd get a segfault if lucky.  */
+#define INVALID_LISP_VALUE make_lisp_ptr (NULL, Lisp_Float)
+
 /* Key value that marks an unused hash table entry.  */
-#define HASH_UNUSED_ENTRY_KEY Qunbound
+#define HASH_UNUSED_ENTRY_KEY INVALID_LISP_VALUE
 
 /* KEY is a key of an unused hash table entry.  */
 INLINE bool
@@ -2321,6 +2326,14 @@ hash_from_key (struct Lisp_Hash_Table *h, Lisp_Object key)
 {
   return h->test->hashfn (key, h);
 }
+
+/* Hash table iteration construct (roughly an inlined maphash):
+   Iterate IDXVAR as index over valid entries of TABLE.
+   The body may remove the current entry or alter its value slot, but not
+   mutate TABLE in any other way.  */
+#define DOHASH(TABLE, IDXVAR)						\
+  for (ptrdiff_t IDXVAR = 0; IDXVAR < (TABLE)->table_size; IDXVAR++)	\
+    if (!hash_unused_entry_key_p (HASH_KEY (TABLE, IDXVAR)))
 
 void hash_table_thaw (Lisp_Object hash_table);
 
