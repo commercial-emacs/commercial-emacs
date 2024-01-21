@@ -24,7 +24,6 @@
 
 #include "acl.h"
 
-#include <stdbool.h>
 #include <stdlib.h>
 
 /* All systems define the ACL related API in <sys/acl.h>.  */
@@ -53,9 +52,6 @@ extern int aclsort (int, int, struct acl *);
 #include <errno.h>
 
 #include <limits.h>
-#ifndef MIN
-# define MIN(a,b) ((a) < (b) ? (a) : (b))
-#endif
 
 #ifndef SIZE_MAX
 # define SIZE_MAX ((size_t) -1)

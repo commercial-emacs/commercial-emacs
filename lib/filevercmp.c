@@ -20,15 +20,15 @@
 #include <config.h>
 #include "filevercmp.h"
 
-#include <stdbool.h>
 #include <c-ctype.h>
 #include <limits.h>
 #include <idx.h>
-#include <verify.h>
 
 /* Return the length of a prefix of S that corresponds to the suffix
    defined by this extended regular expression in the C locale:
      (\.[A-Za-z~][A-Za-z0-9~]*)*$
+   Use the longest suffix matching this regular expression,
+   except do not use all of S as a suffix if S is nonempty.
    If *LEN is -1, S is a string; set *LEN to S's length.
    Otherwise, *LEN should be nonnegative, S is a char array,
    and *LEN does not change.  */
@@ -36,20 +36,22 @@ static idx_t
 file_prefixlen (char const *s, ptrdiff_t *len)
 {
   size_t n = *len;  /* SIZE_MAX if N == -1.  */
+  idx_t prefixlen = 0;
 
-  for (idx_t i = 0; ; i++)
+  for (idx_t i = 0; ; )
     {
-      idx_t prefixlen = i;
-      while (i + 1 < n && s[i] == '.' && (c_isalpha (s[i + 1])
-                                          || s[i + 1] == '~'))
-        for (i += 2; i < n && (c_isalnum (s[i]) || s[i] == '~'); i++)
-          continue;
-
       if (*len < 0 ? !s[i] : i == n)
         {
           *len = i;
           return prefixlen;
         }
+
+      i++;
+      prefixlen = i;
+      while (i + 1 < n && s[i] == '.' && (c_isalpha (s[i + 1])
+                                          || s[i + 1] == '~'))
+        for (i += 2; i < n && (c_isalnum (s[i]) || s[i] == '~'); i++)
+          continue;
     }
 }
 
@@ -71,7 +73,7 @@ order (char const *s, idx_t pos, idx_t len)
     return -2;
   else
     {
-      verify (UCHAR_MAX <= (INT_MAX - 1 - 2) / 2);
+      static_assert (UCHAR_MAX <= (INT_MAX - 1 - 2) / 2);
       return c + UCHAR_MAX + 1;
     }
 }

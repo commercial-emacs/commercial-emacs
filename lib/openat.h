@@ -30,7 +30,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <stdbool.h>
 
 _GL_INLINE_HEADER_BEGIN
 

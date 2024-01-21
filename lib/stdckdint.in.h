@@ -1,6 +1,6 @@
 /* stdckdint.h -- checked integer arithmetic
 
-   Copyright 2022 Free Software Foundation, Inc.
+   Copyright 2022-2024 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify it
    under the terms of the GNU Lesser General Public License as published
@@ -19,8 +19,6 @@
 #define _GL_STDCKDINT_H
 
 #include "intprops-internal.h"
-
-#include <stdbool.h>
 
 /* Store into *R the low-order bits of A + B, A - B, A * B, respectively.
    Return 1 if the result overflows, 0 otherwise.

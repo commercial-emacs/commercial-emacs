@@ -1,6 +1,6 @@
 /* Functions to support link list bitsets.
 
-   Copyright (C) 2002-2004, 2006, 2009-2015, 2018-2022 Free Software
+   Copyright (C) 2002-2004, 2006, 2009-2015, 2018-2024 Free Software
    Foundation, Inc.
 
    Contributed by Michael Hayes (m.hayes@elec.canterbury.ac.nz).
@@ -441,7 +441,8 @@ lbitset_copy_ (bitset dst, bitset src)
 
   lbitset_elt *prev = 0;
   lbitset_elt *tmp;
-  for (lbitset_elt *elt = head; elt; elt = elt->next)
+  lbitset_elt *elt = head;
+  do
     {
       tmp = lbitset_elt_alloc ();
       tmp->index = elt->index;
@@ -454,7 +455,10 @@ lbitset_copy_ (bitset dst, bitset src)
       prev = tmp;
 
       memcpy (tmp->words, elt->words, sizeof (elt->words));
+
+      elt = elt->next;
     }
+  while (elt);
   LBITSET_TAIL (dst) = tmp;
 
   dst->b.csize = LBITSET_ELT_WORDS;

@@ -1,6 +1,6 @@
 /* Generic bitsets.
 
-   Copyright (C) 2002-2004, 2009-2015, 2018-2022 Free Software Foundation, Inc.
+   Copyright (C) 2002-2004, 2009-2015, 2018-2024 Free Software Foundation, Inc.
 
    Contributed by Michael Hayes (m.hayes@elec.canterbury.ac.nz).
 
@@ -22,6 +22,11 @@
 
 /* This file is the public interface to the bitset abstract data type.
    Only use the functions and macros defined in this file.  */
+
+/* This file uses _GL_ATTRIBUTE_DEALLOC.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
+#endif
 
 #include <stdio.h>
 #if USE_UNLOCKED_IO
@@ -378,10 +383,10 @@ void bitset_stats_enable (void);
 /* Disable bitset stats gathering.  */
 void bitset_stats_disable (void);
 
-/* Read bitset stats file of accummulated stats.  */
+/* Read bitset stats file of accumulated stats.  */
 void bitset_stats_read (const char *file_name);
 
-/* Write bitset stats file of accummulated stats.  */
+/* Write bitset stats file of accumulated stats.  */
 void bitset_stats_write (const char *file_name);
 
 /* Dump bitset stats.  */

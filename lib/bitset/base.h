@@ -1,6 +1,6 @@
 /* Base bitset stuff.
 
-   Copyright (C) 2002-2004, 2006, 2009-2015, 2018-2022 Free Software
+   Copyright (C) 2002-2004, 2006, 2009-2015, 2018-2024 Free Software
    Foundation, Inc.
 
    Contributed by Michael Hayes (m.hayes@elec.canterbury.ac.nz).
@@ -22,7 +22,6 @@
 #define _BITSET_BASE_H
 
 #include <limits.h>
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>     /* because Gnulib's <stdlib.h> may '#define free ...' */
 #include <string.h> /* ffsl */

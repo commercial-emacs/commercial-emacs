@@ -1101,7 +1101,7 @@ AS_IF([test $gl_gcc_warnings = no],
   for w in $ws; do
     gl_WARN_ADD([$w])
   done
-  gl_WARN_ADD([-Wredundant-decls])     # Prefer this, as we don't use Bison.
+  gl_WARN_ADD([-Wno-redundant-decls])  # error.h not cutting it
   gl_WARN_ADD([-Wno-missing-field-initializers]) # We need this one
   gl_WARN_ADD([-Wno-override-init])    # More trouble than it is worth
   gl_WARN_ADD([-Wno-sign-compare])     # Too many warnings for now

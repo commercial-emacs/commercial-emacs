@@ -71,8 +71,10 @@
    But avoid namespace pollution on glibc systems.*/
 #if (@GNULIB_PTHREAD_SIGMASK@ || defined GNULIB_POSIXCHECK) \
     && ((defined __APPLE__ && defined __MACH__) \
-        || defined __FreeBSD__ || defined __OpenBSD__ || defined __osf__ \
-        || defined __sun || defined __ANDROID__ || defined __KLIBC__) \
+        || (defined __FreeBSD__ && __FreeBSD__ < 8) \
+        || (defined __OpenBSD__ && OpenBSD < 201205) \
+        || defined __osf__ || defined __sun || defined __ANDROID__ \
+        || defined __KLIBC__) \
     && ! defined __GLIBC__
 # include <pthread.h>
 #endif

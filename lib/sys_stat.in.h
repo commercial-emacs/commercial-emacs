@@ -55,9 +55,32 @@
 #ifndef _@GUARD_PREFIX@_SYS_STAT_H
 #define _@GUARD_PREFIX@_SYS_STAT_H
 
-/* This file uses GNULIB_POSIXCHECK, HAVE_RAW_DECL_*.  */
+/* This file uses _GL_ATTRIBUTE_NOTHROW, GNULIB_POSIXCHECK, HAVE_RAW_DECL_*.  */
 #if !_GL_CONFIG_H_INCLUDED
  #error "Please include config.h first."
+#endif
+
+
+/* _GL_ATTRIBUTE_NOTHROW declares that the function does not throw exceptions.
+ */
+#ifndef _GL_ATTRIBUTE_NOTHROW
+# if defined __cplusplus
+#  if (__GNUC__ + (__GNUC_MINOR__ >= 8) > 2) || __clang_major >= 4
+#   if __cplusplus >= 201103L
+#    define _GL_ATTRIBUTE_NOTHROW noexcept (true)
+#   else
+#    define _GL_ATTRIBUTE_NOTHROW throw ()
+#   endif
+#  else
+#   define _GL_ATTRIBUTE_NOTHROW
+#  endif
+# else
+#  if (__GNUC__ + (__GNUC_MINOR__ >= 3) > 3) || defined __clang__
+#   define _GL_ATTRIBUTE_NOTHROW __attribute__ ((__nothrow__))
+#  else
+#   define _GL_ATTRIBUTE_NOTHROW
+#  endif
+# endif
 #endif
 
 /* The definitions of _GL_FUNCDECL_RPL etc. are copied here.  */
@@ -65,6 +88,7 @@
 /* The definition of _GL_ARG_NONNULL is copied here.  */
 
 /* The definition of _GL_WARN_ON_USE is copied here.  */
+
 
 /* Before doing "#define mknod rpl_mknod" below, we need to include all
    headers that may declare mknod().  OS/2 kLIBC declares mknod() in
@@ -403,7 +427,33 @@ struct stat
 #endif
 
 
-#if @GNULIB_MDA_CHMOD@
+#if @GNULIB_CHMOD@
+# if @REPLACE_CHMOD@
+#  if !(defined __cplusplus && defined GNULIB_NAMESPACE)
+#   undef chmod
+#   define chmod rpl_chmod
+#  endif
+_GL_FUNCDECL_RPL (chmod, int, (const char *filename, mode_t mode)
+                               _GL_ARG_NONNULL ((1)));
+_GL_CXXALIAS_RPL (chmod, int, (const char *filename, mode_t mode));
+# elif defined _WIN32 && !defined __CYGWIN__
+#  if !(defined __cplusplus && defined GNULIB_NAMESPACE)
+#   undef chmod
+#   define chmod _chmod
+#  endif
+/* Need to cast, because in mingw the last argument is 'int mode'.  */
+_GL_CXXALIAS_MDA_CAST (chmod, int, (const char *filename, mode_t mode));
+# else
+_GL_CXXALIAS_SYS (chmod, int, (const char *filename, mode_t mode));
+# endif
+_GL_CXXALIASWARN (chmod);
+#elif defined GNULIB_POSIXCHECK
+# undef chmod
+# if HAVE_RAW_DECL_CHMOD
+_GL_WARN_ON_USE (chmod, "chmod has portability problems - "
+                 "use gnulib module chmod for portability");
+# endif
+#elif @GNULIB_MDA_CHMOD@
 /* On native Windows, map 'chmod' to '_chmod', so that -loldnames is not
    required.  In C++ with GNULIB_NAMESPACE, avoid differences between
    platforms by defining GNULIB_NAMESPACE::chmod always.  */
@@ -549,7 +599,11 @@ _GL_WARN_ON_USE (futimens, "futimens is not portable - "
 
 #if @GNULIB_GETUMASK@
 # if !@HAVE_GETUMASK@
+#  if __GLIBC__ + (__GLIBC_MINOR__ >= 2) > 2
+_GL_FUNCDECL_SYS (getumask, mode_t, (void) _GL_ATTRIBUTE_NOTHROW);
+#  else
 _GL_FUNCDECL_SYS (getumask, mode_t, (void));
+#  endif
 # endif
 _GL_CXXALIAS_SYS (getumask, mode_t, (void));
 # if @HAVE_GETUMASK@
@@ -578,44 +632,6 @@ _GL_CXXALIASWARN (lchmod);
 # if HAVE_RAW_DECL_LCHMOD
 _GL_WARN_ON_USE (lchmod, "lchmod is unportable - "
                  "use gnulib module lchmod for portability");
-# endif
-#endif
-
-
-#if @GNULIB_LSTAT@
-# if ! @HAVE_LSTAT@
-/* mingw does not support symlinks, therefore it does not have lstat.  But
-   without links, stat does just fine.  */
-#  if !(defined __cplusplus && defined GNULIB_NAMESPACE)
-#   define lstat stat
-#  endif
-_GL_CXXALIAS_RPL_1 (lstat, stat, int,
-                    (const char *restrict name, struct stat *restrict buf));
-# elif @REPLACE_LSTAT@
-#  if !(defined __cplusplus && defined GNULIB_NAMESPACE)
-#   undef lstat
-#   define lstat rpl_lstat
-#  endif
-_GL_FUNCDECL_RPL (lstat, int,
-                  (const char *restrict name, struct stat *restrict buf)
-                  _GL_ARG_NONNULL ((1, 2)));
-_GL_CXXALIAS_RPL (lstat, int,
-                  (const char *restrict name, struct stat *restrict buf));
-# else
-_GL_CXXALIAS_SYS (lstat, int,
-                  (const char *restrict name, struct stat *restrict buf));
-# endif
-# if @HAVE_LSTAT@
-_GL_CXXALIASWARN (lstat);
-# endif
-#elif @GNULIB_OVERRIDES_STRUCT_STAT@
-# undef lstat
-# define lstat lstat_used_without_requesting_gnulib_module_lstat
-#elif defined GNULIB_POSIXCHECK
-# undef lstat
-# if HAVE_RAW_DECL_LSTAT
-_GL_WARN_ON_USE (lstat, "lstat is unportable - "
-                 "use gnulib module lstat for portability");
 # endif
 #endif
 
@@ -881,6 +897,44 @@ _GL_EXTERN_C int stat (const char *restrict name, struct stat *restrict buf)
 # if HAVE_RAW_DECL_STAT
 _GL_WARN_ON_USE (stat, "stat is unportable - "
                  "use gnulib module stat for portability");
+# endif
+#endif
+
+
+#if @GNULIB_LSTAT@
+# if ! @HAVE_LSTAT@
+/* mingw does not support symlinks, therefore it does not have lstat.  But
+   without links, stat does just fine.  */
+#  if !(defined __cplusplus && defined GNULIB_NAMESPACE)
+#   define lstat stat
+#  endif
+_GL_CXXALIAS_RPL_1 (lstat, stat, int,
+                    (const char *restrict name, struct stat *restrict buf));
+# elif @REPLACE_LSTAT@
+#  if !(defined __cplusplus && defined GNULIB_NAMESPACE)
+#   undef lstat
+#   define lstat rpl_lstat
+#  endif
+_GL_FUNCDECL_RPL (lstat, int,
+                  (const char *restrict name, struct stat *restrict buf)
+                  _GL_ARG_NONNULL ((1, 2)));
+_GL_CXXALIAS_RPL (lstat, int,
+                  (const char *restrict name, struct stat *restrict buf));
+# else
+_GL_CXXALIAS_SYS (lstat, int,
+                  (const char *restrict name, struct stat *restrict buf));
+# endif
+# if @HAVE_LSTAT@
+_GL_CXXALIASWARN (lstat);
+# endif
+#elif @GNULIB_OVERRIDES_STRUCT_STAT@
+# undef lstat
+# define lstat lstat_used_without_requesting_gnulib_module_lstat
+#elif defined GNULIB_POSIXCHECK
+# undef lstat
+# if HAVE_RAW_DECL_LSTAT
+_GL_WARN_ON_USE (lstat, "lstat is unportable - "
+                 "use gnulib module lstat for portability");
 # endif
 #endif
 

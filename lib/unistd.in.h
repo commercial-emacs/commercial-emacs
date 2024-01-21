@@ -971,23 +971,28 @@ _GL_WARN_ON_USE (faccessat, "faccessat is not portable - "
    Return 0 if successful, otherwise -1 and errno set.
    See the POSIX:2008 specification
    <https://pubs.opengroup.org/onlinepubs/9699919799/functions/fchdir.html>.  */
-# if ! @HAVE_FCHDIR@
+# if @REPLACE_FCHDIR@
+#  if !(defined __cplusplus && defined GNULIB_NAMESPACE)
+#   undef fchdir
+#   define fchdir rpl_fchdir
+#  endif
+_GL_FUNCDECL_RPL (fchdir, int, (int /*fd*/));
+_GL_CXXALIAS_RPL (fchdir, int, (int /*fd*/));
+# else
+#  if !@HAVE_FCHDIR@ || !@HAVE_DECL_FCHDIR@
 _GL_FUNCDECL_SYS (fchdir, int, (int /*fd*/));
-
+#  endif
+_GL_CXXALIAS_SYS (fchdir, int, (int /*fd*/));
+# endif
+_GL_CXXALIASWARN (fchdir);
+# if @REPLACE_FCHDIR@ || !@HAVE_FCHDIR@
 /* Gnulib internal hooks needed to maintain the fchdir metadata.  */
 _GL_EXTERN_C int _gl_register_fd (int fd, const char *filename)
      _GL_ARG_NONNULL ((2));
 _GL_EXTERN_C void _gl_unregister_fd (int fd);
 _GL_EXTERN_C int _gl_register_dup (int oldfd, int newfd);
 _GL_EXTERN_C const char *_gl_directory_name (int fd);
-
-# else
-#  if !@HAVE_DECL_FCHDIR@
-_GL_FUNCDECL_SYS (fchdir, int, (int /*fd*/));
-#  endif
 # endif
-_GL_CXXALIAS_SYS (fchdir, int, (int /*fd*/));
-_GL_CXXALIASWARN (fchdir);
 #elif defined GNULIB_POSIXCHECK
 # undef fchdir
 # if HAVE_RAW_DECL_FCHDIR
@@ -1113,10 +1118,10 @@ _GL_WARN_ON_USE (ftruncate, "ftruncate is unportable - "
    or SIZE was too small.
    See the POSIX:2008 specification
    <https://pubs.opengroup.org/onlinepubs/9699919799/functions/getcwd.html>.
-   Additionally, the gnulib module 'getcwd' guarantees the following GNU
-   extension: If BUF is NULL, an array is allocated with 'malloc'; the array
-   is SIZE bytes long, unless SIZE == 0, in which case it is as big as
-   necessary.  */
+   Additionally, the gnulib module 'getcwd' or 'getcwd-lgpl' guarantees the
+   following GNU extension: If BUF is NULL, an array is allocated with
+   'malloc'; the array is SIZE bytes long, unless SIZE == 0, in which case
+   it is as big as necessary.  */
 # if @REPLACE_GETCWD@
 #  if !(defined __cplusplus && defined GNULIB_NAMESPACE)
 #   define getcwd rpl_getcwd
@@ -1186,7 +1191,9 @@ _GL_FUNCDECL_SYS (getdomainname, int, (char *name, size_t len)
 #  endif
 _GL_CXXALIAS_SYS (getdomainname, int, (char *name, size_t len));
 # endif
+# if __GLIBC__ >= 2
 _GL_CXXALIASWARN (getdomainname);
+# endif
 #elif defined GNULIB_POSIXCHECK
 # undef getdomainname
 # if HAVE_RAW_DECL_GETDOMAINNAME
@@ -2134,7 +2141,7 @@ _GL_CXXALIAS_MDA_CAST (swab, void, (char *from, char *to, int n));
 # else
 #  if defined __hpux /* HP-UX */
 _GL_CXXALIAS_SYS (swab, void, (const char *from, char *to, int n));
-#  elif defined __sun && !defined _XPG4 /* Solaris */
+#  elif defined __sun && (defined __SunOS_5_10 || defined __XOPEN_OR_POSIX) && !defined _XPG4 /* Solaris */
 _GL_CXXALIAS_SYS (swab, void, (const char *from, char *to, ssize_t n));
 #  else
 _GL_CXXALIAS_SYS (swab, void, (const void *from, void *to, ssize_t n));

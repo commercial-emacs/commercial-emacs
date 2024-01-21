@@ -1,5 +1,6 @@
+/* DO NOT EDIT! GENERATED AUTOMATICALLY! */
 /* obstack.h - object stack macros
-   Copyright (C) 1988-2022 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    This file is free software: you can redistribute it and/or modify
@@ -97,18 +98,22 @@
           as you would with a stack.)
  */
 
+/* Documentation (part of the GNU libc manual):
+   <https://www.gnu.org/software/libc/manual/html_node/Obstacks.html>  */
+
 
 /* Don't do the contents of this file more than once.  */
-
 #ifndef _OBSTACK_H
 #define _OBSTACK_H 1
 
-#ifndef _OBSTACK_INTERFACE_VERSION
-# define _OBSTACK_INTERFACE_VERSION 2
+/* This file uses _Noreturn, _GL_ATTRIBUTE_PURE.  */
+#if !_GL_CONFIG_H_INCLUDED
+ #error "Please include config.h first."
 #endif
 
 #include <stddef.h>             /* For size_t and ptrdiff_t.  */
-#include <string.h>             /* For __GNU_LIBRARY__, and memcpy.  */
+#include <stdint.h>             /* For uintptr_t.  */
+#include <string.h>             /* For memcpy.  */
 
 #if __STDC_VERSION__ < 199901L || defined __HP_cc
 # define __FLEXIBLE_ARRAY_MEMBER 1
@@ -116,14 +121,14 @@
 # define __FLEXIBLE_ARRAY_MEMBER
 #endif
 
-#if _OBSTACK_INTERFACE_VERSION == 1
-/* For binary compatibility with obstack version 1, which used "int"
-   and "long" for these two types.  */
+/* These macros highlight the places where this implementation
+   is different from the one in GNU libc.  */
+#ifdef _LIBC
 # define _OBSTACK_SIZE_T unsigned int
 # define _CHUNK_SIZE_T unsigned long
 # define _OBSTACK_CAST(type, expr) ((type) (expr))
 #else
-/* Version 2 with sane types, especially for 64-bit hosts.  */
+/* In Gnulib, we use sane types, especially for 64-bit hosts.  */
 # define _OBSTACK_SIZE_T size_t
 # define _CHUNK_SIZE_T size_t
 # define _OBSTACK_CAST(type, expr) (expr)
@@ -131,20 +136,15 @@
 
 /* If B is the base of an object addressed by P, return the result of
    aligning P to the next multiple of A + 1.  B and P must be of type
-   char *.  A + 1 must be a power of 2.  */
+   char *.  A + 1 must be a power of 2.
+   If ptrdiff_t is narrower than a pointer (e.g., the AS/400), play it
+   safe and compute the alignment relative to B.  Otherwise, use the
+   faster strategy of computing the alignment through uintptr_t.  */
 
-#define __BPTR_ALIGN(B, P, A) ((B) + (((P) - (B) + (A)) & ~(A)))
-
-/* Similar to __BPTR_ALIGN (B, P, A), except optimize the common case
-   where pointers can be converted to integers, aligned as integers,
-   and converted back again.  If ptrdiff_t is narrower than a
-   pointer (e.g., the AS/400), play it safe and compute the alignment
-   relative to B.  Otherwise, use the faster strategy of computing the
-   alignment relative to 0.  */
-
-#define __PTR_ALIGN(B, P, A)						      \
-  __BPTR_ALIGN (sizeof (ptrdiff_t) < sizeof (void *) ? (B) : (char *) 0,      \
-                P, A)
+#define __PTR_ALIGN(B, P, A) \
+  (sizeof (ptrdiff_t) < sizeof (void *) \
+   ? (B) + (((P) - (B) + (A)) & ~(A))   \
+   : (P) + ((- (uintptr_t) (P)) & (A)))
 
 #ifndef __attribute_pure__
 # define __attribute_pure__ _GL_ATTRIBUTE_PURE
@@ -209,6 +209,14 @@ struct obstack          /* control current object in current chunk */
 
 /* Declare the external functions we use; they are in obstack.c.  */
 
+#if 1
+# define _obstack_newchunk rpl_obstack_newchunk
+# define _obstack_free rpl_obstack_free
+# define _obstack_begin rpl_obstack_begin
+# define _obstack_begin_1 rpl_obstack_begin_1
+# define _obstack_memory_used rpl_obstack_memory_used
+# define _obstack_allocated_p rpl_obstack_allocated_p
+#endif
 extern void _obstack_newchunk (struct obstack *, _OBSTACK_SIZE_T);
 extern void _obstack_free (struct obstack *, void *);
 extern int _obstack_begin (struct obstack *,

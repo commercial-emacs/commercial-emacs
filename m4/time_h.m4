@@ -1,7 +1,6 @@
 # Configure a more-standard replacement for <time.h>.
 
-# Copyright (C) 2000-2001, 2003-2007, 2009-2024 Free Software
-# Foundation, Inc.
+# Copyright (C) 2000-2001, 2003-2007, 2009-2024 Free Software Foundation, Inc.
 
 # serial 24
 
@@ -19,6 +18,15 @@ AC_DEFUN_ONCE([gl_TIME_H],
 
   gl_NEXT_HEADERS([time.h])
   AC_REQUIRE([gl_CHECK_TYPE_STRUCT_TIMESPEC])
+
+  dnl Check for declarations of anything we want to poison if the
+  dnl corresponding gnulib module is not in use.
+  gl_WARN_ON_USE_PREPARE([[
+#include <time.h>
+    ]], [
+      asctime asctime_r ctime ctime_r gmtime_r localtime localtime_r mktime
+      nanosleep strftime strptime time timegm timespec_get timespec_getres tzset
+    ])
 
   AC_REQUIRE([AC_C_RESTRICT])
 
