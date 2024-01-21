@@ -239,6 +239,16 @@ Please report any problems with this script to bug-gnu-emacs@gnu.org .'
 
   fi                            # do_check
 
+  # Stale caches can confuse autoconf.
+  rm -fr autom4te.cache exec/autom4te.cache || exit
+
+  # In build-aux save config.guess, config.sub and install-sh
+  # in case autoreconf overwrites them, as we rely on the copies
+  # in Git, which are updated by admin/merge-gnulib.
+  for file in config.guess config.sub install-sh; do
+    cp -p build-aux/$file build-aux/$file.tmp || exit
+  done
+
   # Build aclocal.m4 here so that autoreconf need not use aclocal.
   # aclocal is part of Automake and might not be installed, and
   # autoreconf skips aclocal if aclocal.m4 is already supplied.
