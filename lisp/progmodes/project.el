@@ -1287,6 +1287,7 @@ If you exit the `query-replace', you can later continue the
 
 (defvar compilation-read-command)
 (declare-function compilation-read-command "compile")
+(declare-function recompile "compile")
 
 (defun project-prefixed-buffer-name (mode)
   (concat "*"
@@ -1336,6 +1337,18 @@ of the `recompile' command."
                                'compile-history))
 	                  eval-command))))
     (compile command (consp current-prefix-arg))))
+
+(defun project-recompile (&optional edit-command)
+  "Run `recompile' with appropriate buffer."
+  (declare (interactive-only recompile))
+  (interactive "P")
+  (let ((compilation-buffer-name-function
+         (or project-compilation-buffer-name-function
+             ;; Should we error instead?  When there's no
+             ;; project-specific naming, there is no point in using
+             ;; this command.
+             compilation-buffer-name-function)))
+    (recompile edit-command)))
 
 (defcustom project-ignore-buffer-conditions nil
   "List of conditions to filter the buffers to be switched to.
