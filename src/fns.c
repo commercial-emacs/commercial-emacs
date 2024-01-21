@@ -4406,8 +4406,6 @@ reduce_emacs_uint_to_hash_hash (EMACS_UINT x)
 static EMACS_INT
 sxhash_eq (Lisp_Object key)
 {
-  if (symbols_with_pos_enabled && SYMBOL_WITH_POS_P (key))
-    key = SYMBOL_WITH_POS_SYM (key);
   return XHASH (key) ^ XTYPE (key);
 }
 
