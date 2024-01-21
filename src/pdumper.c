@@ -2402,6 +2402,19 @@ dump_symbol (struct dump_context *ctx,
   return offset;
 }
 
+/* Give Qunbound its name.
+   All other symbols are dumped and loaded but not Qunbound because it
+   cannot be used as a key in a hash table.
+   FIXME: A better solution would be to use a value other than Qunbound
+   as a marker for unused entries in hash tables.  */
+static void
+pdumper_init_symbol_unbound (void)
+{
+  eassert (NILP (SYMBOL_NAME (Qunbound)));
+  const char *name = "unbound";
+  init_symbol (Qunbound, make_pure_c_string (name, strlen (name)));
+}
+
 static dump_off
 dump_vectorlike_generic (struct dump_context *ctx,
 			 const union vectorlike_header *header)
@@ -5555,6 +5568,8 @@ pdumper_load (const char *dump_filename, char *argv0)
      initialization.  */
   for (int i = 0; i < nr_dump_hooks; ++i)
     dump_hooks[i] ();
+
+  pdumper_init_symbol_unbound ();
 
 #ifdef HAVE_NATIVE_COMP
   pdumper_set_emacs_execdir (argv0);

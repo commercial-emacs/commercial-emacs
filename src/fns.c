@@ -4403,20 +4403,6 @@ reduce_emacs_uint_to_hash_hash (EMACS_UINT x)
 	  : x ^ (x >> (8 * (sizeof x - sizeof (hash_hash_t)))));
 }
 
-static EMACS_INT
-sxhash_eq (Lisp_Object key)
-{
-  if (symbols_with_pos_enabled && SYMBOL_WITH_POS_P (key))
-    key = SYMBOL_WITH_POS_SYM (key);
-  return XHASH (key) ^ XTYPE (key);
-}
-
-static EMACS_INT
-sxhash_eql (Lisp_Object key)
-{
-  return FLOATP (key) || BIGNUMP (key) ? sxhash (key) : sxhash_eq (key);
-}
-
 /* Ignore H and return a hash code for KEY which uses 'eq' to compare keys.  */
 
 static hash_hash_t
@@ -4437,7 +4423,8 @@ hashfn_equal (Lisp_Object key, struct Lisp_Hash_Table *h)
 static hash_hash_t
 hashfn_eql (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  return reduce_emacs_uint_to_hash_hash (sxhash_eql (key));
+  return (FLOATP (key) || BIGNUMP (key)
+	  ? hashfn_equal (key, h) : hashfn_eq (key, h));
 }
 
 /* Given H, return a hash code for KEY which uses a user-defined
@@ -5215,11 +5202,13 @@ collect_interval (INTERVAL interval, void *arg)
 			    Lisp Interface
  ***********************************************************************/
 
-/* Reduce the hash value X to a Lisp fixnum.  */
+/* Reduce X to a Lisp fixnum.  */
 static inline Lisp_Object
-reduce_emacs_uint_to_fixnum (EMACS_UINT x)
+hash_hash_to_fixnum (hash_hash_t x)
 {
-  return make_ufixnum (SXHASH_REDUCE (x));
+  return make_ufixnum (FIXNUM_BITS < 8 * sizeof x
+		       ? (x ^ x >> (8 * sizeof x - FIXNUM_BITS)) & INTMASK
+		       : x);
 }
 
 DEFUN ("sxhash-eq", Fsxhash_eq, Ssxhash_eq, 1, 1, 0,
@@ -5229,7 +5218,7 @@ If (eq A B), then (= (sxhash-eq A) (sxhash-eq B)).
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
-  return reduce_emacs_uint_to_fixnum (sxhash_eq (obj));
+  return hash_hash_to_fixnum (hashfn_eq (obj, NULL));
 }
 
 DEFUN ("sxhash-eql", Fsxhash_eql, Ssxhash_eql, 1, 1, 0,
@@ -5240,7 +5229,7 @@ isn't necessarily true.
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
-  return reduce_emacs_uint_to_fixnum (sxhash_eql (obj));
+  return hash_hash_to_fixnum (hashfn_eql (obj, NULL));
 }
 
 DEFUN ("sxhash-equal", Fsxhash_equal, Ssxhash_equal, 1, 1, 0,
@@ -5251,7 +5240,7 @@ opposite isn't necessarily true.
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
-  return reduce_emacs_uint_to_fixnum (sxhash (obj));
+  return hash_hash_to_fixnum (hashfn_equal (obj, NULL));
 }
 
 DEFUN ("sxhash-equal-including-properties", Fsxhash_equal_including_properties,
@@ -5264,10 +5253,14 @@ If (sxhash-equal-including-properties A B), then
 Hash codes are not guaranteed to be preserved across Emacs sessions.  */)
   (Lisp_Object obj)
 {
-  EMACS_UINT hash = sxhash (obj);
   if (STRINGP (obj))
-    traverse_intervals (string_intervals (obj), 0, hash_interval, &hash);
-  return reduce_emacs_uint_to_fixnum (hash);
+    {
+      EMACS_UINT hash = 0;
+      traverse_intervals (string_intervals (obj), 0, hash_interval, &hash);
+      return make_ufixnum (SXHASH_REDUCE (sxhash_combine (sxhash (obj), hash)));
+    }
+
+  return hash_hash_to_fixnum (hashfn_equal (obj, NULL));
 }
 
 
@@ -5575,13 +5568,18 @@ DEFUN ("remhash", Fremhash, Sremhash, 2, 2, 0,
 DEFUN ("maphash", Fmaphash, Smaphash, 2, 2, 0,
        doc: /* Call FUNCTION for all entries in hash table TABLE.
 FUNCTION is called with two arguments, KEY and VALUE.
-It should not alter TABLE in any way other than using `puthash' to
-set a new value for KEY, or `remhash' to remove KEY.
 `maphash' always returns nil.  */)
   (Lisp_Object function, Lisp_Object table)
 {
   struct Lisp_Hash_Table *h = check_hash_table (table);
-  DOHASH (h, i) call2 (function, HASH_KEY (h, i), HASH_VALUE (h, i));
+
+  for (ptrdiff_t i = 0; i < HASH_TABLE_SIZE (h); ++i)
+    {
+      Lisp_Object k = HASH_KEY (h, i);
+      if (!hash_unused_entry_key_p (k))
+        call2 (function, k, HASH_VALUE (h, i));
+    }
+
   return Qnil;
 }
 
