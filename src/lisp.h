@@ -2268,7 +2268,7 @@ XHASH_TABLE (Lisp_Object a)
 }
 
 #define XSET_HASH_TABLE(VAR, PTR) \
-     (XSETPSEUDOVECTOR (VAR, PTR, PVEC_HASH_TABLE))
+  XSETPSEUDOVECTOR (VAR, PTR, PVEC_HASH_TABLE)
 
 /* Value is the key part of entry IDX in hash table H.  */
 INLINE Lisp_Object
@@ -4045,7 +4045,7 @@ extern void syms_of_mgc (void);
 extern struct buffer *allocate_buffer (void) ATTRIBUTE_RETURNS_NONNULL;
 extern int valid_lisp_object_p (Lisp_Object);
 
-void *hash_table_alloc_bytes (ptrdiff_t nbytes);
+void *hash_table_alloc_bytes (ptrdiff_t nbytes) ATTRIBUTE_MALLOC_SIZE ((1));
 void hash_table_free_bytes (void *p, ptrdiff_t nbytes);
 
 /* Defined in gmalloc.c.  */

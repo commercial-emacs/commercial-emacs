@@ -266,12 +266,12 @@ font_def_new (Lisp_Object font_spec, Lisp_Object encoding,
 
 #define RFONT_DEF_FACE(rfont_def) AREF (rfont_def, 0)
 #define RFONT_DEF_SET_FACE(rfont_def, face_id)	\
-  ASET ((rfont_def), 0, make_fixnum (face_id))
+  ASET (rfont_def, 0, make_fixnum (face_id))
 #define RFONT_DEF_FONT_DEF(rfont_def) AREF (rfont_def, 1)
 #define RFONT_DEF_SPEC(rfont_def) FONT_DEF_SPEC (AREF (rfont_def, 1))
 #define RFONT_DEF_OBJECT(rfont_def) AREF (rfont_def, 2)
 #define RFONT_DEF_SET_OBJECT(rfont_def, object)	\
-  ASET ((rfont_def), 2, (object))
+  ASET (rfont_def, 2, object)
 /* Score of RFONT_DEF is an integer value; the lowest 8 bits represent
    the order of listing by font backends, the higher bits represents
    the order given by charset priority list.  The smaller value is
@@ -295,7 +295,7 @@ font_def_new (Lisp_Object font_spec, Lisp_Object encoding,
 #define FONTSET_REF(fontset, c)		\
   (EQ (fontset, Vdefault_fontset)	\
    ? CHAR_TABLE_REF (fontset, c)	\
-   : fontset_ref ((fontset), (c)))
+   : fontset_ref (fontset, c))
 
 static Lisp_Object
 fontset_ref (Lisp_Object fontset, int c)
@@ -315,7 +315,7 @@ fontset_ref (Lisp_Object fontset, int c)
    specifying a range.  */
 
 #define FONTSET_SET(fontset, range, elt)	\
-  Fset_char_table_range ((fontset), (range), (elt))
+  Fset_char_table_range (fontset, range, elt)
 
 
 /* Modify the elements of FONTSET for characters in RANGE by replacing

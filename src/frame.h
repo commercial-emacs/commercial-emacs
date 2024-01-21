@@ -838,7 +838,7 @@ default_pixels_per_inch_y (void)
 
 #define XFRAME(p) \
   (eassert (FRAMEP (p)), XUNTAG (p, Lisp_Vectorlike, struct frame))
-#define XSETFRAME(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_FRAME))
+#define XSETFRAME(a, b) XSETPSEUDOVECTOR (a, b, PVEC_FRAME)
 
 /* Given a window, return its frame as a Lisp_Object.  */
 #define WINDOW_FRAME(w) ((w)->frame)
@@ -1031,12 +1031,12 @@ default_pixels_per_inch_y (void)
 /* Height of F's bottom margin in frame lines.  */
 
 #define FRAME_BOTTOM_MARGIN(f)			\
-  (FRAME_TOOL_BAR_BOTTOM_LINES (f))
+  FRAME_TOOL_BAR_BOTTOM_LINES (f)
 
 /* Pixel height of frame F's bottom margin.  */
 
 #define FRAME_BOTTOM_MARGIN_HEIGHT(f)		\
-  (FRAME_TOOL_BAR_BOTTOM_HEIGHT (f))
+  FRAME_TOOL_BAR_BOTTOM_HEIGHT (f)
 
 /* Size of both vertical margins combined.  */
 
@@ -1060,7 +1060,7 @@ default_pixels_per_inch_y (void)
    visible by the X server.  */
 
 #ifndef HAVE_X_WINDOWS
-#define FRAME_REDISPLAY_P(f) (FRAME_VISIBLE_P (f))
+#define FRAME_REDISPLAY_P(f) FRAME_VISIBLE_P (f)
 #else
 #define FRAME_REDISPLAY_P(f) (FRAME_VISIBLE_P (f)		\
 			      || (FRAME_X_P (f)			\

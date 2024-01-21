@@ -5701,7 +5701,7 @@ load_overlay_strings (struct it *it, ptrdiff_t charpos)
 									\
       entries[n].string = (STRING);					\
       entries[n].overlay = (OVERLAY);					\
-      priority = Foverlay_get ((OVERLAY), Qpriority);			\
+      priority = Foverlay_get (OVERLAY, Qpriority);			\
       entries[n].priority = FIXNUMP (priority) ? XFIXNUM (priority) : 0;  \
       entries[n].after_string_p = (AFTER_P);				\
       ++n;								\
@@ -25605,9 +25605,9 @@ get_font_ascent_descent (struct font *font, int *ascent, int *descent)
 # define ALLOCATE_HDC(hdc, f)			\
   Lisp_Object prev_quit = Vinhibit_quit;	\
   Vinhibit_quit = Qt;				\
-  HDC hdc = get_frame_dc ((f))
+  HDC hdc = get_frame_dc (f)
 # define RELEASE_HDC(hdc, f)			\
-  release_frame_dc ((f), (hdc));		\
+  release_frame_dc (f, hdc);			\
   Vinhibit_quit = prev_quit
 #else
 # define ALLOCATE_HDC(hdc, f)
