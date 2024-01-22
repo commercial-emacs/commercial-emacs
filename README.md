@@ -40,7 +40,7 @@ Roughly every hour.
 
 1. Install Rust library:
 ```bash
-git clone --depth 1 --branch v0.20.10beta2 \
+git clone --depth 1 --branch v0.20.10beta3 \
   https://github.com/commercial-emacs/tree-sitter.git
 make -C tree-sitter install
 ```
