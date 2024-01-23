@@ -6342,9 +6342,7 @@ Add import for undefined name `%s' (empty to skip): "
               `(,python-font-lock-keywords
                 nil nil nil nil
                 (font-lock-syntactic-face-function
-                 . python-font-lock-syntactic-face-function)
-                (font-lock-extend-after-change-region-function
-                 . python-font-lock-extend-region)))
+                 . python-font-lock-syntactic-face-function)))
 
   (setq-local syntax-propertize-function
               python-syntax-propertize-function)
