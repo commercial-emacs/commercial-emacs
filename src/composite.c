@@ -1953,7 +1953,7 @@ void
 mark_composite (void)
 {
   for (int i = 0; i < n_compositions; i++)
-    mark_object (composition_table[i]->key);
+    mark_object (&(composition_table[i]->key));
 }
 
 void
