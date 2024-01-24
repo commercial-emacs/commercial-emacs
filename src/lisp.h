@@ -3378,7 +3378,7 @@ maybe_quit (void)
 INLINE void
 rarely_quit (unsigned short int count)
 {
-  if (! count)
+  if (count == 0)
     maybe_quit ();
 }
 
@@ -3763,7 +3763,7 @@ extern void syms_of_json (void);
 #endif
 
 /* Defined in insdel.c.  */
-extern void move_gap_both (ptrdiff_t, ptrdiff_t);
+extern void move_gap (ptrdiff_t, ptrdiff_t);
 extern AVOID buffer_overflow (void);
 extern void make_gap (ptrdiff_t);
 extern void make_gap_1 (struct buffer *, ptrdiff_t);

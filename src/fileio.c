@@ -3803,7 +3803,7 @@ decide_coding_unwind (Lisp_Object unwind_data)
      this can't move more bytes than were moved during the execution
      of Vset_auto_coding_function, which is normally 0 (because it
      normally doesn't modify the buffer).  */
-  move_gap_both (Z, Z_BYTE);
+  move_gap (Z, Z_BYTE);
   ptrdiff_t inserted = Z_BYTE - BEG_BYTE;
   GAP_SIZE += inserted;
   ZV = Z = GPT = BEG;
@@ -3944,7 +3944,7 @@ maybe_move_gap (struct buffer *b)
       struct buffer *cb = current_buffer;
 
       set_buffer_internal (b);
-      move_gap_both (Z, Z_BYTE);
+      move_gap (Z, Z_BYTE);
       set_buffer_internal (cb);
     }
 }
@@ -4686,7 +4686,7 @@ by calling `format-decode', which see.  */)
   if (EQ (replace, Qunbound))
     del_range (BEGV, ZV);
 
-  move_gap_both (PT, PT_BYTE);
+  move_gap (PT, PT_BYTE);
 
   /* Ensure the gap is at least one byte larger than needed for the
      estimated file size, so that in the usual case we read to EOF
@@ -4888,7 +4888,7 @@ by calling `format-decode', which see.  */)
       /* Now we have all the new bytes at the beginning of the gap,
          but `decode_coding_gap` can't have them at the beginning of the gap,
          so we need to move them.  */
-      memmove (GAP_END_ADDR - inserted, GPT_ADDR, inserted);
+      memmove (GAP_END_ADDR - inserted, GAP_BEG_ADDR, inserted);
       decode_coding_gap (&coding, inserted);
       inserted = coding.produced_char;
       coding_system = CODING_ID_NAME (coding.id);

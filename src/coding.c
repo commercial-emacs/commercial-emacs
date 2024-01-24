@@ -7331,14 +7331,14 @@ decode_coding (struct coding_system *coding)
       && coding->src_pos > 0
       && coding->src_pos < GPT
       && coding->src_pos + coding->src_chars > GPT)
-    move_gap_both (coding->src_pos, coding->src_pos_byte);
+    move_gap (coding->src_pos, coding->src_pos_byte);
 
   undo_list = Qt;
   if (BUFFERP (coding->dst_object))
     {
       set_buffer_internal (XBUFFER (coding->dst_object));
       if (GPT != PT)
-	move_gap_both (PT, PT_BYTE);
+	move_gap (PT, PT_BYTE);
 
       /* We must disable undo_list in order to record the whole insert
 	 transaction via record_insert at the end.  But doing so also
@@ -8073,7 +8073,7 @@ decode_coding_object (struct coding_system *coding,
     {
       set_buffer_internal (XBUFFER (src_object));
       if (from != GPT)
-	move_gap_both (from, from_byte);
+	move_gap (from, from_byte);
       if (EQ (src_object, dst_object))
 	{
 	  struct Lisp_Marker *tail;
@@ -8166,7 +8166,7 @@ decode_coding_object (struct coding_system *coding,
 	  eassert (coding->produced > 0);
 	  destination = xrealloc (destination, coding->produced);
 	  if (BEGV < GPT && GPT < BEGV + coding->produced_char)
-	    move_gap_both (BEGV, BEGV_BYTE);
+	    move_gap (BEGV, BEGV_BYTE);
 	  memcpy (destination, BEGV_ADDR, coding->produced);
 	  coding->destination = destination;
 	}
@@ -8318,7 +8318,7 @@ encode_coding_object (struct coding_system *coding,
 	kill_src_buffer = 1;
       coding->src_object = Fcurrent_buffer ();
       if (BEG != GPT)
-	move_gap_both (BEG, BEG_BYTE);
+	move_gap (BEG, BEG_BYTE);
       coding->src_chars = Z - BEG;
       coding->src_bytes = Z_BYTE - BEG_BYTE;
       coding->src_pos = BEG;
@@ -8345,7 +8345,7 @@ encode_coding_object (struct coding_system *coding,
       else
 	{
 	  if (from < GPT && to >= GPT)
-	    move_gap_both (from, from_byte);
+	    move_gap (from, from_byte);
 	  coding->src_pos = from;
 	  coding->src_pos_byte = from_byte;
 	}
@@ -8372,7 +8372,7 @@ encode_coding_object (struct coding_system *coding,
 	  set_buffer_temp (XBUFFER (dst_object));
 	  coding->dst_pos = PT;
 	  coding->dst_pos_byte = PT_BYTE;
-	  move_gap_both (coding->dst_pos, coding->dst_pos_byte);
+	  move_gap (coding->dst_pos, coding->dst_pos_byte);
 	  set_buffer_temp (current);
 	}
       coding->dst_multibyte
@@ -8944,7 +8944,7 @@ highest priority.  */)
   to_byte = CHAR_TO_BYTE (to);
 
   if (from < GPT && to >= GPT)
-    move_gap_both (to, to_byte);
+    move_gap (to, to_byte);
 
   return detect_coding_system (BYTE_POS_ADDR (from_byte),
 			       to - from, to_byte - from_byte,
@@ -9042,9 +9042,9 @@ DEFUN ("find-coding-systems-region-internal",
       if (s < GPT && GPT < e)
 	{
 	  if (GPT - s < e - GPT)
-	    move_gap_both (s, start_byte);
+	    move_gap (s, start_byte);
 	  else
-	    move_gap_both (e, end_byte);
+	    move_gap (e, end_byte);
 	}
     }
 
@@ -9172,7 +9172,7 @@ to the string and treated as in `substring'.  */)
       p = CHAR_POS_ADDR (from);
       pend = CHAR_POS_ADDR (to);
       if (from < GPT && to >= GPT)
-	stop = GPT_ADDR;
+	stop = GAP_BEG_ADDR;
       else
 	stop = pend;
     }
@@ -9230,7 +9230,7 @@ to the string and treated as in `substring'.  */)
 	  p = CHAR_POS_ADDR (from);
 	  pend = CHAR_POS_ADDR (to);
 	  if (from < GPT && to >= GPT)
-	    stop = GPT_ADDR;
+	    stop = GAP_BEG_ADDR;
 	  else
 	    stop = pend;
 	  charset_map_loaded = 0;
@@ -9296,9 +9296,9 @@ is nil.  */)
       if (s < GPT && GPT < e)
 	{
 	  if (GPT - s < e - GPT)
-	    move_gap_both (s, start_byte);
+	    move_gap (s, start_byte);
 	  else
-	    move_gap_both (e, end_byte);
+	    move_gap (e, end_byte);
 	}
       pos = s;
     }
@@ -9591,7 +9591,7 @@ get_buffer_gap_address (Lisp_Object buffer, ptrdiff_t nbytes)
       struct buffer *oldb = current_buffer;
 
       current_buffer = buf;
-      move_gap_both (PT, PT_BYTE);
+      move_gap (PT, PT_BYTE);
       current_buffer = oldb;
     }
   if (BUF_GAP_SIZE (buf) < nbytes)

@@ -106,10 +106,10 @@ enum { BEG = 1, BEG_BYTE = BEG };
 #define PT_ADDR (BYTE_POS_ADDR (current_buffer->pt_byte))
 
 /* Address of beginning of gap in buffer.  */
-#define GPT_ADDR (current_buffer->text->beg + current_buffer->text->gpt_byte - BEG_BYTE)
+#define GAP_BEG_ADDR (current_buffer->text->beg + current_buffer->text->gpt_byte - BEG_BYTE)
 
 /* Address of end of gap in buffer.  */
-#define GAP_END_ADDR (current_buffer->text->beg + current_buffer->text->gpt_byte + current_buffer->text->gap_size - BEG_BYTE)
+#define GAP_END_ADDR (GAP_BEG_ADDR + current_buffer->text->gap_size)
 
 /* Address of end of accessible range of buffer.  */
 #define ZV_ADDR (BYTE_POS_ADDR (current_buffer->zv_byte))
@@ -986,20 +986,12 @@ BUF_GAP_END_ADDR (struct buffer *buf)
 INLINE void
 BUF_COMPUTE_UNCHANGED (struct buffer *buf, ptrdiff_t start, ptrdiff_t end)
 {
-  if (BUF_UNCHANGED_MODIFIED (buf) == BUF_MODIFF (buf)
-      && (BUF_OVERLAY_UNCHANGED_MODIFIED (buf)
-	  == BUF_OVERLAY_MODIFF (buf)))
-    {
-      buf->text->beg_unchanged = start - BUF_BEG (buf);
-      buf->text->end_unchanged = BUF_Z (buf) - (end);
-    }
-  else
-    {
-      if (BUF_Z (buf) - end < BUF_END_UNCHANGED (buf))
-	buf->text->end_unchanged = BUF_Z (buf) - end;
-      if (start - BUF_BEG (buf) < BUF_BEG_UNCHANGED (buf))
-	buf->text->beg_unchanged = start - BUF_BEG (buf);
-    }
+  const bool unmodified = BUF_UNCHANGED_MODIFIED (buf) == BUF_MODIFF (buf)
+    && BUF_OVERLAY_UNCHANGED_MODIFIED (buf) == BUF_OVERLAY_MODIFF (buf);
+  if (unmodified || start - BUF_BEG (buf) < BUF_BEG_UNCHANGED (buf))
+    buf->text->beg_unchanged = start - BUF_BEG (buf);
+  if (unmodified || BUF_Z (buf) - end < BUF_END_UNCHANGED (buf))
+    buf->text->end_unchanged = BUF_Z (buf) - end;
 }
 
 /* Functions for setting the BEGV, ZV or PT of a given buffer.
@@ -1602,7 +1594,7 @@ fetch_char_advance_no_check (ptrdiff_t *charidx, ptrdiff_t *byteidx)
 
 /* Return the number of bytes in the multibyte character in BUF
    that starts at position POS_BYTE.  This relies on the fact that
-   *GPT_ADDR and *Z_ADDR are always accessible and the values are
+   *GAP_BEG_ADDR and *Z_ADDR are always accessible and the values are
    '\0'.  No range checking of POS_BYTE.  */
 
 INLINE int

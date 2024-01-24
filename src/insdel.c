@@ -39,9 +39,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static void insert_from_string_1 (Lisp_Object, ptrdiff_t, ptrdiff_t, ptrdiff_t,
 				  ptrdiff_t, bool, bool);
 static void insert_from_buffer_1 (struct buffer *, ptrdiff_t, ptrdiff_t, bool);
-static void gap_left (ptrdiff_t, ptrdiff_t, bool);
-static void gap_right (ptrdiff_t, ptrdiff_t);
-
 static void signal_before_change (ptrdiff_t, ptrdiff_t, ptrdiff_t *);
 
 /* Also used in marker.c to enable expensive marker checks.  */
@@ -72,138 +69,6 @@ check_markers (void)
 #define check_markers() do { } while (0)
 
 #endif /* MARKER_DEBUG */
-
-/* Move gap to byte position BYTEPOS, which is also char position CHARPOS.
-   Note that this can quit!  */
-
-void
-move_gap_both (ptrdiff_t charpos, ptrdiff_t bytepos)
-{
-  eassert (charpos == BYTE_TO_CHAR (bytepos)
-	   && bytepos == CHAR_TO_BYTE (charpos));
-  if (bytepos < GPT_BYTE)
-    gap_left (charpos, bytepos, 0);
-  else if (bytepos > GPT_BYTE)
-    gap_right (charpos, bytepos);
-}
-
-/* Move the gap to a position less than the current GPT.
-   BYTEPOS describes the new position as a byte position,
-   and CHARPOS is the corresponding char position.
-   If NEWGAP, then don't update beg_unchanged and end_unchanged.  */
-
-static void
-gap_left (ptrdiff_t charpos, ptrdiff_t bytepos, bool newgap)
-{
-  unsigned char *to, *from;
-  ptrdiff_t i;
-  ptrdiff_t new_s1;
-
-  if (!newgap)
-    BUF_COMPUTE_UNCHANGED (current_buffer, charpos, GPT);
-
-  i = GPT_BYTE;
-  to = GAP_END_ADDR;
-  from = GPT_ADDR;
-  new_s1 = GPT_BYTE; /* May point in the middle of multibyte sequences.  */
-
-  /* Now copy the characters.  To move the gap down,
-     copy characters up.  */
-
-  while (1)
-    {
-      /* I gets number of characters left to copy.  */
-      i = new_s1 - bytepos;
-      if (i == 0)
-	break;
-      /* If a quit is requested, stop copying now.
-	 Change BYTEPOS to be where we have actually moved the gap to.
-	 Note that this cannot happen when we are called to make the
-	 gap larger or smaller, since make_gap_larger and
-	 make_gap_smaller set inhibit-quit.  */
-      if (QUITP)
-	{
-          /* FIXME: This can point in the middle of a multibyte character.  */
-	  bytepos = new_s1;
-	  charpos = BYTE_TO_CHAR (bytepos);
-	  break;
-	}
-      /* Move at most 32000 chars before checking again for a quit.  */
-      /* FIXME: This 32KB chunk size dates back to before 1991.
-         Maybe we should bump it to reflect the >1000x increase
-         in memory size and bandwidth since that time.
-         Is it even worthwhile checking `quit` within this loop?
-         Especially since make_gap_smaller/larger binds inhibit-quit anyway!  */
-      if (i > 32000)
-	i = 32000;
-      new_s1 -= i;
-      from -= i, to -= i;
-      memmove (to, from, i);
-    }
-
-  /* Adjust buffer data structure, to put the gap at BYTEPOS.
-     BYTEPOS is where the loop above stopped, which may be what
-     was specified or may be where a quit was detected.  */
-  GPT_BYTE = bytepos;
-  GPT = charpos;
-  eassert (charpos <= bytepos);
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
-  maybe_quit ();
-}
-
-/* Move the gap to a position greater than the current GPT.
-   BYTEPOS describes the new position as a byte position,
-   and CHARPOS is the corresponding char position.  */
-
-static void
-gap_right (ptrdiff_t charpos, ptrdiff_t bytepos)
-{
-  register unsigned char *to, *from;
-  register ptrdiff_t i;
-  ptrdiff_t new_s1; /* May point in the middle of multibyte sequences.  */
-
-  BUF_COMPUTE_UNCHANGED (current_buffer, charpos, GPT);
-
-  i = GPT_BYTE;
-  from = GAP_END_ADDR;
-  to = GPT_ADDR;
-  new_s1 = GPT_BYTE;
-
-  /* Now copy the characters.  To move the gap up,
-     copy characters down.  */
-
-  while (1)
-    {
-      /* I gets number of characters left to copy.  */
-      i = bytepos - new_s1;
-      if (i == 0)
-	break;
-      /* If a quit is requested, stop copying now.
-	 Change BYTEPOS to be where we have actually moved the gap to.
-	 Note that this cannot happen when we are called to make the
-	 gap larger or smaller, since make_gap_larger and
-	 make_gap_smaller set inhibit-quit.  */
-      if (QUITP)
-	{
-          /* FIXME: This can point in the middle of a multibyte character.  */
-	  bytepos = new_s1;
-	  charpos = BYTE_TO_CHAR (bytepos);
-	  break;
-	}
-      /* Move at most 32000 chars before checking again for a quit.  */
-      if (i > 32000)
-	i = 32000;
-      new_s1 += i;
-      memmove (to, from, i);
-      from += i, to += i;
-    }
-
-  GPT = charpos;
-  GPT_BYTE = bytepos;
-  eassert (charpos <= bytepos);
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
-  maybe_quit ();
-}
 
 /* If the selected window's old pointm is adjacent or covered by the
    region from FROM to TO, unsuspend auto hscroll in that window.  */
@@ -433,11 +298,32 @@ adjust_markers_bytepos (ptrdiff_t from, ptrdiff_t from_byte,
   clear_charpos_cache (current_buffer);
 }
 
-
 void
 buffer_overflow (void)
 {
   error ("Maximum buffer size exceeded");
+}
+
+void
+move_gap (ptrdiff_t charpos, ptrdiff_t bytepos)
+{
+  BUF_COMPUTE_UNCHANGED (current_buffer, charpos, GPT);
+  if (bytepos < GPT_BYTE)
+    {
+      /* moving characters up moves gap down */
+      const ptrdiff_t nbytes = GPT_BYTE - bytepos;
+      memmove (GAP_END_ADDR - nbytes, GAP_BEG_ADDR - nbytes, nbytes);
+    }
+  else
+    {
+      /* moving characters down moves gap up */
+      const ptrdiff_t nbytes = bytepos - GPT_BYTE;
+      memmove (GAP_BEG_ADDR, GAP_END_ADDR, nbytes);
+    }
+  GPT_BYTE = bytepos;
+  GPT = charpos;
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
 }
 
 /* Make the gap NBYTES_ADDED bytes longer.  */
@@ -445,10 +331,9 @@ buffer_overflow (void)
 static void
 make_gap_larger (ptrdiff_t nbytes_added)
 {
-  Lisp_Object tem;
-  ptrdiff_t real_gap_loc;
-  ptrdiff_t real_gap_loc_byte;
-  ptrdiff_t old_gap_size;
+  ptrdiff_t restore_gap_pt;
+  ptrdiff_t restore_gap_pt_byte;
+  ptrdiff_t restore_gap_size;
   ptrdiff_t current_size = Z_BYTE - BEG_BYTE + GAP_SIZE;
 
   if (BUF_BYTES_MAX - current_size < nbytes_added)
@@ -461,33 +346,28 @@ make_gap_larger (ptrdiff_t nbytes_added)
 
   enlarge_buffer_text (current_buffer, nbytes_added);
 
-  /* Prevent quitting in gap_left.  We cannot allow a quit there,
-     because that would leave the buffer text in an inconsistent
-     state, with 2 gap holes instead of just one.  */
-  tem = Vinhibit_quit;
-  Vinhibit_quit = Qt;
-
-  real_gap_loc = GPT;
-  real_gap_loc_byte = GPT_BYTE;
-  old_gap_size = GAP_SIZE;
-
-  /* Call the newly allocated space a gap at the end of the whole space.  */
-  GPT = Z + GAP_SIZE;
-  GPT_BYTE = Z_BYTE + GAP_SIZE;
+  restore_gap_size = GAP_SIZE;
   GAP_SIZE = nbytes_added;
+  restore_gap_pt = GPT;
+  GPT = Z + restore_gap_size;
+  restore_gap_pt_byte = GPT_BYTE;
+  GPT_BYTE = Z_BYTE + restore_gap_size;
 
-  /* Move the new gap down to be consecutive with the end of the old one.  */
-  gap_left (real_gap_loc + old_gap_size, real_gap_loc_byte + old_gap_size, 1);
+  /* Move the new gap down to be consecutive with the end of the old one.
+     Do not update beg_unchanged end_unchanged! */
+  const ptrdiff_t restore_beg_unchanged = current_buffer->text->beg_unchanged,
+    restore_end_unchanged = current_buffer->text->end_unchanged;
+  move_gap (restore_gap_pt + restore_gap_size, restore_gap_pt_byte + restore_gap_size);
+  current_buffer->text->beg_unchanged = restore_beg_unchanged;
+  current_buffer->text->end_unchanged = restore_end_unchanged;
 
   /* Now combine the two into one large gap.  */
-  GAP_SIZE += old_gap_size;
-  GPT = real_gap_loc;
-  GPT_BYTE = real_gap_loc_byte;
+  GAP_SIZE += restore_gap_size;
+  GPT = restore_gap_pt;
+  GPT_BYTE = restore_gap_pt_byte;
 
   /* Put an anchor.  */
-  *(Z_ADDR) = 0;
-
-  Vinhibit_quit = tem;
+  *Z_ADDR = 0;
 }
 
 #if defined USE_MMAP_FOR_BUFFERS || defined REL_ALLOC || defined DOUG_LEA_MALLOC
@@ -497,35 +377,27 @@ make_gap_larger (ptrdiff_t nbytes_added)
 static void
 make_gap_smaller (ptrdiff_t nbytes_removed)
 {
-  Lisp_Object tem;
-  ptrdiff_t real_gap_loc;
-  ptrdiff_t real_gap_loc_byte;
-  ptrdiff_t real_Z;
-  ptrdiff_t real_Z_byte;
-  ptrdiff_t real_beg_unchanged;
+  ptrdiff_t restore_gap_pt;
+  ptrdiff_t restore_gap_pt_byte;
+  ptrdiff_t restore_Z;
+  ptrdiff_t restore_Z_byte;
+  ptrdiff_t restore_beg_unchanged;
   ptrdiff_t new_gap_size;
 
   /* Make sure the gap is at least GAP_BYTES_MIN bytes.  */
-  if (GAP_SIZE - nbytes_removed < GAP_BYTES_MIN)
-    nbytes_removed = GAP_SIZE - GAP_BYTES_MIN;
+  nbytes_removed = min (GAP_SIZE - GAP_BYTES_MIN, nbytes_removed);
 
-  /* Prevent quitting in gap_right.  We cannot allow a quit there,
-     because that would leave the buffer text in an inconsistent
-     state, with 2 gap holes instead of just one.  */
-  tem = Vinhibit_quit;
-  Vinhibit_quit = Qt;
-
-  real_gap_loc = GPT;
-  real_gap_loc_byte = GPT_BYTE;
+  restore_gap_pt = GPT;
+  restore_gap_pt_byte = GPT_BYTE;
   new_gap_size = GAP_SIZE - nbytes_removed;
-  real_Z = Z;
-  real_Z_byte = Z_BYTE;
-  real_beg_unchanged = BEG_UNCHANGED;
+  restore_Z = Z;
+  restore_Z_byte = Z_BYTE;
+  restore_beg_unchanged = BEG_UNCHANGED;
 
   /* Pretend that the last unwanted part of the gap is the entire gap,
      and that the first desired part of the gap is part of the buffer
      text.  */
-  memset (GPT_ADDR, 0, new_gap_size);
+  memset (GAP_BEG_ADDR, 0, new_gap_size);
   GPT += new_gap_size;
   GPT_BYTE += new_gap_size;
   Z += new_gap_size;
@@ -533,22 +405,19 @@ make_gap_smaller (ptrdiff_t nbytes_removed)
   GAP_SIZE = nbytes_removed;
 
   /* Move the unwanted pretend gap to the end of the buffer.  */
-  gap_right (Z, Z_BYTE);
-
+  move_gap (Z, Z_BYTE);
   enlarge_buffer_text (current_buffer, -nbytes_removed);
 
   /* Now restore the desired gap.  */
   GAP_SIZE = new_gap_size;
-  GPT = real_gap_loc;
-  GPT_BYTE = real_gap_loc_byte;
-  Z = real_Z;
-  Z_BYTE = real_Z_byte;
-  BEG_UNCHANGED = real_beg_unchanged;
+  GPT = restore_gap_pt;
+  GPT_BYTE = restore_gap_pt_byte;
+  Z = restore_Z;
+  Z_BYTE = restore_Z_byte;
+  BEG_UNCHANGED = restore_beg_unchanged;
 
   /* Put an anchor.  */
-  *(Z_ADDR) = 0;
-
-  Vinhibit_quit = tem;
+  *Z_ADDR = 0;
 }
 
 #endif /* USE_MMAP_FOR_BUFFERS || REL_ALLOC || DOUG_LEA_MALLOC */
@@ -906,7 +775,7 @@ insert_1_both (const char *string,
     prepare_to_modify_buffer (PT, PT, NULL);
 
   if (PT != GPT)
-    move_gap_both (PT, PT_BYTE);
+    move_gap (PT, PT_BYTE);
   if (GAP_SIZE < nbytes)
     make_gap (nbytes - GAP_SIZE);
 
@@ -923,7 +792,7 @@ insert_1_both (const char *string,
   modiff_incr (&MODIFF);
   CHARS_MODIFF = MODIFF;
 
-  memcpy (GPT_ADDR, string, nbytes);
+  memcpy (GAP_BEG_ADDR, string, nbytes);
 
   GAP_SIZE -= nbytes;
   GPT += nchars;
@@ -932,7 +801,8 @@ insert_1_both (const char *string,
   GPT_BYTE += nbytes;
   ZV_BYTE += nbytes;
   Z_BYTE += nbytes;
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1031,13 +901,13 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
   prepare_to_modify_buffer (PT, PT, NULL);
 
   if (PT != GPT)
-    move_gap_both (PT, PT_BYTE);
+    move_gap (PT, PT_BYTE);
   if (GAP_SIZE < outgoing_nbytes)
     make_gap (outgoing_nbytes - GAP_SIZE);
 
   /* Copy the string text into the buffer, perhaps converting
      between single-byte and multibyte.  */
-  copy_text (SDATA (string) + pos_byte, GPT_ADDR, nbytes,
+  copy_text (SDATA (string) + pos_byte, GAP_BEG_ADDR, nbytes,
 	     STRING_MULTIBYTE (string),
 	     !NILP (BVAR (current_buffer, enable_multibyte_characters)));
 
@@ -1047,8 +917,8 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
      to these functions and get the same results as we would
      have got earlier on.  Meanwhile, PT_ADDR does point to
      the text that has been stored by copy_text.  */
-  if (count_combining_before (GPT_ADDR, outgoing_nbytes, PT, PT_BYTE)
-      || count_combining_after (GPT_ADDR, outgoing_nbytes, PT, PT_BYTE))
+  if (count_combining_before (GAP_BEG_ADDR, outgoing_nbytes, PT, PT_BYTE)
+      || count_combining_after (GAP_BEG_ADDR, outgoing_nbytes, PT, PT_BYTE))
     emacs_abort ();
 #endif
 
@@ -1063,7 +933,8 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
   GPT_BYTE += outgoing_nbytes;
   ZV_BYTE += outgoing_nbytes;
   Z_BYTE += outgoing_nbytes;
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1100,7 +971,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 
 /* Insert a sequence of NCHARS chars which occupy NBYTES bytes
    starting at GAP_END_ADDR - NBYTES (if text_at_gap_tail) and at
-   GPT_ADDR (if not text_at_gap_tail).
+   GAP_BEG_ADDR (if not text_at_gap_tail).
    Contrary to insert_from_gap, this does not invalidate any cache,
    nor update any markers, nor record any buffer modification information
    of any sort.  */
@@ -1122,13 +993,14 @@ insert_from_gap_1 (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
   Z_BYTE += nbytes;
 
   /* Put an anchor to ensure multi-byte form ends at gap.  */
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0;
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0;
   eassert (GPT <= GPT_BYTE);
 }
 
 /* Insert a sequence of NCHARS chars which occupy NBYTES bytes
    starting at GAP_END_ADDR - NBYTES (if text_at_gap_tail) and at
-   GPT_ADDR (if not text_at_gap_tail).  */
+   GAP_BEG_ADDR (if not text_at_gap_tail).  */
 
 void
 insert_from_gap (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
@@ -1239,7 +1111,7 @@ insert_from_buffer_1 (struct buffer *buf,
   prepare_to_modify_buffer (PT, PT, NULL);
 
   if (PT != GPT)
-    move_gap_both (PT, PT_BYTE);
+    move_gap (PT, PT_BYTE);
   if (GAP_SIZE < outgoing_nbytes)
     make_gap (outgoing_nbytes - GAP_SIZE);
 
@@ -1252,7 +1124,7 @@ insert_from_buffer_1 (struct buffer *buf,
 	 to put the output from the second copy_text.  */
       chunk_expanded
 	= copy_text (BUF_BYTE_ADDRESS (buf, from_byte),
-		     GPT_ADDR, chunk,
+		     GAP_BEG_ADDR, chunk,
 		     !NILP (BVAR (buf, enable_multibyte_characters)),
 		     !NILP (BVAR (current_buffer, enable_multibyte_characters)));
     }
@@ -1261,7 +1133,7 @@ insert_from_buffer_1 (struct buffer *buf,
 
   if (chunk < incoming_nbytes)
     copy_text (BUF_BYTE_ADDRESS (buf, from_byte + chunk),
-	       GPT_ADDR + chunk_expanded, incoming_nbytes - chunk,
+	       GAP_BEG_ADDR + chunk_expanded, incoming_nbytes - chunk,
 	       !NILP (BVAR (buf, enable_multibyte_characters)),
 	       !NILP (BVAR (current_buffer, enable_multibyte_characters)));
 
@@ -1269,10 +1141,10 @@ insert_from_buffer_1 (struct buffer *buf,
   /* We have copied text into the gap, but we have not altered
      PT or PT_BYTE yet.  So we can pass PT and PT_BYTE
      to these functions and get the same results as we would
-     have got earlier on.  Meanwhile, GPT_ADDR does point to
+     have got earlier on.  Meanwhile, GAP_BEG_ADDR does point to
      the text that has been stored by copy_text.  */
-  if (count_combining_before (GPT_ADDR, outgoing_nbytes, PT, PT_BYTE)
-      || count_combining_after (GPT_ADDR, outgoing_nbytes, PT, PT_BYTE))
+  if (count_combining_before (GAP_BEG_ADDR, outgoing_nbytes, PT, PT_BYTE)
+      || count_combining_after (GAP_BEG_ADDR, outgoing_nbytes, PT, PT_BYTE))
     emacs_abort ();
 #endif
 
@@ -1287,7 +1159,8 @@ insert_from_buffer_1 (struct buffer *buf,
   GPT_BYTE += outgoing_nbytes;
   ZV_BYTE += outgoing_nbytes;
   Z_BYTE += outgoing_nbytes;
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1327,7 +1200,7 @@ insert_from_buffer_1 (struct buffer *buf,
 /* Record undo information and adjust markers and position keepers for
    a replacement of a text PREV_TEXT at FROM to a new text of LEN
    chars (LEN_BYTE bytes) which resides in the gap just after
-   GPT_ADDR.
+   GAP_BEG_ADDR.
 
    PREV_TEXT nil means the new text was just inserted.  */
 
@@ -1341,8 +1214,8 @@ adjust_after_replace (ptrdiff_t from, ptrdiff_t from_byte,
 #endif
 
 #ifdef BYTE_COMBINING_DEBUG
-  if (count_combining_before (GPT_ADDR, len_byte, from, from_byte)
-      || count_combining_after (GPT_ADDR, len_byte, from, from_byte))
+  if (count_combining_before (GAP_BEG_ADDR, len_byte, from, from_byte)
+      || count_combining_after (GAP_BEG_ADDR, len_byte, from, from_byte))
     emacs_abort ();
 #endif
 
@@ -1361,7 +1234,8 @@ adjust_after_replace (ptrdiff_t from, ptrdiff_t from_byte,
   ZV += len; Z += len;
   ZV_BYTE += len_byte; Z_BYTE += len_byte;
   GPT += len; GPT_BYTE += len_byte;
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
 
   if (nchars_del > 0)
     adjust_markers_for_replace (from, from_byte, nchars_del, nbytes_del,
@@ -1404,7 +1278,7 @@ adjust_after_insert (ptrdiff_t from, ptrdiff_t from_byte,
   ptrdiff_t len = to - from, len_byte = to_byte - from_byte;
 
   if (GPT != to)
-    move_gap_both (to, to_byte);
+    move_gap (to, to_byte);
   GAP_SIZE += len_byte;
   GPT -= len; GPT_BYTE -= len_byte;
   ZV -= len; ZV_BYTE -= len_byte;
@@ -1483,9 +1357,9 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
 
   /* Make sure the gap is somewhere in or next to what we are deleting.  */
   if (from > GPT)
-    gap_right (from, from_byte);
+    move_gap (from, from_byte);
   if (to < GPT)
-    gap_left (to, to_byte, 0);
+    move_gap (to, to_byte);
 
   /* Even if we don't record for undo, we must keep the original text
      because we may have to recover it because of inappropriate byte
@@ -1500,7 +1374,8 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   Z_BYTE -= nbytes_del;
   GPT = from;
   GPT_BYTE = from_byte;
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1514,7 +1389,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
 
   /* Copy the string text into the buffer, perhaps converting
      between single-byte and multibyte.  */
-  copy_text (SDATA (new), GPT_ADDR, insbytes,
+  copy_text (SDATA (new), GAP_BEG_ADDR, insbytes,
 	     STRING_MULTIBYTE (new),
 	     !NILP (BVAR (current_buffer, enable_multibyte_characters)));
 
@@ -1522,10 +1397,10 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   /* We have copied text into the gap, but we have not marked
      it as part of the buffer.  So we can use the old FROM and FROM_BYTE
      here, for both the previous text and the following text.
-     Meanwhile, GPT_ADDR does point to
+     Meanwhile, GAP_BEG_ADDR does point to
      the text that has been stored by copy_text.  */
-  if (count_combining_before (GPT_ADDR, outgoing_insbytes, from, from_byte)
-      || count_combining_after (GPT_ADDR, outgoing_insbytes, from, from_byte))
+  if (count_combining_before (GAP_BEG_ADDR, outgoing_insbytes, from, from_byte)
+      || count_combining_after (GAP_BEG_ADDR, outgoing_insbytes, from, from_byte))
     emacs_abort ();
 #endif
 
@@ -1546,7 +1421,8 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   GPT_BYTE += outgoing_insbytes;
   ZV_BYTE += outgoing_insbytes;
   Z_BYTE += outgoing_insbytes;
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1631,9 +1507,9 @@ replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
 
   /* Make sure the gap is somewhere in or next to what we are deleting.  */
   if (from > GPT)
-    gap_right (from, from_byte);
+    move_gap (from, from_byte);
   if (to < GPT)
-    gap_left (to, to_byte, 0);
+    move_gap (to, to_byte);
 
   GAP_SIZE += nbytes_del;
   ZV -= nchars_del;
@@ -1642,7 +1518,8 @@ replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   Z_BYTE -= nbytes_del;
   GPT = from;
   GPT_BYTE = from_byte;
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1655,16 +1532,16 @@ replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
     make_gap (insbytes - GAP_SIZE);
 
   /* Copy the replacement text into the buffer.  */
-  memcpy (GPT_ADDR, ins, insbytes);
+  memcpy (GAP_BEG_ADDR, ins, insbytes);
 
 #ifdef BYTE_COMBINING_DEBUG
-  /* We have copied text into the gap, but we have not marked
-     it as part of the buffer.  So we can use the old FROM and FROM_BYTE
+  /* We have copied text into the gap, but we have not marked it as
+     part of the buffer.  So we can use the old FROM and FROM_BYTE
      here, for both the previous text and the following text.
-     Meanwhile, GPT_ADDR does point to
-     the text that has been stored by copy_text.  */
-  if (count_combining_before (GPT_ADDR, insbytes, from, from_byte)
-      || count_combining_after (GPT_ADDR, insbytes, from, from_byte))
+     Meanwhile, GAP_BEG_ADDR does point to the text that has been
+     stored by copy_text.  */
+  if (count_combining_before (GAP_BEG_ADDR, insbytes, from, from_byte)
+      || count_combining_after (GAP_BEG_ADDR, insbytes, from, from_byte))
     emacs_abort ();
 #endif
 
@@ -1675,7 +1552,8 @@ replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   GPT_BYTE += insbytes;
   ZV_BYTE += insbytes;
   Z_BYTE += insbytes;
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1908,9 +1786,9 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
 
   /* Make sure the gap is somewhere in or next to what we are deleting.  */
   if (from > GPT)
-    gap_right (from, from_byte);
+    move_gap (from, from_byte);
   if (to < GPT)
-    gap_left (to, to_byte, 0);
+    move_gap (to, to_byte);
 
 #ifdef BYTE_COMBINING_DEBUG
   if (count_combining_before (BUF_BYTE_ADDRESS (current_buffer, to_byte),
@@ -1951,7 +1829,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   if (GAP_SIZE > 0 && !current_buffer->text->inhibit_shrinking)
     /* Put an anchor, unless called from decode_coding_object which
        needs to access the previous gap contents.  */
-    *(GPT_ADDR) = 0;
+    *GAP_BEG_ADDR = 0;
 
   eassert (GPT <= GPT_BYTE);
 

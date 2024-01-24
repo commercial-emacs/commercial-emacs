@@ -266,7 +266,7 @@ This function can be called only in unibyte buffers.  */)
   /* Do the following before manipulating the gap.  */
   modify_text (istart, iend);
 
-  move_gap_both (iend, iend);
+  move_gap (iend, iend);
 
   stream.zalloc = Z_NULL;
   stream.zfree = Z_NULL;
@@ -305,7 +305,7 @@ This function can be called only in unibyte buffers.  */)
 	make_gap (avail_out - GAP_SIZE);
       stream.next_in = BYTE_POS_ADDR (pos_byte);
       stream.avail_in = avail_in;
-      stream.next_out = GPT_ADDR;
+      stream.next_out = GAP_BEG_ADDR;
       stream.avail_out = avail_out;
       inflate_status = inflate (&stream, Z_NO_FLUSH);
       pos_byte += avail_in - stream.avail_in;

@@ -1466,7 +1466,7 @@ struct position_record
 #define BACKWARD_CHAR(POSITION, STOP)		\
   do {						\
     if ((POSITION).pos == (STOP))		\
-      (POSITION).p = GPT_ADDR;			\
+      (POSITION).p = GAP_BEG_ADDR;		\
     do {					\
       (POSITION).pos_byte--;			\
       (POSITION).p--;				\

@@ -729,7 +729,7 @@ usage: (json-insert OBJECT &rest ARGS)  */)
   record_unwind_protect_ptr (json_release_object, json);
 
   prepare_to_modify_buffer (PT, PT, NULL);
-  move_gap_both (PT, PT_BYTE);
+  move_gap (PT, PT_BYTE);
   struct json_insert_data data;
   data.inserted_bytes = 0;
   /* Could have used json_dumpb, but that became available only in
@@ -762,7 +762,7 @@ usage: (json-insert OBJECT &rest ARGS)  */)
           /* Now we have all the new bytes at the beginning of the gap,
              but `decode_coding_gap` needs them at the end of the gap, so
              we need to move them.  */
-          memmove (GAP_END_ADDR - inserted_bytes, GPT_ADDR, inserted_bytes);
+          memmove (GAP_END_ADDR - inserted_bytes, GAP_BEG_ADDR, inserted_bytes);
 	  decode_coding_gap (&coding, inserted_bytes);
 	  inserted = coding.produced_char;
 	}

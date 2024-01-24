@@ -4288,9 +4288,9 @@ ring.  */)
   if (start1 < gap && gap < end2)
     {
       if (gap - start1 < end2 - gap)
-	move_gap_both (start1, start1_byte);
+	move_gap (start1, start1_byte);
       else
-	move_gap_both (end2, end2_byte);
+	move_gap (end2, end2_byte);
     }
 
   start2_byte = CHAR_TO_BYTE (start2);

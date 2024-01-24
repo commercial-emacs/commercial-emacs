@@ -2700,7 +2700,7 @@ since only regular expressions have distinguished subexpressions.  */)
 	      begbyte = CHAR_TO_BYTE (search_regs.start[idx]);
 	      add_len = CHAR_TO_BYTE (search_regs.end[idx]) - begbyte;
 	      if (search_regs.start[idx] < GPT && GPT < search_regs.end[idx])
-		move_gap_both (search_regs.start[idx], begbyte);
+		move_gap (search_regs.start[idx], begbyte);
 	    }
 
 	  /* Now the stuff we want to add to SUBSTED

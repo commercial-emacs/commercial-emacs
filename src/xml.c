@@ -200,7 +200,7 @@ parse_region (Lisp_Object start, Lisp_Object end, Lisp_Object base_url,
   iend_byte = CHAR_TO_BYTE (iend);
 
   if (istart < GPT && GPT < iend)
-    move_gap_both (iend, iend_byte);
+    move_gap (iend, iend_byte);
 
   if (!NILP (base_url))
     {

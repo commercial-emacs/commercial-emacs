@@ -3742,7 +3742,7 @@ base64_encode_region_1 (Lisp_Object beg, Lisp_Object end, bool line_break,
 
   ibeg = CHAR_TO_BYTE (XFIXNAT (beg));
   iend = CHAR_TO_BYTE (XFIXNAT (end));
-  move_gap_both (XFIXNAT (beg), ibeg);
+  move_gap (XFIXNAT (beg), ibeg);
 
   /* We need to allocate enough room for encoding the text.
      We need 33 1/3% more space, plus a newline every 76
@@ -3990,7 +3990,7 @@ are ignored instead of signaling an error.  */)
   allength = multibyte ? length * 2 : length;
   decoded = SAFE_ALLOCA (allength);
 
-  move_gap_both (XFIXNAT (beg), ibeg);
+  move_gap (XFIXNAT (beg), ibeg);
   decoded_length = base64_decode_1 ((char *) BYTE_POS_ADDR (ibeg),
 				    decoded, length, !NILP (base64url),
 				    multibyte, !NILP (ignore_invalid),

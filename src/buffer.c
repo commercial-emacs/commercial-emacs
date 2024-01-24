@@ -2603,14 +2603,14 @@ current buffer is cleared.  */)
 	  && GPT_BYTE > 1 && GPT_BYTE < Z_BYTE
 	  && !CHAR_HEAD_P (*(GAP_END_ADDR)))
 	{
-	  unsigned char *q = GPT_ADDR - 1;
+	  unsigned char *q = GAP_BEG_ADDR - 1;
 
 	  while (!CHAR_HEAD_P (*q) && q > BEG_ADDR) q--;
 	  if (LEADING_CODE_P (*q))
 	    {
-	      ptrdiff_t new_gpt = GPT_BYTE - (GPT_ADDR - q);
+	      ptrdiff_t new_gpt = GPT_BYTE - (GAP_BEG_ADDR - q);
 
-	      move_gap_both (new_gpt, new_gpt);
+	      move_gap (new_gpt, new_gpt);
 	    }
 	}
 
@@ -2619,7 +2619,7 @@ current buffer is cleared.  */)
       pos = BEG;
       stop = GPT;
       p = BEG_ADDR;
-      pend = GPT_ADDR;
+      pend = GAP_BEG_ADDR;
       while (1)
 	{
 	  int bytes;

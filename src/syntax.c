@@ -1913,8 +1913,8 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
 
     if (forwardp)
       {
-	endp = (XFIXNUM (lim) == GPT) ? GPT_ADDR : CHAR_POS_ADDR (XFIXNUM (lim));
-	stop = (pos < GPT && GPT < XFIXNUM (lim)) ? GPT_ADDR : endp;
+	endp = (XFIXNUM (lim) == GPT) ? GAP_BEG_ADDR : CHAR_POS_ADDR (XFIXNUM (lim));
+	stop = (pos < GPT && GPT < XFIXNUM (lim)) ? GAP_BEG_ADDR : endp;
       }
     else
       {
@@ -2008,7 +2008,7 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		{
 		  if (p <= endp)
 		    break;
-		  p = GPT_ADDR;
+		  p = GAP_BEG_ADDR;
 		  stop = endp;
 		}
 	      unsigned char *prev_p = p;
@@ -2048,7 +2048,7 @@ skip_chars (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		{
 		  if (p <= endp)
 		    break;
-		  p = GPT_ADDR;
+		  p = GAP_BEG_ADDR;
 		  stop = endp;
 		}
 
@@ -2149,8 +2149,8 @@ skip_syntaxes (bool forwardp, Lisp_Object string, Lisp_Object lim)
 	while (true)
 	  {
 	    p = BYTE_POS_ADDR (pos_byte);
-	    endp = XFIXNUM (lim) == GPT ? GPT_ADDR : CHAR_POS_ADDR (XFIXNUM (lim));
-	    stop = pos < GPT && GPT < XFIXNUM (lim) ? GPT_ADDR : endp;
+	    endp = XFIXNUM (lim) == GPT ? GAP_BEG_ADDR : CHAR_POS_ADDR (XFIXNUM (lim));
+	    stop = pos < GPT && GPT < XFIXNUM (lim) ? GAP_BEG_ADDR : endp;
 
 	    do
 	      {
@@ -2192,7 +2192,7 @@ skip_syntaxes (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		  {
 		    if (p <= endp)
 		      break;
-		    p = GPT_ADDR;
+		    p = GAP_BEG_ADDR;
 		    stop = endp;
 		  }
 		UPDATE_SYNTAX_TABLE_BACKWARD (pos - 1);
@@ -2217,7 +2217,7 @@ skip_syntaxes (bool forwardp, Lisp_Object string, Lisp_Object lim)
 		  {
 		    if (p <= endp)
 		      break;
-		    p = GPT_ADDR;
+		    p = GAP_BEG_ADDR;
 		    stop = endp;
 		  }
 		UPDATE_SYNTAX_TABLE_BACKWARD (pos - 1);

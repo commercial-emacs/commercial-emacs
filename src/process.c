@@ -6197,7 +6197,7 @@ set up yet, this function will block until socket setup has completed.  */)
   end_byte = CHAR_TO_BYTE (XFIXNUM (end));
 
   if (XFIXNUM (start) < GPT && XFIXNUM (end) > GPT)
-    move_gap_both (XFIXNUM (start), start_byte);
+    move_gap (XFIXNUM (start), start_byte);
 
   if (NETCONN_P (proc))
     wait_while_connecting (proc);

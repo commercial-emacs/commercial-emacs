@@ -376,7 +376,7 @@ current_column (void)
 
 	  /* It was the gap.  Jump back over it.  */
 	  stop = BEGV_ADDR;
-	  ptr = GPT_ADDR;
+	  ptr = GAP_BEG_ADDR;
 
 	  /* Check whether that brings us to beginning of buffer.  */
 	  if (BEGV >= GPT)
