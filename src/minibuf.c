@@ -2056,7 +2056,8 @@ If COLLECTION is a function, it is called with three arguments:
 the values STRING, PREDICATE and `lambda'.  */)
   (Lisp_Object string, Lisp_Object collection, Lisp_Object predicate)
 {
-  Lisp_Object tail, tem = Qnil, arg = Qnil;
+  Lisp_Object tail, tem = Qnil;
+  ptrdiff_t i = 0;
 
   CHECK_STRING (string);
 
@@ -2075,7 +2076,7 @@ the values STRING, PREDICATE and `lambda'.  */)
 		      SBYTES (string));
       if (completion_ignore_case && !SYMBOLP (tem))
 	{
-	  for (ptrdiff_t i = ASIZE (collection) - 1; i >= 0; i--)
+	  for (i = ASIZE (collection) - 1; i >= 0; i--)
 	    {
 	      tail = AREF (collection, i);
 	      if (SYMBOLP (tail))
@@ -2102,17 +2103,17 @@ the values STRING, PREDICATE and `lambda'.  */)
   else if (HASH_TABLE_P (collection))
     {
       struct Lisp_Hash_Table *h = XHASH_TABLE (collection);
-      ptrdiff_t i = hash_lookup (h, string);
+      i = hash_lookup (h, string);
       if (i >= 0)
         {
           tem = HASH_KEY (h, i);
-          arg = HASH_VALUE (h, i);
           goto found_matching_key;
         }
       else
-	DOHASH (h, k, v)
+	DOHASH (h, j)
           {
-            tem = k;
+	    i = j;
+            tem = HASH_KEY (h, i);
             Lisp_Object strkey = (SYMBOLP (tem) ? Fsymbol_name (tem) : tem);
             if (!STRINGP (strkey)) continue;
             if (EQ (Fcompare_strings (string, Qnil, Qnil,
@@ -2136,7 +2137,7 @@ the values STRING, PREDICATE and `lambda'.  */)
   if (!NILP (predicate))
     {
       return HASH_TABLE_P (collection)
-	? call2 (predicate, tem, arg)
+	? call2 (predicate, tem, HASH_VALUE (XHASH_TABLE (collection), i))
 	: call1 (predicate, tem);
     }
   else
