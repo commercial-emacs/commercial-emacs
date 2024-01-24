@@ -304,6 +304,13 @@ buffer_overflow (void)
   error ("Maximum buffer size exceeded");
 }
 
+static inline void
+anchor_gap (void)
+{
+  if (GAP_SIZE > 0)
+    *GAP_BEG_ADDR = 0;
+}
+
 void
 move_gap (ptrdiff_t charpos, ptrdiff_t bytepos)
 {
@@ -322,8 +329,7 @@ move_gap (ptrdiff_t charpos, ptrdiff_t bytepos)
     }
   GPT_BYTE = bytepos;
   GPT = charpos;
-  if (GAP_SIZE > 0)
-    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
+  anchor_gap ();
 }
 
 /* Make the gap NBYTES_ADDED bytes longer.  */
@@ -801,8 +807,7 @@ insert_1_both (const char *string,
   GPT_BYTE += nbytes;
   ZV_BYTE += nbytes;
   Z_BYTE += nbytes;
-  if (GAP_SIZE > 0)
-    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
+  anchor_gap ();
 
   eassert (GPT <= GPT_BYTE);
 
@@ -933,8 +938,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
   GPT_BYTE += outgoing_nbytes;
   ZV_BYTE += outgoing_nbytes;
   Z_BYTE += outgoing_nbytes;
-  if (GAP_SIZE > 0)
-    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
+  anchor_gap ();
 
   eassert (GPT <= GPT_BYTE);
 
@@ -992,9 +996,8 @@ insert_from_gap_1 (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
   ZV_BYTE += nbytes;
   Z_BYTE += nbytes;
 
-  /* Put an anchor to ensure multi-byte form ends at gap.  */
-  if (GAP_SIZE > 0)
-    *GAP_BEG_ADDR = 0;
+  /* Ensure multi-byte form ends at gap.  */
+  anchor_gap ();
   eassert (GPT <= GPT_BYTE);
 }
 
@@ -1159,8 +1162,7 @@ insert_from_buffer_1 (struct buffer *buf,
   GPT_BYTE += outgoing_nbytes;
   ZV_BYTE += outgoing_nbytes;
   Z_BYTE += outgoing_nbytes;
-  if (GAP_SIZE > 0)
-    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
+  anchor_gap ();
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1234,8 +1236,7 @@ adjust_after_replace (ptrdiff_t from, ptrdiff_t from_byte,
   ZV += len; Z += len;
   ZV_BYTE += len_byte; Z_BYTE += len_byte;
   GPT += len; GPT_BYTE += len_byte;
-  if (GAP_SIZE > 0)
-    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
+  anchor_gap ();
 
   if (nchars_del > 0)
     adjust_markers_for_replace (from, from_byte, nchars_del, nbytes_del,
@@ -1374,8 +1375,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   Z_BYTE -= nbytes_del;
   GPT = from;
   GPT_BYTE = from_byte;
-  if (GAP_SIZE > 0)
-    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
+  anchor_gap ();
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1421,8 +1421,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   GPT_BYTE += outgoing_insbytes;
   ZV_BYTE += outgoing_insbytes;
   Z_BYTE += outgoing_insbytes;
-  if (GAP_SIZE > 0)
-    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
+  anchor_gap ();
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1518,8 +1517,7 @@ replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   Z_BYTE -= nbytes_del;
   GPT = from;
   GPT_BYTE = from_byte;
-  if (GAP_SIZE > 0)
-    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
+  anchor_gap ();
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1552,8 +1550,7 @@ replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   GPT_BYTE += insbytes;
   ZV_BYTE += insbytes;
   Z_BYTE += insbytes;
-  if (GAP_SIZE > 0)
-    *GAP_BEG_ADDR = 0; /* Put an anchor.  */
+  anchor_gap ();
 
   eassert (GPT <= GPT_BYTE);
 
@@ -1826,11 +1823,10 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   Z -= nchars_del;
   GPT = from;
   GPT_BYTE = from_byte;
-  if (GAP_SIZE > 0 && !current_buffer->text->inhibit_shrinking)
-    /* Put an anchor, unless called from decode_coding_object which
-       needs to access the previous gap contents.  */
-    *GAP_BEG_ADDR = 0;
-
+  /* Anchor unless decode_coding_object needs to access the original
+     gap contents.  */
+  if (!current_buffer->text->inhibit_shrinking)
+    anchor_gap ();
   eassert (GPT <= GPT_BYTE);
 
   if (GPT - BEG < BEG_UNCHANGED)
