@@ -2734,7 +2734,7 @@ sort_args (int argc, char **argv)
 	      for (i = 0; i < ARRAYELTS (standard_args); i++)
 		if (standard_args[i].longname
 		    && !strncmp (argv[from], standard_args[i].longname,
-				  thislen))
+				 thislen))
 		  {
 		    if (match == -1)
 		      match = i;
@@ -2794,7 +2794,7 @@ sort_args (int argc, char **argv)
       /* Copy the highest priority remaining option, with its args, to NEW.
          Unless it is a duplicate of the previous one.  */
       if (!(options[best] == 0
-	     && !strcmp (new[to - 1], argv[best])))
+	    && !strcmp (new[to - 1], argv[best])))
 	{
 	  new[to++] = argv[best];
 	  for (i = 0; i < options[best]; i++)
