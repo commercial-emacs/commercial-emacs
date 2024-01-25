@@ -9860,6 +9860,20 @@ Also see the `completion-auto-wrap' variable."
   (interactive "p")
   (next-completion (- n)))
 
+(defun completion--move-to-candidate-start ()
+  "If in a completion candidate, move point to its start."
+  (when (and (get-text-property (point) 'mouse-face)
+             (not (bobp))
+             (get-text-property (1- (point)) 'mouse-face))
+    (goto-char (previous-single-property-change (point) 'mouse-face))))
+
+(defun completion--move-to-candidate-end ()
+  "If in a completion candidate, move point to its end."
+  (when (and (get-text-property (point) 'mouse-face)
+             (not (eobp))
+             (get-text-property (1+ (point)) 'mouse-face))
+    (goto-char (or (next-single-property-change (point) 'mouse-face) (point-max)))))
+
 (defun next-completion (n)
   "Move to the next item in the completions buffer.
 With prefix argument N, move N items (negative N means move
@@ -9949,9 +9963,7 @@ Also see the `completion-auto-wrap' variable."
 
     (if (get-text-property (point) 'mouse-face)
         ;; If in a completion, move to the start of it.
-        (when (and (not (bobp))
-                   (get-text-property (1- (point)) 'mouse-face))
-          (goto-char (previous-single-property-change (point) 'mouse-face)))
+        (completion--move-to-candidate-start)
       ;; Try to move to the previous completion.
       (setq pos (previous-single-property-change (point) 'mouse-face))
       (if pos
@@ -9966,6 +9978,7 @@ Also see the `completion-auto-wrap' variable."
 
     (while (> n 0)
       (setq found nil pos nil column (current-column) line (line-number-at-pos))
+      (completion--move-to-candidate-end)
       (while (and (not found)
                   (eq (forward-line 1) 0)
                   (not (eobp))
@@ -9990,6 +10003,7 @@ Also see the `completion-auto-wrap' variable."
 
     (while (< n 0)
       (setq found nil pos nil column (current-column) line (line-number-at-pos))
+      (completion--move-to-candidate-start)
       (while (and (not found)
                   (eq (forward-line -1) 0)
                   (eq (move-to-column column) column))
@@ -10241,13 +10255,27 @@ Called from `temp-buffer-show-hook'."
       ;; Maybe insert help string.
       (when completion-show-help
 	(goto-char (point-min))
-        (insert (substitute-command-keys
-	         (if (display-mouse-p)
-	             "Click or type \\[minibuffer-choose-completion] on a completion to select it.\n"
-                   "Type \\[minibuffer-choose-completion] on a completion to select it.\n")))
-        (insert (substitute-command-keys
-		 "Type \\[minibuffer-next-completion] or \\[minibuffer-previous-completion] \
-to move point between completions.\n\n"))))))
+        (if minibuffer-visible-completions
+            (let ((helps
+                   (with-current-buffer (window-buffer (active-minibuffer-window))
+                     (list
+                      (substitute-command-keys
+	               (if (display-mouse-p)
+	                   "Click or type \\[minibuffer-choose-completion-or-exit] on a completion to select it.\n"
+                         "Type \\[minibuffer-choose-completion-or-exit] on a completion to select it.\n"))
+                      (substitute-command-keys
+		       "Type \\[minibuffer-next-completion], \\[minibuffer-previous-completion], \
+\\[minibuffer-next-line-completion], \\[minibuffer-previous-line-completion] \
+to move point between completions.\n\n")))))
+              (dolist (help helps)
+                (insert help)))
+          (insert (substitute-command-keys
+	           (if (display-mouse-p)
+	               "Click or type \\[minibuffer-choose-completion] on a completion to select it.\n"
+                     "Type \\[minibuffer-choose-completion] on a completion to select it.\n")))
+          (insert (substitute-command-keys
+		   "Type \\[minibuffer-next-completion] or \\[minibuffer-previous-completion] \
+to move point between completions.\n\n")))))))
 
 (add-hook 'completion-setup-hook #'completion-setup-function)
 
