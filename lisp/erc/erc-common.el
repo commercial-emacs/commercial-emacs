@@ -37,6 +37,7 @@
 (defvar erc-session-server)
 
 (declare-function erc--get-isupport-entry "erc-backend" (key &optional single))
+(declare-function erc--init-cusr-fallback-status "erc" (v h o a q))
 (declare-function erc-get-buffer "erc" (target &optional proc))
 (declare-function erc-server-buffer "erc" nil)
 (declare-function widget-apply-action "wid-edit" (widget &optional event))
@@ -50,7 +51,23 @@
 (declare-function cl--defsubst-expand "cl-macs")
 
 (cl-defstruct erc-input
-  string insertp sendp)
+  "Object shared among members of `erc-pre-send-functions'.
+Any use outside of the hook is not supported."
+  ( string "" :type string
+    :documentation "String to send and, without `substxt', insert.
+ERC treats separate lines as separate messages.")
+  ( insertp nil :type boolean
+    :documentation "Whether to insert outgoing message.
+When nil, ERC still sends `string'.")
+  ( sendp nil :type boolean
+    :documentation "Whether to send and (for compat reasons) insert.
+To insert without sending, define a (slash) command.")
+  ( substxt nil :type (or function string null)
+    :documentation "Alternate string to insert without splitting.
+The function form is for internal use.")
+  ( refoldp nil :type boolean
+    :documentation "Whether to resplit a possibly overlong `string'.
+ERC only refolds `string', never `substxt'."))
 
 (cl-defstruct (erc--input-split (:include erc-input
                                           (string "" :read-only t)
@@ -58,7 +75,6 @@
                                           (sendp (with-suppressed-warnings
                                                      ((obsolete erc-send-this))
                                                    erc-send-this))))
-  (refoldp nil :type boolean)
   (lines nil :type (list-of string))
   (abortp nil :type (list-of symbol))
   (cmdp nil :type boolean))
@@ -77,11 +93,11 @@
                                  make-erc-channel-user
                                  ( &key voice halfop op admin owner
                                    last-message-time
-                                   &aux (status (+ (if voice  1 0)
-                                                   (if halfop 2 0)
-                                                   (if op     4 0)
-                                                   (if admin  8 0)
-                                                   (if owner 16 0)))))
+                                   &aux (status
+                                         (if (or voice halfop op admin owner)
+                                             (erc--init-cusr-fallback-status
+                                              voice halfop op admin owner)
+                                           0))))
                                 :named)
   "Object containing channel-specific data for a single user."
   ;; voice halfop op admin owner
@@ -141,9 +157,12 @@ For use with the macro `erc--with-isupport-data'."
 (cl-defstruct (erc--parsed-prefix (:include erc--isupport-data))
   "Server-local data for recognized membership-status prefixes.
 Derived from the advertised \"PREFIX\" ISUPPORT parameter."
-  (letters "qaohv" :type string)
-  (statuses "~&@%+" :type string)
-  (alist nil :type (list-of cons)))
+  ( letters "vhoaq" :type string
+    :documentation "Status letters ranked lowest to highest.")
+  ( statuses "+%@&~" :type string
+    :documentation "Status prefixes ranked lowest to highest.")
+  ( alist nil :type (list-of cons)
+    :documentation "Alist of letters-prefix pairs."))
 
 (cl-defstruct (erc--channel-mode-types (:include erc--isupport-data))
   "Server-local \"CHANMODES\" data."
@@ -594,6 +613,10 @@ the resulting variables will end up with more useful doc strings."
   (declare (indent 1)
            (debug (symbolp [&rest [keywordp form]] &rest (symbolp . form))))
   `(erc--define-catalog ,language ,entries))
+
+(define-inline erc--strpos (char string)
+  "Return position of CHAR in STRING or nil if not found."
+  (inline-quote (string-search (string ,char) ,string)))
 
 (defmacro erc--doarray (spec &rest body)
   "Map over ARRAY, running BODY with VAR bound to iteration element.
