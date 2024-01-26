@@ -334,58 +334,6 @@ this option's value should be 'yes', 'no', 'alsa', 'oss', or 'bsd-ossaudio'.])
   ],
   [with_sound=$with_features])
 
-AC_ARG_WITH([pdumper],
-  AS_HELP_STRING(
-    [--with-pdumper=VALUE],
-    [enable pdumper support unconditionally
-      ('yes', 'no', or 'auto': default 'auto')]),
-    [ case "${withval}" in
-        yes|no|auto) val=$withval ;;
-        *) AC_MSG_ERROR(
-           ['--with-pdumper=$withval' is invalid;
-this option's value should be 'yes' or 'no'.]) ;;
-      esac
-      with_pdumper=$val
-    ],
-    [with_pdumper=auto])
-
-AC_ARG_WITH([dumping],[AS_HELP_STRING([--with-dumping=VALUE],
-    [kind of dumping to use for initial Emacs build
-(VALUE one of: pdumper, none; default pdumper)])],
-    [ case "${withval}" in
-        pdumper|none) val=$withval ;;
-        *) AC_MSG_ERROR(['--with-dumping=$withval is invalid;
-this option's value should be 'pdumper', or 'none'.])
-        ;;
-      esac
-      with_dumping=$val
-    ],
-    [with_dumping=pdumper])
-
-if test "$with_pdumper" = "auto"; then
-  if test "$with_dumping" = "pdumper"; then
-    with_pdumper=yes
-  else
-    with_pdumper=no
-  fi
-fi
-
-if test "$with_dumping" = "pdumper" && test "$with_pdumper" = "no"; then
-  AC_MSG_ERROR(['--with-dumping=pdumper' requires pdumper support])
-fi
-
-if test "$with_pdumper" = "yes"; then
-  AC_DEFINE([HAVE_PDUMPER], [1],
-    [Define to build with portable dumper support])
-  HAVE_PDUMPER=yes
-else
-  HAVE_PDUMPER=no
-fi
-AC_SUBST([HAVE_PDUMPER])
-
-DUMPING=$with_dumping
-AC_SUBST([DUMPING])
-
 dnl FIXME currently it is not the last.
 dnl This should be the last --with option, because --with-x is
 dnl added later on when we find the file name of X, and it's best to
@@ -644,13 +592,13 @@ AC_ARG_ENABLE([build-details],
   [test "$enableval" = no && BUILD_DETAILS=--no-build-details])
 AC_SUBST([BUILD_DETAILS])
 
-DUMPING_OVERWRITE=
-AC_ARG_ENABLE([dumping-overwrite],
-  [AS_HELP_STRING([--enable-dumping-overwrite],
+PDUMPER_OVERWRITE=
+AC_ARG_ENABLE([pdump-overwrite],
+  [AS_HELP_STRING([--enable-pdump-overwrite],
 		  [Overwrite pdumper artifacts to conserve disk space.])],
-  [test "$enableval" = yes && DUMPING_OVERWRITE=--dumping-overwrite],
-  [DUMPING_OVERWRITE=--dumping-overwrite])
-AC_SUBST([DUMPING_OVERWRITE])
+  [test "$enableval" = yes && PDUMPER_OVERWRITE=--pdump-overwrite],
+  [PDUMPER_OVERWRITE=--pdump-overwrite])
+AC_SUBST([PDUMPER_OVERWRITE])
 
 dnl This used to use changequote, but, apart from 'changequote is evil'
 dnl per the autoconf manual, we can speed up autoconf somewhat by quoting
@@ -1394,9 +1342,6 @@ AC_CACHE_CHECK([whether addresses are sanitized],
 	]])],
      [emacs_cv_sanitize_address=yes],
      [emacs_cv_sanitize_address=no])])
-
-UNEXEC_OBJ=
-AC_SUBST(UNEXEC_OBJ)
 
 ac_link="$ac_link"
 
@@ -4089,9 +4034,6 @@ if test "${with_native_compilation}" = "default"; then
 fi
 
 if test "${with_native_compilation}" != "no"; then
-    if test "${HAVE_PDUMPER}" = no; then
-       AC_MSG_ERROR(['--with-native-compilation' requires '--with-dumping=pdumper'])
-    fi
     if test "${HAVE_ZLIB}" = no; then
        AC_MSG_ERROR(['--with-native-compilation' requires zlib])
     fi
@@ -6366,7 +6308,7 @@ for opt in ACL BE_APP CAIRO DBUS FREETYPE GCONF GIF GLIB GMP GNUTLS GPM GSETTING
  ZLIB; do
 
     case $opt in
-      PDUMPER) val=${with_pdumper} ;;
+      PDUMPER) val=yes ;;
       GLIB) val=${emacs_cv_links_glib} ;;
       NOTIFY|ACL) eval val=\${${opt}_SUMMARY} ;;
       TOOLKIT_SCROLL_BARS|X_TOOLKIT) eval val=\${USE_$opt} ;;
@@ -6439,7 +6381,6 @@ AS_ECHO(["  Does Emacs use -lXaw3d?                                 ${HAVE_XAW3D
   Does Emacs support cooperative lisp threads?            ${threads_enabled}
   Does Emacs support preemptive lisp threads?             ${have_gcc_tls}
   Does Emacs support the portable dumper?                 ${with_pdumper}
-  Which dumping strategy does Emacs use?                  ${with_dumping}
   Does Emacs have native lisp compiler?                   ${HAVE_NATIVE_COMP}
   Does Emacs use version 2 of the X Input Extension?      ${HAVE_XINPUT2}
   Does Emacs generate a smaller-size Japanese dictionary? ${with_small_ja_dic}

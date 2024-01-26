@@ -67,8 +67,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 */
 
-#ifdef HAVE_PDUMPER
-
 #if GNUC_PREREQ (4, 7, 0)
 # pragma GCC diagnostic error "-Wshadow"
 #endif
@@ -491,9 +489,9 @@ struct dump_context
   dump_off buf_size;
   dump_off max_offset;
 
-  Lisp_Object old_purify_flag;
-  Lisp_Object old_post_gc_hook;
-  Lisp_Object old_process_environment;
+  Lisp_Object restore_pure_pool;
+  Lisp_Object restore_post_gc_hook;
+  Lisp_Object restore_process_environment;
 
 #ifdef REL_ALLOC
   bool blocked_ralloc;
@@ -638,7 +636,7 @@ error_unsupported_dump_object (struct dump_context *ctx,
 static uintptr_t
 emacs_basis (void)
 {
-  return (uintptr_t) &Vloadup_pure_table;
+  return (uintptr_t) &Vpdumper__pure_pool;
 }
 
 static void *
@@ -2514,11 +2512,13 @@ hash_table_contents (struct Lisp_Hash_Table *h)
   return key_and_value;
 }
 
-static void
+static dump_off
 dump_hash_table_list (struct dump_context *ctx)
 {
   if (!NILP (ctx->hash_tables))
-    dump_object (ctx, CALLN (Fvconcat, ctx->hash_tables));
+    return dump_object (ctx, CALLN (Fapply, Qvector, ctx->hash_tables));
+  else
+    return 0;
 }
 
 static hash_table_std_test_t
@@ -3065,39 +3065,34 @@ dump_charset (struct dump_context *ctx, int cs_i)
 #if CHECK_STRUCTS && !defined (HASH_charset_E31F4B5D96)
 # error "charset changed. See CHECK_STRUCTS comment in config.h."
 #endif
-  /* We can't change the alignment here, because ctx->offset is what
-     will be used for the whole array.  */
-  eassert (ctx->offset % alignof (struct charset) == 0);
+  dump_align_output (ctx, alignof (struct charset));
   const struct charset *cs = charset_table + cs_i;
   struct charset out;
   dump_object_start (ctx, &out, sizeof (out));
-  if (cs_i < charset_table_used) /* Don't look at uninitialized data.  */
-    {
-      DUMP_FIELD_COPY (&out, cs, id);
-      dump_field_lv (ctx, &out, cs, &cs->attributes, WEIGHT_NORMAL);
-      DUMP_FIELD_COPY (&out, cs, dimension);
-      memcpy (out.code_space, &cs->code_space, sizeof (cs->code_space));
-      if (cs->code_space_mask)
-        dump_field_fixup_later (ctx, &out, cs, &cs->code_space_mask);
-      DUMP_FIELD_COPY (&out, cs, code_linear_p);
-      DUMP_FIELD_COPY (&out, cs, iso_chars_96);
-      DUMP_FIELD_COPY (&out, cs, ascii_compatible_p);
-      DUMP_FIELD_COPY (&out, cs, supplementary_p);
-      DUMP_FIELD_COPY (&out, cs, compact_codes_p);
-      DUMP_FIELD_COPY (&out, cs, unified_p);
-      DUMP_FIELD_COPY (&out, cs, iso_final);
-      DUMP_FIELD_COPY (&out, cs, iso_revision);
-      DUMP_FIELD_COPY (&out, cs, emacs_mule_id);
-      DUMP_FIELD_COPY (&out, cs, method);
-      DUMP_FIELD_COPY (&out, cs, min_code);
-      DUMP_FIELD_COPY (&out, cs, max_code);
-      DUMP_FIELD_COPY (&out, cs, char_index_offset);
-      DUMP_FIELD_COPY (&out, cs, min_char);
-      DUMP_FIELD_COPY (&out, cs, max_char);
-      DUMP_FIELD_COPY (&out, cs, invalid_code);
-      memcpy (out.fast_map, &cs->fast_map, sizeof (cs->fast_map));
-      DUMP_FIELD_COPY (&out, cs, code_offset);
-    }
+  DUMP_FIELD_COPY (&out, cs, id);
+  dump_field_lv (ctx, &out, cs, &cs->attributes, WEIGHT_NORMAL);
+  DUMP_FIELD_COPY (&out, cs, dimension);
+  memcpy (out.code_space, &cs->code_space, sizeof (cs->code_space));
+  if (cs_i < charset_table_used && cs->code_space_mask)
+    dump_field_fixup_later (ctx, &out, cs, &cs->code_space_mask);
+  DUMP_FIELD_COPY (&out, cs, code_linear_p);
+  DUMP_FIELD_COPY (&out, cs, iso_chars_96);
+  DUMP_FIELD_COPY (&out, cs, ascii_compatible_p);
+  DUMP_FIELD_COPY (&out, cs, supplementary_p);
+  DUMP_FIELD_COPY (&out, cs, compact_codes_p);
+  DUMP_FIELD_COPY (&out, cs, unified_p);
+  DUMP_FIELD_COPY (&out, cs, iso_final);
+  DUMP_FIELD_COPY (&out, cs, iso_revision);
+  DUMP_FIELD_COPY (&out, cs, emacs_mule_id);
+  DUMP_FIELD_COPY (&out, cs, method);
+  DUMP_FIELD_COPY (&out, cs, min_code);
+  DUMP_FIELD_COPY (&out, cs, max_code);
+  DUMP_FIELD_COPY (&out, cs, char_index_offset);
+  DUMP_FIELD_COPY (&out, cs, min_char);
+  DUMP_FIELD_COPY (&out, cs, max_char);
+  DUMP_FIELD_COPY (&out, cs, invalid_code);
+  memcpy (out.fast_map, &cs->fast_map, sizeof (cs->fast_map));
+  DUMP_FIELD_COPY (&out, cs, code_offset);
   dump_off offset = dump_object_finish (ctx, &out, sizeof (out));
   if (cs_i < charset_table_used && cs->code_space_mask)
     dump_remember_cold_op (ctx, COLD_OP_CHARSET,
@@ -3111,7 +3106,7 @@ dump_charset_table (struct dump_context *ctx)
 {
   struct dump_flags old_flags = ctx->flags;
   ctx->flags.pack_objects = true;
-  dump_align_output (ctx, alignof (struct charset));
+  dump_align_output (ctx, DUMP_ALIGNMENT);
   dump_off offset = ctx->offset;
   /* We are dumping the entire table, not just the used slots, because
      otherwise when we restore from the pdump file, the actual size of
@@ -3519,9 +3514,9 @@ dump_unwind_cleanup (void *data)
   if (ctx->blocked_ralloc)
     r_alloc_inhibit_buffer_relocation (0);
 #endif
-  Vloadup_pure_table = ctx->old_purify_flag;
-  Vpost_gc_hook = ctx->old_post_gc_hook;
-  Vprocess_environment = ctx->old_process_environment;
+  Vpdumper__pure_pool = ctx->restore_pure_pool;
+  Vpost_gc_hook = ctx->restore_post_gc_hook;
+  Vprocess_environment = ctx->restore_process_environment;
 }
 
 /* Check that DUMP_OFFSET is within the heap.  */
@@ -3911,15 +3906,7 @@ DEFUN ("dump-emacs-portable",
   (void) unused;
 
   if (!noninteractive)
-    error ("Dumping Emacs currently works only in batch mode.  "
-           "If you'd like it to work interactively, please consider "
-           "contributing a patch to Emacs.");
-
-  if (!main_thread_p (current_thread))
-    error ("This function can be called only in the main thread");
-
-  if (!NILP (XCDR (Fall_threads ())))
-    error ("No other Lisp threads can be running when this function is called");
+    error ("dump-emacs-portable is a batch operation.");
 
   /* Clear detritus in memory.  */
   while (garbage_collect ()); // while a finalizer was run
@@ -3983,17 +3970,17 @@ DEFUN ("dump-emacs-portable",
   ctx->blocked_ralloc = true;
 #endif
 
-  ctx->old_purify_flag = Vloadup_pure_table;
-  Vloadup_pure_table = Qnil;
+  ctx->restore_pure_pool = Vpdumper__pure_pool;
+  Vpdumper__pure_pool = Qnil;
 
   /* Make sure various weird things are less likely to happen.  */
-  ctx->old_post_gc_hook = Vpost_gc_hook;
+  ctx->restore_post_gc_hook = Vpost_gc_hook;
   Vpost_gc_hook = Qnil;
 
   /* Reset process-environment -- this is for when they re-dump a
      pdump-restored emacs, since set_initial_environment wants always
      to cons it from scratch.  */
-  ctx->old_process_environment = Vprocess_environment;
+  ctx->restore_process_environment = Vprocess_environment;
   Vprocess_environment = Qnil;
 
   ctx->fd = emacs_open (SSDATA (filename),
@@ -5387,7 +5374,7 @@ static Lisp_Object *pdumper_hashes = &zero_vector;
    N.B. We run very early in initialization, so we can't use lisp,
    unwinding, xmalloc, and so on.  */
 int
-pdumper_load (const char *dump_filename, char *argv0)
+pdumper_load (char *dump_filename, char *argv0)
 {
   intptr_t dump_size;
   struct stat stat;
@@ -5518,7 +5505,7 @@ pdumper_load (const char *dump_filename, char *argv0)
   /* Point of no return.  */
   err = PDUMPER_LOAD_SUCCESS;
   dump_base = (uintptr_t) sections[DS_HOT].mapping;
-  gflags.dumped_with_pdumper_ = true;
+  gflags.was_dumped_ = true;
   dump_private.header = *header;
   dump_private.mark_bits = mark_bits[0];
   dump_private.last_mark_bits = mark_bits[1];
@@ -5596,14 +5583,14 @@ DEFUN ("pdumper-stats", Fpdumper_stats, Spdumper_stats, 0, 0, 0,
 If this Emacs session was started from a dump file,
 the return value is an alist of the form:
 
-  ((dumped-with-pdumper . t) (load-time . TIME) (dump-file-name . FILE))
+  ((dumped-with-pdumper . t) (load-time . TIME) (pdump-file-name . FILE))
 
 where TIME is the time in seconds it took to restore Emacs state
 from the dump file, and FILE is the name of the dump file.
 Value is nil if this session was not started using a dump file.*/)
      (void)
 {
-  if (!dumped_with_pdumper_p ())
+  if (!was_dumped_p ())
     return Qnil;
 
   Lisp_Object dump_fn;
@@ -5632,21 +5619,22 @@ thaw_hash_tables (void)
     hash_table_thaw (AREF (hash_tables, i));
 }
 
-#endif /* HAVE_PDUMPER */
-
 
 void
 init_pdumper_once (void)
 {
-#ifdef HAVE_PDUMPER
   pdumper_do_now_and_after_load (thaw_hash_tables);
-#endif
 }
 
 void
 syms_of_pdumper (void)
 {
-#ifdef HAVE_PDUMPER
+  DEFVAR_LISP ("pdumper--pure-pool", Vpdumper__pure_pool,
+	       doc: /* Singularizes objects "purified" during pdump.
+As a half-measure towards reducing the pdumped image size, Monnier
+arbitrarily chooses certain lisp objects to become singletons in
+purespace.  */);
+  Vpdumper__pure_pool = Qnil;
   defsubr (&Sdump_emacs_portable);
   defsubr (&Sdump_emacs_portable__sort_predicate);
   defsubr (&Sdump_emacs_portable__sort_predicate_copied);
@@ -5656,8 +5644,7 @@ syms_of_pdumper (void)
           "dump-emacs-portable--sort-predicate-copied");
   DEFSYM (Qdumped_with_pdumper, "dumped-with-pdumper");
   DEFSYM (Qload_time, "load-time");
-  DEFSYM (Qdump_file_name, "dump-file-name");
+  DEFSYM (Qdump_file_name, "pdump-file-name");
   DEFSYM (Qafter_pdump_load_hook, "after-pdump-load-hook");
   defsubr (&Spdumper_stats);
-#endif /* HAVE_PDUMPER */
 }

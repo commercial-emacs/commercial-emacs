@@ -163,7 +163,7 @@
 
 2015-03-18  Stefan Monnier  <monnier@iro.umontreal.ca>
 
-	* alloc.c (purecopy): Handle hash-tables.
+	* alloc.c (purecopy-maybe): Handle hash-tables.
 
 2015-03-16  Stefan Monnier  <monnier@iro.umontreal.ca>
 
@@ -7593,7 +7593,7 @@
 	* alloc.c: Keep track of symbols referenced from pure space (bug#17168).
 	(symbol_block_pinned): New var.
 	(Fmake_symbol): Initialize `pinned'.
-	(purecopy): New function, extracted from Fpurecopy.  Mark symbols as
+	(purecopy-maybe): New function, extracted from Fpurecopy.  Mark symbols as
 	pinned and signal an error for un-purifiable objects.
 	(pure_cons): Use it.
 	(Fpurecopy): Use it, except for objects that can't be purified.

@@ -69,7 +69,8 @@ BYTE_COMPILE_EXTRA_FLAGS =
 loaddefs = $(shell find ${srcdir} -name '*loaddefs.el' ! -name '.*')
 # Elisp files auto-generated.
 AUTOGENEL = ${loaddefs} ${srcdir}/cus-load.el ${srcdir}/finder-inf.el \
-  ${srcdir}/subdirs.el ${srcdir}/eshell/esh-groups.el ${srcdir}/emacs-lisp/cldefs.el
+  ${srcdir}/subdirs.el ${srcdir}/eshell/esh-groups.el ${srcdir}/emacs-lisp/cldefs.el \
+  ${srcdir}/leim/leim-list.el
 
 BYTE_COMPILE_FLAGS = \
   --eval "(setq load-prefer-newer t byte-compile-warnings 'all)" \
@@ -157,9 +158,11 @@ generate-ja-dic: compile
 org-manuals: compile
 	$(AM_V_at)$(MAKE) -C ../doc/misc org.texi modus-themes.texi
 
-autoloads: $(lisp)/emacs-lisp/loaddefs-gen.elc leim
+autoloads: leim
+	$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile \
+	  ../lisp/emacs-lisp/loaddefs-gen.el
 	$(AM_V_GEN)$(emacs) \
-            -l $(lisp)/emacs-lisp/loaddefs-gen.elc \
+            -l $(lisp)/emacs-lisp/loaddefs-gen \
 	    -f loaddefs-generate--emacs-batch ${SUBDIRS_ALMOST}
 
 cldefs .PHONY: $(lisp)/emacs-lisp/cldefs.el
@@ -194,8 +197,7 @@ ldefs-boot.el: autoloads-force
 	sed '/^;; Local Variables:/a ;; no-byte-compile: t'\
 		< $(lisp)/loaddefs.el > $(lisp)/ldefs-boot.el
 
-# This is required by the bootstrap-emacs target in ../src/Makefile, so
-# we know that if we have an emacs executable, we also have a subdirs.el.
+# Overwrought load-path augmentation dates back to 1994.
 $(lisp)/subdirs.el:
 	$(AM_V_GEN)$(MAKE) update-subdirs
 update-subdirs:

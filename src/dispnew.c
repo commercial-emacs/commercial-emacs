@@ -6295,7 +6295,7 @@ init_display_interactive (void)
 	 init_faces_initial will realize these faces now.  (Non-daemon
 	 Emacs does this either near the end of this function or when
 	 the GUI frame is created.)  */
-      if (dumped_with_pdumper_p ())
+      if (was_dumped_p ())
         init_faces_initial ();
 #ifndef WINDOWSNT
       return;
@@ -6464,7 +6464,7 @@ init_display (void)
 {
   if (noninteractive)
     {
-      if (dumped_with_pdumper_p ())
+      if (was_dumped_p ())
         init_faces_initial ();
     }
   else

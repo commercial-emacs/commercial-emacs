@@ -355,7 +355,7 @@ looked for.
 Setting `init-file-user' does not prevent Emacs from loading
 `site-start.el'.  The only way to do that is to use `--no-site-file'.")
 
-(defcustom site-run-file (purecopy "site-start")
+(defcustom site-run-file (purecopy-maybe "site-start")
   "File containing site-wide run-time initializations.
 This file is loaded at run-time before `user-init-file'.  It contains
 inits that need to be in place for the entire site, but which, due to
@@ -430,7 +430,7 @@ from being initialized."
 (defvar pure-space-overflow nil
   "Non-nil if building Emacs overflowed pure space.")
 
-(defvar pure-space-overflow-message (purecopy "\
+(defvar pure-space-overflow-message (purecopy-maybe "\
 Warning Warning!!!  Pure space overflow    !!!Warning Warning
 \(See the node Pure Storage in the Lisp manual for details.)\n"))
 
@@ -1202,7 +1202,7 @@ please check its value")
                          ("--no-x-resources") ("--debug-init")
                          ("--user") ("--iconic") ("--icon-type") ("--quick")
 			 ("--no-blinking-cursor") ("--basic-display")
-                         ("--dump-file") ("--temacs") ("--seccomp")
+                         ("--pdump-read") ("--temacs") ("--seccomp")
                          ("--init-directory" "--no-comp-spawn")))
              (argi (pop args))
              (orig-argi argi)
@@ -1275,7 +1275,7 @@ please check its value")
 	  (push '(visibility . icon) initial-frame-alist))
 	 ((member argi '("-nbc" "-no-blinking-cursor"))
 	  (setq no-blinking-cursor t))
-         ((member argi '("-dump-file" "-temacs" "-seccomp"))
+         ((member argi '("-pdump-read" "-temacs" "-seccomp"))
           ;; Handled in C
           (or argval (pop args))
           (setq argval nil))
@@ -1656,7 +1656,7 @@ Changed settings will be marked as \"CHANGED outside of Customize\"."
 	   `((changed ((t :background ,color)))))
       (put 'cursor 'face-modified t))))
 
-(defcustom initial-scratch-message (purecopy "\
+(defcustom initial-scratch-message (purecopy-maybe "\
 ;; This buffer is for text that is not saved, and for Lisp evaluation.
 ;; To create a file, visit it with `\\[find-file]' and enter text in its buffer.
 
@@ -2533,7 +2533,7 @@ A fancy display is used on graphic displays, normal otherwise."
                ;; and long versions of what's on command-switch-alist.
                (longopts
                 (append '("--funcall" "--load" "--insert" "--kill"
-                          "--dump-file" "--seccomp"
+                          "--pdump-read" "--seccomp"
                           "--directory" "--eval" "--execute" "--no-splash"
                           "--find-file" "--visit" "--file" "--no-desktop")
                         (mapcar (lambda (elt) (concat "-" (car elt)))
@@ -2698,7 +2698,7 @@ nil default-directory" name)
                          (error "File name omitted from `-insert' option"))
                      (insert-file-contents (command-line-normalize-file-name tem)))
 
-                    ((or (equal argi "-dump-file")
+                    ((or (equal argi "-pdump-read")
                          (equal argi "-seccomp"))
                      ;; This was processed in C.
                      (or argval (pop command-line-args-left)))

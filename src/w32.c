@@ -10319,10 +10319,9 @@ check_windows_init_file (void)
      it cannot find the Windows installation file.  If this file does
      not exist in the expected place, tell the user.  */
 
-  if (! noninteractive && ! inhibit_window_system
-      /* Vload_path is not yet initialized when we are loading
-	 loadup.el.  */
-      && NILP (Vloadup_pure_table))
+  if (!noninteractive && !inhibit_window_system
+      /* Vload_path is not yet initialized in loadup.el */
+      && NILP (Vpdumper__pure_pool))
     {
       Lisp_Object init_file;
       int fd;

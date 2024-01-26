@@ -36,7 +36,7 @@ INLINE_HEADER_BEGIN
 /* First define a measure of the amount of data we have.  */
 
 /* A system configuration file may set this to request a certain extra
-   amount of storage.  This is a lot more update-robust that defining
+   amount of storage.  This is a lot more update-robust than defining
    BASE_PURESIZE or even PURESIZE directly.  */
 #ifndef SYSTEM_PURESIZE_EXTRA
 #define SYSTEM_PURESIZE_EXTRA 0

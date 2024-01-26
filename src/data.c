@@ -982,10 +982,9 @@ The return value is undefined.  */)
   (register Lisp_Object symbol, Lisp_Object definition, Lisp_Object docstring)
 {
   CHECK_SYMBOL (symbol);
-  if (!NILP (Vloadup_pure_table)
-      /* If `definition' is a keymap, immutable (and copying) is wrong.  */
-      && !KEYMAPP (definition))
-    definition = Fpurecopy (definition);
+  if (!KEYMAPP (definition)) /* else immutable and non-copyable */
+    if (!NILP (Vpdumper__pure_pool))
+      definition = Fpurecopy_maybe (definition);
 
   defalias (symbol, definition);
 

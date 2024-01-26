@@ -265,7 +265,7 @@ attribute."
 	  (aset emacs-mule-charset-table emacs-mule-id name)))
 
     (dolist (slot attrs)
-      (setcdr slot (purecopy (plist-get props (car slot)))))
+      (setcdr slot (purecopy-maybe (plist-get props (car slot)))))
 
     ;; Make sure that the value of :code-space is a vector of 8
     ;; elements.
@@ -278,7 +278,7 @@ attribute."
 
     ;; Add :name and :docstring properties to PROPS.
     (setq props
-	  (cons :name (cons name (cons :docstring (cons (purecopy docstring) props)))))
+	  (cons :name (cons name (cons :docstring (cons (purecopy-maybe docstring) props)))))
     (or (plist-get props :short-name)
 	(plist-put props :short-name (symbol-name name)))
     (or (plist-get props :long-name)
@@ -288,7 +288,7 @@ attribute."
     (setq props
 	  (mapcar (lambda (elt)
 		    (if (stringp elt)
-			(purecopy elt)
+			(purecopy-maybe elt)
 		      elt))
 		  props))
     (setcdr (assq :plist attrs) props)
@@ -325,8 +325,8 @@ Return t if file exists."
 	(if source
 	    (message "Loading %s (source)..." file)
 	  (message "Loading %s..." file)))
-      (when loadup-pure-table
-	(push (purecopy file) preloaded-file-list))
+      (when pdumper--pure-pool
+	(push (purecopy-maybe file) preloaded-file-list))
       (unwind-protect
 	  (let ((load-true-file-name fullname)
                 (load-file-name fullname)
@@ -363,10 +363,10 @@ Return t if file exists."
 	    (let ((read-symbol-shorthands shorthands))
               (if eval-function
                   (funcall eval-function buffer
-                           (if dump-mode file fullname))
+                           (if (pdumping-p) file fullname))
                 (eval-buffer buffer nil
 			     ;; This is compatible with what `load' does.
-                             (if dump-mode file fullname)
+                             (if (pdumping-p) file fullname)
 			     nil t))))
 	(let (kill-buffer-hook kill-buffer-query-functions)
 	  (kill-buffer buffer)))
@@ -442,7 +442,7 @@ It can be retrieved with `(get-charset-property CHARSET PROPNAME)'."
   (set-charset-plist charset
 		     (plist-put (charset-plist charset) propname
 				(if (stringp value)
-				    (purecopy value)
+				    (purecopy-maybe value)
 				  value))))
 
 (defun charset-description (charset)
@@ -984,7 +984,7 @@ non-ASCII files.  This attribute is meaningful only when
 
     ;; Add :name and :docstring properties to PROPS.
     (setq props
-	  (cons :name (cons name (cons :docstring (cons (purecopy docstring)
+	  (cons :name (cons name (cons :docstring (cons (purecopy-maybe docstring)
 							props)))))
     (setcdr (assq :plist common-attrs) props)
     (apply #'define-coding-system-internal
@@ -1568,7 +1568,7 @@ Each element must be one of the names listed in the variable
 `ctext-non-standard-encodings-alist' (which see).")
 
 (defvar ctext-non-standard-encodings-regexp
-  (purecopy
+  (purecopy-maybe
   (string-to-multibyte
    (concat
     ;; For non-standard encodings.
@@ -1746,7 +1746,7 @@ in-place."
 (defcustom auto-coding-alist
   ;; .exe and .EXE are added to support archive-mode looking at DOS
   ;; self-extracting exe archives.
-  (mapcar (lambda (arg) (cons (purecopy (car arg)) (cdr arg)))
+  (mapcar (lambda (arg) (cons (purecopy-maybe (car arg)) (cdr arg)))
 	  '(("\\.\\(\
 arc\\|zip\\|lzh\\|lha\\|zoo\\|[jew]ar\\|xpi\\|rar\\|7z\\|squashfs\\|\
 ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|7Z\\|SQUASHFS\\)\\'"
@@ -1771,7 +1771,7 @@ and the contents of `file-coding-system-alist'."
 		       (symbol :tag "Coding system"))))
 
 (defcustom auto-coding-regexp-alist
-  (mapcar (lambda (arg) (cons (purecopy (car arg)) (cdr arg)))
+  (mapcar (lambda (arg) (cons (purecopy-maybe (car arg)) (cdr arg)))
   '(("\\`BABYL OPTIONS:[ \t]*-\\*-[ \t]*rmail[ \t]*-\\*-" . no-conversion)
     ("\\`\xFE\xFF" . utf-16be-with-signature)
     ("\\`\xFF\xFE" . utf-16le-with-signature)

@@ -1797,7 +1797,7 @@ If it's nil, automatic feeding takes place."
 
 ;;;###autoload
 (defcustom ps-page-dimensions-database
- (purecopy
+ (purecopy-maybe
   (list (list 'a4    (/ (* 72 21.0) 2.54)  (/ (* 72 29.7) 2.54) "A4")
 	(list 'a3    (/ (* 72 29.7) 2.54)  (/ (* 72 42.0) 2.54) "A3")
 	(list 'letter       (* 72  8.5)    (* 72 11.0)          "Letter")

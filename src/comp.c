@@ -4793,13 +4793,13 @@ maybe_defer_native_compilation (Lisp_Object function_name,
   if (! load_gccjit_if_necessary (false))
     return;
 
-  if (! native_comp_jit_compilation
+  if (!native_comp_jit_compilation
       || noninteractive
-      || ! NILP (Vloadup_pure_table)
-      || ! COMPILEDP (definition)
-      || ! STRINGP (Vload_true_file_name)
-      || ! suffix_p (Vload_true_file_name, ".elc")
-      || ! NILP (Fgethash (Vload_true_file_name, V_comp_no_native_file_h, Qnil)))
+      || !NILP (Vpdumper__pure_pool)
+      || !COMPILEDP (definition)
+      || !STRINGP (Vload_true_file_name)
+      || !suffix_p (Vload_true_file_name, ".elc")
+      || !NILP (Fgethash (Vload_true_file_name, V_comp_no_native_file_h, Qnil)))
     return;
 
   Lisp_Object src =
@@ -4996,9 +4996,9 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump,
 	  comp_u->data_impure_vec =
 	    load_static_obj (comp_u, TEXT_DATA_RELOC_IMPURE_SYM);
 
-	  if (! NILP (Vloadup_pure_table))
+	  if (!NILP (Vpdumper__pure_pool))
 	    /* Non impure can be copied into pure space.  */
-	    comp_u->data_vec = Fpurecopy (comp_u->data_vec);
+	    comp_u->data_vec = Fpurecopy_maybe (comp_u->data_vec);
 	}
 
       EMACS_INT d_vec_len = XFIXNUM (Flength (comp_u->data_vec));

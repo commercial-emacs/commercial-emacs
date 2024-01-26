@@ -359,7 +359,7 @@ taken after exiting the help buffer."
 
 (defalias 'help 'help-for-help)
 (make-help-screen help-for-help
-  (purecopy "Type a help option: [abcCdefFgiIkKlLmnprstvw.] C-[cdefmnoptw] or ?")
+  (purecopy-maybe "Type a help option: [abcCdefFgiIkKlLmnprstvw.] C-[cdefmnoptw] or ?")
   (concat
    "(Type "
    (help--key-description-fontified (kbd "<PageDown>"))

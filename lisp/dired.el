@@ -59,7 +59,7 @@
   :group 'dired)
 
 ;;;###autoload
-(defcustom dired-listing-switches (purecopy "-al")
+(defcustom dired-listing-switches (purecopy-maybe "-al")
   "Switches passed to `ls' for Dired.  MUST contain the `l' option.
 May contain all other options that don't contradict `-l';
 may contain even `F', `b', `i' and `s'.  See also the variable
@@ -4925,6 +4925,7 @@ Any other value means to ask for each directory."
 
 (defvar dired-overwrite-confirmed)      ;Defined in dired-aux.
 
+(declare-function dired-rename-file "dired-aux")
 (defun dired-dnd-handle-local-file (uri action)
   "Copy, move or link a file to the Dired directory.
 URI is the file to handle, ACTION is one of copy, move, link or ask.
@@ -5120,6 +5121,57 @@ Interactively with prefix argument, read FILE-NAME."
 (declare-function Man-getpage-in-background "man" (topic))
 (defvar Man-support-remote-systems) ; from man.el
 (defvar manual-program) ; from man.el
+
+(declare-function dired-guess-shell-command "dired-aux")
+(declare-function dired-rename-file "dired-aux")
+(declare-function dired-copy-file "dired-aux")
+(declare-function dired-query "dired-aux")
+(declare-function dired-kill-subdir "dired-aux")
+(declare-function dired-isearch-filenames-setup "dired-aux")
+(declare-function dired-vc-next-action "dired-aux")
+(declare-function dired-isearch-filenames-regexp "dired-aux")
+(declare-function dired-isearch-filenames "dired-aux")
+(declare-function dired-do-isearch-regexp "dired-aux")
+(declare-function dired-do-isearch "dired-aux")
+(declare-function dired-hide-all "dired-aux")
+(declare-function dired-create-directory "dired-aux")
+(declare-function dired-show-file-type "dired-aux")
+(declare-function dired-do-redisplay "dired-aux")
+(declare-function dired-do-kill-lines "dired-aux")
+(declare-function dired-maybe-insert-subdir "dired-aux")
+(declare-function dired-mark-subdir-files "dired-aux")
+(declare-function dired-do-symlink-regexp "dired-aux")
+(declare-function dired-do-hardlink-regexp "dired-aux")
+(declare-function dired-do-copy-regexp "dired-aux")
+(declare-function dired-do-rename-regexp "dired-aux")
+(declare-function dired-downcase "dired-aux")
+(declare-function dired-upcase "dired-aux")
+(declare-function dired-prev-subdir "dired-aux")
+(declare-function dired-tree-up "dired-aux")
+(declare-function dired-tree-down "dired-aux")
+(declare-function dired-diff "dired-aux")
+(declare-function dired-do-async-shell-command "dired-aux")
+(declare-function dired-do-compress-to "dired-aux")
+(declare-function dired-do-compress "dired-aux")
+(declare-function dired-do-relsymlink "dired-aux")
+(declare-function dired-do-shell-command "dired-aux")
+(declare-function dired-do-touch "dired-aux")
+(declare-function dired-do-symlink "dired-aux")
+(declare-function dired-do-rename "dired-aux")
+(declare-function dired-do-find-regexp-and-replace "dired-aux")
+(declare-function dired-do-print "dired-aux")
+(declare-function dired-do-chown "dired-aux")
+(declare-function dired-do-chmod "dired-aux")
+(declare-function dired-do-load "dired-aux")
+(declare-function dired-do-hardlink "dired-aux")
+(declare-function dired-do-chgrp "dired-aux")
+(declare-function dired-do-byte-compile "dired-aux")
+(declare-function dired-do-copy "dired-aux")
+(declare-function dired-do-find-regexp "dired-aux")
+(declare-function dired-clean-directory "dired-aux")
+(declare-function dired-insert-subdir "dired-aux")
+(declare-function dired-hide-subdir "dired-aux")
+(declare-function dired-goto-subdir "dired-aux")
 
 (defun dired-do-man ()
   "In Dired, run `man' on this file."

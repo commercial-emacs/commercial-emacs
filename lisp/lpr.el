@@ -94,7 +94,7 @@ This switch is used in conjunction with `printer-name'."
 
 ;;;###autoload
 (defcustom lpr-command
- (purecopy
+ (purecopy-maybe
   (cond
    (lpr-windows-system
     "")

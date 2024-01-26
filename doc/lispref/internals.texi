@@ -26,7 +26,6 @@ internal aspects of GNU Emacs that may be of interest to C programmers.
 @node Building Emacs
 @section Building Emacs
 @cindex building Emacs
-@pindex temacs
 
   This section explains the steps involved in building the Emacs
 executable.  You don't have to know this material to build and install
@@ -35,30 +34,7 @@ information is pertinent to Emacs developers.
 
   Building Emacs requires GNU Make version 3.81 or later.
 
-  Compilation of the C source files in the @file{src} directory
-produces an executable file called @file{temacs}, also called a
-@dfn{bare impure Emacs}.  It contains the Emacs Lisp interpreter and
-I/O routines, but not the editing commands.
-
-@cindex @file{loadup.el}
-  The command @w{@command{temacs -l loadup}} would run @file{temacs}
-and direct it to load @file{loadup.el}.  The @code{loadup} library
-loads additional Lisp libraries, which set up the normal Emacs editing
-environment.  After this step, the Emacs executable is no longer
-@dfn{bare}.
-
 @cindex dumping Emacs
-@cindex @option{--temacs} option, and dumping method
-  Because it takes some time to load the standard Lisp files, the
-@file{temacs} executable usually isn't run directly by users.
-Instead, one of the last steps of building Emacs runs the command
-@w{@samp{temacs -batch -l loadup --temacs=@var{dump-method}}}.  The
-special option @option{--temacs} tells @command{temacs} how to record
-all the standard preloaded Lisp functions and variables, so that when
-you subsequently run Emacs, it will start much faster.  The
-@option{--temacs} option requires an argument @var{dump-method}, which
-can be one of the following:
-
 @table @samp
 @item pdump
 @cindex dump file
@@ -70,43 +46,7 @@ Functions}).  This method is the most preferred one, as it does not
 require Emacs to employ any special techniques of memory allocation,
 which might get in the way of various memory-layout techniques used by
 modern systems to enhance security and privacy.
-
-@item pbootstrap
-@cindex bootstrapping Emacs
-Like @samp{pdump}, but used while @dfn{bootstrapping} Emacs, when no
-previous Emacs binary and no @file{*.elc} byte-compiled Lisp files are
-available.  The produced dump file is usually named
-@file{bootstrap-emacs.pdmp} in this case.
-
-@item dump
-@cindex unexec
-This method causes @command{temacs} to dump out an executable program,
-called @file{emacs}, which has all the standard Lisp files already
-preloaded into it.  (The @samp{-batch} argument prevents
-@command{temacs} from trying to initialize any of its data on the
-terminal, so that the tables of terminal information are empty in the
-dumped Emacs.)  This method is also known as @dfn{unexec}, because it
-produces a program file from a running process, and thus is in some
-sense the opposite of executing a program to start a process.
-Although this method was the way that Emacs traditionally saved its
-state, it is now deprecated.
-
-@item bootstrap
-Like @samp{dump}, but used when bootstrapping Emacs with the
-@code{unexec} method.
 @end table
-
-@cindex preloaded Lisp files
-@vindex preloaded-file-list
-  The dumped @file{emacs} executable (also called a @dfn{pure} Emacs)
-is the one which is installed.  If the portable dumper was used to
-build Emacs, the @file{emacs} executable is actually an exact copy of
-@file{temacs}, and the corresponding @file{emacs.pdmp} file is
-installed as well.  The variable @code{preloaded-file-list} stores a
-list of the preloaded Lisp files recorded in the dump file or
-in the dumped Emacs executable.  If you port Emacs to a new operating
-system, and are not able to implement dumping of any kind, then Emacs
-must load @file{loadup.el} each time it starts.
 
 @cindex build details
 @cindex deterministic build
@@ -224,29 +164,6 @@ that problem, you can put functions on the
 Emacs.
 @end defun
 
-@defun dump-emacs to-file from-file
-@cindex unexec
-This function dumps the current state of Emacs into an executable file
-@var{to-file}, using the @code{unexec} method.  It takes symbols from
-@var{from-file} (this is normally the executable file @file{temacs}).
-
-This function cannot be used in an Emacs that was already dumped.
-This function is deprecated, and by default Emacs is built without
-@code{unexec} support so this function is not available.
-@end defun
-
-@defun pdumper-stats
-If the current Emacs session restored its state from a dump
-file, this function returns information about the dump file and the
-time it took to restore the Emacs state.  The value is an alist
-@w{@code{((dumped-with-pdumper . t) (load-time . @var{time})
-(dump-file-name . @var{file}))}},
-where @var{file} is the name of the dump file, and @var{time} is the
-time in seconds it took to restore the state from the dump file.
-If the current session was not restored from a dump file, the
-value is @code{nil}.
-@end defun
-
 @node Pure Storage
 @section Pure Storage
 @cindex pure storage
@@ -258,26 +175,17 @@ all the new data created during an Emacs session are kept
 in the preloaded standard Lisp files---data that should never change
 during actual use of Emacs.
 
-  Pure storage is allocated only while @command{temacs} is loading the
+  Pure storage is allocated only while @command{emacs} is loading the
 standard preloaded Lisp libraries.  In the file @file{emacs}, it is
 marked as read-only (on operating systems that permit this), so that
 the memory space can be shared by all the Emacs jobs running on the
 machine at once.  Pure storage is not expandable; a fixed amount is
 allocated when Emacs is compiled, and if that is not sufficient for
-the preloaded libraries, @file{temacs} allocates dynamic memory for
+the preloaded libraries, @file{emacs} allocates dynamic memory for
 the part that didn't fit.  If Emacs will be dumped using the
 @code{pdump} method (@pxref{Building Emacs}), the pure-space overflow
 is of no special importance (it just means some of the preloaded stuff
-cannot be shared with other Emacs jobs).  However, if Emacs will be
-dumped using the now obsolete @code{unexec} method, the resulting
-image will work, but garbage collection (@pxref{Garbage Collection})
-is disabled in this situation, causing a memory leak.  Such an
-overflow normally won't happen unless you try to preload additional
-libraries or add features to the standard ones.  Emacs will display a
-warning about the overflow when it starts, if it was dumped using
-@code{unexec}.  If this happens, you should increase the compilation
-parameter @code{SYSTEM_PURESIZE_EXTRA} in the file
-@file{src/puresize.h} and rebuild Emacs.
+cannot be shared with other Emacs jobs).
 
 @defun purecopy object
 This function makes a copy in pure storage of @var{object}, and returns
@@ -296,13 +204,6 @@ The value of this variable is the number of bytes of pure storage
 allocated so far.  Typically, in a dumped Emacs, this number is very
 close to the total amount of pure storage available---if it were not,
 we would preallocate less.
-@end defvar
-
-@defvar loadup-pure-table
-This should not be exposed to the user.  It is temporarily assigned
-non-@code{nil} during loadup.el initialization for tracking purespace
-(shareable and non-collectible) object allocations when building
-bootstrapped Emacs.
 @end defvar
 
 @node Garbage Collection
@@ -495,11 +396,6 @@ Total heap size, in @var{unit-size} units.
 Heap space which is not currently used, in @var{unit-size} units.
 @end table
 
-If there was overflow in pure space (@pxref{Pure Storage}), and Emacs
-was dumped using the (now obsolete) @code{unexec} method
-(@pxref{Building Emacs}), then @code{garbage-collect} returns
-@code{nil}, because a real garbage collection cannot be done in that
-case.
 @end deffn
 
 @defopt garbage-collection-messages

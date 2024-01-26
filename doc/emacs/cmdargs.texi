@@ -421,8 +421,8 @@ option makes Emacs abort if a module-related assertion triggers.
 @xref{Writing Dynamic Modules,, Writing Dynamically-Loaded Modules,
 elisp, The GNU Emacs Lisp Reference Manual}.
 
-@item --dump-file=@var{file}
-@opindex --dump-file
+@item --pdump-read=@var{file}
+@opindex --pdump-read
 @cindex specify dump file
 Load the dumped Emacs state from the named @var{file}.  By default, an
 installed Emacs will look for its dump state in a file named

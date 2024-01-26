@@ -416,7 +416,7 @@ don't include."
                                        (file-name-sans-extension
                                         (file-name-nondirectory file)))))
             (push (list (or local-outfile main-outfile) file
-                        `(push (purecopy ',(cons (intern package) version))
+                        `(push (purecopy-maybe ',(cons (intern package) version))
                                package--builtin-versions))
                   defs))))
 
@@ -718,7 +718,7 @@ instead of just updating them with the new/changed autoloads."
         (excludes nil)
 	file)
     (with-temp-buffer
-      (insert-file-contents "loadup.el")
+      (insert-file-contents "../admin/bootstrap-pdump.el")
       (while (re-search-forward "^(load \"\\([^\"]+\\)\"" nil t)
 	(setq file (match-string 1))
 	(or (string-match "\\.el\\'" file)

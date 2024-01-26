@@ -514,7 +514,7 @@ at the mouse-down event to the position at mouse-up event."
   "S-<wheel-right>" #'tab-bar-move-tab)
 
 (global-set-key [tab-bar]
-                `(menu-item ,(purecopy "tab bar") ,(make-sparse-keymap)
+                `(menu-item ,(purecopy-maybe "tab bar") ,(make-sparse-keymap)
                             :filter tab-bar-make-keymap))
 
 (defun tab-bar-make-keymap (&optional _ignore)
@@ -1285,6 +1285,7 @@ tab bar might wrap to the second line when it shouldn't.")
               current)
     current))
 
+(defvar frameset-filter-alist)
 (push '(tabs . frameset-filter-tabs) frameset-filter-alist)
 
 (defun tab-bar--tab (&optional frame)

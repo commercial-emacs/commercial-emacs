@@ -232,7 +232,7 @@ have fast storage with limited space, such as a RAM disk."
   :type '(choice (const nil) directory))
 
 ;; The system null device. (Should reference NULL_DEVICE from C.)
-(defvar null-device (purecopy "/dev/null") "The system null device.")
+(defvar null-device (purecopy-maybe "/dev/null") "The system null device.")
 
 (declare-function msdos-long-file-names "msdos.c")
 (declare-function w32-long-file-name "w32proc.c")
@@ -244,17 +244,17 @@ have fast storage with limited space, such as a RAM disk."
 
 (defvar file-name-invalid-regexp
   (cond ((and (eq system-type 'ms-dos) (not (msdos-long-file-names)))
-	 (purecopy
+	 (purecopy-maybe
 	 (concat "^\\([^A-Z[-`a-z]\\|..+\\)?:\\|" ; colon except after drive
 		 "[+, ;=|<>\"?*]\\|\\[\\|\\]\\|"  ; invalid characters
 		 "[\000-\037]\\|"		  ; control characters
 		 "\\(/\\.\\.?[^/]\\)\\|"	  ; leading dots
 		 "\\(/[^/.]+\\.[^/.]*\\.\\)")))	  ; more than a single dot
 	((memq system-type '(ms-dos windows-nt cygwin))
-	 (purecopy
+	 (purecopy-maybe
 	 (concat "^\\([^A-Z[-`a-z]\\|..+\\)?:\\|" ; colon except after drive
 		 "[|<>\"?*\000-\037]")))		  ; invalid characters
-	(t (purecopy "[\000]")))
+	(t (purecopy-maybe "[\000]")))
   "Regexp recognizing file names that aren't allowed by the filesystem.")
 
 (defcustom file-precious-flag nil
@@ -1112,7 +1112,7 @@ call, thus bypassing file name handlers."
        string-dir names string-file pred action)))))
 
 (defvar locate-dominating-stop-dir-regexp
-  (purecopy "\\`\\(?:[\\/][\\/][^\\/]+[\\/]\\|/\\(?:net\\|afs\\|\\.\\.\\.\\)/\\)\\'")
+  (purecopy-maybe "\\`\\(?:[\\/][\\/][^\\/]+[\\/]\\|/\\(?:net\\|afs\\|\\.\\.\\.\\)/\\)\\'")
   "Regexp of directory names that stop the search in `locate-dominating-file'.
 Any directory whose name matches this regexp will be treated like
 a kind of root directory by `locate-dominating-file', which will stop its
@@ -1167,7 +1167,7 @@ directory if it does not exist."
        ;; Make sure `user-emacs-directory' exists,
        ;; unless we're in batch mode or dumping Emacs.
        (or noninteractive
-           dump-mode
+           (pdumping-p)
 	   (let (errtype)
 	     (if (file-directory-p user-emacs-directory)
 		 (or (file-accessible-directory-p user-emacs-directory)
@@ -2877,7 +2877,7 @@ since only a single case-insensitive search through the alist is made."
   ;; directives in that file.
   (mapcar
    (lambda (elt)
-     (cons (purecopy (car elt)) (cdr elt)))
+     (cons (purecopy-maybe (car elt)) (cdr elt)))
    `(;; do this first, so that .html.pl is Polish html, not Perl
      ("\\.[sx]?html?\\(\\.[a-zA-Z_]+\\)?\\'" . mhtml-mode)
      ("\\.svgz?\\'" . image-mode)
@@ -3177,7 +3177,7 @@ and `magic-mode-alist', which determines modes based on file contents.")
   ;; file.
   (mapcar
    (lambda (l)
-     (cons (purecopy (car l)) (cdr l)))
+     (cons (purecopy-maybe (car l)) (cdr l)))
    '(("\\(mini\\)?perl5?" . perl-mode)
      ("wishx?" . tcl-mode)
      ("tcl\\(sh\\)?" . tcl-mode)
@@ -3263,7 +3263,7 @@ and `inhibit-local-variables-suffixes'.  If
     temp))
 
 (defvar auto-mode-interpreter-regexp
-  (purecopy
+  (purecopy-maybe
    (concat
     "#![ \t]*"
     ;; Optional group 1: env(1) invocation.
@@ -3293,7 +3293,7 @@ If FUNCTION is nil, then it is not called.  (That is a way of saying
 (put 'magic-mode-alist 'risky-local-variable t)
 
 (defvar magic-fallback-mode-alist
-  (purecopy
+  (purecopy-maybe
   `((image-type-auto-detected-p . image-mode)
     ("\\(PK00\\)?[P]K\003\004" . archive-mode) ; zip
     ;; The < comes before the groups (but the first) to reduce backtracking.
@@ -6021,12 +6021,12 @@ Before and after saving the buffer, this function runs
           (recursive-edit))
         ;; Return nil to ask about BUF again.
         nil)
-     ,(purecopy "view this buffer"))
+     ,(purecopy-maybe "view this buffer"))
     (?\C-f
      ,(lambda (buf)
         (funcall save-some-buffers--switch-window-callback buf)
         (setq quit-flag t))
-     ,(purecopy "view this buffer and quit"))
+     ,(purecopy-maybe "view this buffer and quit"))
     (?d ,(lambda (buf)
            (if (null (buffer-file-name buf))
                (message "Not applicable: no file")
@@ -6040,7 +6040,7 @@ Before and after saving the buffer, this function runs
                  (recursive-edit))))
            ;; Return nil to ask about BUF again.
            nil)
-	,(purecopy "view changes in this buffer")))
+	,(purecopy-maybe "view changes in this buffer")))
   "ACTION-ALIST argument used in call to `map-y-or-n-p'.")
 (put 'save-some-buffers-action-alist 'risky-local-variable t)
 
@@ -7515,13 +7515,13 @@ by `sh' are supported."
     (concat "\\`" result "\\'")))
 
 (defcustom list-directory-brief-switches
-  (purecopy "-CF")
+  (purecopy-maybe "-CF")
   "Switches for `list-directory' to pass to `ls' for brief listing."
   :type 'string
   :group 'dired)
 
 (defcustom list-directory-verbose-switches
-    (purecopy "-l")
+    (purecopy-maybe "-l")
   "Switches for `list-directory' to pass to `ls' for verbose listing."
   :type 'string
   :group 'dired)
@@ -7776,8 +7776,8 @@ need to be passed verbatim to shell commands."
 (defcustom insert-directory-program
   (if (and (memq system-type '(berkeley-unix darwin))
            (executable-find "gls"))
-      (purecopy "gls")
-    (purecopy "ls"))
+      (purecopy-maybe "gls")
+    (purecopy-maybe "ls"))
   "Absolute or relative name of the `ls'-like program.
 This is used by `insert-directory' and `dired-insert-directory'
 \(thus, also by `dired').  For Dired, this should ideally point to
@@ -7806,7 +7806,7 @@ Return nil if we should prefer `ls-lisp' instead."
          t)
        insert-directory-program))
 
-(defcustom directory-free-space-program (purecopy "df")
+(defcustom directory-free-space-program (purecopy-maybe "df")
   "Program to get the amount of free space on a file system.
 We assume the output has the format of `df'.
 The value of this variable must be just a command name or file name;
@@ -7820,7 +7820,7 @@ A value of nil disables this feature."
 			"27.1")
 
 (defcustom directory-free-space-args
-  (purecopy (if (eq system-type 'darwin) "-k" "-Pk"))
+  (purecopy-maybe (if (eq system-type 'darwin) "-k" "-Pk"))
   "Options to use when running `directory-free-space-program'."
   :type 'string
   :group 'dired)
@@ -7885,7 +7885,7 @@ If DIR's free space cannot be obtained, this function returns nil."
          ;; parentheses:
          ;; -rw-r--r-- (modified) 2005-10-22 21:25 files.el
          ;; This is not supported yet.
-    (purecopy (concat "\\([0-9][BkKMGTPEZYRQ]? " iso
+    (purecopy-maybe (concat "\\([0-9][BkKMGTPEZYRQ]? " iso
 		      "\\|.*[0-9][BkKMGTPEZYRQ]? "
 	              "\\(" western "\\|" western-comma
                       "\\|" DD-MMM-YYYY "\\|" east-asian "\\)"
@@ -8348,7 +8348,7 @@ arguments as the running Emacs)."
 ;; so that magic file name handlers will not apply to it.
 
 (setq file-name-handler-alist
-      (cons (cons (purecopy "\\`/:") 'file-name-non-special)
+      (cons (cons (purecopy-maybe "\\`/:") 'file-name-non-special)
 	    file-name-handler-alist))
 
 ;; We depend on being the last handler on the list,

@@ -1376,7 +1376,7 @@ This returns an error if any Emacs frames are X frames."
 
 (defcustom x-gtk-stock-map
   (mapcar (lambda (arg)
-	    (cons (purecopy (car arg)) (purecopy (cdr arg))))
+	    (cons (purecopy-maybe (car arg)) (purecopy-maybe (cdr arg))))
   '(
     ("etc/images/new" . ("document-new" "gtk-new"))
     ("etc/images/open" . ("document-open" "gtk-open"))

@@ -479,57 +479,30 @@ extern char *fixnum_to_string (EMACS_INT number, char *buffer, char *end);
 extern bool initialized;
 extern struct gflags
 {
-  /* True means this Emacs instance was born to dump.  */
+  /* was born to dump.  */
   bool will_dump_ : 1;
-  bool will_bootstrap_ : 1;
-#ifdef HAVE_PDUMPER
-  /* Set in an Emacs process that will likely dump with pdumper; all
-     Emacs processes may dump with pdumper, however.  */
-  bool will_dump_with_pdumper_ : 1;
-  /* Set in an Emacs process that has been restored from a portable
-     dump.  */
-  bool dumped_with_pdumper_ : 1;
-#endif
+  /* has been restored from a dump.  */
+  bool was_dumped_ : 1;
+  /* file to dump. */
+  char *where_dumped_;
 } gflags;
 
 INLINE bool
 will_dump_p (void)
 {
-#if HAVE_PDUMPER
   return gflags.will_dump_;
-#else
-  return false;
-#endif
 }
 
 INLINE bool
-will_bootstrap_p (void)
+was_dumped_p (void)
 {
-#if HAVE_PDUMPER
-  return gflags.will_bootstrap_;
-#else
-  return false;
-#endif
+  return gflags.was_dumped_;
 }
 
-INLINE bool
-will_dump_with_pdumper_p (void)
+INLINE const char *
+where_dumped (void)
 {
-#if HAVE_PDUMPER
-  return gflags.will_dump_with_pdumper_;
-#else
-  return false;
-#endif
-}
-
-INLINE bool
-dumped_with_pdumper_p (void)
-{
-#if HAVE_PDUMPER
-  return gflags.dumped_with_pdumper_;
-#else
-  return false;
-#endif
+  return gflags.where_dumped_;
 }
 
 /* Defined in floatfns.c.  */

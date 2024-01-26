@@ -7036,10 +7036,9 @@ DEFUN ("show-face-resources", Fshow_face_resources, Sshow_face_resources,
 void
 init_xfaces (void)
 {
-#ifdef HAVE_PDUMPER
   int nfaces;
 
-  if (dumped_with_pdumper_p ())
+  if (was_dumped_p ())
     {
       nfaces = XFIXNAT (Fhash_table_count (Vface_new_frame_defaults));
       if (nfaces > 0)
@@ -7063,7 +7062,6 @@ init_xfaces (void)
 	    }
 	}
     }
-#endif
 
   face_attr_sym[0] = Qface;
   face_attr_sym[LFACE_FOUNDRY_INDEX] = QCfoundry;

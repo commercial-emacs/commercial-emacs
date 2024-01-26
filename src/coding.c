@@ -12209,7 +12209,7 @@ internal character representation.  */);
 static void
 reset_coding_after_pdumper_load (void)
 {
-  if (!dumped_with_pdumper_p ())
+  if (!was_dumped_p ())
     return;
   for (struct coding_system *this = &coding_categories[0];
        this < &coding_categories[coding_category_max];

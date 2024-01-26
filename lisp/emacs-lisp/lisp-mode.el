@@ -94,7 +94,7 @@
 (defvar lisp-imenu-generic-expression
   (list
    (list nil
-	 (purecopy (concat "^\\s-*("
+	 (purecopy-maybe (concat "^\\s-*("
 			   (regexp-opt
 			    '("defun" "defmacro"
                               ;; Elisp.
@@ -119,14 +119,14 @@
 	 2)
    ;; Like the previous, but uses a quoted symbol as the name.
    (list nil
-	 (purecopy (concat "^\\s-*("
+	 (purecopy-maybe (concat "^\\s-*("
 			   (regexp-opt
 			    '("defalias" "define-obsolete-function-alias")
                             t)
 			   "\\s-+'\\(" (rx lisp-mode-symbol) "\\)"))
 	 2)
-   (list (purecopy "Variables")
-	 (purecopy (concat "^\\s-*("
+   (list (purecopy-maybe "Variables")
+	 (purecopy-maybe (concat "^\\s-*("
 			   (regexp-opt
 			    '(;; Elisp
                               "defconst" "defcustom" "defvar-keymap"
@@ -137,13 +137,13 @@
 			   "\\s-+\\(" (rx lisp-mode-symbol) "\\)"))
 	 2)
    ;; For `defvar'/`defvar-local', we ignore (defvar FOO) constructs.
-   (list (purecopy "Variables")
-	 (purecopy (concat "^\\s-*(defvar\\(?:-local\\)?\\s-+\\("
+   (list (purecopy-maybe "Variables")
+	 (purecopy-maybe (concat "^\\s-*(defvar\\(?:-local\\)?\\s-+\\("
                            (rx lisp-mode-symbol) "\\)"
 			   "[[:space:]\n]+[^)]"))
 	 1)
-   (list (purecopy "Types")
-	 (purecopy (concat "^\\s-*("
+   (list (purecopy-maybe "Types")
+	 (purecopy-maybe (concat "^\\s-*("
 			   (regexp-opt
 			    '(;; Elisp
                               "defgroup" "deftheme"

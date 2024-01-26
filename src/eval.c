@@ -685,8 +685,8 @@ value.  */)
   XSYMBOL (symbol)->u.s.declared_special = true;
   if (!NILP (doc))
     {
-      if (!NILP (Vloadup_pure_table))
-	doc = Fpurecopy (doc);
+      if (!NILP (Vpdumper__pure_pool))
+	doc = Fpurecopy_maybe (doc);
       Fput (symbol, Qvariable_documentation, doc);
     }
   LOADHIST_ATTACH (symbol);
@@ -824,8 +824,8 @@ More specifically, behaves like (defconst SYM 'INITVALUE DOCSTRING).  */)
   CHECK_SYMBOL (sym);
   Lisp_Object tem = initvalue;
   Finternal__define_uninitialized_variable (sym, docstring);
-  if (!NILP (Vloadup_pure_table))
-    tem = Fpurecopy (tem);
+  if (!NILP (Vpdumper__pure_pool))
+    tem = Fpurecopy_maybe (tem);
   Fset_default (sym, tem);      /* FIXME: set-default-toplevel-value? */
   Fput (sym, Qrisky_local_variable, Qt); /* FIXME: Why?  */
   return sym;
@@ -2015,7 +2015,7 @@ this does nothing and returns nil.  */)
       && !AUTOLOADP (XSYMBOL (function)->u.s.function))
     return Qnil;
 
-  if (!NILP (Vloadup_pure_table) && EQ (docstring, make_fixnum (0)))
+  if (!NILP (Vpdumper__pure_pool) && EQ (docstring, make_fixnum (0)))
     /* `read1' in lread.c has found the docstring starting with "\
        and assumed the docstring will be provided by Snarf-documentation, so it
        passed us 0 instead.  But that leads to accidental sharing in purecopy's
@@ -2089,17 +2089,6 @@ it defines a macro.  */)
   if (EQ (macro_only, Qmacro)
       && !(EQ (kind, Qt) || EQ (kind, Qmacro)))
     return fundef;
-
-  /* This is to make sure that loadup.el gives a clear picture
-     of what files are preloaded and when.  */
-  if (will_dump_p () && !will_bootstrap_p ())
-    {
-      /* Avoid landing here recursively while outputting the
-	 backtrace from the error.  */
-      gflags.will_dump_ = false;
-      error ("Attempt to autoload %s while preparing to dump",
-	     SDATA (SYMBOL_NAME (funname)));
-    }
 
   CHECK_SYMBOL (funname);
 

@@ -60,12 +60,7 @@ extern void pdumper_remember_scalar_impl (void *data, ptrdiff_t nbytes);
 INLINE void
 pdumper_remember_scalar (void *data, ptrdiff_t nbytes)
 {
-#ifdef HAVE_PDUMPER
   pdumper_remember_scalar_impl (data, nbytes);
-#else
-  (void) data;
-  (void) nbytes;
-#endif
 }
 
 extern void pdumper_remember_lv_ptr_raw_impl (void *ptr, enum Lisp_Type type);
@@ -76,12 +71,7 @@ extern void pdumper_remember_lv_ptr_raw_impl (void *ptr, enum Lisp_Type type);
 INLINE void
 pdumper_remember_lv_ptr_raw (void *ptr, enum Lisp_Type type)
 {
-#ifdef HAVE_PDUMPER
   pdumper_remember_lv_ptr_raw_impl (ptr, type);
-#else
-  (void) ptr;
-  (void) type;
-#endif
 }
 
 typedef void (*pdumper_hook)(void);
@@ -91,11 +81,7 @@ extern void pdumper_do_now_and_after_late_load_impl (pdumper_hook hook);
 INLINE void
 pdumper_do_now_and_after_load (pdumper_hook hook)
 {
-#ifdef HAVE_PDUMPER
   pdumper_do_now_and_after_load_impl (hook);
-#else
-  hook ();
-#endif
 }
 
 /* Same as 'pdumper_do_now_and_after_load' but for hooks running code
@@ -103,11 +89,7 @@ pdumper_do_now_and_after_load (pdumper_hook hook)
 INLINE void
 pdumper_do_now_and_after_late_load (pdumper_hook hook)
 {
-#ifdef HAVE_PDUMPER
   pdumper_do_now_and_after_late_load_impl (hook);
-#else
-  hook ();
-#endif
 }
 
 /* Macros useful in pdumper callback functions.  Assign a value if
@@ -117,7 +99,7 @@ pdumper_do_now_and_after_late_load (pdumper_hook hook)
 
 #define PDUMPER_RESET(variable, value)         \
   do {                                         \
-    if (dumped_with_pdumper_p ())              \
+    if (was_dumped_p ())		       \
       (variable) = (value);                    \
     else                                       \
       eassert ((variable) == (value));         \
@@ -125,7 +107,7 @@ pdumper_do_now_and_after_late_load (pdumper_hook hook)
 
 #define PDUMPER_RESET_LV(variable, value)         \
   do {                                            \
-    if (dumped_with_pdumper_p ())                 \
+    if (was_dumped_p ())			  \
       (variable) = (value);                       \
     else                                          \
       eassert (EQ (variable, value));		  \
@@ -145,7 +127,7 @@ enum pdumper_load_result
     PDUMPER_LOAD_ERROR /* Must be last, as errno may be added.  */
   };
 
-int pdumper_load (const char *dump_filename, char *argv0);
+int pdumper_load (char *dump_filename, char *argv0);
 
 struct pdumper_loaded_dump
 {
@@ -161,13 +143,8 @@ extern struct pdumper_loaded_dump dump_public;
 INLINE _GL_ATTRIBUTE_CONST bool
 pdumper_object_p (const void *obj)
 {
-#ifdef HAVE_PDUMPER
   uintptr_t obj_addr = (uintptr_t) obj;
   return dump_public.start <= obj_addr && obj_addr < dump_public.end;
-#else
-  (void) obj;
-  return false;
-#endif
 }
 
 extern bool pdumper_cold_object_p_impl (const void *obj);
@@ -179,12 +156,7 @@ extern bool pdumper_cold_object_p_impl (const void *obj);
 INLINE _GL_ATTRIBUTE_CONST bool
 pdumper_cold_object_p (const void *obj)
 {
-#ifdef HAVE_PDUMPER
   return pdumper_cold_object_p_impl (obj);
-#else
-  (void) obj;
-  return false;
-#endif
 }
 
 
@@ -196,12 +168,7 @@ extern int pdumper_find_object_type_impl (const void *obj);
 INLINE _GL_ATTRIBUTE_CONST int
 pdumper_find_object_type (const void *obj)
 {
-#ifdef HAVE_PDUMPER
   return pdumper_find_object_type_impl (obj);
-#else
-  (void) obj;
-  emacs_abort ();
-#endif
 }
 
 /* Return true if TYPE is that of a Lisp object.
@@ -219,12 +186,7 @@ pdumper_valid_object_type_p (int type)
 INLINE _GL_ATTRIBUTE_CONST bool
 pdumper_object_p_precise (const void *obj)
 {
-#ifdef HAVE_PDUMPER
   return pdumper_valid_object_type_p (pdumper_find_object_type (obj));
-#else
-  (void) obj;
-  emacs_abort ();
-#endif
 }
 
 extern bool pdumper_marked_p_impl (const void *obj);
@@ -235,12 +197,7 @@ extern bool pdumper_marked_p_impl (const void *obj);
 INLINE bool
 pdumper_marked_p (const void *obj)
 {
-#ifdef HAVE_PDUMPER
   return pdumper_marked_p_impl (obj);
-#else
-  (void) obj;
-  emacs_abort ();
-#endif
 }
 
 extern void pdumper_set_marked_impl (const void *obj);
@@ -251,12 +208,7 @@ extern void pdumper_set_marked_impl (const void *obj);
 INLINE void
 pdumper_set_marked (const void *obj)
 {
-#ifdef HAVE_PDUMPER
   pdumper_set_marked_impl (obj);
-#else
-  (void) obj;
-  emacs_abort ();
-#endif
 }
 
 extern void pdumper_clear_marks_impl (void);
@@ -265,9 +217,7 @@ extern void pdumper_clear_marks_impl (void);
 INLINE void
 pdumper_clear_marks (void)
 {
-#ifdef HAVE_PDUMPER
   pdumper_clear_marks_impl ();
-#endif
 }
 
 /* Record the Emacs startup directory, relative to which the pdump

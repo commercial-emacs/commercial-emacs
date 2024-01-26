@@ -660,20 +660,6 @@ features available just for debugging Emacs:
 4) The command gud-pv has the global binding 'C-x C-a C-v' and prints the
    value of the lisp variable at point.
 
-** Debugging what happens while preloading and dumping Emacs
-
-Debugging 'temacs' is useful when you want to establish whether a
-problem happens in an undumped Emacs.  To run 'temacs' under a
-debugger, type "gdb temacs", then start it with 'r -batch -l loadup'.
-
-If you need to debug what happens during dumping, start it with 'r -batch -l
-loadup dump' instead.  For debugging the bootstrap dumping, use "loadup
-bootstrap" instead of "loadup dump".
-
-If temacs actually succeeds when running under GDB in this way, do not
-try to run the dumped Emacs, because it was dumped with the GDB
-breakpoints in it.
-
 ** If you encounter X protocol errors
 
 The X server normally reports protocol errors asynchronously,

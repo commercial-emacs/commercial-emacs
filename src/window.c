@@ -8281,16 +8281,16 @@ static void init_window_once_for_pdumper (void)
      the initial frame and window, this variable must be false.  */
   bool old_mode_line_in_non_selected_windows;
 
-  /* Snapshot dumped_with_pdumper to suppress compiler warning.  */
-  bool saved_dumped_with_pdumper = dumped_with_pdumper_p ();
-  if (saved_dumped_with_pdumper)
+  /* Snapshot to suppress compiler warning.  */
+  bool saved_dumped = was_dumped_p ();
+  if (saved_dumped)
     {
       old_mode_line_in_non_selected_windows
         = mode_line_in_non_selected_windows;
       mode_line_in_non_selected_windows = false;
     }
   struct frame *f = make_initial_frame ();
-  if (saved_dumped_with_pdumper)
+  if (saved_dumped)
     mode_line_in_non_selected_windows =
       old_mode_line_in_non_selected_windows;
   XSETFRAME (selected_frame, f);

@@ -3730,7 +3730,7 @@ pure_alloc (size_t size, int alignment)
       /* Allocate non-Lisp object from PURE end.  */
       ptrdiff_t new_offs = non_lisp_bytes + size;
       char *addr = (char *) pure + PURESIZE - new_offs;
-      int shim = (intptr_t) addr & (alignment - 1);
+      int shim = (intptr_t) addr & (-1 + alignment);
       non_lisp_bytes = new_offs + shim;
       result = addr - shim;
     }
@@ -3759,7 +3759,7 @@ make_pure_string (const char *data,
     s->u.s.data = pure_nul;
   else
     {
-      s->u.s.data = pure_alloc (nbytes + 1, 1);
+      s->u.s.data = pure_alloc (nbytes + 1, 0);
       memcpy (s->u.s.data, data, nbytes);
       s->u.s.data[nbytes] = '\0';
       if (nbytes == 0)
@@ -3831,8 +3831,7 @@ make_pure_bignum (Lisp_Object value)
   struct Lisp_Bignum *b = pure_alloc (sizeof *b, 0);
   XSETPVECTYPESIZE (b, PVEC_BIGNUM, 0, VECSIZE (struct Lisp_Bignum));
 
-  int limb_alignment = alignof (mp_limb_t);
-  pure_limbs = pure_alloc (nbytes, limb_alignment);
+  pure_limbs = pure_alloc (nbytes, 0);
   for (i = 0; i < nlimbs; ++i)
     pure_limbs[i] = mpz_getlimbn (*n, i);
 
@@ -3874,41 +3873,38 @@ purecopy_hash_table (struct Lisp_Hash_Table *table)
   if (table->table_size > 0)
     {
       ptrdiff_t hash_bytes = table->table_size * sizeof *table->hash;
-      pure->hash = pure_alloc (hash_bytes, -(int)sizeof *table->hash);
+      pure->hash = pure_alloc (hash_bytes, (int)sizeof *table->hash);
       memcpy (pure->hash, table->hash, hash_bytes);
 
       ptrdiff_t next_bytes = table->table_size * sizeof *table->next;
-      pure->next = pure_alloc (next_bytes, -(int)sizeof *table->next);
+      pure->next = pure_alloc (next_bytes, (int)sizeof *table->next);
       memcpy (pure->next, table->next, next_bytes);
 
       ptrdiff_t nvalues = table->table_size * 2;
       ptrdiff_t kv_bytes = nvalues * sizeof *table->key_and_value;
       pure->key_and_value = pure_alloc (kv_bytes,
-					-(int)sizeof *table->key_and_value);
+					(int)sizeof *table->key_and_value);
       for (ptrdiff_t i = 0; i < nvalues; i++)
 	pure->key_and_value[i] = purecopy (table->key_and_value[i]);
 
       ptrdiff_t index_bytes = table->index_size * sizeof *table->index;
-      pure->index = pure_alloc (index_bytes, -(int)sizeof *table->index);
+      pure->index = pure_alloc (index_bytes, (int)sizeof *table->index);
       memcpy (pure->index, table->index, index_bytes);
     }
 
   return pure;
 }
 
-DEFUN ("purecopy", Fpurecopy, Spurecopy, 1, 1, 0,
-       doc: /* Make a copy of object OBJ in pure storage.
-Recursively copies contents of vectors and cons cells.
-Does not copy symbols.  Copies strings without text properties.  */)
+DEFUN ("purecopy-maybe", Fpurecopy_maybe, Spurecopy_maybe, 1, 1, 0,
+       doc: /* Monnier's half-measure to reduce pdump footprint.  */)
   (register Lisp_Object obj)
 {
-  if (NILP (Vloadup_pure_table))
-    return obj;
-  else if (MARKERP (obj) || OVERLAYP (obj) || SYMBOLP (obj))
-    /* Can't purify those.  */
-    return obj;
-  else
-    return purecopy (obj);
+  if (NILP (Vpdumper__pure_pool)
+      || MARKERP (obj)
+      || OVERLAYP (obj)
+      || SYMBOLP (obj))
+    return obj; /* Can't purify OBJ.  */
+  return purecopy (obj);
 }
 
 static struct pinned_object
@@ -3931,11 +3927,11 @@ purecopy (Lisp_Object obj)
     message_with_string ("Dropping text-properties while making string `%s' pure",
 			 obj, true);
 
-  if (!NILP (Vloadup_pure_table)) /* Hash consing.  */
+  if (!NILP (Vpdumper__pure_pool))
     {
-      Lisp_Object tmp = Fgethash (obj, Vloadup_pure_table, Qnil);
-      if (!NILP (tmp))
-	return tmp;
+      Lisp_Object pooled = Fgethash (obj, Vpdumper__pure_pool, Qnil);
+      if (!NILP (pooled))
+	return pooled;
     }
 
   if (CONSP (obj))
@@ -4005,8 +4001,8 @@ purecopy (Lisp_Object obj)
       Fsignal (Qerror, list1 (CALLN (Fformat, fmt, obj)));
     }
 
-  if (!NILP (Vloadup_pure_table)) /* Hash consing.  */
-    Fputhash (obj, obj, Vloadup_pure_table);
+  if (!NILP (Vpdumper__pure_pool))
+    Fputhash (obj, obj, Vpdumper__pure_pool);
 
   return obj;
 }
@@ -5992,8 +5988,6 @@ init_alloc_once (void)
   /* Nothing can be malloc'd until init_runtime().  */
   pdumper_do_now_and_after_load (init_runtime);
 
-  Vloadup_pure_table = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize,
-                              make_fixed_natnum (80000));
   update_bytes_between_gc ();
   verify_alloca ();
   init_strings ();
@@ -6081,10 +6075,6 @@ If this portion is smaller than `gc-cons-threshold', this is ignored.  */);
   DEFVAR_INT ("strings-consed", strings_consed,
 	      doc: /* Number of strings that have been consed so far.  */);
 
-  DEFVAR_LISP ("loadup-pure-table", Vloadup_pure_table,
-	       doc: /* Allocate objects in pure space during loadup.el.  */);
-  Vloadup_pure_table = Qnil;
-
   DEFVAR_LISP ("post-gc-hook", Vpost_gc_hook,
 	       doc: /* Hook run after garbage collection has finished.  */);
   Vpost_gc_hook = Qnil;
@@ -6135,7 +6125,7 @@ N should be nonnegative.  */);
   defsubr (&Smake_symbol);
   defsubr (&Smake_marker);
   defsubr (&Smake_finalizer);
-  defsubr (&Spurecopy);
+  defsubr (&Spurecopy_maybe);
   defsubr (&Sgarbage_collect);
   defsubr (&Sgarbage_collect_maybe);
   defsubr (&Sgc_counts);

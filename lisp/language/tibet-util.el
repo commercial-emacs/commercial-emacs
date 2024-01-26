@@ -41,6 +41,8 @@
 
 ;;; Code:
 
+(require 'tibetan)
+
 (defconst tibetan-obsolete-glyphs
   `(("།" . "།")			; 2 col <-> 1 col
     ("༏" . "༏")

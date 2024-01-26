@@ -86,7 +86,7 @@ Change to
 .BR \-q ", " \-\-no\-init\-file
 Do not load an init file.
 .TP
-.BR \-nl ", " \-\-no\-shared\-memory
+.BR \-\-no\-shared\-memory
 Do not use shared memory.
 .TP
 .B \-\-no\-site\-file

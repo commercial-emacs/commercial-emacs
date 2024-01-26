@@ -655,7 +655,7 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
             ;; BEWARE!  Don't purify this function definition, since that leads
             ;; to memory corruption if the hash-tables it holds are modified
             ;; (the GC doesn't trace those pointers).
-            loadup-pure-table)
+            pdumper--pure-pool)
         (when (listp old-adv-cc)
           (set-advertised-calling-convention gfun old-adv-cc nil))
         ;; But do use `defalias', so that it interacts properly with nadvice,
@@ -694,7 +694,7 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
       ;; We need `copy-sequence` here because this `dispatch' object might be
       ;; modified by side-effect in `cl-generic-define-method' (bug#46722).
       (gethash (copy-sequence dispatch) cl--generic-dispatchers)
-    (when (and loadup-pure-table
+    (when (and pdumper--pure-pool
                (eq cl--generic-compiler #'byte-compile))
       (error
        "Missing cl-generic dispatcher in the prefilled cache!

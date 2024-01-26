@@ -51,7 +51,7 @@
 
 ;;;###autoload
 (defcustom latex-inputenc-coding-alist
-  (purecopy
+  (purecopy-maybe
   '(("ansinew" . windows-1252) ; MS Windows ANSI encoding, extension of Latin-1
     ("applemac" . mac-roman)
     ("ascii" . us-ascii)

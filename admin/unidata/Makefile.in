@@ -43,16 +43,12 @@ unifiles = $(addprefix ${unidir}/,$(sort $(shell sed -n 's/^[ \t][ \t]*${lparen}
 
 .PHONY: all
 
-all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
-  ${unidir}/charprop.el ${unidir}/emoji-zwj.el ${unidir}/emoji-labels.el \
+all: ${top_srcdir}/src/macuvs.h ${unifiles} \
+  ${unidir}/charprop.el ${unidir}/emoji-labels.el \
   ${unidir}/uni-scripts.el ${unidir}/uni-confusable.el \
   ${unidir}/idna-mapping.el
 
-## Specify .elc as an order-only prereq so as to not needlessly rebuild
-## target just because the .elc is missing.
-## Same with charprop.el below.
-${top_srcdir}/src/macuvs.h: ${srcdir}/uvs.el ${srcdir}/IVD_Sequences.txt | \
-  ${srcdir}/uvs.elc
+${top_srcdir}/src/macuvs.h: ${srcdir}/uvs.el ${srcdir}/IVD_Sequences.txt ${unidir}/charscript.el ${unidir}/emoji-zwj.el
 	$(AM_V_GEN)${emacs} -L ${srcdir} -l uvs \
 	  --eval '(uvs-print-table-ivd (unmsys--file-name "${srcdir}/IVD_Sequences.txt") "Adobe-Japan1")' \
 	  > $@
@@ -100,9 +96,6 @@ ${unidir}/idna-mapping.el: ${srcdir}/unidata-gen.el \
 	  ${srcdir}/IdnaMappingTable.txt
 	$(AM_V_GEN)${emacs} -L ${srcdir} \
 		-l unidata-gen.el -f unidata-gen-idna-mapping $@
-
-.PHONY: charscript.el
-charscript.el: ${unidir}/charscript.el
 
 blocks = ${srcdir}/blocks.awk
 blocks_sources = ${srcdir}/Blocks.txt ${srcdir}/emoji-data.txt

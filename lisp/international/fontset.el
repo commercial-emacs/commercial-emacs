@@ -34,7 +34,7 @@
 
 (setq font-encoding-alist
       (mapcar (lambda (arg)
-		(cons (purecopy (car arg)) (cdr arg)))
+		(cons (purecopy-maybe (car arg)) (cdr arg)))
       '(("iso8859-1$" . iso-8859-1)
 	("iso8859-2$" . iso-8859-2)
 	("iso8859-3$" . iso-8859-3)
@@ -1183,17 +1183,17 @@ Internal use only.  Should be called at startup time."
 
 ;; Setting for suppressing XLoadQueryFont on big fonts.
 (setq x-pixel-size-width-font-regexp
-      (purecopy "gb2312\\|gbk\\|gb18030\\|jisx0208\\|ksc5601\\|cns11643\\|big5"))
+      (purecopy-maybe "gb2312\\|gbk\\|gb18030\\|jisx0208\\|ksc5601\\|cns11643\\|big5"))
 
 ;; These fonts require vertical centering.
 (setq vertical-centering-font-regexp
-      (purecopy "gb2312\\|gbk\\|gb18030\\|jisx0208\\|jisx0212\\|ksc5601\\|cns11643\\|big5"))
+      (purecopy-maybe "gb2312\\|gbk\\|gb18030\\|jisx0208\\|jisx0212\\|ksc5601\\|cns11643\\|big5"))
 (put 'vertical-centering-font-regexp 'standard-value
      (list vertical-centering-font-regexp))
 
 ;; CDAC fonts are actually smaller than their design sizes.
 (setq face-font-rescale-alist
-      (list (cons (purecopy "-cdac$")  1.3)))
+      (list (cons (purecopy-maybe "-cdac$")  1.3)))
 
 (defvar x-font-name-charset-alist nil
   "This variable has no meaning now.  Just kept for backward compatibility.")
@@ -1512,7 +1512,7 @@ It returns a name of the created fontset."
 ;; specified here because FAMILY of those fonts are not "fixed" in
 ;; many cases.
 (defvar standard-fontset-spec
-  (purecopy "-*-fixed-medium-r-normal-*-16-*-*-*-*-*-fontset-standard")
+  (purecopy-maybe "-*-fixed-medium-r-normal-*-16-*-*-*-*-*-fontset-standard")
   "String of fontset spec of the standard fontset.
 You have the biggest chance to display international characters
 with correct glyphs by using the standard fontset.

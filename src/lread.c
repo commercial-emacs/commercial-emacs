@@ -1167,7 +1167,7 @@ loadhist_initialize (Lisp_Object filename)
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
        doc: /* Execute a file of Lisp code named FILE.
-First try FILE with `.elc' appended, then try with `.el', then try
+First try FILE with '.elc' appended, then try with '.el', then try
 with a system-dependent suffix of dynamic modules (see `load-suffixes'),
 then try FILE unmodified (the exact suffixes in the exact order are
 determined by `load-suffixes').  Environment variable references in
@@ -1386,7 +1386,7 @@ Return t if the file exists and loads successfully.  */)
     ? compute_found_effective (found)
     : found;
 
-  hist_file_name = (!NILP (Vloadup_pure_table)
+  hist_file_name = (!NILP (Vpdumper__pure_pool)
                     ? concat2 (Ffile_name_directory (file),
                                Ffile_name_nondirectory (found_eff))
                     : found_eff);
@@ -1497,8 +1497,8 @@ Return t if the file exists and loads successfully.  */)
       unread_char = -1;
     }
 
-  if (!NILP (Vloadup_pure_table))
-    Vpreloaded_file_list = Fcons (Fpurecopy (file), Vpreloaded_file_list);
+  if (!NILP (Vpdumper__pure_pool))
+    Vpreloaded_file_list = Fcons (Fpurecopy_maybe (file), Vpreloaded_file_list);
 
   if (NILP (nomessage) || force_load_messages)
     {
@@ -2243,7 +2243,7 @@ readevalloop (Lisp_Object readcharfun,
 	  || XHASH_TABLE (read_objects_completed)->count)
 	read_objects_completed
 	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
-      if (!NILP (Vloadup_pure_table) && c == '(')
+      if (!NILP (Vpdumper__pure_pool) && c == '(')
 	val = read0 (readcharfun, false);
       else
 	{
@@ -4128,10 +4128,9 @@ read0 (Lisp_Object readcharfun, bool annotated)
 		  : nbytes);
 	if (uninterned_symbol)
 	  {
-	    Lisp_Object name
-	      = (NILP (Vloadup_pure_table)
-		 ? make_specified_string (read_buffer, nbytes, multibyte)
-		 : make_pure_string (read_buffer, nchars, nbytes, multibyte));
+	    Lisp_Object name = !NILP (Vpdumper__pure_pool)
+	      ? make_pure_string (read_buffer, nchars, nbytes, multibyte)
+	      : make_specified_string (read_buffer, nbytes, multibyte);
 	    result = Fmake_symbol (name);
 	  }
 	else
@@ -4628,20 +4627,13 @@ intern_c_string (const char *str)
 {
   const ptrdiff_t len = strlen (str);
   Lisp_Object obarray = check_obarray (Vobarray);
-  Lisp_Object tem = oblookup (obarray, str, len, len);
-
-  if (!SYMBOLP (tem))
-    {
-      Lisp_Object string;
-
-      if (NILP (Vloadup_pure_table))
-	string = make_string (str, len);
-      else
-	string = make_pure_c_string (str, len);
-
-      tem = intern_driver (string, obarray, tem);
-    }
-  return tem;
+  Lisp_Object val = oblookup (obarray, str, len, len);
+  return SYMBOLP (val)
+    ? val
+    : intern_driver (!NILP (Vpdumper__pure_pool)
+		     ? make_pure_c_string (str, len)
+		     : make_string (str, len),
+		     obarray, val);
 }
 
 static void
@@ -4690,7 +4682,7 @@ it defaults to the value of `obarray'.  */)
 	  xfree (longhand);
 	}
       else
-	tem = intern_driver (NILP (Vloadup_pure_table) ? string : Fpurecopy (string),
+	tem = intern_driver (!NILP (Vpdumper__pure_pool) ? Fpurecopy_maybe (string) : string,
 			     obarray, tem);
     }
   return tem;
@@ -4996,7 +4988,7 @@ defsubr (union Aligned_Lisp_Subr *aname)
   set_symbol_function (sym, tem);
 #ifdef HAVE_NATIVE_COMP
   eassert (NILP (Vcomp_abi_hash));
-  Vcomp_subr_list = Fpurecopy (Fcons (tem, Vcomp_subr_list));
+  Vcomp_subr_list = Fpurecopy_maybe (Fcons (tem, Vcomp_subr_list));
 #endif
 }
 

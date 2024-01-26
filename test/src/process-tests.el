@@ -959,7 +959,7 @@ Return nil if that doesn't appear to be possible."
              (dump (process-tests--dump-file)))
     (cons binary
           (unless (eq dump :not-needed)
-            (list (concat "--dump-file="
+            (list (concat "--pdump-write="
                           (file-name-unquote dump)))))))
 
 (defun process-tests--emacs-binary ()

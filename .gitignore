@@ -79,7 +79,6 @@ lib/unistd.h
 lib/strings.h
 src/buildobj.h
 src/globals.h
-src/lisp.mk
 src/verbose.mk
 
 # Lisp-level sources built by 'make'.

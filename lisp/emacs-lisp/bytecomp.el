@@ -127,6 +127,7 @@
 (require 'backquote)
 (require 'macroexp)
 (require 'cconv)
+(require 'warnings)
 
 (autoload 'cl-tailp "cl-extra")
 (declare-function cl-find-if "cl-seq")

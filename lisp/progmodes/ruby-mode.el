@@ -2701,7 +2701,7 @@ Currently there are `ruby-mode' and `ruby-ts-mode'."
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist
-             (cons (purecopy (concat "\\(?:\\.\\(?:"
+             (cons (purecopy-maybe (concat "\\(?:\\.\\(?:"
                                      "rbw?\\|ru\\|rake\\|thor\\|axlsx"
                                      "\\|jbuilder\\|rabl\\|gemspec\\|podspec"
                                      "\\)"
@@ -2714,7 +2714,7 @@ Currently there are `ruby-mode' and `ruby-ts-mode'."
 
 ;;;###autoload
 (dolist (name (list "ruby" "rbx" "jruby" "j?ruby\\(?:[0-9.]+\\)"))
-  (add-to-list 'interpreter-mode-alist (cons (purecopy name) 'ruby-mode)))
+  (add-to-list 'interpreter-mode-alist (cons (purecopy-maybe name) 'ruby-mode)))
 
 (provide 'ruby-mode)
 

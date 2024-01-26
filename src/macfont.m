@@ -4247,7 +4247,7 @@ syms_of_macfont (void)
 static void
 syms_of_macfont_for_pdumper (void)
 {
-  if (dumped_with_pdumper_p ())
+  if (was_dumped_p ())
     macfont_family_cache = Qnil;
   else
     eassert (NILP (macfont_family_cache));

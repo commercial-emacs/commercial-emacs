@@ -3397,17 +3397,6 @@ FILENAME are suppressed.  */)
       specpdl_ref count = SPECPDL_INDEX ();
       int nesting = 0;
 
-      /* This is to make sure that loadup.el gives a clear picture
-	 of what files are preloaded and when.  */
-      if (will_dump_p () && !will_bootstrap_p ())
-	{
-	  /* Avoid landing here recursively while outputting the
-	     backtrace from the error.  */
-	  gflags.will_dump_ = false;
-	  error ("(require %s) while preparing to dump",
-		 SDATA (SYMBOL_NAME (feature)));
-	}
-
       /* A certain amount of recursive `require' is legitimate,
 	 but if we require the same feature recursively 3 times,
 	 signal an error.  */
@@ -4681,7 +4670,7 @@ maybe_resize_hash_table (struct Lisp_Hash_Table *h)
 	}
 
 #ifdef ENABLE_CHECKING
-      if (HASH_TABLE_P (Vloadup_pure_table) && XHASH_TABLE (Vloadup_pure_table) == h)
+      if (HASH_TABLE_P (Vpdumper__pure_pool) && XHASH_TABLE (Vpdumper__pure_pool) == h)
 	message ("Growing hash table to: %"pD"d", new_size);
 #endif
     }

@@ -118,8 +118,8 @@ the current buffer's category table.  */)
 
   if (!NILP (CATEGORY_DOCSTRING (table, XFIXNAT (category))))
     error ("Category `%c' is already defined", (int) XFIXNAT (category));
-  if (!NILP (Vloadup_pure_table))
-    docstring = Fpurecopy (docstring);
+  if (!NILP (Vpdumper__pure_pool))
+    docstring = Fpurecopy_maybe (docstring);
   SET_CATEGORY_DOCSTRING (table, XFIXNAT (category), docstring);
 
   return Qnil;

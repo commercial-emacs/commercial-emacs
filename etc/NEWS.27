@@ -112,7 +112,7 @@ operating systems.
 When built with the portable dumping support (which is the default),
 Emacs looks for the "emacs.pdmp" file, generated during the build, in
 its data directory at startup, and loads the dumped state from there.
-The new command-line argument '--dump-file=FILE' allows specifying a
+The new command-line argument '--pdump-file=FILE' allows specifying a
 non-default ".pdmp" file to load the state from; see the node
 "(emacs) Initial Options" in the Emacs manual for more information.
 
