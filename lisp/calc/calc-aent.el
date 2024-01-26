@@ -1270,7 +1270,14 @@ If the current Calc language does not use placeholders, return nil."
 	   (math-read-string))
 	  ((equal math-expr-data "[")
 	   (require 'calc-ext)
-	   (math-read-brackets t "]"))
+	   (let ((space-sep
+                  ;; Allow spaces as separators when the vector is
+                  ;; specified using "[", but not when it is specified
+                  ;; using language-specific constructions such as
+                  ;; "\\begin{pmatrix}".
+                  (equal "[" (substring math-exp-str math-exp-old-pos
+                                        math-exp-pos))))
+             (math-read-brackets space-sep "]")))
 	  ((equal math-expr-data "{")
 	   (require 'calc-ext)
 	   (math-read-brackets nil "}"))
