@@ -132,7 +132,12 @@ to the value of `register--read-with-preview-function'.")
 (defcustom register-use-preview 'traditional
   "Whether to show register preview when modifying registers.
 
-When set to `t', show a preview buffer with navigation and highlighting.
+When set to `t', show a preview buffer with navigation and
+highlighting.
+When set to \\='insist, behave as with `t', but allow exiting the
+minibuffer by pressing the register name a second time.  E.g.,
+press \"a\" to select register \"a\", then press \"a\" again to
+exit the minibuffer.
 When nil, show a preview buffer without navigation and highlighting, and
 exit the minibuffer immediately after inserting response in minibuffer.
 When set to \\='never, behave as with nil, but with no preview buffer at
@@ -142,6 +147,7 @@ according to `register-preview-delay'; this preserves the traditional
 behavior of Emacs 29 and before."
   :type '(choice
           (const :tag "Use preview" t)
+          (const :tag "Use preview and exit by pressing register name" insist)
           (const :tag "Use quick preview" nil)
           (const :tag "Never use preview" never)
           (const :tag "Basic preview like Emacs-29" traditional))
@@ -542,7 +548,12 @@ or \\='never."
                                              (member new strs))
                                          new old))
                          (delete-minibuffer-contents)
-                         (insert input)))
+                         (insert input)
+                         ;; Exit minibuffer on second hit
+                         ;; when *-use-preview == insist.
+                         (when (and (string= new old)
+                                    (eq register-use-preview 'insist))
+                           (setq noconfirm t))))
                      (when (and smatch (not (string= input ""))
                                 (not (member input strs)))
                        (setq input "")
@@ -552,6 +563,10 @@ or \\='never."
                        (setq pat input))))
                  (if (setq win (get-buffer-window buffer))
                      (with-selected-window win
+                       (when noconfirm
+                         ;; Happen only when
+                         ;; *-use-preview == insist.
+                         (exit-minibuffer))
                        (let ((ov (make-overlay
                                   (point-min) (point-min)))
                              ;; Allow upper-case and lower-case letters
