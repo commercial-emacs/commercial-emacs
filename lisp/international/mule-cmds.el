@@ -2158,7 +2158,9 @@ See `set-language-info-alist' for use in programs."
   (interactive
    (list (read-language-name
 	  'documentation
-	  (format-prompt "Describe language environment" current-language-environment))))
+	  (format-prompt "Describe language environment"
+                         current-language-environment)
+          current-language-environment)))
   (let ((help-buffer-under-preparation t))
     (if (null language-name)
 	(setq language-name current-language-environment))
