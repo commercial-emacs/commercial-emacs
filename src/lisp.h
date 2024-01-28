@@ -297,6 +297,9 @@ DEFINE_GDB_SYMBOL_END (VALMASK)
 
 #define LISP_WORDS_ARE_POINTERS (EMACS_INT_MAX == INTPTR_MAX)
 #if LISP_WORDS_ARE_POINTERS
+/* TAG_PTR_INITIALLY casts to Lisp_Word and can be used in static initializers
+   so this typedef assumes static initializers can contain casts to pointers.
+   All Emacs targets support this extension to the C standard.  */
 typedef struct Lisp_X *Lisp_Word;
 #else
 typedef EMACS_INT Lisp_Word;
@@ -763,14 +766,16 @@ typedef EMACS_UINT Lisp_Word_tag;
 #define LISP_WORD_TAG(tag) \
   ((Lisp_Word_tag) (tag) << (USE_LSB_TAG ? 0 : VALBITS))
 
-/* An initializer for a Lisp_Object that contains TAG along with PTR.  */
-#define TAG_PTR(tag, ptr) \
-  LISP_INITIALLY ((Lisp_Word) ((uintptr_t) (ptr) + LISP_WORD_TAG (tag)))
+/* An initializer for a Lisp_Object that contains TAG along with P.
+   P can be a pointer or an integer.  The result is usable in a static
+   initializer if TAG and P are both integer constant expressions.  */
+#define TAG_PTR_INITIALLY(tag, p) \
+  LISP_INITIALLY ((Lisp_Word) ((uintptr_t) (p) + LISP_WORD_TAG (tag)))
 
 /* LISPSYM_INITIALLY (Qfoo) is equivalent to Qfoo except it is
-   designed for use as an initializer, even for a constant initializer.  */
+   designed for use as a (possibly static) initializer.  */
 #define LISPSYM_INITIALLY(name) \
-  TAG_PTR (Lisp_Symbol, (char *) (intptr_t) ((i##name) * sizeof *lispsym))
+  TAG_PTR_INITIALLY (Lisp_Symbol, (intptr_t) ((i##name) * sizeof *lispsym))
 
 /* Declare extern constants for Lisp symbols.  These can be helpful
    when using a debugger like GDB, on older platforms where the debug
@@ -1207,7 +1212,7 @@ XFIXNUMPTR (Lisp_Object a)
 INLINE Lisp_Object
 make_pointer_integer_unsafe (void *p)
 {
-  Lisp_Object a = TAG_PTR (Lisp_Int0, p);
+  Lisp_Object a = TAG_PTR_INITIALLY (Lisp_Int0, p);
   return a;
 }
 
@@ -2468,7 +2473,7 @@ extern Lisp_Object make_misc_ptr (void *);
 INLINE Lisp_Object
 make_mint_ptr (void *a)
 {
-  Lisp_Object val = TAG_PTR (Lisp_Int0, a);
+  Lisp_Object val = TAG_PTR_INITIALLY (Lisp_Int0, a);
   return FIXNUMP (val) && XFIXNUMPTR (val) == a ? val : make_misc_ptr (a);
 }
 
