@@ -619,7 +619,8 @@ be_display_notification (const char *title, const char *body,
       /* SUPERSEDES hasn't been provided, so allocate a new
 	 notification ID.  */
 
-      ckd_add (&last_notification_id, last_notification_id, 1);
+      INT_ADD_WRAPV (last_notification_id, 1,
+		     &last_notification_id);
       id = last_notification_id;
     }
   else
