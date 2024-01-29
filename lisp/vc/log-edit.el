@@ -1347,3 +1347,7 @@ line of MSG."
 (provide 'log-edit)
 
 ;;; log-edit.el ends here
+
+;; Local Variables:
+;; coding: utf-8-unix
+;; End:
