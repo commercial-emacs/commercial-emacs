@@ -5,7 +5,7 @@
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: pcl-cvs cvs commit log vc
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -658,31 +658,71 @@ Consecutive function entries without prose (i.e., lines of the
 form \"(FUNCTION):\") will be combined into \"(FUNC1, FUNC2):\"
 according to `fill-column'."
   (save-excursion
-    (pcase-let ((`(,beg ,end) (log-edit-changelog-paragraph)))
-      (unless (= beg end)
-        (cl-callf copy-marker end)
+    (let* ((range (log-edit-changelog-paragraph))
+           (beg (car range))
+           (end (cadr range)))
+      (if (= beg end)
+          ;; Not a ChangeLog entry, fill as normal.
+          nil
+        (setq end (copy-marker end))
         (goto-char beg)
-        (cl-loop
-         for defuns-beg =
-         (and (< beg end)
-              (re-search-forward
-               (concat "\\(?1:" change-log-unindented-file-names-re
-                       "\\)\\|^\\(?1:\\)[[:blank:]]*(")
-               end t)
-              (copy-marker (match-end 1)))
-         ;; Fill prose between log entries.
-         do (let ((fill-indent-according-to-mode t)
-                  (end (if defuns-beg (match-beginning 0) end))
-                  (beg (progn (goto-char beg) (line-beginning-position))))
-              (when (<= (line-end-position) end)
-                (fill-region beg end justify)))
-         while defuns-beg
-         for defuns = (progn (goto-char defuns-beg)
-                             (change-log-read-defuns end))
-         do (progn (delete-region defuns-beg (point))
-                   (log-edit--insert-filled-defuns defuns)
-                   (setq beg (point))))
-        (prog1 t)))))
+        (let* ((defuns-beg nil)
+               (defuns nil))
+          (while
+              (progn
+                ;; Match a regexp against the next ChangeLog entry.
+                ;; `defuns-beg' will be the end of the file name,
+                ;; which marks the beginning of the list of defuns.
+                (setq defuns-beg
+                      (and (< beg end)
+                           (re-search-forward
+                            (concat "\\(?1:"
+                                    change-log-unindented-file-names-re
+                                    "\\)\\|^\\(?1:\\)[[:blank:]]*(")
+                            end t)
+                           (copy-marker (match-end 1))))
+                ;; Fill the intervening prose between the end of the
+                ;; last match and the beginning of the current match.
+                (let ((fill-indent-according-to-mode t)
+                      (end (if defuns-beg
+                               (match-beginning 0) end))
+                      (beg (progn (goto-char beg)
+                                  (line-beginning-position)))
+                      space-beg space-end)
+                  (when (<= (line-end-position) end)
+                    ;; Replace space characters within parentheses
+                    ;; that resemble ChangeLog defun names between BEG
+                    ;; and END with non-breaking spaces to prevent
+                    ;; them from being considered break points by
+                    ;; `fill-region'.
+                    (save-excursion
+                      (goto-char beg)
+                      (when (re-search-forward
+                             "^[[:blank:]]*(.*\\([[:space:]]\\).*):"
+                             end t)
+                        (replace-regexp-in-region "[[:space:]]" " "
+                                                  (setq space-beg
+                                                        (copy-marker
+                                                         (match-beginning 0)))
+                                                  (setq space-end
+                                                        (copy-marker
+                                                         (match-end 0))))))
+                    (fill-region beg end justify))
+                  ;; Restore the spaces replaced by NBSPs.
+                  (when space-beg
+                    (replace-string-in-region " " " "
+                                              space-beg space-end)
+                    (set-marker space-beg nil)
+                    (set-marker space-end nil)))
+                defuns-beg)
+            (goto-char defuns-beg)
+            (setq defuns (change-log-read-defuns end))
+            (progn
+              (delete-region defuns-beg (point))
+              (log-edit--insert-filled-defuns defuns)
+              (setq beg (point))))
+          nil)
+        t))))
 
 (defun log-edit-hide-buf (&optional buf where)
   (when (setq buf (get-buffer (or buf log-edit-files-buf)))
