@@ -2854,19 +2854,6 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
     xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (numargs));
 }
 
-/* Call the compiled Lisp function FUN.  If we have not yet read FUN's
-   bytecode string and constants vector, fetch them from the file first.  */
-
-static Lisp_Object
-fetch_and_exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
-			  ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (CONSP (AREF (fun, COMPILED_BYTECODE)))
-    Ffetch_bytecode (fun);
-
-  return exec_byte_code (fun, args_template, nargs, args);
-}
-
 /* Return the result of applying FUN to NARGS number of evaluated
    arguments in ARG_VECTOR.  FUN is one of a lambda-expression, a
    compiled-code object, or a module function.  */
@@ -2998,8 +2985,8 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
     /* save call to funcall_subr since 0 args by construction */
     ? XSUBR (fun)->function.a0 ()
     : args_template < 0
-    ? fetch_and_exec_byte_code (fun, 0, 0, NULL)
-    : fetch_and_exec_byte_code (fun, args_template, nargs, arg_vector);
+    ? exec_byte_code (fun, 0, 0, NULL)
+    : exec_byte_code (fun, args_template, nargs, arg_vector);
   return specpdl_ptr == specpdl_ref_to_ptr (count)
     ? retval : unbind_to (count, retval);
 }
@@ -3117,47 +3104,6 @@ lambda_arity (Lisp_Object fun)
   return Fcons (make_fixnum (minargs), make_fixnum (maxargs));
 }
 
-DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
-       1, 1, 0,
-       doc: /* If byte-compiled OBJECT is lazy-loaded, fetch it now.  */)
-  (Lisp_Object object)
-{
-  Lisp_Object tem;
-
-  if (COMPILEDP (object))
-    {
-      if (CONSP (AREF (object, COMPILED_BYTECODE)))
-	{
-	  tem = read_doc_string (AREF (object, COMPILED_BYTECODE));
-	  if (!(CONSP (tem) && STRINGP (XCAR (tem))
-		 && VECTORP (XCDR (tem))))
-	    {
-	      tem = AREF (object, COMPILED_BYTECODE);
-	      if (CONSP (tem) && STRINGP (XCAR (tem)))
-		error ("Invalid byte code in %s", SDATA (XCAR (tem)));
-	      else
-		error ("Invalid byte code");
-	    }
-
-	  Lisp_Object bytecode = XCAR (tem);
-	  if (STRING_MULTIBYTE (bytecode))
-	    {
-	      /* BYTECODE must have been produced by Emacs 20.2 or earlier
-		 because it produced a raw 8-bit string for byte-code and now
-		 such a byte-code string is loaded as multibyte with raw 8-bit
-		 characters converted to multibyte form.  Convert them back to
-		 the original unibyte form.  */
-	      bytecode = Fstring_as_unibyte (bytecode);
-	    }
-
-	  pin_string (bytecode);
-	  ASET (object, COMPILED_BYTECODE, bytecode);
-	  ASET (object, COMPILED_CONSTANTS, XCDR (tem));
-	}
-    }
-  return object;
-}
-
 /* Return true in the circumstance where SYMBOL was let-bound when the
    buffer had not yet assigned its own bespoke buffer local value for
    SYMBOL.
@@ -3166,7 +3112,6 @@ DEFUN ("fetch-bytecode", Ffetch_bytecode, Sfetch_bytecode,
    assignment within such a `let' closure should change the SYMBOL's
    default, not value, binding.
 */
-
 bool
 locally_unbound_blv_let_bounded (struct Lisp_Symbol *symbol)
 {
@@ -4102,7 +4047,6 @@ Don't set this unless you're sure that can't happen.  */);
   defsubr (&Srun_hook_with_args_until_success);
   defsubr (&Srun_hook_with_args_until_failure);
   defsubr (&Srun_hook_wrapped);
-  defsubr (&Sfetch_bytecode);
   defsubr (&Sbacktrace_debug);
   DEFSYM (QCdebug_on_exit, ":debug-on-exit");
   defsubr (&Smapbacktrace);
