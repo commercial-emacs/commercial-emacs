@@ -69,16 +69,19 @@
 
 (require 'macroexp)
 
+;;;###autoload
 (defmacro inline-quote (_exp)
   "Similar to backquote, but quotes code and only accepts , and not ,@."
   (declare (debug (backquote-form)))
   (error "inline-quote can only be used within define-inline"))
 
+;;;###autoload
 (defmacro inline-const-p (_exp)
   "Return non-nil if the value of EXP is already known."
   (declare (debug t))
   (error "inline-const-p can only be used within define-inline"))
 
+;;;###autoload
 (defmacro inline-const-val (_exp)
   "Return the value of EXP.
 During inlining, if the value of EXP is not yet known, this aborts the
@@ -86,6 +89,7 @@ inlining and makes us revert to a non-inlined function call."
   (declare (debug t))
   (error "inline-const-val can only be used within define-inline"))
 
+;;;###autoload
 (defmacro inline-error (_format &rest _args)
   "Signal an error."
   (declare (debug t))
@@ -102,6 +106,7 @@ inlining and makes us revert to a non-inlined function call."
   ;; inline-letevals, so signal the error in terms of the user's code.
   (error "inline-letevals can only be used within define-inline"))
 
+;;;###autoload
 (defmacro inline-letevals (vars &rest body)
   "Make sure the expressions in VARS are evaluated.
 VARS should be a list of elements of the form (VAR EXP) or just VAR, in case
