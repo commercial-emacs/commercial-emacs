@@ -2858,10 +2858,18 @@ otherwise, print without quoting."
 
 (defun byte-compile--reify-function (fun)
   "Return an expression which will evaluate to a function value FUN.
-FUN should be an interpreted closure."
-  (pcase-let* ((`(closure ,env ,args . ,body) fun)
-               (`(,preamble . ,body) (macroexp-parse-body body))
+FUN should be either a `lambda' value or a `closure' value."
+  (pcase-let* (((or (and `(lambda ,args . ,body) (let env nil))
+                    `(closure ,env ,args . ,body))
+                fun)
+               (preamble nil)
                (renv ()))
+    ;; Split docstring and `interactive' form from body.
+    (when (stringp (car body))
+      (push (pop body) preamble))
+    (when (eq (car-safe (car body)) 'interactive)
+      (push (pop body) preamble))
+    (setq preamble (nreverse preamble))
     ;; Turn the function's closed vars (if any) into local let bindings.
     (dolist (binding env)
       (cond
