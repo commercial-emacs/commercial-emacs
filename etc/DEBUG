@@ -1091,7 +1091,7 @@ disabled:
   setarch -R emacs [args...]
 
 To disable ASLR in Emacs on MS-Windows, you will have to rebuild Emacs
-while adding '-Wl,-disable-dynamicbase' to LD_SWITCH_SYSTEM_TEMACS
+while adding '-Wl,-disable-dynamicbase' to LD_SWITCH_SYSTEM_EMACS
 variable defined in src/Makefile.  Alternatively, use some tool to
 edit the PE header of the Emacs executable file and reset the
 DYNAMIC_BASE (0x40) flag in the DllCharacteristics flags recorded by

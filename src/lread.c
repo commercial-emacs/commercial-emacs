@@ -1428,8 +1428,7 @@ Return t if the file exists and loads successfully.  */)
 						   get_stat_mtime (&s2)));
 	      SSET (efound, SBYTES (efound) - 1, 'c'); /* back to .elc from .el */
               if (report_newer)
-		message_with_string ("Source file `%s' newer than byte-compiled file; using older file",
-				     Fsubstring (found, make_fixnum (0), make_fixnum (-1)), 1);
+		message_with_string ("Loading %s despite modified .el", found, 1);
             }
 	}
     }

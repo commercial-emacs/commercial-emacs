@@ -11129,7 +11129,7 @@ typedef USHORT (WINAPI * CaptureStackBackTrace_proc) (ULONG, ULONG, PVOID *,
 
 #define BACKTRACE_LIMIT_MAX 62
 /* The below must be kept in sync with the value of the
-   -Wl,-image-base switch we use in LD_SWITCH_SYSTEM_TEMACS, see
+   -Wl,-image-base switch we use in LD_SWITCH_SYSTEM_EMACS, see
    configure.ac.  */
 #if defined MINGW_W64 && EMACS_INT_MAX > LONG_MAX
 # define DEFAULT_IMAGE_BASE (ptrdiff_t)0x400000000

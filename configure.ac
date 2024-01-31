@@ -1349,12 +1349,12 @@ ac_link="$ac_link"
 ## which has not been defined yet.  When this was handled with cpp,
 ## it was expanded to null when configure sourced the s/*.h file.
 ## Thus LD_SWITCH_SYSTEM had different values in configure and the Makefiles.
-## FIXME it would be cleaner to put this in LD_SWITCH_SYSTEM_TEMACS
+## FIXME it would be cleaner to put this in LD_SWITCH_SYSTEM_EMACS
 ## (or somesuch), but because it is supposed to go at the _front_
 ## of LD_SWITCH_SYSTEM, we cannot do that in exactly the same way.
 ## Compare with the gnu-linux case below, which added to the end
 ## of LD_SWITCH_SYSTEM, and so can instead go at the front of
-## LD_SWITCH_SYSTEM_TEMACS.
+## LD_SWITCH_SYSTEM_EMACS.
 LD_SWITCH_SYSTEM=
 case "$opsys" in
   netbsd|openbsd)
@@ -6139,9 +6139,9 @@ if test "${opsys}" = "mingw32"; then
 fi
 
 case "$opsys" in
-  aix4-2) LD_SWITCH_SYSTEM_TEMACS="-Wl,-bnodelcsect" ;;
+  aix4-2) LD_SWITCH_SYSTEM_EMACS="-Wl,-bnodelcsect" ;;
 
-  cygwin) LD_SWITCH_SYSTEM_TEMACS="-Wl,-stack,0x00800000" ;;
+  cygwin) LD_SWITCH_SYSTEM_EMACS="-Wl,-stack,0x00800000" ;;
 
   darwin)
    if test "$HAVE_NS" = "yes"; then
@@ -6156,7 +6156,7 @@ case "$opsys" in
    else
      libs_nsgui=
    fi
-   LD_SWITCH_SYSTEM_TEMACS=$libs_nsgui
+   LD_SWITCH_SYSTEM_EMACS=$libs_nsgui
    ## The -headerpad option tells ld (see man page) to leave room at the
    ## end of the header for adding load commands.  Needed for dumping.
    ## 0x1000 is enough for roughly 52 load commands on the x86_64
@@ -6168,9 +6168,9 @@ case "$opsys" in
 
    ## This is here because src/Makefile.in did some extra fiddling around
    ## with LD_SWITCH_SYSTEM.  It seems cleaner to put this in
-   ## LD_SWITCH_SYSTEM_TEMACS instead,
+   ## LD_SWITCH_SYSTEM_EMACS instead,
    test "x$LD_SWITCH_SYSTEM" = "x" && test "x$GCC" != "xyes" && \
-     LD_SWITCH_SYSTEM_TEMACS="-X $LD_SWITCH_SYSTEM_TEMACS"
+     LD_SWITCH_SYSTEM_EMACS="-X $LD_SWITCH_SYSTEM_EMACS"
    ;;
 
   ## LD_SWITCH_X_SITE_RPATH is a -rpath option saying where to
@@ -6179,32 +6179,32 @@ case "$opsys" in
   ## point where configure sourced the s/*.h file, LD_SWITCH_X_SITE_RPATH
   ## had not yet been defined and was expanded to null.  Hence LD_SWITCH_SYSTEM
   ## had different values in configure (in ac_link) and src/Makefile.in.
-  ## It seems clearer therefore to put this piece in LD_SWITCH_SYSTEM_TEMACS.
-  gnu*) LD_SWITCH_SYSTEM_TEMACS="\$(LD_SWITCH_X_SITE_RPATH)" ;;
+  ## It seems clearer therefore to put this piece in LD_SWITCH_SYSTEM_EMACS.
+  gnu*) LD_SWITCH_SYSTEM_EMACS="\$(LD_SWITCH_X_SITE_RPATH)" ;;
 
   mingw32)
    ## Is it any better under MinGW64 to relocate emacs into higher addresses?
    ## If the values of -image-base are modified, the corresponding
    ## values of DEFAULT_IMAGE_BASE in w32fns.c should be kept in sync.
    case "$canonical" in
-     x86_64-*-*) LD_SWITCH_SYSTEM_TEMACS="-Wl,-stack,0x00800000 -Wl,-heap,0x00100000 -Wl,-image-base,0x400000000 -Wl,-entry,__start -Wl,-Map,./temacs.map" ;;
-     *) LD_SWITCH_SYSTEM_TEMACS="-Wl,-stack,0x00800000 -Wl,-heap,0x00100000 -Wl,-image-base,0x01000000 -Wl,-entry,__start -Wl,-Map,./temacs.map" ;;
+     x86_64-*-*) LD_SWITCH_SYSTEM_EMACS="-Wl,-stack,0x00800000 -Wl,-heap,0x00100000 -Wl,-image-base,0x400000000 -Wl,-entry,__start -Wl,-Map,./temacs.map" ;;
+     *) LD_SWITCH_SYSTEM_EMACS="-Wl,-stack,0x00800000 -Wl,-heap,0x00100000 -Wl,-image-base,0x01000000 -Wl,-entry,__start -Wl,-Map,./temacs.map" ;;
    esac
    ;;
 
-  *) LD_SWITCH_SYSTEM_TEMACS= ;;
+  *) LD_SWITCH_SYSTEM_EMACS= ;;
 esac
 
 if test x$ac_enable_profiling != x ; then
   case $opsys in
     *freebsd | gnu-linux) ;;
-    *) LD_SWITCH_SYSTEM_TEMACS="$LD_SWITCH_SYSTEM_TEMACS -pg" ;;
+    *) LD_SWITCH_SYSTEM_EMACS="$LD_SWITCH_SYSTEM_EMACS -pg" ;;
   esac
 fi
 
-LD_SWITCH_SYSTEM_TEMACS="$LD_SWITCH_SYSTEM_TEMACS"
+LD_SWITCH_SYSTEM_EMACS="$LD_SWITCH_SYSTEM_EMACS"
 
-AC_SUBST([LD_SWITCH_SYSTEM_TEMACS])
+AC_SUBST([LD_SWITCH_SYSTEM_EMACS])
 
 ## Common for all window systems
 if test "$window_system" != "none"; then
@@ -6380,7 +6380,6 @@ AS_ECHO(["  Does Emacs use -lXaw3d?                                 ${HAVE_XAW3D
   Does Emacs support Xwidgets?                            ${HAVE_XWIDGETS}
   Does Emacs support cooperative lisp threads?            ${threads_enabled}
   Does Emacs support preemptive lisp threads?             ${have_gcc_tls}
-  Does Emacs support the portable dumper?                 ${with_pdumper}
   Does Emacs have native lisp compiler?                   ${HAVE_NATIVE_COMP}
   Does Emacs use version 2 of the X Input Extension?      ${HAVE_XINPUT2}
   Does Emacs generate a smaller-size Japanese dictionary? ${with_small_ja_dic}

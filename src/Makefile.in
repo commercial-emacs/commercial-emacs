@@ -24,6 +24,8 @@ SHELL = @SHELL@
 # We use $(srcdir) explicitly in dependencies so as not to depend on VPATH.
 srcdir = @srcdir@
 top_builddir = @top_builddir@
+# MinGW CPPFLAGS may use this.
+abs_top_srcdir=@abs_top_srcdir@
 VPATH = $(srcdir)
 CC = @CC@
 CXX = @CXX@
@@ -90,6 +92,13 @@ LD_SWITCH_X_SITE_RPATH=@LD_SWITCH_X_SITE_RPATH@
 
 ## System-specific LDFLAGS.
 LD_SWITCH_SYSTEM=@LD_SWITCH_SYSTEM@
+
+## This holds any special options for linking emacs only (i.e., not
+## used by configure).
+LD_SWITCH_SYSTEM_EMACS=@LD_SWITCH_SYSTEM_EMACS@
+
+## Flags to pass to ld only for emacs.
+EMACS_LDFLAGS = $(LD_SWITCH_SYSTEM) $(LD_SWITCH_SYSTEM_EMACS)
 
 ## Some systems define this to request special libraries.
 LIBS_SYSTEM=@LIBS_SYSTEM@
@@ -462,7 +471,7 @@ FIRSTFILE_OBJ=@FIRSTFILE_OBJ@
 ALLOBJS = $(FIRSTFILE_OBJ) $(VMLIMIT_OBJ) $(obj) $(otherobj)
 
 .PHONY: all
-all: emacs.pdmp
+all: emacs.pdmp ../lisp/emacs-lisp/cldefs.el $(OTHER_FILES)
 
 ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
 all: ../native-lisp
@@ -485,24 +494,22 @@ endif
 bootstrap-emacs$(EXEEXT): ../lisp/subdirs.el | emacs$(EXEEXT)
 	cp -f $(firstword $|) $@
 
-../admin/charsets/charsets.stamp: | bootstrap-emacs$(EXEEXT) bootstrap-emacs.pdmp
-	$(MAKE) -C ../admin/charsets all EMACS=../../src/bootstrap-emacs$(EXEEXT)
-
-../lisp/international/charprop.el: ../admin/charsets/charsets.stamp
+../lisp/international/charprop.el: | bootstrap-emacs.pdmp
 	$(MAKE) -C ../admin/unidata all EMACS=../../src/bootstrap-emacs$(EXEEXT)
 
-../lisp/loaddefs.el: | bootstrap-emacs$(EXEEXT) bootstrap-emacs.pdmp
+../lisp/loaddefs.elc: | bootstrap-emacs.pdmp
 	# compile bootstrapped elisp
 	../src/bootstrap-emacs$(EXEEXT) --batch --no-site-file --no-site-lisp \
 	   --eval "(mapc (function byte-compile-file) \
 	                 (mapcar (lambda (entry) \
 	                           (concat (file-name-sans-extension (car entry)) \
 	                                   \".el\")) \
-	                         (copy-sequence load-history)))"
+	                         load-history))"
 	$(MAKE) -C ../lisp autoloads EMACS=../src/bootstrap-emacs$(EXEEXT)
+	$(MAKE) -C ../lisp loaddefs.elc EMACS=../src/bootstrap-emacs$(EXEEXT)
 
 bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT)
-emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.el ../lisp/international/charprop.el
+emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.elc ../lisp/international/charprop.el
 bootstrap-emacs.pdmp emacs.pdmp:
 	rm -f $@
 	LC_ALL=C ../src/$< --batch $(BUILD_DETAILS) $(PDUMPER_OVERWRITE) \
@@ -546,19 +553,31 @@ ALLLIBS = $(LIBS) $(W32_LIBS) $(LIBS_GNUSTEP) $(PGTK_LIBS) $(LIBX_BASE) $(LIBIMA
    $(JSON_LIBS) $(LIBGMP) $(LIBGCCJIT_LIBS) $(XINPUT_LIBS) $(HAIKU_LIBS) \
    $(SQLITE3_LIBS) $(XCOMPOSITE_LIBS) $(XSHAPE_LIBS)
 
+../lisp/international/charscript.el:
+	$(MAKE) -C ../admin/unidata ../$@
+
+../admin/charsets/charsets.stamp:
+	$(MAKE) -C ../admin/charsets all
+
+../lisp/international/emoji-zwj.el:
+	$(MAKE) -C ../admin/unidata ../$@
+
 emacs$(EXEEXT): $(LIBXMENU) $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(EMACSRES) \
-  $(MAKE_PDUMPER_FINGERPRINT) $(etc)/DOC \
+  ../admin/charsets/charsets.stamp \
+  ../lisp/international/charscript.el \
+  ../lisp/international/emoji-zwj.el \
+  $(libsrc)/make-fingerprint$(EXEEXT) $(etc)/DOC \
   $(shell 2>/dev/null git rev-parse --git-path index)
 ifeq ($(HAVE_BE_APP),yes)
 	$(AM_V_CXXLD)$(CXX) -o $@.tmp \
-	  $(ALL_CFLAGS) $(LD_SWITCH_SYSTEM) $(LDFLAGS) \
+	  $(ALL_CFLAGS) $(EMACS_LDFLAGS) $(LDFLAGS) \
 	  $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(W32_RES_LINK) $(ALLLIBS) -lstdc++
 else
 	$(AM_V_CCLD)$(CC) -o $@.tmp \
-	  $(ALL_CFLAGS) $(CXXFLAGS) $(LD_SWITCH_SYSTEM) $(LDFLAGS) \
+	  $(ALL_CFLAGS) $(CXXFLAGS) $(EMACS_LDFLAGS) $(LDFLAGS) \
 	  $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(W32_RES_LINK) $(ALLLIBS)
 endif
-	$(AM_V_at)$(MAKE_PDUMPER_FINGERPRINT) $@.tmp
+	$(AM_V_at)$(libsrc)/make-fingerprint$(EXEEXT) $@.tmp
 ifeq ($(DO_CODESIGN),yes)
 	codesign -s - -f $@.tmp
 endif
@@ -601,8 +620,6 @@ LIBEGNU_ARCHIVE = $(lib)/lib$(if $(HYBRID_MALLOC),e)gnu.a
 $(LIBEGNU_ARCHIVE): $(config_h)
 	$(MAKE) -C $(dir $@) all
 
-MAKE_PDUMPER_FINGERPRINT = $(libsrc)/make-fingerprint$(EXEEXT)
-
 ## We have to create $(etc) here because init_cmdargs tests its
 ## existence when setting Vinstallation_directory (FIXME?).
 ## This goes on to affect various things, and the emacs binary fails
@@ -627,7 +644,7 @@ emacs.res:
 	$(MAKE) -C ../nt ../src/emacs.res
 
 .PHONY: ns-app
-ns-app: all
+ns-app: emacs.pdmp
 	$(MAKE) -C ../nextstep all
 
 ETAGS = ../lib-src/etags${EXEEXT}
@@ -686,33 +703,28 @@ elnlisp := \
 	international/emoji-zwj.eln
 elnlisp := $(addprefix ../lisp/,${elnlisp}) $(lisp:.elc=.eln)
 
-%.eln: %.el | emacs$(EXEEXT) emacs.pdmp
+%.eln: %.el | emacs.pdmp
 	@$(MAKE) $(AM_V_NO_PD) -C ../lisp $<
 
-## FIXME: this is fragile!  We lie to Make about the files produced by
-## this rule, and we rely on the absence of the native-lisp directory
-## to trigger it.  This means that if anything goes wrong during
-## native compilation, the only way to trigger it again is to remove
-## the directory and re-native-compile everything.  The main
-## underlying problem is that the name of the subdirectory of
-## native-lisp where the *.eln files will be produced, and the exact
-## names of those *.eln files, cannot be known in advance; we must ask
-## Emacs to produce them.
-../native-lisp: | emacs$(EXEEXT) emacs.pdmp
+## This was obviously the wrong way to do this.
+../native-lisp: | emacs.pdmp
 	@if test ! -d $@; then \
 	  mkdir $@ && $(MAKE) $(AM_V_NO_PD) $(elnlisp); \
 	  if test $(SYSTEM_TYPE) = cygwin; then \
 	    find $@ -name '*.eln' | rebase -v -O -T -; \
 	  fi; \
-	  LC_ALL=C ./emacs$(EXEEXT) --batch $(BUILD_DETAILS) --pdump-write=$< \
-		--bin-dest $(BIN_DESTDIR) --eln-dest $(ELN_DESTDIR) \
+	  LC_ALL=C ../src/emacs$(EXEEXT) --batch $(BUILD_DETAILS) \
+	    $(PDUMPER_OVERWRITE) -l ../admin/pdump --pdump-write=emacs.pdmp \
+	    $(if $(BIN_DESTDIR),--bin-dest $(BIN_DESTDIR),) \
+	    $(if $(ELN_DESTDIR),--eln-dest $(ELN_DESTDIR),) ; \
 	  if test $(NATIVE_COMPILATION_AOT) = yes; then \
-	    $(MAKE) $(AM_V_NO_PD) -C ../lisp compile-eln-aot ELNDONE="$(addprefix %,$(notdir $(elnlisp))))"; \
+	    $(MAKE) $(AM_V_NO_PD) -C ../lisp compile-eln-aot \
+	      ELNDONE="$(addprefix %,$(notdir $(elnlisp))))"; \
 	  fi; \
 	fi
 endif
 
-../lisp/emacs-lisp/cldefs.el: | emacs$(EXEEXT)
+../lisp/emacs-lisp/cldefs.el: | emacs.pdmp
 	$(MAKE) -C ../lisp cldefs
 
 ### Flymake support (for C only)

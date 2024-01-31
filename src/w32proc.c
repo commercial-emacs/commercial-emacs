@@ -117,7 +117,7 @@ free_before_init (void *ptr)
 extern BOOL ctrl_c_handler (unsigned long type);
 
 /* MinGW64 doesn't add a leading underscore to external symbols,
-   whereas configure.ac sets up LD_SWITCH_SYSTEM_TEMACS to force the
+   whereas configure.ac sets up LD_SWITCH_SYSTEM_EMACS to force the
    entry point at __start, with two underscores.  */
 #ifdef __MINGW64__
 #define _start __start

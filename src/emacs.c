@@ -888,13 +888,51 @@ load_pdump (int argc, char **argv, char *emacs_executable)
       pdump_file = xmalloc (buflen);
       sprintf (pdump_file, "%s", emacs_executable);
       sprintf (pdump_file + strlen (pdump_file) - strlen (strip), "%s", extension);
+      if (!file_access_p (pdump_file, F_OK))
+	{
+	  xfree (pdump_file);
+	  pdump_file = NULL;
+	  buflen = 0;
+	}
     }
 
-  result = pdumper_load (pdump_file, emacs_executable);
-  if (buflen)
-    xfree (pdump_file);
+  if (pdump_file == NULL)
+    {
+      /* Look for "emacs-FINGERPRINT.pdmp" in PATH_EXEC.  We hardcode
+	 "emacs" in "emacs-FINGERPRINT.pdmp" so that the Emacs binary
+	 still works if the user copies and renames it.  */
+      const char *suffix = ".pdmp";
+      ptrdiff_t hexbuf_size = 2 * sizeof fingerprint;
+      char *hexbuf = xmalloc (hexbuf_size + 1);
+      hexbuf_digest (hexbuf, (char *) fingerprint, sizeof fingerprint);
+      hexbuf[hexbuf_size] = '\0';
+      const char *argv0_base =
+#ifdef NS_SELF_CONTAINED
+	"Emacs"
+#else
+	"emacs"
+#endif
+	;
+      buflen = (strlen (path_exec)
+		+ 1
+		+ strlen (argv0_base)
+		+ 1
+		+ strlen (hexbuf)
+		+ strlen (suffix)
+		+ 1);
+      pdump_file = xmalloc (buflen);
+      sprintf (pdump_file, "%s%c%s-%s%s",
+	       path_exec, DIRECTORY_SEP, argv0_base, hexbuf, suffix);
+      xfree (hexbuf);
+      if (!file_access_p (pdump_file, F_OK))
+	{
+	  xfree (pdump_file);
+	  pdump_file = NULL;
+	  buflen = 0;
+	}
+    }
 
-  if (result == PDUMPER_LOAD_FILE_NOT_FOUND)
+  if (pdump_file == NULL)
     {
       /* Look for basename(argv0)+".pdmp" in PATH_EXEC.  */
       const char *suffix = ".pdmp";
@@ -914,11 +952,13 @@ load_pdump (int argc, char **argv, char *emacs_executable)
 		 (int)(argv0_len - 4), argv0_base, suffix);
       else
 #endif
-      sprintf (pdump_file, "%s%c%s%s",
-	       path_exec, DIRECTORY_SEP, argv0_base, suffix);
-      result = pdumper_load (pdump_file, emacs_executable);
-      xfree (pdump_file);
+	sprintf (pdump_file, "%s%c%s%s",
+		 path_exec, DIRECTORY_SEP, argv0_base, suffix);
     }
+
+  result = pdumper_load (pdump_file, emacs_executable);
+  if (buflen)
+    xfree (pdump_file);
   return result;
 }
 

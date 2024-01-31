@@ -1285,7 +1285,6 @@ tab bar might wrap to the second line when it shouldn't.")
               current)
     current))
 
-(defvar frameset-filter-alist)
 (push '(tabs . frameset-filter-tabs) frameset-filter-alist)
 
 (defun tab-bar--tab (&optional frame)

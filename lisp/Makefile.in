@@ -22,7 +22,6 @@ SHELL = @SHELL@
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
 top_builddir = @top_builddir@
-lisp = $(srcdir)
 VPATH = $(srcdir)
 EXEEXT = @EXEEXT@
 
@@ -112,14 +111,10 @@ COMPILE_FIRST = ./emacs-lisp/loaddefs-gen.el ./emacs-lisp/radix-tree.el \
   ./international/ja-dic-cnv.el \
   ./org/ox.el ./org/ox-texinfo.el ./org/org-macro.el ./org/org-element.el \
   ./org/oc.el ./org/ol.el ./emacs-lisp/cl-lib.el
-# cus-load, finder-inf and autoloads are not explicitly requested by
-# anything, so we add them here to make sure they get built.
-all: compile $(lisp)/cus-load.el $(lisp)/finder-inf.el generate-ja-dic \
-	org-manuals autoloads
+all: compile ./cus-load.el ./finder-inf.el ./leim/ja-dic/ja-dic.elc ../doc/misc/org.texi ../doc/misc/modus-themes.texi
 
 PHONY_EXTRAS =
-.PHONY: all custom-deps finder-data autoloads update-subdirs $(PHONY_EXTRAS) \
-	generate-ja-dic org-manuals
+.PHONY: all custom-deps finder-data update-subdirs $(PHONY_EXTRAS)
 
 # custom-deps and finder-data both used to scan _all_ the *.el files.
 # This could lead to problems in parallel builds if automatically
@@ -136,37 +131,39 @@ PHONY_EXTRAS =
 # since they will never contain any useful information
 # (see finder-no-scan-regexp and custom-dependencies-no-scan-regexp).
 custom-deps:
-	$(AM_V_at)$(MAKE) PHONY_EXTRAS=$(lisp)/cus-load.el $(lisp)/cus-load.el
-$(lisp)/cus-load.el:
+	$(AM_V_at)$(MAKE) PHONY_EXTRAS=./cus-load.el ./cus-load.el
+./cus-load.el:
 	$(AM_V_GEN)$(emacs) -l cus-dep \
 	  --eval '(setq generated-custom-dependencies-file (unmsys--file-name "$(srcdir)/cus-load.el"))' \
 	  -f custom-make-dependencies ${SUBDIRS_ALMOST}
 
 finder-data:
-	$(AM_V_at)$(MAKE) PHONY_EXTRAS=$(lisp)/finder-inf.el \
-	  $(lisp)/finder-inf.el
-$(lisp)/finder-inf.el:
+	$(AM_V_at)$(MAKE) PHONY_EXTRAS=./finder-inf.el \
+	  ./finder-inf.el
+./finder-inf.el:
 	$(AM_V_GEN)$(emacs) -l finder \
 	  --eval '(setq generated-finder-keywords-file (unmsys--file-name "$(srcdir)/finder-inf.el"))' \
 	  -f finder-compile-keywords-make-dist ${SUBDIRS_FINDER}
 
 # This is the OKURO-NASI compilation trigger.
-generate-ja-dic: compile
+./leim/ja-dic/ja-dic.el: ./leim/leim-list.el
 	$(AM_V_at)$(MAKE) -C ../leim generate-ja-dic EMACS="$(EMACS)"
-	$(AM_V_at)$(MAKE) ./leim/ja-dic/ja-dic.elc
 
-org-manuals: compile
-	$(AM_V_at)$(MAKE) -C ../doc/misc org.texi modus-themes.texi
+../doc/misc/org.texi ../doc/misc/modus-themes.texi:
+	$(AM_V_at)$(MAKE) -C ../doc/misc $@
 
-autoloads: leim
+.PHONY: autoloads
+autoloads: ./loaddefs.el
+
+./loaddefs.el: ./leim/leim-list.el
 	$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile \
 	  ../lisp/emacs-lisp/loaddefs-gen.el
 	$(AM_V_GEN)$(emacs) \
-            -l $(lisp)/emacs-lisp/loaddefs-gen \
+            -l ./emacs-lisp/loaddefs-gen \
 	    -f loaddefs-generate--emacs-batch ${SUBDIRS_ALMOST}
 
-cldefs .PHONY: $(lisp)/emacs-lisp/cldefs.el
-$(lisp)/emacs-lisp/cldefs.el: $(lisp)/emacs-lisp/cldefs.el.in
+cldefs .PHONY: ./emacs-lisp/cldefs.el
+./emacs-lisp/cldefs.el: ./emacs-lisp/cldefs.el.in
 	$(AM_V_GEN)$(emacs) -l pp -l "cldefs.el.in" \
 	    --eval "(with-temp-file (expand-file-name (unmsys--file-name \"$@\")) \
 	              (insert \";; Automatically generated from cldefs.el.in.  \" \
@@ -185,20 +182,11 @@ $(lisp)/emacs-lisp/cldefs.el: $(lisp)/emacs-lisp/cldefs.el.in
 	                \";;; cldefs.el ends here\n\" \
 	                ))"
 
-# autoloads only runs when loaddefs.el is nonexistent, although it
-# generates a number of different files. Provide a force option to enable
-# regeneration of all these files.
-.PHONY: autoloads-force
-autoloads-force:
-	rm -f $(lisp)/loaddefs.el
-	$(MAKE) autoloads
-
-ldefs-boot.el: autoloads-force
-	sed '/^;; Local Variables:/a ;; no-byte-compile: t'\
-		< $(lisp)/loaddefs.el > $(lisp)/ldefs-boot.el
+./ldefs-boot.el: ./loaddefs.el
+	sed '/^;; Local Variables:/a ;; no-byte-compile: t' < $< > $@
 
 # Overwrought load-path augmentation dates back to 1994.
-$(lisp)/subdirs.el:
+./subdirs.el:
 	$(AM_V_GEN)$(MAKE) update-subdirs
 update-subdirs:
 	$(AM_V_at)for file in ${SUBDIRS_SUBDIRS}; do \
@@ -208,18 +196,13 @@ update-subdirs:
 .PHONY: updates repo-update update-authors
 
 # Some modes of make-dist use this.
-updates: update-subdirs autoloads finder-data custom-deps
+updates: update-subdirs finder-data custom-deps
 
 repo-update: compile finder-data custom-deps
-
-# Update etc/AUTHORS
 
 update-authors:
 	$(emacs) -L "$(top_srcdir)/admin" -l authors \
 	  -f batch-update-authors "$(top_srcdir)/etc/AUTHORS" "$(top_srcdir)"
-
-FORCE:
-.PHONY: FORCE
 
 tagsfiles = $(shell find ${srcdir} -name '*.el' \
 	        ! -name '.*' ! -name '*loaddefs.el' ! -name '*cldefs.el')
@@ -228,7 +211,7 @@ tagsfiles := $(filter-out ${srcdir}/eshell/esh-groups.el,${tagsfiles})
 
 ETAGS = ../lib-src/etags${EXEEXT}
 
-${ETAGS}: FORCE
+${ETAGS}:
 	${MAKE} -C ../lib-src $(notdir $@)
 
 ## The use of xargs is to stop the command line getting too long
@@ -240,56 +223,19 @@ TAGS: ${ETAGS} ${tagsfiles}
 	$(AM_V_at)touch $@
 	$(AM_V_at)ls ${tagsfiles} | xargs $(XARGS_LIMIT) "${ETAGS}" -a -o $@
 
-
-# The src/Makefile.in has its own set of dependencies and when they decide
-# that one Lisp file needs to be re-compiled, we had better recompile it as
-# well, otherwise every subsequent make will again call us, until we finally
-# end up deciding that yes, the file deserves recompilation.
-# One option is to try and reproduce exactly the same dependencies here as
-# we have in src/Makefile.in, but it turns out to be painful
-# (e.g. src/Makefile.in may have a dependency for ../lisp/foo.elc where we
-# only know of $(lisp)/foo.elc).  So instead we provide a direct way for
-# src/Makefile.in to rebuild a particular Lisp file, no questions asked.
-# Use byte-compile-refresh-preloaded to try and work around some of
-# the most common problems of not bootstrapping from a clean state.
-THEFILE = no-such-file
-.PHONY: $(THEFILE)c
-$(THEFILE)c:
 ifeq ($(HAVE_NATIVE_COMP),yes)
-	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) \
-		-l comp -f byte-compile-refresh-preloaded \
-		-f batch-byte+native-compile $(THEFILE)
-else
-	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) \
-		-l bytecomp -f byte-compile-refresh-preloaded \
-		-f batch-byte-compile $(THEFILE)
-endif
-
-ifeq ($(HAVE_NATIVE_COMP),yes)
-.PHONY: $(THEFILE)n
-$(THEFILE)n:
-	$(AM_V_ELN)$(emacs) $(BYTE_COMPILE_FLAGS) \
-		-l comp -f byte-compile-refresh-preloaded \
-		--eval '(batch-native-compile t)' $(THEFILE)
-endif
-
-ifeq ($(HAVE_NATIVE_COMP),yes)
-# Two passes, first to .elc, second to .eln.
-# acm claims this is faster than direct to .eln from .el.
+# Two passes, first to .elc, second to .eln.  acm claims this is faster
+# than direct to .eln from .el.
 $(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
 	$(AM_V_ELC)NATIVE_DISABLED=$(NATIVE_SKIP_NONDUMP) \
-	$(emacs) $(BYTE_COMPILE_FLAGS) \
-	-l comp -f batch-byte-compile $<
+	  $(emacs) $(BYTE_COMPILE_FLAGS) -l comp -f batch-byte-compile $<
 	$(AM_V_ELC)NATIVE_DISABLED=$(NATIVE_SKIP_NONDUMP) \
-	$(emacs) $(BYTE_COMPILE_FLAGS) \
-	-l comp -f batch-byte+native-compile $<
+	  $(emacs) $(BYTE_COMPILE_FLAGS) -l comp -f batch-byte+native-compile $<
 %.elc: %.el $(BYTE_COMPILER_EL:.el=.elc)
 	$(AM_V_ELC)NATIVE_DISABLED=$(NATIVE_SKIP_NONDUMP) \
-	$(emacs) $(BYTE_COMPILE_FLAGS) \
-	-l comp -f batch-byte-compile $<
+	  $(emacs) $(BYTE_COMPILE_FLAGS) -l comp -f batch-byte-compile $<
 	$(AM_V_ELC)NATIVE_DISABLED=$(NATIVE_SKIP_NONDUMP) \
-	$(emacs) $(BYTE_COMPILE_FLAGS) \
-	-l comp -f batch-byte+native-compile $<
+	  $(emacs) $(BYTE_COMPILE_FLAGS) -l comp -f batch-byte+native-compile $<
 else
 $(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
 	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile $<
@@ -310,7 +256,7 @@ $(filter-out $(BYTE_COMPILER_EL:.el=.elc) $(COMPILE_FIRST:.el=.elc),$(shell for 
 endef
 
 .PHONY: compile-compiler
-compile-compiler: $(BYTE_COMPILER_EL:.el=.elc) | autoloads
+compile-compiler: $(BYTE_COMPILER_EL:.el=.elc)
 
 .SECONDEXPANSION:
 .PHONY: compile
@@ -319,8 +265,7 @@ compile: compile-clean compile-compiler $(COMPILE_FIRST:.el=.elc) $$(compile-res
 .PHONY: compile-clean
 # Erase left-over .elc files that do not have a corresponding .el file.
 compile-clean:
-	@cd $(lisp) && \
-	elcs=`echo "${SUBDIRS_REL} " | sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.elc |g'`; \
+	@elcs=`echo "${SUBDIRS_REL} " | sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.elc |g'`; \
 	for el in `echo $$elcs | sed -e 's/\.elc/\.el/g'`; do \
 	  if test -f "$$el" || test ! -f "$${el}c"; then :; else \
 	    echo rm "$${el}c"; \
@@ -328,14 +273,13 @@ compile-clean:
 	  fi; \
 	done
 
-.PHONY: leim
-leim: $(lisp)/international/titdic-cnv.elc
+./leim/leim-list.el: ./international/titdic-cnv.elc
 	$(MAKE) -C ../leim all EMACS="$(EMACS)"
 
 # Force world rebuild.
 .PHONY: compile-always
 compile-always:
-	find $(lisp) -name '*.elc' $(FIND_DELETE)
+	find . -name '*.elc' $(FIND_DELETE)
 	@$(MAKE) compile
 
 .PHONY: trampolines
@@ -363,8 +307,7 @@ endif
 # This is called from ../src/Makefile when building a release tarball
 # configured --with-native-compilation=aot.
 compile-eln-aot:
-	@(cd $(lisp) && 			     \
-	els=`echo "${SUBDIRS_REL} " | sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.el |g'`; \
+	@(els=`echo "${SUBDIRS_REL} " | sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.el |g'`; \
 	for el in $$els; do            \
 	  test -f $$el || continue; 		     \
 	  test -f $${el}c || continue; 		     \
@@ -386,8 +329,8 @@ compile-eln-aot:
 # exists, make a backup of it.
 
 backup-compiled-files:
-	-mv $(lisp)/elc.tar.gz $(lisp)/elc.tar.gz~
-	-tar czf $(lisp)/elc.tar.gz $(lisp)/*.elc $(lisp)/*/*.elc $(lisp)/*/*/*.elc $(lisp)/*/*/*/*.elc
+	-mv ./elc.tar.gz ./elc.tar.gz~
+	-tar czf ./elc.tar.gz ./*.elc ./*/*.elc ./*/*/*.elc ./*/*/*/*.elc
 
 # Compile Lisp files, but save old compiled files first.
 
@@ -411,16 +354,16 @@ compile-after-backup: backup-compiled-files compile-always
 .PHONY: compile-one-process
 compile-one-process: compile-compiler
 	$(emacs) $(BYTE_COMPILE_FLAGS) \
-	    --eval "(batch-byte-recompile-directory 0)" $(lisp)
+	    --eval "(batch-byte-recompile-directory 0)" .
 
 .PHONY: bootstrap-clean distclean maintainer-clean
 
 bootstrap-clean:
-	find $(lisp) -name '*.elc' $(FIND_DELETE)
+	find . -name '*.elc' $(FIND_DELETE)
 	rm -f $(AUTOGENEL)
 
 distclean:
-	-rm -f ./Makefile $(lisp)/loaddefs.el $(lisp)/emacs-lisp/cldefs.el
+	-rm -f ./Makefile ./loaddefs.el ./emacs-lisp/cldefs.el
 
 maintainer-clean: distclean bootstrap-clean
 	rm -f TAGS
@@ -428,7 +371,7 @@ maintainer-clean: distclean bootstrap-clean
 .PHONY: check-declare
 
 check-declare:
-	$(emacs) -l check-declare --eval '(check-declare-directory "$(lisp)")'
+	$(emacs) -l check-declare --eval '(check-declare-directory ".")'
 
 ## This finds a lot of duplicates between foo.el and obsolete/foo.el.
 check-defun-dups:
@@ -448,43 +391,43 @@ check-defun-dups:
 # CC Mode uses a compile time macro system which causes a compile time
 # dependency in cc-*.elc files on the macros in other cc-*.el and the
 # version string in cc-defs.el.
-$(lisp)/progmodes/cc-align.elc\
- $(lisp)/progmodes/cc-cmds.elc $(lisp)/progmodes/cc-compat.elc\
- $(lisp)/progmodes/cc-engine.elc $(lisp)/progmodes/cc-fonts.elc\
- $(lisp)/progmodes/cc-langs.elc $(lisp)/progmodes/cc-menus.elc\
- $(lisp)/progmodes/cc-mode.elc $(lisp)/progmodes/cc-styles.elc\
- $(lisp)/progmodes/cc-vars.elc: \
-   $(lisp)/progmodes/cc-bytecomp.elc $(lisp)/progmodes/cc-defs.elc
+./progmodes/cc-align.elc\
+ ./progmodes/cc-cmds.elc ./progmodes/cc-compat.elc\
+ ./progmodes/cc-engine.elc ./progmodes/cc-fonts.elc\
+ ./progmodes/cc-langs.elc ./progmodes/cc-menus.elc\
+ ./progmodes/cc-mode.elc ./progmodes/cc-styles.elc\
+ ./progmodes/cc-vars.elc: \
+   ./progmodes/cc-bytecomp.elc ./progmodes/cc-defs.elc
 
-$(lisp)/progmodes/cc-align.elc $(lisp)/progmodes/cc-cmds.elc: \
-   $(lisp)/progmodes/cc-vars.elc $(lisp)/progmodes/cc-engine.elc
+./progmodes/cc-align.elc ./progmodes/cc-cmds.elc: \
+   ./progmodes/cc-vars.elc ./progmodes/cc-engine.elc
 
-$(lisp)/progmodes/cc-compat.elc: \
-   $(lisp)/progmodes/cc-vars.elc $(lisp)/progmodes/cc-styles.elc \
-   $(lisp)/progmodes/cc-engine.elc
+./progmodes/cc-compat.elc: \
+   ./progmodes/cc-vars.elc ./progmodes/cc-styles.elc \
+   ./progmodes/cc-engine.elc
 
-$(lisp)/progmodes/cc-defs.elc: $(lisp)/progmodes/cc-bytecomp.elc
+./progmodes/cc-defs.elc: ./progmodes/cc-bytecomp.elc
 
-$(lisp)/progmodes/cc-engine.elc: $(lisp)/progmodes/cc-langs.elc \
-   $(lisp)/progmodes/cc-vars.elc
+./progmodes/cc-engine.elc: ./progmodes/cc-langs.elc \
+   ./progmodes/cc-vars.elc
 
-$(lisp)/progmodes/cc-fonts.elc: $(lisp)/progmodes/cc-langs.elc \
-   $(lisp)/progmodes/cc-vars.elc $(lisp)/progmodes/cc-engine.elc
+./progmodes/cc-fonts.elc: ./progmodes/cc-langs.elc \
+   ./progmodes/cc-vars.elc ./progmodes/cc-engine.elc
 
-$(lisp)/progmodes/cc-langs.elc: $(lisp)/progmodes/cc-vars.elc
+./progmodes/cc-langs.elc: ./progmodes/cc-vars.elc
 
-$(lisp)/progmodes/cc-mode.elc: $(lisp)/progmodes/cc-langs.elc \
-   $(lisp)/progmodes/cc-vars.elc $(lisp)/progmodes/cc-engine.elc \
-   $(lisp)/progmodes/cc-styles.elc $(lisp)/progmodes/cc-cmds.elc \
-   $(lisp)/progmodes/cc-align.elc $(lisp)/progmodes/cc-menus.elc
+./progmodes/cc-mode.elc: ./progmodes/cc-langs.elc \
+   ./progmodes/cc-vars.elc ./progmodes/cc-engine.elc \
+   ./progmodes/cc-styles.elc ./progmodes/cc-cmds.elc \
+   ./progmodes/cc-align.elc ./progmodes/cc-menus.elc
 
-$(lisp)/progmodes/cc-styles.elc: $(lisp)/progmodes/cc-vars.elc \
-   $(lisp)/progmodes/cc-align.elc
+./progmodes/cc-styles.elc: ./progmodes/cc-vars.elc \
+   ./progmodes/cc-align.elc
 
 # https://debbugs.gnu.org/43037
 # js.elc (like all modes using CC Mode's compile time macros) needs to
 # be compiled under the same version of CC Mode it will run with.
-$(lisp)/progmodes/js.elc: $(lisp)/progmodes/cc-defs.elc \
-   $(lisp)/progmodes/cc-engine.elc $(lisp)/progmodes/cc-mode.elc
+./progmodes/js.elc: ./progmodes/cc-defs.elc \
+   ./progmodes/cc-engine.elc ./progmodes/cc-mode.elc
 
 # Makefile ends here.

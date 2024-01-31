@@ -254,7 +254,7 @@ This has effect only if `search-invisible' is set to `open'."
 
 ;;;###autoload
 (defvar hs-special-modes-alist
-  (mapcar #'purecopy
+  (mapcar #'purecopy-maybe
   '((c-mode "{" "}" "/[*/]" nil nil)
     (c-ts-mode "{" "}" "/[*/]" nil nil)
     (c++-mode "{" "}" "/[*/]" nil nil)
