@@ -243,7 +243,7 @@ Check it when `gud-running' is t")
      :visible (eq gud-minor-mode 'gdbmi)]
     ["Print Expression" gud-print
      :enable (not gud-running)]
-    ["Dump object-Dereference" gud-pstar
+    ["Dump object-Derefenrece" gud-pstar
      :label (if (eq gud-minor-mode 'jdb)
 	        "Dump object"
               "Print Dereference")
