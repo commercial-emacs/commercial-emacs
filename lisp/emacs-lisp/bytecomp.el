@@ -352,7 +352,7 @@ A value of `all' really means all."
   '(docstrings-non-ascii-quotes)
   "List of warning types that are only enabled during Emacs builds.
 This is typically either warning types that are being phased in
-(but shouldn't be enabled for packages yet), or that are only relevant
+\(but shouldn't be enabled for packages yet), or that are only relevant
 for the Emacs build itself.")
 
 (defvar byte-compile--suppressed-warnings nil
@@ -1706,64 +1706,79 @@ Also ignore URLs."
 The byte-compiler will emit a warning for documentation strings
 containing lines wider than this.  If `fill-column' has a larger
 value, it will override this variable."
-  :group 'bytecomp
   :type 'natnum
   :safe #'natnump
   :version "28.1")
 
-(define-obsolete-function-alias 'byte-compile-docstring-length-warn
-  'byte-compile-docstring-style-warn "29.1")
+(defun byte-compile--list-with-n (list n elem)
+  "Return LIST with its Nth element replaced by ELEM."
+  (if (eq elem (nth n list))
+      list
+    (nconc (take n list)
+           (list elem)
+           (nthcdr (1+ n) list))))
 
-(defun byte-compile-docstring-style-warn (form)
-  "Warn if there are stylistic problems with the docstring in FORM.
-Warn if documentation string of FORM is too wide.
+(defun byte-compile--docstring-style-warn (docs kind name)
+  "Warn if there are stylistic problems in the docstring DOCS.
+Warn if documentation string is too wide.
 It is too wide if it has any lines longer than the largest of
 `fill-column' and `byte-compile-docstring-max-column'."
   (when (byte-compile-warning-enabled-p 'docstrings)
-    (let* ((kind nil) (name nil) (docs nil)
+    (let* ((name (if (eq (car-safe name) 'quote) (cadr name) name))
            (prefix (lambda ()
                      (format "%s%s"
                              kind
-                             (if name (format-message " `%s' " name) "")))))
-      (pcase (car form)
-        ((or 'autoload 'custom-declare-variable 'defalias
-             'defconst 'define-abbrev-table
-             'defvar 'defvaralias
-             'custom-declare-face)
-         (setq kind (nth 0 form))
-         (setq name (nth 1 form))
-         (when (and (consp name) (eq (car name) 'quote))
-           (setq name (cadr name)))
-         (setq docs (nth 3 form)))
-        ('lambda
-          (setq kind "")          ; can't be "function", unfortunately
-          (setq docs (nth 2 form))))
-      (when (and kind docs (stringp docs))
-	(let ((col (max byte-compile-docstring-max-column fill-column)))
-          (when (byte-compile--wide-docstring-p docs col)
-            (byte-compile-warn
-             "%sdocstring wider than %s characters" (funcall prefix) col)))
-        ;; There's a "naked" ' character before a symbol/list, so it
-        ;; should probably be quoted with \=.
-        (when (string-match-p (rx (| (in " \t") bol)
-                                  (? (in "\"#"))
-                                  "'"
-                                  (in "A-Za-z" "("))
+                             (if name (format-message " `%S' " name) "")))))
+      (let ((col (max byte-compile-docstring-max-column fill-column)))
+        (when (and (byte-compile-warning-enabled-p 'docstrings-wide)
+                   (byte-compile--wide-docstring-p docs col))
+          (byte-compile-warn
+           "%sdocstring wider than %s characters" (funcall prefix) col)))
+      ;; There's a "naked" ' character before a symbol/list, so it
+      ;; should probably be quoted with \=.
+      (when (string-match-p (rx (| (in " \t") bol)
+                                (? (in "\"#"))
+                                "'"
+                                (in "A-Za-z" "("))
+                            docs)
+        (byte-compile-warn
+         (concat "%sdocstring has wrong usage of unescaped single quotes"
+                 " (use \\=%c or different quoting such as %c...%c)")
+         (funcall prefix) ?' ?` ?'))
+      ;; There's a "Unicode quote" in the string -- it should probably
+      ;; be an ASCII one instead.
+      (when (byte-compile-warning-enabled-p 'docstrings-non-ascii-quotes)
+        (when (string-match-p (rx (| " \"" (in " \t") bol)
+                                  (in "‘’"))
                               docs)
           (byte-compile-warn
-           (concat "%sdocstring has wrong usage of unescaped single quotes"
-                   " (use \\=%c or different quoting such as %c...%c)")
-           (funcall prefix) ?' ?` ?'))
-        ;; There's a "Unicode quote" in the string -- it should probably
-        ;; be an ASCII one instead.
-        (when (byte-compile-warning-enabled-p 'docstrings-non-ascii-quotes)
-          (when (string-match-p (rx (| " \"" (in " \t") bol)
-                                    (in "‘’"))
-                                docs)
-            (byte-compile-warn
-             "%sdocstring uses curved single quotes; use %s instead of ‘...’"
-             (funcall prefix) "`...'"))))))
-  form)
+           "%sdocstring uses curved single quotes; use %s instead of ‘...’"
+           (funcall prefix) "`...'"))))))
+
+(defvar byte-compile--\#$) ; Special value that will print as `#$'.
+(defvar byte-compile--docstrings nil "Table of already compiled docstrings.")
+
+(defun byte-compile--docstring (doc kind name &optional is-a-value)
+  (byte-compile--docstring-style-warn doc kind name)
+  ;; Make docstrings dynamic, when applicable.
+  (cond
+   ((and byte-compile-dynamic-docstrings
+         ;; The native compiler doesn't use those dynamic docstrings.
+         (not byte-native-compiling)
+         ;; Docstrings can only be dynamic when compiling a file.
+         byte-compile--\#$)
+    (let* ((byte-pos (with-memoization
+                         ;; Reuse a previously written identical docstring.
+                         ;; This is not done out of thriftiness but to try and
+                         ;; make sure that "equal" functions remain `equal'.
+                         ;; (Often those identical docstrings come from
+                         ;; `help-add-fundoc-usage').
+                         ;; Needed e.g. for `advice-tests-nadvice'.
+                         (gethash doc byte-compile--docstrings)
+                       (byte-compile-output-as-comment doc nil)))
+           (newdoc (cons byte-compile--\#$ byte-pos)))
+      (if is-a-value newdoc (macroexp-quote newdoc))))
+   (t doc)))
 
 (defun byte-compile-warn--undefined-funcs ()
   (prog1 nil
@@ -1793,6 +1808,8 @@ and cl-macs.el.")
           ;; macroenvironment.
           (copy-alist byte-compile-initial-macro-environment))
          (byte-compile--outbuffer nil)
+         (byte-compile--\#$ nil)
+         (byte-compile--docstrings (make-hash-table :test 'equal))
          (overriding-plist-environment nil)
          (byte-compile-function-environment nil)
          (byte-compile-bound-variables nil)
@@ -2257,7 +2274,12 @@ With argument ARG, insert value in current buffer after the form."
        (setq case-fold-search nil))
      (displaying-byte-compile-warnings
       (with-current-buffer inbuffer
-	(when byte-compile-current-file
+	(when byte-compile-dest-file
+          (setq byte-compile--\#$
+                (copy-sequence ;It needs to be a fresh new object.
+                 ;; Also it stands for the `load-file-name' when the `.elc' will
+                 ;; be loaded, so make it look like it.
+                 byte-compile-dest-file))
 	  (byte-compile-insert-header byte-compile-current-file
                                       byte-compile--outbuffer))
 	(goto-char (point-min))
@@ -2357,121 +2379,15 @@ stupid (and also obsolete)."
         (print-level nil)
         (print-quoted t)
         (print-gensym t)
-        (print-circle t))               ; Handle circular data structures.
-    (if (memq (car-safe form) '(defvar defvaralias defconst
-                                 autoload custom-declare-variable))
-        (byte-compile-output-docform nil nil nil '("\n(" ")") form nil 3
-                                     (memq (car form)
-                                           '(defvaralias autoload
-                                              custom-declare-variable)))
-      (princ "\n" byte-compile--outbuffer)
-      (prin1 form byte-compile--outbuffer))))
+        (print-circle t)
+        (print-continuous-numbering t)
+        (print-number-table (make-hash-table :test #'eq)))
+    (when byte-compile--\#$
+      (puthash byte-compile--\#$ "#$" print-number-table))
+    (princ "\n" byte-compile--outbuffer)
+    (prin1 form byte-compile--outbuffer)))
 
 (defvar byte-compile--for-effect)
-
-(defun byte-compile--output-docform-recurse
-    (info position form cvecindex docindex quoted)
-  "Print a form with a doc string.  INFO is (prefix postfix).
-POSITION is where the next doc string is to be inserted.
-CVECINDEX is the index in the FORM of the constant vector, or nil.
-DOCINDEX is the index of the doc string (or nil) in the FORM.
-QUOTED says that we have to put a quote before the
-list that represents a doc string reference.
-`defvaralias', `autoload' and `custom-declare-variable' need that.
-
-Return the position after any inserted docstrings as comments."
-  (let ((index 0)
-        doc-string-position)
-    ;; Insert the doc string, and make it a comment with #@LENGTH.
-    (when (and byte-compile-dynamic-docstrings
-               (stringp (nth docindex form)))
-      (goto-char position)
-      (setq doc-string-position
-            (byte-compile-output-as-comment
-             (nth docindex form) nil)
-            position (point))
-      (goto-char (point-max)))
-
-    (insert (car info))
-    (prin1 (car form) byte-compile--outbuffer)
-    (while (setq form (cdr form))
-      (setq index (1+ index))
-      (insert " ")
-      (cond ((eq index cvecindex)
-             (let* ((cvec (car form))
-                    (len (length cvec))
-                    (index2 0)
-                    elt)
-               (insert "[")
-               (while (< index2 len)
-                 (setq elt (aref cvec index2))
-                 (if (byte-code-function-p elt)
-                     (setq position
-                           (byte-compile--output-docform-recurse
-                            '("#[" "]") position
-                            (append elt nil) ; Convert the vector to a list.
-                            2 4 nil))
-                   (prin1 elt byte-compile--outbuffer))
-                 (setq index2 (1+ index2))
-                 (unless (eq index2 len)
-                   (insert " ")))
-               (insert "]")))
-            ((= index docindex)
-             (cond
-              (doc-string-position
-               (princ (format (if quoted "'(#$ . %d)"  "(#$ . %d)")
-                              doc-string-position)
-                      byte-compile--outbuffer))
-              ((stringp (car form))
-               (let ((print-escape-newlines nil))
-                 (goto-char (prog1 (1+ (point))
-                              (prin1 (car form)
-                                     byte-compile--outbuffer)))
-                 (insert "\\\n")
-                 (goto-char (point-max))))
-              (t (prin1 (car form) byte-compile--outbuffer))))
-            (t (prin1 (car form) byte-compile--outbuffer))))
-    (insert (cadr info))
-    position))
-
-(defun byte-compile-output-docform (preface tailpiece name info form
-                                            cvecindex docindex
-                                            quoted)
-  "Print a form with a doc string.  INFO is (prefix postfix).
-If PREFACE, NAME, and TAILPIECE are non-nil, print them too,
-before/after INFO and the FORM but after the doc string itself.
-CVECINDEX is the index in the FORM of the constant vector, or nil.
-DOCINDEX is the index of the doc string (or nil) in the FORM.
-QUOTED says that we have to put a quote before the
-list that represents a doc string reference.
-`defvaralias', `autoload' and `custom-declare-variable' need that."
-  ;; We need to examine byte-compile-dynamic-docstrings
-  ;; in the input buffer (now current), not in the output buffer.
-  (let ((dynamic-docstrings byte-compile-dynamic-docstrings))
-    (with-current-buffer byte-compile--outbuffer
-      (let ((byte-compile-dynamic-docstrings dynamic-docstrings)
-            (position (point))
-            (print-continuous-numbering t)
-            print-number-table
-            ;; FIXME: The bindings below are only needed for when we're
-            ;; called from ...-defmumble.
-            (print-escape-newlines t)
-            (print-length nil)
-            (print-level nil)
-            (print-quoted t)
-            (print-gensym t)
-            (print-circle t))       ; Handle circular data structures.
-        (when preface
-          ;; FIXME: We don't handle uninterned names correctly.
-          ;; E.g. if cl-define-compiler-macro uses uninterned name we get:
-          ;;    (defalias '#1=#:foo--cmacro #[514 ...])
-          ;;    (put 'foo 'compiler-macro '#:foo--cmacro)
-          (insert preface)
-          (prin1 name byte-compile--outbuffer))
-        (byte-compile--output-docform-recurse
-         info position form cvecindex docindex quoted)
-        (when tailpiece
-          (insert tailpiece))))))
 
 (defun byte-compile-keep-pending (form &optional handler)
   (prog1 nil
@@ -2488,19 +2404,18 @@ list that represents a doc string reference.
       (byte-compile-form form t))))
 
 (defun byte-compile-flush-pending ()
-  "Compile pending forms at end of file."
   (when byte-compile-output
-    (let ((form (byte-compile-out-top-level t 'file)))
-      (cond ((eq (car-safe form) 'progn)
-	     (mapc #'byte-compile-output-file-form (cdr form)))
-	    (form
-	     (byte-compile-output-file-form form)))
-      (setq byte-compile-constants nil
-	    byte-compile-variables nil
-	    byte-compile-depth 0
-	    byte-compile-maxdepth 0
-	    byte-compile-output nil
-            byte-compile-jump-tables nil))))
+      (let ((form (byte-compile-out-top-level t 'file)))
+	(cond ((eq (car-safe form) 'progn)
+	       (mapc #'byte-compile-output-file-form (cdr form)))
+	      (form
+	       (byte-compile-output-file-form form)))
+	(setq byte-compile-constants nil
+	      byte-compile-variables nil
+	      byte-compile-depth 0
+	      byte-compile-maxdepth 0
+	      byte-compile-output nil
+              byte-compile-jump-tables nil))))
 
 (defun byte-compile-preprocess (form)
   (let ((form* (macroexpand-all form byte-compile-macro-environment)))
@@ -2539,11 +2454,12 @@ list that represents a doc string reference.
      (setq byte-compile--undefined-funcs
            (delq (assq funsym byte-compile--undefined-funcs)
                  byte-compile--undefined-funcs))))
-  (if (stringp (nth 3 form))
-      (prog1 form
-        (byte-compile-docstring-style-warn form))
-    ;; No doc string, so we can compile this as a normal form.
-    (byte-compile-keep-pending form 'byte-compile-normal-call)))
+  (let* ((doc (nth 3 form))
+         (newdoc (if (not (stringp doc)) doc
+                   (byte-compile--docstring
+                    doc 'autoload (nth 1 form)))))
+    (byte-compile-keep-pending (byte-compile--list-with-n form 3 newdoc)
+                               #'byte-compile-normal-call)))
 
 (put 'defvar 'byte-hunk-handler 'byte-compile-file-form-defvar)
 (put 'defconst 'byte-hunk-handler 'byte-compile-file-form-defvar)
@@ -2554,9 +2470,10 @@ list that represents a doc string reference.
              (byte-compile-warning-enabled-p 'lexical sym))
     (byte-compile-warn "global/dynamic var `%s' lacks a prefix" sym)))
 
-(defun byte-compile--declare-var (sym)
+(defun byte-compile--declare-var (sym &optional not-toplevel)
   (byte-compile--check-prefixed-var sym)
-  (when (memq sym byte-compile-lexical-variables)
+  (when (and (not not-toplevel)
+             (memq sym byte-compile-lexical-variables))
     (setq byte-compile-lexical-variables
           (delq sym byte-compile-lexical-variables))
     (when (byte-compile-warning-enabled-p 'lexical sym)
@@ -2565,17 +2482,7 @@ list that represents a doc string reference.
   (push sym byte-compile--seen-defvars))
 
 (defun byte-compile-file-form-defvar (form)
-  (let ((sym (nth 1 form)))
-    (byte-compile--declare-var sym)
-    (when (eq (car form) 'defconst)
-      (push sym byte-compile-const-variables)))
-  (when (or (cddr form) (not (eq (car form) 'defvar)))
-    (byte-compile-docstring-style-warn form)
-    (cond ((consp (nth 2 form))
-           (setq form (copy-sequence form))
-           (setcar (cdr (cdr form))
-                   (byte-compile-top-level (nth 2 form) nil 'file))))
-    form))
+  (byte-compile-defvar form 'toplevel))
 
 (put 'define-abbrev-table 'byte-hunk-handler
      'byte-compile-file-form-defvar-function)
@@ -2583,25 +2490,35 @@ list that represents a doc string reference.
 
 (defun byte-compile-file-form-defvar-function (form)
   (pcase-let (((or `',name (let name nil)) (nth 1 form)))
-    (when name (byte-compile--declare-var name)))
-  ;; Variable aliases are better declared before the corresponding variable,
-  ;; since it makes it more likely that only one of the two vars has a value
-  ;; before the `defvaralias' gets executed, which avoids the need to
-  ;; merge values.
-  (pcase form
-    (`(defvaralias ,_ ',newname . ,_)
-     (when (memq newname byte-compile-bound-variables)
-       (when (byte-compile-warning-enabled-p 'suspicious)
-         (byte-compile-warn
-          "Alias for `%S' should be declared before its referent" newname)))))
-  (byte-compile-docstring-style-warn form)
-  (byte-compile-keep-pending form))
+    (when name (byte-compile--declare-var name))
+    ;; Variable aliases are better declared before the corresponding variable,
+    ;; since it makes it more likely that only one of the two vars has a value
+    ;; before the `defvaralias' gets executed, which avoids the need to
+    ;; merge values.
+    (pcase form
+      (`(defvaralias ,_ ',newname . ,_)
+       (when (memq newname byte-compile-bound-variables)
+	 (when (byte-compile-warning-enabled-p 'suspicious)
+           (byte-compile-warn
+            "Alias for `%S' should be declared before its referent" newname)))))
+    (let ((doc (nth 3 form)))
+      (when (stringp doc)
+	(setcar (nthcdr 3 form)
+		(byte-compile--docstring doc (nth 0 form) name))))
+    (byte-compile-keep-pending form)))
 
 (put 'custom-declare-variable 'byte-hunk-handler
      'byte-compile-file-form-defvar-function)
 
 (put 'custom-declare-face 'byte-hunk-handler
-     'byte-compile-docstring-style-warn)
+     #'byte-compile--custom-declare-face)
+(defun byte-compile--custom-declare-face (form)
+  (let ((kind (nth 0 form)) (name (nth 1 form)) (docs (nth 3 form)))
+    (when (stringp docs)
+      (let ((newdocs (byte-compile--docstring docs kind name)))
+        (unless (eq docs newdocs)
+          (setq form (byte-compile--list-with-n form 3 newdocs)))))
+    form))
 
 (put 'require 'byte-hunk-handler 'byte-compile-file-form-require)
 (defun byte-compile-file-form-require (form)
@@ -2743,32 +2660,23 @@ otherwise."
               (setcdr this-one code))
           (set this-kind (cons (cons name code) (symbol-value this-kind))))
 
-        (if rest
-            ;; There are additional args to `defalias' (like maybe a docstring)
-            ;; that the code below can't handle: punt!
-            nil
-          ;; Otherwise, we have a bona-fide defun/defmacro definition, and use
-          ;; special code to allow dynamic docstrings and byte-code.
-          (byte-compile-flush-pending)
+        (byte-compile-flush-pending)
+        (let ((newform `(defalias ',name
+                          ,(if macro-p `'(macro . ,code) code) ,@rest)))
           (when byte-native-compiling
-            ;; Spill output for the native compiler here.
+            ;; Don't let `byte-compile-output-file-form' push the form to
+            ;; `byte-to-native-top-level-forms' because we want to use
+            ;; `make-byte-to-native-func-def' when possible.
             (push
-             (if macro-p
+             (if (or macro-p rest)
                  (make-byte-to-native-top-level
-                  :form `(defalias ',name '(macro . ,code) nil)
+                  :form newform
                   :lexical lexical-binding)
                (make-byte-to-native-func-def :name name
                                              :byte-func code))
              byte-to-native-top-level-forms))
-          ;; Output the form by hand, that's much simpler than having
-          ;; b-c-output-file-form analyze the defalias.
-          (byte-compile-output-docform
-           "\n(defalias '" ")"
-           name
-           (if macro-p '(" '(macro . #[" "])") '(" #[" "]"))
-           (append code nil)          ; Turn byte-code-function-p into list.
-           2 4
-           nil)
+          (let ((byte-native-compiling nil))
+            (byte-compile-output-file-form newform))
           t)))))
 
 (defun byte-compile-output-as-comment (exp quoted)
@@ -2971,7 +2879,6 @@ of the list FUN."
       (setq fun (cons 'lambda fun))
     (unless (eq 'lambda (car-safe fun))
       (error "Not a lambda list: %S" fun)))
-  (byte-compile-docstring-style-warn fun)
   (byte-compile-check-lambda-list (nth 1 fun))
   (let* ((arglist (nth 1 fun))
          (arglistvars (byte-compile-arglist-vars arglist))
@@ -2981,16 +2888,22 @@ of the list FUN."
 	 (body (cdr (cdr fun)))
 	 (doc (if (stringp (car body))
                   (prog1 (car body)
-                    ;; Discard the doc string
+                    ;; Discard the doc string from the body
                     ;; unless it is the last element of the body.
                     (if (cdr body)
                         (setq body (cdr body))))))
 	 (int (assq 'interactive body))
          command-modes)
     (when lexical-binding
+      (when arglist
+        ;; byte-compile-make-args-desc lost the args's names,
+        ;; so preserve them in the docstring.
+	(setq doc (help-add-fundoc-usage doc arglist)))
       (dolist (var arglistvars)
         (when (assq var byte-compile--known-dynamic-vars)
           (byte-compile--warn-lexical-dynamic var 'lambda))))
+    (when (stringp doc)
+      (setq doc (byte-compile--docstring doc "" nil 'is-a-value)))
     ;; Process the interactive spec.
     (when int
       ;; Skip (interactive) if it is in front (the most usual location).
@@ -3042,12 +2955,7 @@ of the list FUN."
 		     ;; byte-string, constants-vector, stack depth
 		     (cdr compiled)
 		     ;; optionally, the doc string.
-		     (cond ((and lexical-binding arglist)
-			    ;; byte-compile-make-args-desc lost the argnames,
-			    ;; so preserve them in the docstring.
-			    (list (help-add-fundoc-usage doc arglist)))
-			   ((or doc int)
-			    (list doc)))
+		     (when (or doc int) (list doc))
 		     ;; optionally, the interactive spec (and the modes the
 		     ;; command applies to).
 		     (cond
@@ -4887,41 +4795,47 @@ binding slots have been popped."
     (push (nth 1 (nth 1 form)) byte-compile-global-not-obsolete-vars))
   (byte-compile-normal-call form))
 
-(defun byte-compile-defvar (form)
-  ;; This is not used for file-level defvar/consts.
-  (when (and (symbolp (nth 1 form))
-             (not (string-match "[-*/:$]" (symbol-name (nth 1 form))))
-             (byte-compile-warning-enabled-p 'lexical (nth 1 form)))
-    (byte-compile-warn "global/dynamic var `%s' lacks a prefix"
-                       (nth 1 form)))
-  (byte-compile-docstring-style-warn form)
-  (let ((fun (nth 0 form))
-	(var (nth 1 form))
-	(value (nth 2 form))
-	(string (nth 3 form)))
-    (when (or (> (length form) 4)
-	      (and (eq fun 'defconst) (null (cddr form))))
-      (let ((ncall (length (cdr form))))
-	(byte-compile-warn "`%s' called with %d argument%s, but %s %s"
-	                   fun ncall
-	                   (if (= 1 ncall) "" "s")
-	                   (if (< ncall 2) "requires" "accepts only")
-	                   "2-3")))
-    (push var byte-compile-bound-variables)
+(defun byte-compile-defvar (form &optional toplevel)
+  (let* ((fun (nth 0 form))
+	 (var (nth 1 form))
+	 (value (nth 2 form))
+	 (string (nth 3 form)))
+    (byte-compile--declare-var var (not toplevel))
     (when (eq fun 'defconst)
       (push var byte-compile-const-variables))
-    (when (and string (not (stringp string)))
-      (byte-compile-warn "third arg to `%s %s' is not a string: %s"
-                         fun var string))
-    (byte-compile-form-do-effect
-     (cond
-      ((eq fun 'defconst) `(defconst-1 ',var ,@(nthcdr 2 form)))
-      ((not (cddr form)) `',var) ; A simple (defvar foo) just returns foo.
-      (t `(defvar-1 ',var
-                    ;; Don't eval `value' if `defvar' wouldn't eval it either.
-                    ,(if (macroexp-const-p value) value
-                       `(if (boundp ',var) nil ,value))
-                    ,@(nthcdr 3 form)))))))
+    (cond
+     ((stringp string)
+      (setq string (byte-compile--docstring string fun var 'is-a-value)))
+     (string
+      (byte-compile-warn
+       "third arg to `%s %s' is not a string: %s"
+       fun var string)))
+    (if toplevel
+        ;; At top-level we emit calls to defvar/defconst.
+        (when (or (cddr form)       ; `value' provided.
+		  (not (eq (car form) 'defvar))) ;not just a declaration.
+          (let ((tail (nthcdr 4 form)))
+            (when (or tail string) (push string tail))
+            (when (cddr form)
+              (push (if (not (consp value)) value
+                      (byte-compile-top-level value nil 'file))
+                    tail))
+            `(,fun ,var ,@tail)))
+      ;; At non-top-level, since there is no byte code for
+      ;; defvar/defconst, we delegate the actual work to the function
+      ;; version of the special form, named with a "-1" suffix.
+      (byte-compile-form-do-effect
+       (cond
+        ((eq fun 'defconst)
+         `(defconst-1 ',var ,@(byte-compile--list-with-n
+                               (nthcdr 2 form) 1 (macroexp-quote string))))
+        ((not (cddr form)) `',var) ; A simple (defvar foo) just returns foo.
+        (t `(defvar-1 ',var
+                      ;; Don't eval `value' if `defvar' wouldn't eval it either.
+                      ,(if (macroexp-const-p value) value
+                         `(if (boundp ',var) nil ,value))
+                      ,@(byte-compile--list-with-n
+                         (nthcdr 3 form) 0 (macroexp-quote string)))))))))
 
 (defun byte-compile-autoload (form)
   (and (macroexp-const-p (nth 1 form))
@@ -4940,11 +4854,9 @@ binding slots have been popped."
 
 (put 'defalias 'byte-hunk-handler 'byte-compile-file-form-defalias)
 (defun byte-compile-file-form-defalias (form)
-  "When a defalias defines a macro, add it to byte-compile-macro-environment.
-
-This should be subsumed in byte-compile-lambda now that
-make-docfile is obsolete (and consequently, the elc docstrings no
-longer need to hew to its rules)."
+  ;; For the compilation itself, we could largely get rid of this hunk-handler,
+  ;; if it weren't for the fact that we need to figure out when a defalias
+  ;; defines a macro, so as to add it to byte-compile-macro-environment.
   (let ((byte-compile-free-references nil)
         (byte-compile-free-assignments nil))
     (pcase form
@@ -4953,7 +4865,11 @@ longer need to hew to its rules)."
       ;; - `arg' is the expression to which it is defined.
       ;; - `rest' is the rest of the arguments.
       (`(,_ ',name ,arg . ,rest)
-       (byte-compile-docstring-style-warn form)
+       (let ((doc (car rest)))
+         (when (stringp doc)
+           (setq rest (byte-compile--list-with-n
+                       rest 0
+                       (byte-compile--docstring doc (nth 0 form) name)))))
        (pcase-let*
            ;; `macro' is non-nil if it defines a macro.
            ;; `fun' is the function part of `arg' (defaults to `arg').
