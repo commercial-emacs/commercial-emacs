@@ -8289,13 +8289,6 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
   bool ppos_p = it->bidi_p && (op & MOVE_TO_POS);
   bool saw_smaller_pos = IT_CHARPOS (*it) < to_charpos;
   bool line_number_pending = false;
-  int this_line_subject_to_line_prefix = 0;
-
-#ifdef GLYPH_DEBUG
-  /* atx_flag, atpos_flag and wrap_flag are assigned but never used;
-     these hold information useful while debugging.  */
-  int atx_flag, atpos_flag, wrap_flag;
-#endif /* GLYPH_DEBUG */
 
   /* Stash initial IT.  Should we fail to reach TO_CHARPOS,
      we recurse with a to_charpos just past TO_CHARPOS.  */
@@ -8324,11 +8317,6 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 
       if (it->area == TEXT_AREA && !it->string_from_prefix_prop_p)
 	handle_line_prefix (it);
-
-      /* Save whether this line has received a wrap prefix, as this
-	 affects whether Emacs attempts to move glyphs into
-	 continuation lines.  */
-      this_line_subject_to_line_prefix = it->string_from_prefix_prop_p;
     }
 
   if (IT_CHARPOS (*it) < CHARPOS (static_sline_min_pos))
@@ -8459,21 +8447,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 			  && FRAME_WINDOW_P (it->f)
 			  && ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
 			      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-			      : WINDOW_RIGHT_FRINGE_WIDTH (it->w))))
-		  /* There is no line prefix, next to which the
-		     iterator _must_ produce a minimum of one actual
-		     glyph.  */
-		  && (!this_line_subject_to_line_prefix
-		      /* Or this is the second glyph to be produced
-			 beyond the confines of the line.  */
-		      || (i != 0
-			  && (x > it->last_visible_x
-			      || (x == it->last_visible_x
-				  && FRAME_WINDOW_P (it->f)
-				  && ((it->bidi_p
-				       && it->bidi_it.paragraph_dir == R2L)
-				      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-				      : WINDOW_RIGHT_FRINGE_WIDTH (it->w)))))))
+			      : WINDOW_RIGHT_FRINGE_WIDTH (it->w)))))
 		{
 		  bool moved_forward = false;
 
@@ -8758,26 +8732,11 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
       && wrap_it.sp >= 0
       && ((atpos_it.sp >= 0 && wrap_it.current_x < atpos_it.current_x)
 	  || (atx_it.sp >= 0 && wrap_it.current_x < atx_it.current_x)))
-    {
-#ifdef GLYPH_DEBUG
-      this_line_subject_to_line_prefix = wrap_flag;
-#endif /* GLYPH_DEBUG */
-      RESTORE_IT (it, &wrap_it, wrap_data);
-    }
+    RESTORE_IT (it, &wrap_it, wrap_data);
   else if (atpos_it.sp >= 0)
-    {
-#ifdef GLYPH_DEBUG
-      this_line_subject_to_line_prefix = atpos_flag;
-#endif /* GLYPH_DEBUG */
-      RESTORE_IT (it, &atpos_it, atpos_data);
-    }
+    RESTORE_IT (it, &atpos_it, atpos_data);
   else if (atx_it.sp >= 0)
-    {
-#ifdef GLYPH_DEBUG
-      this_line_subject_to_line_prefix = atx_flag;
-#endif /* GLYPH_DEBUG */
-      RESTORE_IT (it, &atx_it, atx_data);
-    }
+    RESTORE_IT (it, &atx_it, atx_data);
 
   if (atpos_data)
     bidi_unshelve_cache (atpos_data, true);
@@ -21302,7 +21261,6 @@ display_sline (struct it *it, int cursor_vpos)
       /* We only do this when not calling emulate_display_sline
 	 above, because that function calls itself handle_line_prefix.  */
       handle_line_prefix (it);
-      this_line_subject_to_line_prefix = it->string_from_prefix_prop_p;
     }
   else
     {
@@ -21470,15 +21428,12 @@ display_sline (struct it *it, int cursor_vpos)
 	     process the prefix now.  */
 	  if (it->area == TEXT_AREA && pending_handle_line_prefix)
 	    {
-	      /* Line numbers should precede the line-prefix or
-		 wrap-prefix.  */
+	      /* Line numbers should precede the line-prefix or wrap-prefix.  */
 	      if (line_number_needed)
 		produce_line_number (it);
 
 	      pending_handle_line_prefix = false;
 	      handle_line_prefix (it);
-	      this_line_subject_to_line_prefix
-		= it->string_from_prefix_prop_p;
 	    }
 	  continue;
 	}
@@ -21499,16 +21454,7 @@ display_sline (struct it *it, int cursor_vpos)
       if (/* Not a newline.  */
 	  nglyphs > 0
 	  /* Glyphs produced fit entirely in the line.  */
-	  && (it->current_x < it->last_visible_x
-	      /* Or a line or wrap prefix is in effect, and not
-		 truncating the glyph produced immediately after it
-		 would cause an infinite cycle.  */
-	      || (it->line_wrap != TRUNCATE
-		  /* This code is not valid if multiple glyphs were
-		     produced, as some of these glyphs might remain
-		     within this line.  */
-		  && nglyphs == 1
-		  && this_line_subject_to_line_prefix)))
+	  && it->current_x < it->last_visible_x)
 	{
 	  it->hpos += nglyphs;
 	  row->ascent = max (row->ascent, it->max_ascent);
@@ -21559,20 +21505,7 @@ display_sline (struct it *it, int cursor_vpos)
 			  && FRAME_WINDOW_P (it->f)
 			  && (row->reversed_p
 			      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-			      : WINDOW_RIGHT_FRINGE_WIDTH (it->w))))
-		  /* There is no line prefix, next to which the
-		     iterator _must_ produce a minimum of one actual
-		     glyph.  */
-		  && (!this_line_subject_to_line_prefix
-		      /* Or this is the second glyph to be produced
-			 beyond the confines of the line.  */
-		      || (i != 0
-			  && (x > it->last_visible_x
-			      || (x == it->last_visible_x
-				  && FRAME_WINDOW_P (it->f)
-				  && (row->reversed_p
-				      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-				      : WINDOW_RIGHT_FRINGE_WIDTH (it->w)))))))
+			      : WINDOW_RIGHT_FRINGE_WIDTH (it->w)))))
 		{
 		  /* End of a continued line.  */
 
