@@ -1553,7 +1553,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
       /* Now we're assured case (3) or case(4).  Character after
          preceding non-composable is our search start.  */
       for (struct position_record candidate = cur;
-	   cur.pos >= head;
+	   cur.pos > head;
 	   cur = candidate)
 	{
 	  BACKWARD_CHAR (candidate, stop);

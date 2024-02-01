@@ -52,9 +52,6 @@ config_h = config.h $(srcdir)/conf_post.h
 
 HAVE_NATIVE_COMP = @HAVE_NATIVE_COMP@
 
-## ns-app if NS self contained app, else empty.
-OTHER_FILES = @OTHER_FILES@
-
 ## Flags to pass for profiling builds
 PROFILING_CFLAGS = @PROFILING_CFLAGS@
 
@@ -471,7 +468,7 @@ FIRSTFILE_OBJ=@FIRSTFILE_OBJ@
 ALLOBJS = $(FIRSTFILE_OBJ) $(VMLIMIT_OBJ) $(obj) $(otherobj)
 
 .PHONY: all
-all: emacs.pdmp ../lisp/emacs-lisp/cldefs.el $(OTHER_FILES)
+all: emacs.pdmp ../lisp/emacs-lisp/cldefs.el
 
 ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
 all: ../native-lisp
@@ -642,10 +639,6 @@ doc.o: buildobj.h
 
 emacs.res:
 	$(MAKE) -C ../nt ../src/emacs.res
-
-.PHONY: ns-app
-ns-app: emacs.pdmp
-	$(MAKE) -C ../nextstep all
 
 ETAGS = ../lib-src/etags${EXEEXT}
 

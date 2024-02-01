@@ -46,7 +46,7 @@ ns_check_file = @ns_appdir@/@ns_check_file@
 
 .PHONY: all
 
-all: ${ns_appdir} ${ns_appbindir}/Emacs
+all: ${ns_appbindir}/Emacs.pdmp
 
 ${ns_check_file}: ${ns_appdir}
 
@@ -63,13 +63,14 @@ ${ns_appdir}: ${srcdir}/${ns_appsrc} ${ns_appsrc}
 ## Don't create ns_appbindir via an order-only prerequisite, because
 ## on GNUstep ns_appbindir and ns_bindir are the same, so
 ## the rule for ns_appbindir would conflict with that for ns_appdir.
-${ns_appbindir}/Emacs: ${ns_appdir} ${ns_check_file} ../src/emacs${EXEEXT}
+${ns_appbindir}/Emacs.pdmp: ${ns_appdir} ${ns_check_file} ../src/emacs.pdmp
 	${MKDIR_P} ${ns_appbindir}
-	cp -f ../src/emacs${EXEEXT} $@
+	rm -f ${ns_appbindir}/Emacs
+	cp -f ../src/emacs${EXEEXT} ${ns_appbindir}/Emacs
+	rm -f ${ns_appbindir}/Emacs.pdmp
+	cp -f ../src/emacs.pdmp ${ns_appbindir}/Emacs.pdmp
 
-.PHONY: FORCE
-
-../src/emacs${EXEEXT}: FORCE
+../src/emacs.pdmp:
 	${MAKE} -C ../src $(notdir $@)
 
 # create a fake installation pointing back to the source tree
@@ -85,6 +86,7 @@ links: ../src/emacs${EXEEXT}
 	ln -s $(top_srcdir_abs)/info ${ns_appdir}/Contents/Resources
 	${MKDIR_P} ${ns_appbindir}
 	ln -s $(abs_top_builddir)/src/emacs${EXEEXT} ${ns_appbindir}/Emacs
+	ln -s $(abs_top_builddir)/src/emacs.pdmp ${ns_appbindir}/Emacs.pdmp
 	ln -s $(abs_top_builddir)/lib-src ${ns_appbindir}/bin
 	ln -s $(abs_top_builddir)/lib-src ${ns_applibexecdir}
 	${MKDIR_P} ${ns_appdir}/Contents/Resources/etc

@@ -56,6 +56,9 @@ USE_STARTUP_NOTIFICATION = @USE_STARTUP_NOTIFICATION@
 HAVE_PGTK = @HAVE_PGTK@
 HAVE_GSETTINGS = @HAVE_GSETTINGS@
 
+## ns-app if NS self contained app, else empty.
+OTHER_FILES = @OTHER_FILES@
+
 # ==================== Where To Install Things ====================
 
 # Location to install Emacs.app under GNUstep / macOS.
@@ -308,16 +311,13 @@ endif
 gsettings_SCHEMAS = etc/org.gnu.emacs.defaults.gschema.xml
 
 .PHONY: all
-all: ${SUBDIR} info $(gsettings_SCHEMAS:.xml=.valid) src-depending-on-lisp
+all: ${SUBDIR} info $(gsettings_SCHEMAS:.xml=.valid) lisp ${OTHER_FILES}
 
 .PHONY: ${SUBDIR} blessmail epaths-force epaths-force-w32 epaths-force-ns-self-contained etc-emacsver
 
-# Changes in lisp may require us to reconsider the build in src.  For
-# example, if loaddefs.{el,elc} were built in lisp, we need a new
-# .pdmp containing the new autoloads.
-.PHONY: src-depending-on-lisp
-src-depending-on-lisp: lisp
-	${MAKE} -C src BIN_DESTDIR='$(BIN_DESTDIR)' ELN_DESTDIR='$(ELN_DESTDIR)'
+.PHONY: ns-app
+ns-app: | lisp
+	$(MAKE) -C nextstep all
 
 # If configure were to just generate emacsver.tex from emacsver.tex.in
 # in the normal way, the timestamp of emacsver.tex would always be
@@ -416,8 +416,7 @@ ifeq ($(HAVE_NATIVE_COMP),yes)
 endif
 
 src: Makefile
-	$(MAKE) -C $@ BIN_DESTDIR='$(BIN_DESTDIR)' \
-		 ELN_DESTDIR='$(ELN_DESTDIR)' all
+	$(MAKE) -C $@ BIN_DESTDIR='$(BIN_DESTDIR)' ELN_DESTDIR='$(ELN_DESTDIR)' all
 
 blessmail: Makefile src
 	$(MAKE) -C lib-src maybe-blessmail
