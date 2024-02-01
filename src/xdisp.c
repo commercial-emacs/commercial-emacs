@@ -4479,13 +4479,7 @@ display_min_width (struct it *it, ptrdiff_t bufpos,
 	  it->object = list3 (Qspace, QCwidth, w);
 	  produce_stretch_glyph (it);
 	  if (it->area == TEXT_AREA)
-	    {
-	      it->current_x += it->pixel_width;
-
-	      if (it->continuation_lines_width
-		  && it->string_from_prefix_prop_p)
-		it->wrap_prefix_width = it->current_x;
-	    }
+	    it->current_x += it->pixel_width;
 	  it->min_width_property = Qnil;
 	}
     }
@@ -8983,7 +8977,6 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op,
     {
       it->continuation_lines_width += it->current_x;
       it->current_x = it->hpos = it->max_ascent = it->max_descent = 0;
-      it->wrap_prefix_width = 0;
       it->current_y += it->max_ascent + it->max_descent;
       ++it->vpos;
       last_height = it->max_ascent + it->max_descent;
@@ -12185,7 +12178,7 @@ display_tab_bar_line (struct it *it, int height)
   row->truncated_on_left_p = false;
   row->truncated_on_right_p = false;
 
-  it->current_x = it->hpos = it->wrap_prefix_width = 0;
+  it->current_x = it->hpos = 0;
   it->current_y += row->height;
   ++it->vpos;
   ++it->glyph_row;
@@ -13114,7 +13107,7 @@ display_tool_bar_line (struct it *it, int height)
   row->truncated_on_left_p = false;
   row->truncated_on_right_p = false;
 
-  it->current_x = it->hpos = it->wrap_prefix_width = 0;
+  it->current_x = it->hpos = 0;
   it->current_y += row->height;
   ++it->vpos;
   ++it->glyph_row;
@@ -17415,7 +17408,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       it.current_y = 0;
     }
 
-  it.current_x = it.wrap_prefix_width = it.hpos = 0;
+  it.current_x = it.hpos = 0;
 
   /* Set the window start position here explicitly, to avoid an
      infinite loop in case the functions in window-scroll-functions
@@ -19243,7 +19236,7 @@ try_window_insdel (struct window *w)
       /* We may start in a continuation line.  If so, we have to
 	 get the right continuation_lines_width and current_x.  */
       it.continuation_lines_width = last_row->continuation_lines_width;
-      it.hpos = it.current_x = it.wrap_prefix_width = 0;
+      it.hpos = it.current_x = 0;
 
       /* Display the rest of the lines at the window end.  */
       it.glyph_row = MATRIX_ROW (desired_matrix, it.vpos);
@@ -19408,7 +19401,6 @@ insert_left_trunc_glyphs (struct it *it)
   /* Get the truncation glyphs.  */
   truncate_it = *it;
   truncate_it.current_x = 0;
-  truncate_it.wrap_prefix_width = 0;
   truncate_it.face_id = DEFAULT_FACE_ID;
   truncate_it.glyph_row = &scratch_glyph_row;
   truncate_it.area = TEXT_AREA;
@@ -20170,10 +20162,6 @@ extend_face_to_end_of_line (struct it *it)
 
 	  for (it->current_x = 0; g < e; g++)
 	    it->current_x += g->pixel_width;
-
-	  if (it->continuation_lines_width
-	      && it->string_from_prefix_prop_p)
-	    it->wrap_prefix_width = it->current_x;
 
 	  it->area = LEFT_MARGIN_AREA;
 	  it->face_id = default_face->id;
@@ -21244,10 +21232,7 @@ display_sline (struct it *it, int cursor_vpos)
       if (it->current_x < it->first_visible_x
 	  && (move_result == MOVE_NEWLINE_OR_CR
 	      || move_result == MOVE_POS_MATCH_OR_ZV))
-	{
-	  it->current_x = it->first_visible_x;
-	  it->wrap_prefix_width = 0;
-	}
+	it->current_x = it->first_visible_x;
 
       /* In case emulate_display_sline above "produced" the line
 	 number.  */
@@ -22040,7 +22025,7 @@ done:
      HPOS) = (0 0).  Vertical positions are incremented.  As a
      convenience for the caller, IT->glyph_row is set to the next
      row to be used.  */
-  it->wrap_prefix_width = it->current_x = it->hpos = 0;
+  it->current_x = it->hpos = 0;
   it->current_y += row->height;
   /* Restore the first and last visible X if we adjusted them for
      current-line hscrolling.  */
@@ -22518,7 +22503,7 @@ Value is the new character position of point.  */)
     {
       struct text_pos pt;
       struct it it;
-      int pt_x, pt_wrap_prefix_x, target_x, pixel_width, pt_vpos;
+      int pt_x, target_x, pixel_width, pt_vpos;
       bool at_eol_p;
       bool overshoot_expected = false;
       bool target_is_eol_p = false;
@@ -22550,7 +22535,6 @@ Value is the new character position of point.  */)
     reseat:
       reseat_preceding_line_start (&it);
       it.current_x = it.hpos = it.current_y = it.vpos = 0;
-      it.wrap_prefix_width = 0;
       if (IT_CHARPOS (it) != PT)
 	{
 	  move_it_forward (&it, overshoot_expected ? PT - 1 : PT, -1, MOVE_TO_POS, NULL);
@@ -22568,7 +22552,6 @@ Value is the new character position of point.  */)
 	    emulate_display_sline (&it, PT, -1, MOVE_TO_POS);
 	}
       pt_x = it.current_x;
-      pt_wrap_prefix_x = it.wrap_prefix_width;
       pt_vpos = it.vpos;
       if (dir > 0 || overshoot_expected)
 	{
@@ -22587,7 +22570,6 @@ Value is the new character position of point.  */)
 	     it, lest it will become out of sync with its buffer
 	     position.  */
 	  it.current_x = pt_x;
-	  it.wrap_prefix_width = pt_wrap_prefix_x;
 	}
       else
 	at_eol_p = ITERATOR_AT_END_OF_LINE_P (&it);
@@ -22632,7 +22614,6 @@ Value is the new character position of point.  */)
 		it.last_visible_x = DISP_INFINITY;
 	      reseat_preceding_line_start (&it);
 	      it.current_x = it.current_y = it.hpos = 0;
-	      it.wrap_prefix_width = 0;
 	      if (pt_vpos != 0)
 		move_it_dvpos (&it, pt_vpos);
 	    }
@@ -29116,13 +29097,7 @@ gui_produce_glyphs (struct it *it)
  done:
   eassert (it->ascent >= 0 && it->descent >= 0);
   if (it->area == TEXT_AREA)
-    {
-      it->current_x += it->pixel_width;
-
-      if (it->continuation_lines_width
-	  && it->string_from_prefix_prop_p)
-	it->wrap_prefix_width = it->current_x;
-    }
+    it->current_x += it->pixel_width;
 
   if (extra_line_spacing > 0)
     {

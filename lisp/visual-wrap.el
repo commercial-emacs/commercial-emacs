@@ -173,9 +173,7 @@ by `visual-wrap-extra-indent'."
 
 ;;;###autoload
 (define-minor-mode visual-wrap-prefix-mode
-  "Display continuation lines with prefixes from surrounding context.
-To enable this minor mode across all buffers, enable
-`global-visual-wrap-prefix-mode'."
+  "Display continuation lines with prefixes from surrounding context."
   :lighter ""
   :group 'visual-line
   (if visual-wrap-prefix-mode
@@ -193,12 +191,6 @@ To enable this minor mode across all buffers, enable
       (save-restriction
         (widen)
         (remove-text-properties (point-min) (point-max) '(wrap-prefix nil))))))
-
-;;;###autoload
-(define-globalized-minor-mode global-visual-wrap-prefix-mode
-  visual-wrap-prefix-mode visual-wrap-prefix-mode
-  :init-value nil
-  :group 'visual-line)
 
 (provide 'visual-wrap)
 ;;; visual-wrap.el ends here
