@@ -5305,7 +5305,7 @@ get_hash_table_user_test (Lisp_Object test)
   Lisp_Object equal_fn = XCAR (prop);
   Lisp_Object hash_fn = XCAR (XCDR (prop));
   struct hash_table_user_test *ut = hash_table_user_tests;
-  while (ut && !(BASE_EQ (test, ut->test.name)
+  while (ut && !(EQ (test, ut->test.name)
 		 && EQ (equal_fn, ut->test.user_cmp_function)
 		 && EQ (hash_fn, ut->test.user_hash_function)))
     ut = ut->next;
