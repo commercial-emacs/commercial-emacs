@@ -4102,6 +4102,7 @@ Don't set this unless you're sure that can't happen.  */);
   defsubr (&Srun_hook_with_args_until_success);
   defsubr (&Srun_hook_with_args_until_failure);
   defsubr (&Srun_hook_wrapped);
+  defsubr (&Sfetch_bytecode);
   defsubr (&Sbacktrace_debug);
   DEFSYM (QCdebug_on_exit, ":debug-on-exit");
   defsubr (&Smapbacktrace);
