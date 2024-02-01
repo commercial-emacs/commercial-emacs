@@ -59,7 +59,6 @@ extra indent = 2
     ullamco laboris nisi ut aliquip ex ea commodo consequat."
   :type 'integer
   :safe 'integerp
-  :version "30.1"
   :group 'visual-line)
 
 (defun visual-wrap--face-extend-p (face)
@@ -112,9 +111,8 @@ extra indent = 2
       ""))))
 
 (defun visual-wrap-fill-context-prefix (beg end)
-  "Compute visual wrap prefix from text between FROM and TO.
-This is like `fill-context-prefix', but with prefix length adjusted
-by `visual-wrap-extra-indent'."
+  "Like `fill-context-prefix', but with length adjusted by
+`visual-wrap-extra-indent'."
   (let* ((fcp
           ;; `fill-context-prefix' ignores prefixes that look like
           ;; paragraph starts, in order to avoid inadvertently
