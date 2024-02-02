@@ -939,13 +939,8 @@ whether the region-rectangle or the standard region is highlighted
 (first activating the region if necessary).  When this mode is enabled,
 commands that resize the region (@kbd{C-f}, @kbd{C-n} etc.)@: do
 so in a rectangular fashion, and killing and yanking operate on the
-rectangle.  @xref{Killing}.  The mode persists only as long as the
-region is active.
-
-The region-rectangle works only when the mark is active.  In
-particular, when Transient Mark mode is off (@pxref{Disabled Transient
-Mark}), in addition to typing @kbd{C-x @key{SPC}} you will need to
-activate the mark.
+rectangle.  @xref{Deletion and Killing}, @ref{Yanking}.  The mode
+persists only as long as the region is active.
 
 Unlike the standard region, the region-rectangle can have its corners
 extended past the end of buffer, or inside stretches of white space
@@ -961,6 +956,29 @@ When the region is active (@pxref{Mark}) and in rectangle-mark-mode,
 four corners of the region-rectangle.  This comes in handy if you want
 to modify the dimensions of the region-rectangle before invoking an
 operation on the marked text.
+
+  rectangle-mark-mode behaves in a slightly different way when
+Transient Mark mode is off (@pxref{Disabled Transient Mark}).  In this
+case, when you enable rectangle-mark-mode, the region-rectangle is not
+automatically enabled.  Accordingly, cursor movement with @kbd{C-f},
+@kbd{C-n} etc.@: is confined to the regularly accessible buffer
+positions.  However, killing and yanking still operate on the
+rectangle spanned by point and mark.  Also @kbd{C-x C-x} still cycles
+through the corners of that rectangle, but only as far as these are at
+buffer positions that are regularly accessible.
+
+  As mentioned above, rectangle-mark-mode persists as long the region
+is active: If the region gets deactivated, rectangle-mark-mode gets
+deactivated as well.  But with disabled Transient mark mode there is
+usually no active region that would get deactivated, and so you have
+to explicitly switch off rectangle-mark-mode when you no longer want
+to use it.
+
+  To experience all benefits of rectangle-mark-mode and the
+region-rectangle when Transient Mark mode is off, you can temporarily
+activate Transient Mark mode after enabling rectangle-mark-mode, for
+example, with @kbd{C-@key{SPC} C-@key{SPC}}.  @xref{Disabled Transient
+Mark}.
 
 @node CUA Bindings
 @section CUA Bindings
