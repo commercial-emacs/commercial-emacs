@@ -372,16 +372,26 @@ Used only for `tab-line-tabs-mode-buffers' and `tab-line-tabs-buffer-groups'.")
                                            (derived-mode-p mode)))
                              (funcall tab-line-tabs-buffer-list-function)))))
 
-(defvar tab-line-tabs-buffer-group-function nil
+(defcustom tab-line-tabs-buffer-group-function nil
   "Function to add a buffer to the appropriate group of tabs.
-Takes a buffer as arg and should return a group name as a string.
-If the return value is nil, the buffer should be filtered out.")
+Takes a buffer as argument and should return a group name as a
+string.  If the return value is nil, the buffer should be
+ filtered out."
+  :type 'function
+  :group 'tab-line
+  :version "29.1")
 
-(defvar tab-line-tabs-buffer-group-sort-function nil
-  "Function to sort buffers in a group.")
+(defcustom tab-line-tabs-buffer-group-sort-function nil
+  "Function to sort buffers in a group."
+  :type 'function
+  :group 'tab-line
+  :version "29.1")
 
-(defvar tab-line-tabs-buffer-groups-sort-function #'string<
-  "Function to sort group names.")
+(defcustom tab-line-tabs-buffer-groups-sort-function #'string<
+  "Function to sort group names."
+  :type 'function
+  :group 'tab-line
+  :version "29.1")
 
 (defvar tab-line-tabs-buffer-groups mouse-buffer-menu-mode-groups
   "How to group various major modes together in the tab line.
@@ -409,13 +419,14 @@ If non-nil, `tab-line-tabs-buffer-group-function' is used to
 generate the group name."
   (if (window-parameter nil 'tab-line-groups)
       (let* ((buffers (funcall tab-line-tabs-buffer-list-function))
-             (groups
-              (seq-sort tab-line-tabs-buffer-groups-sort-function
-                        (delq nil (mapcar #'car (seq-group-by
-                                                 (lambda (buffer)
-                                                   (tab-line-tabs-buffer-group-name
-                                                    buffer))
-                                                 buffers)))))
+             (groups (delq nil
+                           (mapcar #'car
+                                   (seq-group-by #'tab-line-tabs-buffer-group-name
+                                                 buffers))))
+             (sorted-groups (if (functionp tab-line-tabs-buffer-groups-sort-function)
+                                (seq-sort tab-line-tabs-buffer-groups-sort-function
+                                          groups)
+                              groups))
              (selected-group (window-parameter nil 'tab-line-group))
              (tabs
               (mapcar (lambda (group)
@@ -426,9 +437,8 @@ generate the group name."
                                        (set-window-parameter nil 'tab-line-groups nil)
                                        (set-window-parameter nil 'tab-line-group group)
                                        (set-window-parameter nil 'tab-line-hscroll nil)))))
-                      groups)))
-        tabs)
-
+                      sorted-groups)))
+             tabs)
     (let* ((window-parameter (window-parameter nil 'tab-line-group))
            (group-name (tab-line-tabs-buffer-group-name (current-buffer)))
            (group (prog1 (or window-parameter group-name "All")
@@ -441,10 +451,9 @@ generate the group name."
                                      (set-window-parameter nil 'tab-line-groups t)
                                      (set-window-parameter nil 'tab-line-group group)
                                      (set-window-parameter nil 'tab-line-hscroll nil)))))
-           (buffers
-            (seq-filter (lambda (b)
-                          (equal (tab-line-tabs-buffer-group-name b) group))
-                        (funcall tab-line-tabs-buffer-list-function)))
+           (buffers (seq-filter (lambda (b)
+                                  (equal (tab-line-tabs-buffer-group-name b) group))
+                                (funcall tab-line-tabs-buffer-list-function)))
            (sorted-buffers (if (functionp tab-line-tabs-buffer-group-sort-function)
                                (seq-sort tab-line-tabs-buffer-group-sort-function
                                          buffers)
