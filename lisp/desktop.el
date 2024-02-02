@@ -1158,6 +1158,13 @@ no questions asked."
 	    (desktop-release-lock)
 	  (unless (and new-modtime (desktop-owner)) (desktop-claim-lock)))
 
+        ;; If the desktop file does not exist, create one only
+        ;; read/writable by user.
+        (let ((full-name (desktop-full-file-name)))
+          (unless (file-exists-p full-name)
+            (make-empty-file full-name)
+            (set-file-modes full-name #o600)))
+
         ;; What format are we going to write the file in?
         (setq desktop-io-file-version
               (cond
