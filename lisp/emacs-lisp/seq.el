@@ -235,6 +235,22 @@ Return a list of the results.
       (setq sequences (seq-map #'cdr sequences)))
     (nreverse result)))
 
+(cl-defgeneric seq-mapsub (function sequence)
+  "Return the result of applying FUNCTION to SEQUENCE and its sub-sequences.
+
+If SEQUENCE is empty, nil is returned.
+
+The first sequence used is SEQUENCE, the second sequence used is
+everything in SEQUENCE after the first element, the third
+sequence used is everything after the second element, and so
+on."
+  (let ((result nil))
+    (while (not (seq-empty-p sequence))
+      (push (funcall function sequence)
+            result)
+      (setq sequence (seq-rest sequence)))
+    (nreverse result)))
+
 (cl-defgeneric seq-drop (sequence n)
   "Remove the first N elements of SEQUENCE and return the resulting sequence.
 The result is a sequence of the same type as SEQUENCE.
@@ -671,6 +687,15 @@ Signal an error if SEQUENCE is empty."
 (cl-defmethod seq-empty-p ((list list))
   "Optimized implementation of `seq-empty-p' for lists."
   (null list))
+
+(cl-defmethod seq-mapsub (function (list list))
+  "Optimized implementation of `seq-mapsub' for lists."
+  (let ((result nil))
+    (while list
+      (push (funcall function list)
+            result)
+      (setq list (cdr list)))
+    (nreverse result)))
 
 
 (defun seq--into-list (sequence)
