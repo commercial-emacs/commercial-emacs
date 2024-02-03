@@ -1531,7 +1531,7 @@ Bound to local variables from an existing (logical) session's
 buffer during local-module setup and `erc-mode-hook' activation.")
 
 (defmacro erc--restore-initialize-priors (mode &rest vars)
-  "Restore local VARS for MODE from a previous session."
+  "Restore local VARS for local minor MODE from a previous session."
   (declare (indent 1))
   (let ((priors (make-symbol "priors"))
         (initp (make-symbol "initp"))
@@ -1541,6 +1541,8 @@ buffer during local-module setup and `erc-mode-hook' activation.")
       (push `(,k (if ,initp (alist-get ',k ,priors) ,(pop vars))) forms))
     `(let* ((,priors (or erc--server-reconnecting erc--target-priors))
             (,initp (and ,priors (alist-get ',mode ,priors))))
+       (unless (local-variable-if-set-p ',mode)
+         (error "Not a local minor mode var: %s" ',mode))
        (setq ,@(mapcan #'identity (nreverse forms))))))
 
 (defun erc--target-from-string (string)
@@ -2182,13 +2184,17 @@ buffer rather than a server buffer.")
       (cl-pushnew mod (if (get mod 'erc--module) built-in third-party)))
     `(,@(sort built-in #'string-lessp) ,@(nreverse third-party))))
 
+;;;###autoload(custom-autoload 'erc-modules "erc")
+
 (defcustom erc-modules '( autojoin button completion fill imenu irccontrols
                           list match menu move-to-prompt netsplit
                           networks readonly ring stamp track)
-  "A list of modules which ERC should enable.
-If you set the value of this without using `customize' remember to call
-\(erc-update-modules) after you change it.  When using `customize', modules
-removed from the list will be disabled."
+  "Modules to enable while connecting.
+When modifying this option in lisp code, use a Custom-friendly
+facilitator, like `setopt', or call `erc-update-modules'
+afterward.  This ensures a consistent ordering and disables
+removed modules.  It also gives packages access to the hook
+`erc-before-connect'."
   :get (lambda (sym)
          ;; replace outdated names with their newer equivalents
          (erc-migrate-modules (symbol-value sym)))
@@ -3827,14 +3833,14 @@ TYPE, when non-nil, to be a symbol handled by
 string MSG).  Expect BUFFER to be among the sort accepted by the
 function `erc-display-line'.
 
-Expect BUFFER to be a live `erc-mode' buffer, a list of such
-buffers, or the symbols `all' or `active'.  If `all', insert
-STRING in all buffers for the current session.  If `active',
-defer to the function `erc-active-buffer', which may return the
-session's server buffer if the previously active buffer has been
-killed.  If BUFFER is nil or a network process, pretend it's set
-to the appropriate server buffer.  Otherwise, use the current
-buffer.
+When non-nil, expect BUFFER to be a live `erc-mode' buffer, a
+list of such buffers, or the symbols `all' or `active'.  If
+`all', insert STRING in all buffers for the current session.  If
+`active', defer to the function `erc-active-buffer', which may
+return the session's server buffer if the previously active
+buffer has been killed.  If BUFFER is nil or a network process,
+pretend it's set to the appropriate server buffer.  Otherwise,
+use the current buffer.
 
 When TYPE is a list of symbols, call handlers from left to right
 without influencing how they behave when encountering existing
@@ -3847,11 +3853,10 @@ being (erc-error-face erc-notice-face) throughout MSG when
 `erc-notice-highlight-type' is left at its default, `all'.
 
 As of ERC 5.6, assume third-party code will use this function
-instead of lower-level ones, like `erc-insert-line', when needing
-ERC to process arbitrary informative messages as if they'd been
-sent from a server.  That is, guarantee \"local\" messages, for
-which PARSED is typically nil, will be subject to buttonizing,
-filling, and other effects."
+instead of lower-level ones, like `erc-insert-line', to insert
+arbitrary informative messages as if sent by the server.  That
+is, tell modules to treat a \"local\" message for which PARSED is
+nil like any other server-sent message."
   (let* ((erc--msg-props
           (or erc--msg-props
               (let ((table (make-hash-table))
