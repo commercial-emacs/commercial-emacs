@@ -110,21 +110,10 @@
 (load "cus-face")
 (load "faces")  ; after here, `defface' may be used.
 
-;; We don't want to store loaddefs.el in the repository because it is
-;; a generated file; but it is required in order to compile the lisp files.
-;; When bootstrapping, we cannot generate loaddefs.el until an
-;; emacs binary has been built.  We therefore compromise and keep
-;; ldefs-boot.el in the repository.  This does not need to be updated
-;; as often as the real loaddefs.el would.  Bootstrap should always
-;; work with ldefs-boot.el.  Therefore, whenever a new autoload cookie
-;; gets added that is necessary during bootstrapping, ldefs-boot.el
-;; should be updated by overwriting it with an up-to-date copy of
-;; loaddefs.el that is not corrupted by local changes.
-;; admin/update_autogen can be used to update ldefs-boot.el periodically.
-(condition-case nil
+;; Two poorly named files defining autoloaded functions.
+(if pdumper--pure-pool
     (load "loaddefs")
-  (file-error
-   (load "ldefs-boot.el")))
+  (load "ldefs-boot.el"))
 
 (let ((new (make-hash-table :test #'equal)))
   ;; Now that loaddefs has populated definition-prefixes, purify its contents.
@@ -364,7 +353,6 @@
 ;; Make sure that the spine of the list is not in pure space because it can
 ;; be destructively mutated in lread.c:build_load_history.
 (setq load-history (mapcar #'purecopy-maybe load-history))
-
 (set-buffer-modified-p nil)
 
 (remove-hook 'after-load-functions (lambda (_) (garbage-collect)))
@@ -376,6 +364,7 @@
 ;; At this point, we're ready to resume undo recording for scratch.
 (buffer-enable-undo "*scratch*")
 
+(defvar preloaded-file-list nil "Legacy variable")
 (defvar load--bin-dest-dir nil
   "Store the original value passed by \"--bin-dest\" during dump.
 Internal use only.")
@@ -443,6 +432,22 @@ directory got moved.  This is set to be a pair in the form of:
              pdumper--pure-pool)
     (message "Pure-hashed: %d strings, %d vectors, %d conses, %d bytecodes, %d others"
              strings vectors conses bytecodes others)))
+
+(setq preloaded-file-list
+      (delq nil
+       (mapcar
+        (lambda (file)
+          (catch 'relative-name
+            (dolist (path (sort load-path
+                                (lambda (a b) (< (length a) (length b)))))
+              (let ((rx (format "^%s\\(\\S-+\\)"
+                                (regexp-quote
+                                 (file-name-as-directory path)))))
+                (save-match-data
+                  (when (string-match rx file)
+                    (throw 'relative-name (file-name-sans-extension
+                                           (match-string 1 file)))))))))
+        (mapcar #'car load-history))))
 
 (unless (garbage-collect)
   (setq pure-space-overflow t))

@@ -1142,8 +1142,6 @@ Amongst another things, it parses the command-line arguments."
   ;;! to it, then it would be better to eliminate the option.
   ;;! ;; Choose a good default value for split-window-keep-point.
   ;;! (setq split-window-keep-point (> baud-rate 2400))
-
-  ;; Convert preloaded file names in load-history to absolute.
   (let ((simple-file-name
 	 ;; Look for simple.el or simple.elc and use their directory
 	 ;; as the place where all Lisp files live.
@@ -1164,16 +1162,7 @@ please check its value")
 	    (princ (format "Lisp directory %s not readable?" lispdir))
 	    (terpri)))
       (setq lisp-directory
-            (file-truename (file-name-directory simple-file-name)))
-      (setq load-history
-	    (mapcar (lambda (elt)
-		      (if (and (stringp (car elt))
-			       (not (file-name-absolute-p (car elt))))
-			  (cons (concat lisp-directory
-					(car elt))
-				(cdr elt))
-			elt))
-		    load-history))))
+            (file-truename (file-name-directory simple-file-name)))))
 
   ;; Convert the arguments to Emacs internal representation.
   (let ((args command-line-args))

@@ -182,6 +182,9 @@ cldefs .PHONY: ./emacs-lisp/cldefs.el
 	                \";;; cldefs.el ends here\n\" \
 	                ))"
 
+# ldefs-boot.el is merely the last working loaddefs.el that was manually
+# checked in.  It acts as a stopgap for the bootstrap pdump until
+# loaddefs.el can be generated.
 ./ldefs-boot.el: ./loaddefs.el
 	sed '/^;; Local Variables:/a ;; no-byte-compile: t' < $< > $@
 

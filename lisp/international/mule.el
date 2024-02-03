@@ -298,9 +298,10 @@ attribute."
 (defvar hack-read-symbol-shorthands-function nil
   "Holds function to compute `read-symbol-shorthands'.")
 
-(defun load-with-code-conversion (fullname file &optional noerror nomessage
-                                           eval-function)
-  "Execute a file of Lisp code named FILE whose absolute name is FULLNAME.
+(defun load-with-code-conversion (fullname file
+                                  &optional noerror nomessage eval-function)
+  "RMS begged off writing this in C, thus this Fload doppleganger.
+Execute a file of Lisp code named FILE whose absolute name is FULLNAME.
 The file contents are decoded before evaluation if necessary.
 
 If optional third arg NOERROR is non-nil, report no error if FILE
@@ -314,69 +315,57 @@ directly.  It is called with two parameters: The buffer object
 and the file name.
 
 Return t if file exists."
-  (if (null (file-readable-p fullname))
-      (and (null noerror)
-	   (signal 'file-error (list "Cannot open load file" file)))
+  (if (not (file-readable-p fullname))
+      (unless noerror
+	(signal 'file-error (list "Cannot open load file" file)))
     ;; Read file with code conversion, and then eval.
-    (let ((buffer (generate-new-buffer " *load*"))
-          (load-in-progress t)
-          (source (string-suffix-p ".el" fullname)))
-      (unless nomessage
-	(if source
-	    (message "Loading %s (source)..." file)
-	  (message "Loading %s..." file)))
-      (when pdumper--pure-pool
-	(push (purecopy-maybe file) preloaded-file-list))
-      (unwind-protect
-	  (let ((load-true-file-name fullname)
-                (load-file-name fullname)
-                (set-auto-coding-for-load t)
-		(inhibit-file-name-operation nil)
-                shorthands)
-	    (with-current-buffer buffer
-              ;; So that we don't get completely screwed if the
-              ;; file is encoded in some complicated character set,
-              ;; read it with real decoding, as a multibyte buffer.
-              (set-buffer-multibyte t)
-	      ;; Don't let deactivate-mark remain set.
-	      (let (deactivate-mark)
-		(insert-file-contents fullname))
-              (setq shorthands
-                    ;; We need this indirection because hacking local
-                    ;; variables in too early seems to have cause
-                    ;; recursive load loops (bug#50946).  Thus it
-                    ;; remains nil until it is save to do so.
-                    (and hack-read-symbol-shorthands-function
-                         (funcall hack-read-symbol-shorthands-function)))
-	      ;; If the loaded file was inserted with no-conversion or
-	      ;; raw-text coding system, make the buffer unibyte.
-	      ;; Otherwise, eval-buffer might try to interpret random
-	      ;; binary junk as multibyte characters.
-	      (if (and enable-multibyte-characters
-		       (or (eq (coding-system-type last-coding-system-used)
-			       'raw-text)))
+    (prog1 t
+      (let ((buffer (generate-new-buffer " *load*"))
+            (load-in-progress t))
+        (unless nomessage
+	  (message "Loading %s (source)..." file))
+        (unwind-protect
+	    (let ((load-true-file-name fullname)
+                  (load-file-name fullname)
+                  (set-auto-coding-for-load t)
+		  (inhibit-file-name-operation nil)
+                  shorthands)
+	      (with-current-buffer buffer
+                ;; So that we don't get completely screwed if the
+                ;; file is encoded in some complicated character set,
+                ;; read it with real decoding, as a multibyte buffer.
+                (set-buffer-multibyte t)
+	        ;; Don't let deactivate-mark remain set.
+	        (let (deactivate-mark)
+		  (insert-file-contents fullname))
+                (setq shorthands
+                      ;; We need this indirection because hacking local
+                      ;; variables in too early seems to have cause
+                      ;; recursive load loops (bug#50946).  Thus it
+                      ;; remains nil until it is save to do so.
+                      (and hack-read-symbol-shorthands-function
+                           (funcall hack-read-symbol-shorthands-function)))
+	        ;; If the loaded file was inserted with no-conversion or
+	        ;; raw-text coding system, make the buffer unibyte.
+	        ;; Otherwise, eval-buffer might try to interpret random
+	        ;; binary junk as multibyte characters.
+	        (when (and enable-multibyte-characters
+		           (eq (coding-system-type last-coding-system-used)
+			       'raw-text))
 		  (set-buffer-multibyte nil))
-	      ;; Make `kill-buffer' quiet.
-	      (set-buffer-modified-p nil))
-	    ;; Have the original buffer current while we eval,
-            ;; but consider shorthands of the eval'ed one.
-	    (let ((read-symbol-shorthands shorthands))
-              (if eval-function
-                  (funcall eval-function buffer
-                           (if (pdumping-p) file fullname))
-                (eval-buffer buffer nil
-			     ;; This is compatible with what `load' does.
-                             (if (pdumping-p) file fullname)
-			     nil t))))
-	(let (kill-buffer-hook kill-buffer-query-functions)
-	  (kill-buffer buffer)))
-      (do-after-load-evaluation fullname)
-
-      (unless (or nomessage noninteractive)
-	(if source
-	    (message "Loading %s (source)...done" file)
-	  (message "Loading %s...done" file)))
-      t)))
+	        ;; Make `kill-buffer' quiet.
+	        (set-buffer-modified-p nil))
+	      ;; Have the original buffer current while we eval,
+              ;; but consider shorthands of the eval'ed one.
+	      (let ((read-symbol-shorthands shorthands))
+                (if eval-function
+                    (funcall eval-function buffer fullname)
+                  (eval-buffer buffer nil fullname nil t))))
+	  (let (kill-buffer-hook kill-buffer-query-functions)
+	    (kill-buffer buffer)))
+        (do-after-load-evaluation fullname)
+        (when (and (not nomessage) (not noninteractive))
+          (message "Loading %s (source)...done" file))))))
 
 (defun charset-info (charset)
   "Return a vector of information of CHARSET.

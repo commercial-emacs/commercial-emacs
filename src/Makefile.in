@@ -495,24 +495,31 @@ bootstrap-emacs$(EXEEXT): ../lisp/subdirs.el | emacs$(EXEEXT)
 	$(MAKE) -C ../admin/unidata all EMACS=../../src/bootstrap-emacs$(EXEEXT)
 
 ../lisp/loaddefs.elc: | bootstrap-emacs.pdmp
-	# compile bootstrapped elisp
-	../src/bootstrap-emacs$(EXEEXT) --batch --no-site-file --no-site-lisp \
-	   --eval "(mapc (function byte-compile-file) \
-	                 (mapcar (lambda (entry) \
-	                           (concat (file-name-sans-extension (car entry)) \
-	                                   \".el\")) \
-	                         load-history))"
 	$(MAKE) -C ../lisp autoloads EMACS=../src/bootstrap-emacs$(EXEEXT)
 	$(MAKE) -C ../lisp loaddefs.elc EMACS=../src/bootstrap-emacs$(EXEEXT)
+
+define pdump
+	LC_ALL=C ../src/$(@:.pdmp=)$(EXEEXT) --batch $(BUILD_DETAILS) \
+	  $(PDUMPER_OVERWRITE) -l ../admin/$(@:emacs.pdmp=pdump) \
+	  --pdump-write=$@ $(if $(BIN_DESTDIR),--bin-dest $(BIN_DESTDIR),) \
+	  $(if $(ELN_DESTDIR),--eln-dest $(ELN_DESTDIR),)
+endef
 
 bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT)
 emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.elc ../lisp/international/charprop.el
 bootstrap-emacs.pdmp emacs.pdmp:
 	rm -f $@
-	LC_ALL=C ../src/$< --batch $(BUILD_DETAILS) $(PDUMPER_OVERWRITE) \
-	  -l ../admin/$(@:emacs.pdmp=pdump) --pdump-write=$@ \
-	  $(if $(BIN_DESTDIR),--bin-dest $(BIN_DESTDIR),) \
-	  $(if $(ELN_DESTDIR),--eln-dest $(ELN_DESTDIR),)
+	# figure out loaded packages
+	$(call pdump)
+	# compile loaded packages
+	../src/$(@:.pdmp=)$(EXEEXT) --batch --no-site-file --no-site-lisp \
+	   --eval "(mapc (function byte-compile-file) \
+	                 (mapcar (lambda (entry) \
+	                           (concat (file-name-sans-extension (car entry)) \
+	                                   \".el\")) \
+	                         load-history))"
+	# load compiled packages
+	$(call pdump)
 
 dmpstruct_headers=$(srcdir)/lisp.h $(srcdir)/buffer.h $(srcdir)/itree.h \
 	$(srcdir)/intervals.h $(srcdir)/charset.h $(srcdir)/bignum.h

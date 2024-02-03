@@ -1140,10 +1140,11 @@ close_infile_unwind (void *arg)
   infile = prev_infile;
 }
 
-/* Compute the filename we want in `load-history' and `load-file-name'.  */
+/* Workaround for native comp horseshit that recovers .elc from
+   .eln.  */
 
 static Lisp_Object
-compute_found_effective (Lisp_Object found)
+elc_if_eln (Lisp_Object found)
 {
   /* Reconstruct the .elc filename.  */
   Lisp_Object src_name =
@@ -1382,15 +1383,7 @@ Return t if the file exists and loads successfully.  */)
      override.  */
   specbind (Qlexical_binding, Qnil);
 
-  Lisp_Object found_eff = is_native_elisp
-    ? compute_found_effective (found)
-    : found;
-
-  hist_file_name = (!NILP (Vpdumper__pure_pool)
-                    ? concat2 (Ffile_name_directory (file),
-                               Ffile_name_nondirectory (found_eff))
-                    : found_eff);
-
+  hist_file_name = is_native_elisp ? elc_if_eln (found) : found;
   version = -1;
 
   /* Check for the presence of unescaped character literals and warn
@@ -1403,10 +1396,8 @@ Return t if the file exists and loads successfully.  */)
       /* version = 1 means the file is empty, in which case we can
 	 treat it as not byte-compiled.  */
       || (fd >= 0 && (version = safe_to_load_version (file, fd)) > 1))
-    /* Load .elc files directly, but not when they are
-       remote and have no handler!  */
     {
-      if (fd != -2)
+      if (fd != -2) /* not a handler-lacking remote */
 	{
 	  struct stat s1, s2;
 	  if (version < 0 && !(version = safe_to_load_version (file, fd)))
@@ -1434,17 +1425,17 @@ Return t if the file exists and loads successfully.  */)
     }
   else if (!is_module && !is_native_elisp)
     {
-      /* We are loading a source file (*.el).  */
-      if (!NILP (Vload_source_file_function))
+      if (!NILP (Vload_source_file_function)) /* too hard to write in C? */
 	{
 	  Lisp_Object val;
-
 	  if (fd >= 0)
 	    {
 	      emacs_close (fd);
 	      clear_unwind_protect (fd_index);
 	    }
-	  val = call4 (Vload_source_file_function, found, hist_file_name,
+	  val = call4 (Vload_source_file_function, found,
+		       concat2 (Ffile_name_directory (file),
+				Ffile_name_nondirectory (hist_file_name)),
 		       NILP (noerror) ? Qnil : Qt,
 		       (NILP (nomessage) || force_load_messages) ? Qnil : Qt);
 	  return unbind_to (count, val);
@@ -1496,9 +1487,6 @@ Return t if the file exists and loads successfully.  */)
       unread_char = -1;
     }
 
-  if (!NILP (Vpdumper__pure_pool))
-    Vpreloaded_file_list = Fcons (Fpurecopy_maybe (file), Vpreloaded_file_list);
-
   if (NILP (nomessage) || force_load_messages)
     {
       if (is_module)
@@ -1506,7 +1494,7 @@ Return t if the file exists and loads successfully.  */)
       else if (is_native_elisp)
         message_with_string ("Loading %s (native compiled elisp)...", file, 1);
       else if (!compiled)
-	message_with_string ("Loading %s (source)...", file, 1);
+	message_with_string ("Loading %s.el (source)...", file, 1);
       else /* The typical case; compiled file newer than source file.  */
 	message_with_string ("Loading %s...", file, 1);
     }
@@ -2048,17 +2036,14 @@ build_load_history (Lisp_Object filename, bool entire)
 	      FOR_EACH_TAIL (tem2)
 		{
 		  newelt = XCAR (tem2);
-
 		  if (NILP (Fmember (newelt, tem)))
 		    Fsetcar (tail, Fcons (XCAR (tem),
 		     			  Fcons (newelt, XCDR (tem))));
-		  maybe_quit ();
 		}
 	    }
 	}
       else
 	prev = tail;
-      maybe_quit ();
     }
 
   /* If we're loading an entire file, cons the new assoc onto the
@@ -5475,10 +5460,6 @@ make target.  Not to be confused with the legacy
   Vinstalled_directory
     = Fexpand_file_name (build_string ("../"),
 			 Fcar (decode_env_path (0, PATH_LOADSEARCH, 0)));
-
-  DEFVAR_LISP ("preloaded-file-list", Vpreloaded_file_list,
-	       doc: /* List of files that were preloaded (when dumping Emacs).  */);
-  Vpreloaded_file_list = Qnil;
 
   DEFVAR_LISP ("byte-boolean-vars", Vbyte_boolean_vars,
 	       doc: /* List of all DEFVAR_BOOL variables, used by the byte code optimizer.  */);

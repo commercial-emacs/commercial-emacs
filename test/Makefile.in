@@ -335,8 +335,13 @@ src/emacs-tests.log: ../lib-src/seccomp-filter.c
 check-no-automated-subdir:
 	${AM_V_at}test ! -d $(srcdir)/automated
 
+.PHONY: check-no-cl-lib
+check-no-cl-lib:
+	@[ 'nil' = `$(emacs_env) $(GDB) $(emacs) --batch --eval \
+	              "(prin1 (featurep (quote cl-lib)))"` ]
+
 ## Rerun all default tests.
-check: mostlyclean check-no-automated-subdir
+check: mostlyclean check-no-automated-subdir check-no-cl-lib
 	@${MAKE} check-doit SELECTOR="${SELECTOR_ACTUAL}"
 
 ## Rerun all default and expensive tests.
