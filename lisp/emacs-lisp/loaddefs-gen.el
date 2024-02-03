@@ -378,6 +378,7 @@ don't include."
   (let ((defs nil)
         (load-name (loaddefs-generate--file-load-name file main-outfile))
         (compute-prefixes t)
+        read-symbol-shorthands
         local-outfile inhibit-autoloads)
     (with-temp-buffer
       (insert-file-contents file)
@@ -399,7 +400,22 @@ don't include."
             (setq inhibit-autoloads (read (current-buffer)))))
         (save-excursion
           (when (re-search-forward "autoload-compute-prefixes: *" nil t)
-            (setq compute-prefixes (read (current-buffer))))))
+            (setq compute-prefixes (read (current-buffer)))))
+        (save-excursion
+          ;; since we're "open-coding" we have to repeat more
+          ;; complicated logic in `hack-local-variables'.
+          (when-let ((beg
+                      (re-search-forward "read-symbol-shorthands: *" nil t)))
+            ;; `read-symbol-shorthands' alist ends with two parens.
+            (let* ((end (re-search-forward ")[;\n\s]*)"))
+                   (commentless (replace-regexp-in-string
+                                 "\n\\s-*;+" ""
+                                 (buffer-substring beg end)))
+                   (unsorted-shorthands (car (read-from-string commentless))))
+              (setq read-symbol-shorthands
+                    (sort unsorted-shorthands
+                          (lambda (sh1 sh2)
+                            (> (length (car sh1)) (length (car sh2))))))))))
 
       ;; We always return the package version (even for pre-dumped
       ;; files).
@@ -486,7 +502,11 @@ don't include."
     (while (re-search-forward
             "^(\\(def[^ \t\n]+\\)[ \t\n]+['(]*\\([^' ()\"\n]+\\)[\n \t]" nil t)
       (unless (member (match-string 1) autoload-ignored-definitions)
-        (let ((name (match-string-no-properties 2)))
+        (let* ((name (match-string-no-properties 2))
+               ;; Consider `read-symbol-shorthands'.
+               (probe (let ((obarray (obarray-make)))
+                        (car (read-from-string name)))))
+          (setq name (symbol-name probe))
           (when (save-excursion
                   (goto-char (match-beginning 0))
                   (or (bobp)
