@@ -1890,6 +1890,12 @@ process from additional information inserted by Emacs."
 (defvar-local compilation--start-time nil
   "The time when the compilation started as returned by `float-time'.")
 
+(defun compilation--downcase-mode-name (mode)
+  "Downcase the name of major MODE, even if MODE is not a string.
+The function `downcase' will barf if passed the name of a `major-mode'
+which is not a string, but instead a symbol or a list."
+  (downcase (format-mode-line mode)))
+
 ;;;###autoload
 (defun compilation-start (command &optional mode name-function highlight-regexp
                                   continue)
@@ -2704,7 +2710,8 @@ Prefix arg N says how many files to move backwards (or forwards, if negative)."
   (let ((buffer (compilation-find-buffer)))
     (if (get-buffer-process buffer)
 	(interrupt-process (get-buffer-process buffer))
-      (error "The %s process is not running" (downcase mode-name)))))
+      (error "The %s process is not running"
+             (compilation--downcase-mode-name mode-name)))))
 
 (defalias 'compile-mouse-goto-error 'compile-goto-error)
 
