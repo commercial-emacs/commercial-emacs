@@ -513,11 +513,9 @@ bootstrap-emacs.pdmp emacs.pdmp:
 	$(call pdump)
 	# compile loaded packages
 	../src/$(@:.pdmp=)$(EXEEXT) --batch --no-site-file --no-site-lisp \
-	   --eval "(mapc (function byte-compile-file) \
-	                 (mapcar (lambda (entry) \
-	                           (concat (file-name-sans-extension (car entry)) \
-	                                   \".el\")) \
-	                         load-history))"
+	   --eval "(dolist (el (mapcar (function car) load-history)) \
+	             (when (equal \"el\" (file-name-extension el)) \
+	               (byte-compile-file el)))"
 	# load compiled packages
 	$(call pdump)
 
