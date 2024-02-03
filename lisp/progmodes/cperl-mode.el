@@ -6610,14 +6610,13 @@ and \"Whitesmith\"."
 	     read))))
 
   (let ((cmd-desc (concat "^" (regexp-quote command) "[^a-zA-Z_0-9]")) ; "tr///"
-	pos isvar height iniheight frheight buf win fr1 fr2 iniwin not-loner
+	pos isvar height iniheight frheight buf win iniwin not-loner
 	max-height char-height buf-list)
     (if (string-match "^-[a-zA-Z]$" command)
 	(setq cmd-desc "^-X[ \t\n]"))
     (setq isvar (string-match "^[$@%]" command)
 	  buf (cperl-info-buffer isvar)
-	  iniwin (selected-window)
-	  fr1 (window-frame iniwin))
+	  iniwin (selected-window))
     (set-buffer buf)
     (goto-char (point-min))
     (or isvar
