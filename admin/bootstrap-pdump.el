@@ -52,7 +52,7 @@
                          load-path)))
 
 ;; For the post-dump, the load-path is hacked together by
-;; `update-subdirs`, a make target dating back to 1997.
+;; `update-subdirs`, a `make` target dating back to 1997.
 (message "Using load-path %s" load-path)
 
 ;; native comp + interpreted elisp = more stack
@@ -71,8 +71,7 @@
 (load "subr")
 (load "keymap")
 
-;; Do it after subr, since both after-load-functions and add-hook are
-;; implemented in subr.el.
+;; subr.el defines after-load-functions and add-hook
 (add-hook 'after-load-functions (lambda (_) (garbage-collect)))
 
 (load "version")
@@ -349,6 +348,9 @@
 ;; Avoid storing references to build directory in the binary.
 (setq custom-current-group-alist nil)
 
+(when (boundp 'pdumper--doctor-load-history)
+  (eval pdumper--doctor-load-history))
+
 ;; We keep the load-history data in PURE space.
 ;; Make sure that the spine of the list is not in pure space because it can
 ;; be destructively mutated in lread.c:build_load_history.
@@ -438,7 +440,7 @@ directory got moved.  This is set to be a pair in the form of:
        (mapcar
         (lambda (file)
           (catch 'relative-name
-            (dolist (path (sort load-path
+            (dolist (path (sort (copy-sequence load-path)
                                 (lambda (a b) (< (length a) (length b)))))
               (let ((rx (format "^%s\\(\\S-+\\)"
                                 (regexp-quote
@@ -452,10 +454,9 @@ directory got moved.  This is set to be a pair in the form of:
 (unless (garbage-collect)
   (setq pure-space-overflow t))
 
-(when (and (featurep 'native-compile)
-           ;; Enabling this for bootstrap-emacs.pdmp results
-           ;; in dreaded eager macroexpansion cycles.
-           pdumper--pure-pool)
+;; Enabling this without pdumper--pure-pool incurs dreaded eager
+;; macroexpansion cycles.
+(when (and (featurep 'native-compile) pdumper--pure-pool)
   (setq comp-enable-subr-trampolines t))
 
 (message "Dumping to %s" (pdumping-output))

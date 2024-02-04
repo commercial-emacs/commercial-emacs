@@ -418,6 +418,10 @@ endif
 src: Makefile
 	$(MAKE) -C $@ BIN_DESTDIR='$(BIN_DESTDIR)' ELN_DESTDIR='$(ELN_DESTDIR)' all
 
+.PHONY: pdump
+pdump: | src
+	$(MAKE) -C src BIN_DESTDIR='$(BIN_DESTDIR)' ELN_DESTDIR='$(ELN_DESTDIR)' install-emacs.pdmp
+
 blessmail: Makefile src
 	$(MAKE) -C lib-src maybe-blessmail
 
@@ -464,19 +468,19 @@ write_subdir=if [ -f "$${subdir}/subdirs.el" ]; \
 ### Install the executables that were compiled specifically for this machine.
 ### We do install-arch-indep first because the executable needs the
 ### Lisp files and DOC file to work properly.
-install-arch-dep: src install-arch-indep install-etcdoc install-$(NTDIR)
+install-arch-dep: src pdump install-arch-indep install-etcdoc install-$(NTDIR)
 	umask 022; ${MKDIR_P} "$(DESTDIR)${bindir}"
 	$(MAKE) -C lib-src install
 ifeq (${ns_self_contained},no)
 	${INSTALL_PROGRAM} $(INSTALL_STRIP) src/emacs${EXEEXT} "$(DESTDIR)${bindir}/$(EMACSFULL)"
-	${INSTALL_DATA} src/emacs.pdmp "$(DESTDIR)${libexecdir}/emacs/${version}/${configuration}"/emacs-${EMACS_PDMP}
+	${INSTALL_DATA} src/install-emacs.pdmp "$(DESTDIR)${libexecdir}/emacs/${version}/${configuration}"/emacs-${EMACS_PDMP}
 	-chmod 755 "$(DESTDIR)${bindir}/$(EMACSFULL)"
 ifndef NO_BIN_LINK
 	rm -f "$(DESTDIR)${bindir}/$(EMACS)"
 	cd "$(DESTDIR)${bindir}" && $(LN_S_FILEONLY) "$(EMACSFULL)" "$(EMACS)"
 endif
 else
-	${INSTALL_DATA} src/emacs.pdmp "$(DESTDIR)${libexecdir}/Emacs.pdmp"
+	${INSTALL_DATA} src/install-emacs.pdmp "$(DESTDIR)${libexecdir}/Emacs.pdmp"
 	subdir=${ns_appresdir}/site-lisp && ${write_subdir}
 	rm -rf ${ns_appresdir}/share
 endif

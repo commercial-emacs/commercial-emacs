@@ -477,11 +477,11 @@ endif
 ifeq ($(HAVE_BE_APP),yes)
 all: Emacs Emacs.pdmp
 Emacs: emacs$(EXEEXT) $(libsrc)/be-resources
-	$(AM_V_GEN) cp -f emacs$(EXEEXT) $@
-	$(AM_V_at) $(libsrc)/be-resources \
+	$(AM_V_GEN)cp -f emacs$(EXEEXT) $@
+	$(AM_V_at)$(libsrc)/be-resources \
 	  $(etc)/images/icons/hicolor/32x32/apps/emacs.png $@
 Emacs.pdmp: emacs.pdmp
-	$(AM_V_GEN) cp -f $< $@
+	$(AM_V_GEN)cp -f $< $@
 endif
 
 ../lisp/subdirs.el:
@@ -499,25 +499,33 @@ bootstrap-emacs$(EXEEXT): ../lisp/subdirs.el | emacs$(EXEEXT)
 	$(MAKE) -C ../lisp loaddefs.elc EMACS=../src/bootstrap-emacs$(EXEEXT)
 
 define pdump
+	$(AM_V_at)rm -f $@
 	LC_ALL=C ../src/$(@:.pdmp=)$(EXEEXT) --batch $(BUILD_DETAILS) \
 	  $(PDUMPER_OVERWRITE) -l ../admin/$(@:emacs.pdmp=pdump) \
 	  --pdump-write=$@ $(if $(BIN_DESTDIR),--bin-dest $(BIN_DESTDIR),) \
-	  $(if $(ELN_DESTDIR),--eln-dest $(ELN_DESTDIR),)
+	  $(if $(ELN_DESTDIR),--eln-dest $(ELN_DESTDIR),)${1}
+endef
+
+define compile-loaded
+	../src/$(@:.pdmp=)$(EXEEXT) --batch --no-site-file --no-site-lisp \
+	   --eval "(dolist (el (mapcar (function car) load-history)) \
+	             (when (equal \"el\" (file-name-extension el)) \
+	               (byte-compile-file el)))"
 endef
 
 bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT)
 emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.elc ../lisp/international/charprop.el
 bootstrap-emacs.pdmp emacs.pdmp:
-	rm -f $@
-	# figure out loaded packages
+	# this run figures out packages loaded
+	$(call pdump, 2>/dev/null)
+	$(call compile-loaded)
+	# this run ensures only compiled packages loaded
 	$(call pdump)
-	# compile loaded packages
-	../src/$(@:.pdmp=)$(EXEEXT) --batch --no-site-file --no-site-lisp \
-	   --eval "(dolist (el (mapcar (function car) load-history)) \
-	             (when (equal \"el\" (file-name-extension el)) \
-	               (byte-compile-file el)))"
-	# load compiled packages
+install-emacs.pdmp: emacs.pdmp
+	$(AM_V_at)rm -f install-emacs$(EXEEXT)
+	$(AM_V_at)cp -f emacs$(EXEEXT) install-emacs$(EXEEXT)
 	$(call pdump)
+	$(AM_V_at)rm -f install-emacs$(EXEEXT)
 
 dmpstruct_headers=$(srcdir)/lisp.h $(srcdir)/buffer.h $(srcdir)/itree.h \
 	$(srcdir)/intervals.h $(srcdir)/charset.h $(srcdir)/bignum.h

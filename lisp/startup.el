@@ -1129,7 +1129,7 @@ Amongst another things, it parses the command-line arguments."
 
   ;; See if we should import version-control from the environment variable.
   (let ((vc (getenv "VERSION_CONTROL")))
-    (cond ((eq vc nil))			;don't do anything if not set
+    (cond ((null vc))			;don't do anything if not set
 	  ((member vc '("t" "numbered"))
 	   (setq version-control t))
 	  ((member vc '("nil" "existing"))
@@ -1137,32 +1137,22 @@ Amongst another things, it parses the command-line arguments."
 	  ((member vc '("never" "simple"))
 	   (setq version-control 'never))))
 
-  ;;! This has been commented out; I currently find the behavior when
-  ;;! split-window-keep-point is nil disturbing, but if I can get used
-  ;;! to it, then it would be better to eliminate the option.
-  ;;! ;; Choose a good default value for split-window-keep-point.
-  ;;! (setq split-window-keep-point (> baud-rate 2400))
-  (let ((simple-file-name
-	 ;; Look for simple.el or simple.elc and use their directory
-	 ;; as the place where all Lisp files live.
-	 (locate-file "simple" load-path (get-load-suffixes))))
-    ;; Don't abort if simple.el cannot be found, but print a warning.
-    ;; Although in most usage we are going to cryptically abort a moment
-    ;; later anyway, due to missing required bidi data files (eg bug#13430).
-    (if (null simple-file-name)
-	(let ((standard-output 'external-debugging-output)
-	      (lispdir (expand-file-name "../lisp" data-directory)))
-	  (princ "Warning: Could not find simple.el or simple.elc")
-	  (terpri)
-	  (when (getenv "EMACSLOADPATH")
-	    (princ "The EMACSLOADPATH environment variable is set, \
+  ;; Ad hoc weak sauce inferring lisp-directory (dates back to RMS)
+  (if-let ((simple-file-name
+            (locate-file "simple" load-path (get-load-suffixes))))
+      (setq lisp-directory (file-truename
+                            (file-name-directory simple-file-name)))
+    (let ((standard-output 'external-debugging-output)
+	  (lispdir (expand-file-name "../lisp" data-directory)))
+      (princ "Warning: Could not find simple.el or simple.elc")
+      (terpri)
+      (when (getenv "EMACSLOADPATH")
+	(princ "The EMACSLOADPATH environment variable is set, \
 please check its value")
-	    (terpri))
-	  (unless (file-readable-p lispdir)
-	    (princ (format "Lisp directory %s not readable?" lispdir))
-	    (terpri)))
-      (setq lisp-directory
-            (file-truename (file-name-directory simple-file-name)))))
+	(terpri))
+      (unless (file-readable-p lispdir)
+	(princ (format "Lisp directory %s not readable?" lispdir))
+	(terpri))))
 
   ;; Convert the arguments to Emacs internal representation.
   (let ((args command-line-args))
@@ -1171,9 +1161,8 @@ please check its value")
 	      (decode-coding-string (car args) locale-coding-system t))
       (pop args)))
 
-  (let ((done nil)
-	(args (cdr command-line-args))
-	display-arg)
+  (let ((args (cdr command-line-args))
+        done display-arg)
 
     ;; Figure out which user's init file to load,
     ;; either from the environment or from the options.
