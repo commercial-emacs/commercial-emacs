@@ -5461,6 +5461,10 @@ make target.  Not to be confused with the legacy
     = Fexpand_file_name (build_string ("../"),
 			 Fcar (decode_env_path (0, PATH_LOADSEARCH, 0)));
 
+  DEFVAR_LISP ("preloaded-file-list", Vpreloaded_file_list,
+	       doc: /* Legacy variable.  */);
+  Vpreloaded_file_list = Qnil;
+
   DEFVAR_LISP ("byte-boolean-vars", Vbyte_boolean_vars,
 	       doc: /* List of all DEFVAR_BOOL variables, used by the byte code optimizer.  */);
   Vbyte_boolean_vars = Qnil;

@@ -348,6 +348,23 @@
 ;; Avoid storing references to build directory in the binary.
 (setq custom-current-group-alist nil)
 
+(setq preloaded-file-list
+      (delq
+       nil
+       (mapcar
+        (lambda (file)
+          (catch 'relative-name
+            (dolist (path (sort (copy-sequence load-path)
+                                (lambda (a b) (< (length a) (length b)))))
+              (let ((rx (format "^%s\\(\\S-+\\)"
+                                (regexp-quote
+                                 (file-name-as-directory path)))))
+                (save-match-data
+                  (when (string-match rx file)
+                    (throw 'relative-name (file-name-sans-extension
+                                           (match-string 1 file)))))))))
+        (mapcar #'car load-history))))
+
 (when (boundp 'pdumper--doctor-load-history)
   (eval pdumper--doctor-load-history))
 
@@ -366,7 +383,6 @@
 ;; At this point, we're ready to resume undo recording for scratch.
 (buffer-enable-undo "*scratch*")
 
-(defvar preloaded-file-list nil "Legacy variable")
 (defvar load--bin-dest-dir nil
   "Store the original value passed by \"--bin-dest\" during dump.
 Internal use only.")
@@ -434,22 +450,6 @@ directory got moved.  This is set to be a pair in the form of:
              pdumper--pure-pool)
     (message "Pure-hashed: %d strings, %d vectors, %d conses, %d bytecodes, %d others"
              strings vectors conses bytecodes others)))
-
-(setq preloaded-file-list
-      (delq nil
-       (mapcar
-        (lambda (file)
-          (catch 'relative-name
-            (dolist (path (sort (copy-sequence load-path)
-                                (lambda (a b) (< (length a) (length b)))))
-              (let ((rx (format "^%s\\(\\S-+\\)"
-                                (regexp-quote
-                                 (file-name-as-directory path)))))
-                (save-match-data
-                  (when (string-match rx file)
-                    (throw 'relative-name (file-name-sans-extension
-                                           (match-string 1 file)))))))))
-        (mapcar #'car load-history))))
 
 (unless (garbage-collect)
   (setq pure-space-overflow t))
