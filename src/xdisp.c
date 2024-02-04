@@ -4057,7 +4057,7 @@ handle_invisible_prop (struct it *it)
 	  /* Bidi-iterate out of the invisible part of the string.  */
 	  do
 	    {
-	      bidi_move_to_visually_next (&it->bidi_it);
+	      bidi_next (&it->bidi_it);
 	      if (it->bidi_it.charpos < 0 || it->bidi_it.charpos >= endpos)
 		done = true;
 	      else
@@ -4098,7 +4098,7 @@ handle_invisible_prop (struct it *it)
 	  /* Bidi-iterate out of the invisible text.  */
 	  do
 	    {
-	      bidi_move_to_visually_next (&it->bidi_it);
+	      bidi_next (&it->bidi_it);
 	      if (it->bidi_it.charpos < BEGV || it->bidi_it.charpos >= endpos)
 		done = true;
 	      else
