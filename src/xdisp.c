@@ -15979,6 +15979,14 @@ enum
    `scroll-conservatively' and the Emacs manual.  */
 #define SCROLL_LIMIT 100
 
+/* The freshness of the w->base_line_number cache is only ensured at every
+   redisplay cycle, so the cache can be used only if there's been
+   no relevant changes to the buffer since the last redisplay.  */
+#define BASE_LINE_NUMBER_VALID_P(w)                      \
+   (eassert (current_buffer == XBUFFER ((w)->contents)), \
+    !current_buffer->clip_changed                        \
+    && BEG_UNCHANGED >= (w)->base_line_pos)
+
 static int
 try_scrolling (Lisp_Object window, bool just_this_one_p,
 	       intmax_t arg_scroll_conservatively, intmax_t scroll_step,
@@ -16263,9 +16271,10 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
   else
     {
       /* Maybe forget recorded base line for line number display.  */
-      if (!just_this_one_p
-	  || current_buffer->clip_changed
-	  || BEG_UNCHANGED < CHARPOS (startp))
+      /* FIXME: Why do we need this?  `try_scrolling` can only be called from
+         `redisplay_window` which should have flushed this cache already when
+         eeded.  */
+      if (!BASE_LINE_NUMBER_VALID_P (w))
 	w->base_line_number = 0;
 
       /* If cursor ends up on a partially visible line,
@@ -16862,9 +16871,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   /* Record it now because it's overwritten.  */
   bool current_matrix_up_to_date_p = false;
   bool used_current_matrix_p = false;
-  /* This is less strict than current_matrix_up_to_date_p.
-     It indicates that the buffer contents and narrowing are unchanged.  */
-  bool buffer_unchanged_p = false;
   bool temp_scroll_step = false;
   specpdl_ref count = SPECPDL_INDEX ();
   int rc;
@@ -16964,11 +16970,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   SET_TEXT_POS (opoint, PT, PT_BYTE);
 
   specbind (Qinhibit_point_motion_hooks, Qt);
-
-  buffer_unchanged_p
-    = (w->window_end_valid
-       && !current_buffer->clip_changed
-       && !window_outdated (w));
 
   /* When windows_or_buffers_changed is non-zero, we can't rely
      on the window end being valid, so set it to zero there.  */
@@ -17075,6 +17076,10 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	}
     }
 
+  if (!BASE_LINE_NUMBER_VALID_P (w))
+    /* Forget any recorded base line for line number display.  */
+    w->base_line_number = 0;
+
  force_start:
 
   /* Handle case where place to start displaying has been specified,
@@ -17094,10 +17099,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
       w->preserve_vscroll_p = false;
       w->window_end_valid = false;
-
-      /* Forget any recorded base line for line number display.  */
-      if (!buffer_unchanged_p)
-	w->base_line_number = 0;
 
       /* Redisplay the mode line.  Select the buffer properly for that.
 	 Also, run the hook window-scroll-functions
@@ -17371,12 +17372,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
       if (w->cursor.vpos >= 0)
 	{
-	  if (!just_this_one_p
-	      || current_buffer->clip_changed
-	      || BEG_UNCHANGED < CHARPOS (startp))
-	    /* Forget any recorded base line for line number display.  */
-	    w->base_line_number = 0;
-
 	  if (!cursor_row_fully_visible_p (w, true, false, false))
 	    {
 	      clear_glyph_matrix (w->desired_matrix);
@@ -17442,10 +17437,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
      according to user preferences.  */
 
  recenter:
-
-  /* Forget any previously recorded base line for line number display.  */
-  if (!buffer_unchanged_p)
-    w->base_line_number = 0;
 
   /* Determine the window start relative to point.  */
   init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
@@ -20956,6 +20947,13 @@ produce_line_number (struct it *it)
       if (!last_line)
 	{
 	  /* If possible, reuse data cached by line-number-mode.  */
+	  /* NOTE: We use `base_line_number` without checking
+	     BASE_LINE_NUMBER_VALID_P because we assume that `redisplay_window`
+	     has already flushed this cache for us when needed.
+	     NOTE²: Checking BASE_LINE_NUMBER_VALID_P here would be
+	     overly pessimistic because it might say that the cache
+	     was invalid before entering `redisplay_window` yet the
+	     value has just been refreshed.  */
 	  if (it->w->base_line_number > 0
 	      && it->w->base_line_pos > 0
 	      && it->w->base_line_pos <= IT_CHARPOS (*it)
@@ -24218,6 +24216,11 @@ are the selected window and the WINDOW's buffer).  */)
 
   init_iterator (&it, w, -1, -1, NULL, face_id);
 
+  /* Make sure `base_line_number` is fresh in case we encounter a `%l`.  */
+  if (current_buffer == XBUFFER ((w)->contents)
+      && !BASE_LINE_NUMBER_VALID_P (w))
+    w->base_line_number = 0;
+
   if (no_props)
     {
       mode_line_target = MODE_LINE_NOPROP;
@@ -24662,15 +24665,14 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 	startpos = marker_position (w->start);
 	startpos_byte = marker_byte_position (w->start);
 	height = WINDOW_TOTAL_LINES (w);
-	if (BUF_BEGV_BYTE (b) > startpos_byte
+	if (current_buffer != XBUFFER (w->contents)
+	    || BUF_BEGV_BYTE (b) > startpos_byte
 	    || startpos_byte > BUF_ZV_BYTE (b))
 	  {
 	    /* usually means narrowing occurred, and window
 	       wasn't yet redisplayed.  */
 	    startpos = BUF_BEGV (b);
 	    startpos_byte = BUF_BEGV_BYTE (b);
-	    w->base_line_pos = 0;
-	    w->base_line_number = 0;
 	  }
 
 	if (w->base_line_pos == -1)
@@ -24681,14 +24683,12 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 
 	if (FIXNUMP (Vline_number_display_limit)
 	    && BUF_ZV (b) - BUF_BEGV (b) > XFIXNUM (Vline_number_display_limit))
-	  {
-	    /* buffer too big */
-	    w->base_line_pos = 0;
-	    w->base_line_number = 0;
-	    goto no_value;
-	  }
+	  goto no_value;
 
-	if (w->base_line_number > 0
+	/* Callers of `display_mode_element` are in charge of flushing
+	   any stale `base_line_number` cache.  */
+	if (current_buffer == XBUFFER ((w)->contents)
+	    && w->base_line_number > 0
 	    && w->base_line_pos > 0
 	    && w->base_line_pos <= startpos)
 	  {
@@ -24714,7 +24714,9 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 	   or too far away, or if we did not have one.
 	   "Too close" means it's plausible a scroll-down would
 	   go back past it.  */
-	if (startpos == BUF_BEGV (b))
+	if (current_buffer != XBUFFER (w->contents))
+	  ; /* The base line is for another buffer, don't touch it!  */
+	else if (startpos == BUF_BEGV (b))
 	  {
 	    w->base_line_number = topline;
 	    w->base_line_pos = BUF_BEGV (b);
@@ -24751,6 +24753,12 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 		goto no_value;
 	      }
 
+	    /* NOTE: if `clip_changed` is set or if `BEG_UNCHANGED` is
+               before `position`, this new cached value may get flushed
+               soon needlessly, because we can't reset `BEG_UNCHANGED` or
+               `clip_changed` from here (since they reflect the changes
+               since the last redisplay so they can only be reset from
+               `mark_window_display_accurate_1`).  :-(  */
 	    w->base_line_number = topline - nlines;
 	    w->base_line_pos = BYTE_TO_CHAR (position);
 	  }
