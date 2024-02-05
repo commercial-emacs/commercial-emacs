@@ -3383,18 +3383,16 @@ the deferred compilation mechanism."
                    (if (and comp-async-compilation
                             (not (eq (car err) 'native-compiler-error)))
                        (progn
-                         (message "%s: Error %s"
+                         (message (if err-val
+                                      "%s: Error: %s %s"
+                                    "%s: Error %s")
                                   function-or-file
-                                  (error-message-string err))
+                                  (get (car err) 'error-message)
+                                  (car-safe err-val))
                          (kill-emacs -1))
                      ;; Otherwise re-signal it adding the compilation input.
-                     ;; FIXME: We can't just insert arbitrary info in the
-                     ;; error-data part of an error: the handler may expect
-                     ;; specific data at specific positions!
 	             (signal (car err) (if (consp err-val)
 			                   (cons function-or-file err-val)
-			                 ;; FIXME: `err-val' is supposed to be
-			                 ;; a list, so it can only be nil here!
 			                 (list function-or-file err-val)))))))
                       (if (stringp function-or-file)
                           data
