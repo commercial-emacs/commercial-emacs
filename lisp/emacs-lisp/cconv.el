@@ -507,8 +507,7 @@ of variables for referencing in arbitrary scopes."
          (let ((args (mapcar (lambda (form) (cconv-convert form env extend))
                              forms)))
            (unless (symbolp func)
-             (byte-compile-warn-x
-              form
+             (byte-compile-warn
               "Use `funcall' instead of `%s' in the function position" func))
            `(,func . ,args))
        (prog1 nil
