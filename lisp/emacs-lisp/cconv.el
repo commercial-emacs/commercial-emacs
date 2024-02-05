@@ -501,12 +501,16 @@ of variables for referencing in arbitrary scopes."
            (_ (cl-assert (null (cdr x)))))))
      (cconv-convert exp env extend))
     (`(,func . ,forms)
-     (if (symbolp func)
+     (if (or (symbolp func) (functionp func))
          ;; First element is function or whatever function-like forms are:
          ;; or, and, if, catch, progn, prog1, while, until
-         `(,func . ,(mapcar (lambda (form)
-                              (cconv-convert form env extend))
-                            forms))
+         (let ((args (mapcar (lambda (form) (cconv-convert form env extend))
+                             forms)))
+           (unless (symbolp func)
+             (byte-compile-warn-x
+              form
+              "Use `funcall' instead of `%s' in the function position" func))
+           `(,func . ,args))
        (prog1 nil
          (byte-compile-warn "Malformed function `%S'" func))))
     (_ (or (cdr (assq form env)) form))))
