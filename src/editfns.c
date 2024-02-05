@@ -297,6 +297,24 @@ If you set the marker not to point anywhere, the buffer will have no mark.  */)
 }
 
 
+/* Find all the overlays in the current buffer that touch position POS.
+   Return the number found, and store them in a vector in VEC
+   of length LEN.
+
+   Note: this can return overlays that do not touch POS.  The caller
+   should filter these out. */
+
+static ptrdiff_t
+overlays_around (ptrdiff_t pos, Lisp_Object *vec, ptrdiff_t len)
+{
+  /* Find all potentially rear-advance overlays at (POS - 1).  Find
+     all overlays at POS, so end at (POS + 1).  Find even empty
+     overlays, which due to the way 'overlays-in' works implies that
+     we might also fetch empty overlays starting at (POS + 1).  */
+  return overlays_in (pos - 1, pos + 1, false, &vec, &len,
+		      true, false, NULL);
+}
+
 DEFUN ("get-pos-property", Fget_pos_property, Sget_pos_property, 2, 3, 0,
        doc: /* Return the value of POSITION's property PROP, in OBJECT.
 Almost identical to `get-char-property' except for the following difference:
@@ -322,23 +340,39 @@ at POSITION.  */)
   else
     {
       EMACS_INT posn = XFIXNUM (position);
-      Lisp_Object tem;
+      ptrdiff_t noverlays;
+      Lisp_Object *overlay_vec, tem;
       struct buffer *obuf = current_buffer;
-      struct itree_node *node;
-      struct sortvec items[2];
-      struct sortvec *result = NULL;
-      struct buffer *b = XBUFFER (object);
-      Lisp_Object res = Qnil;
+      USE_SAFE_ALLOCA;
 
-      set_buffer_temp (b);
+      set_buffer_temp (XBUFFER (object));
 
-      ITREE_FOREACH (node, b->overlays, posn - 1, posn + 1, ASCENDING)
+      /* First try with room for 40 overlays.  */
+      Lisp_Object overlay_vecbuf[40];
+      noverlays = ARRAYELTS (overlay_vecbuf);
+      overlay_vec = overlay_vecbuf;
+      noverlays = overlays_around (posn, overlay_vec, noverlays);
+
+      /* If there are more than 40,
+	 make enough space for all, and try again.  */
+      if (ARRAYELTS (overlay_vecbuf) < noverlays)
 	{
-	  Lisp_Object ol = node->data;
+	  SAFE_ALLOCA_LISP (overlay_vec, noverlays);
+	  noverlays = overlays_around (posn, overlay_vec, noverlays);
+	}
+      noverlays = sort_overlays (overlay_vec, noverlays, NULL);
+
+      set_buffer_temp (obuf);
+
+      /* Now check the overlays in order of decreasing priority.  */
+      while (--noverlays >= 0)
+	{
+	  Lisp_Object ol = overlay_vec[noverlays];
 	  tem = Foverlay_get (ol, prop);
-	  if (NILP (tem)
+	  if (!NILP (tem))
+	    {
 	      /* Check the overlay is indeed active at point.  */
-	      || ((node->begin == posn
+	      if ((OVERLAY_START (ol) == posn
 		   && OVERLAY_FRONT_ADVANCE_P (ol))
 		  || (OVERLAY_END (ol) == posn
 		      && !OVERLAY_REAR_ADVANCE_P (ol))
@@ -352,10 +386,7 @@ at POSITION.  */)
 		}
 	    }
 	}
-      set_buffer_temp (obuf);
-
-      if (!NILP (res))
-        return res;
+      SAFE_FREE ();
 
       { /* Now check the text properties.  */
 	int stickiness = text_property_stickiness (prop, position, object);
