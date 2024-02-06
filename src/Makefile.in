@@ -719,7 +719,7 @@ elnlisp := $(addprefix ../lisp/,${elnlisp}) $(lisp:.elc=.eln)
 	  if test $(SYSTEM_TYPE) = cygwin; then \
 	    find $@ -name '*.eln' | rebase -v -O -T -; \
 	  fi; \
-	  $(call pdump,emacs.pdmp)
+	  $(call pdump,emacs.pdmp); \
 	  if test $(NATIVE_COMPILATION_AOT) = yes; then \
 	    $(MAKE) $(AM_V_NO_PD) -C ../lisp compile-eln-aot \
 	      ELNDONE="$(addprefix %,$(notdir $(elnlisp))))"; \
