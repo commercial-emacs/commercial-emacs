@@ -709,6 +709,16 @@ run_thread (void *state)
   current_thread = self;
 #endif
 
+#ifdef THREADS_ENABLED
+#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
+  rc
+    = (*android_jvm)->AttachCurrentThread (android_jvm, &self->java_env,
+					   NULL);
+  if (rc != JNI_OK)
+    emacs_abort ();
+#endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
+#endif /* THREADS_ENABLED */
+
   self->m_stack_bottom = self->stack_top = &stack_pos.c;
   self->thread_id = sys_thread_self ();
 
