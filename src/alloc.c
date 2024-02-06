@@ -2148,7 +2148,7 @@ free_by_pvtype (struct Lisp_Vector *vector)
 	struct Lisp_Hash_Table *h = PSEUDOVEC_STRUCT (vector, Lisp_Hash_Table);
 	if (h->table_size > 0)
 	  {
-	    eassert (h->index_size > 1);
+	    eassert (h->index_bits > 0);
 	    xfree (h->index);
 	    xfree (h->key_and_value);
 	    xfree (h->next);
@@ -2156,7 +2156,7 @@ free_by_pvtype (struct Lisp_Vector *vector)
 	    ptrdiff_t bytes = (h->table_size * (2 * sizeof *h->key_and_value
 						+ sizeof *h->hash
 						+ sizeof *h->next)
-			       + h->index_size * sizeof *h->index);
+			       + hash_table_index_size (h) * sizeof *h->index);
 	    hash_table_allocated_bytes -= bytes;
 	  }
       }
