@@ -499,11 +499,11 @@ bootstrap-emacs$(EXEEXT): ../lisp/subdirs.el | emacs$(EXEEXT)
 	$(MAKE) -C ../lisp loaddefs.elc EMACS=../src/bootstrap-emacs$(EXEEXT)
 
 define pdump
-	$(AM_V_at)rm -f $@
-	LC_ALL=C ../src/$(@:.pdmp=)$(EXEEXT) --batch $(BUILD_DETAILS) \
-	  $(PDUMPER_OVERWRITE) -l ../admin/$(@:emacs.pdmp=pdump) \
-	  --pdump-write=$@ $(if $(BIN_DESTDIR),--bin-dest $(BIN_DESTDIR),) \
-	  $(if $(ELN_DESTDIR),--eln-dest $(ELN_DESTDIR),)${1}
+	$(AM_V_at)rm -f $(1)
+	LC_ALL=C ../src/$(1:.pdmp=)$(EXEEXT) --batch $(BUILD_DETAILS) \
+	  $(PDUMPER_OVERWRITE) -l ../admin/$(1:emacs.pdmp=pdump) \
+	  --pdump-write=$1 $(if $(BIN_DESTDIR),--bin-dest $(BIN_DESTDIR),) \
+	  $(if $(ELN_DESTDIR),--eln-dest $(ELN_DESTDIR),)$(2)
 endef
 
 define compile-loaded
@@ -517,14 +517,14 @@ bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT)
 emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.elc ../lisp/international/charprop.el
 bootstrap-emacs.pdmp emacs.pdmp:
 	# this run figures out packages loaded
-	$(call pdump, 2>/dev/null)
+	$(call pdump,$@, 2>/dev/null)
 	$(call compile-loaded)
 	# this run ensures only compiled packages loaded
-	$(call pdump)
+	$(call pdump,$@)
 install-emacs.pdmp: emacs.pdmp
 	$(AM_V_at)rm -f install-emacs$(EXEEXT)
 	$(AM_V_at)cp -f emacs$(EXEEXT) install-emacs$(EXEEXT)
-	$(call pdump)
+	$(call pdump,$@)
 	$(AM_V_at)rm -f install-emacs$(EXEEXT)
 
 dmpstruct_headers=$(srcdir)/lisp.h $(srcdir)/buffer.h $(srcdir)/itree.h \
@@ -719,10 +719,7 @@ elnlisp := $(addprefix ../lisp/,${elnlisp}) $(lisp:.elc=.eln)
 	  if test $(SYSTEM_TYPE) = cygwin; then \
 	    find $@ -name '*.eln' | rebase -v -O -T -; \
 	  fi; \
-	  LC_ALL=C ../src/emacs$(EXEEXT) --batch $(BUILD_DETAILS) \
-	    $(PDUMPER_OVERWRITE) -l ../admin/pdump --pdump-write=emacs.pdmp \
-	    $(if $(BIN_DESTDIR),--bin-dest $(BIN_DESTDIR),) \
-	    $(if $(ELN_DESTDIR),--eln-dest $(ELN_DESTDIR),) ; \
+	  $(call pdump,emacs.pdmp)
 	  if test $(NATIVE_COMPILATION_AOT) = yes; then \
 	    $(MAKE) $(AM_V_NO_PD) -C ../lisp compile-eln-aot \
 	      ELNDONE="$(addprefix %,$(notdir $(elnlisp))))"; \
