@@ -2162,11 +2162,14 @@ struct Lisp_Hash_Table
      The table is physically split into three vectors (hash, next,
      key_and_value) which may or may not be beneficial.  */
 
+  hash_idx_t index_size;   /* Size of the index vector.  */
+  hash_idx_t table_size;   /* Size of the next and hash vectors.  */
+
   /* Bucket vector.  An entry of -1 indicates no item is present,
      and a nonnegative entry is the index of the first item in
      a collision chain.
-     This vector is 2**index_bits entries long.
-     If index_bits is 0 (and table_size is 0), then this is the
+     This vector is index_size entries long.
+     If index_size is 1 (and table_size is 0), then this is the
      constant read-only vector {-1}, shared between all instances.
      Otherwise it is heap-allocated.  */
   hash_idx_t *index;
@@ -2198,24 +2201,20 @@ struct Lisp_Hash_Table
   /* Index of first free entry in free list, or -1 if none.  */
   hash_idx_t next_free;
 
-  hash_idx_t table_size;   /* Size of the next and hash vectors.  */
-
-  unsigned char index_bits;	/* log2 (size of the index vector).  */
-
   /* Weakness of the table.  */
-  hash_table_weakness_t weakness : 3;
+  hash_table_weakness_t weakness : 8;
 
   /* Hash table test (only used when frozen in dump)  */
-  hash_table_std_test_t frozen_test : 2;
+  hash_table_std_test_t frozen_test : 8;
 
   /* True if the table can be purecopied.  The table cannot be
      changed afterwards.  */
-  bool_bf purecopy : 1;
+  bool purecopy;
 
   /* True if the table is mutable.  Ordinarily tables are mutable, but
      pure tables are not, and while a table is being mutated it is
      immutable for recursive attempts to mutate it.  */
-  bool_bf mutable : 1;
+  bool mutable;
 
   /* Next weak hash table if this is a weak hash table.  The head of
      the list is in weak_hash_tables.  Used only during garbage
@@ -2297,13 +2296,6 @@ INLINE ptrdiff_t
 HASH_TABLE_SIZE (const struct Lisp_Hash_Table *h)
 {
   return h->table_size;
-}
-
-/* Size of the index vector in hash table H.  */
-INLINE ptrdiff_t
-hash_table_index_size (const struct Lisp_Hash_Table *h)
-{
-  return (ptrdiff_t)1 << h->index_bits;
 }
 
 /* Hash value for KEY in hash table H.  */
