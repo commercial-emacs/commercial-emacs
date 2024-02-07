@@ -275,21 +275,19 @@ SPECS should be an alist including an `nnselect-function' and an
 `nnselect-args'.  The former applied to the latter should create
 the artlist.  If SPECS is nil retrieve the specs from the group
 parameters."
-  (let* ((specs
-          (or specs (gnus-group-get-parameter group 'nnselect-specs t)))
-         (function (alist-get 'nnselect-function specs))
-         (args (alist-get 'nnselect-args specs)))
-    (condition-case-unless-debug err
-        (funcall function args)
-      ;; Don't swallow gnus-search errors; the user should be made
-      ;; aware of them.
-      (gnus-search-error
-       (signal (car err) (cdr err)))
-      (error
-       (gnus-error
-        3
-        "nnselect-generate-artlist: %s on %s gave error %s" function args err)
-       []))))
+  (let ((result []))
+    (when-let ((specs (or specs (gnus-group-get-parameter group 'nnselect-specs t)))
+               (f (alist-get 'nnselect-function specs)))
+      (condition-case-unless-debug err
+          (setq result (funcall f (alist-get 'nnselect-args specs)))
+        ;; Don't swallow gnus-search errors; the user should be made
+        ;; aware of them.
+        (gnus-search-error
+         (signal (car err) (cdr err)))
+        (error
+         (gnus-error 3 "nnselect-generate-artlist: %s on %s gave error %s"
+                     function args err))))
+    result))
 
 (defmacro nnselect-get-artlist (group)
   "Get the list of articles for GROUP.
