@@ -422,6 +422,7 @@ Used to modify the compiler environment."
   "Limple set operators.")
 
 (defconst comp-limple-assignments `(assume
+                                    fetch-handler
                                     ,@comp-limple-sets)
   "Limple operators that clobber the first m-var argument.")
 

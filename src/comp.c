@@ -860,7 +860,7 @@ bcall0 (Lisp_Object f)
 }
 
 static gcc_jit_block *
-retrive_block (Lisp_Object block_name)
+retrieve_block (Lisp_Object block_name)
 {
   Lisp_Object value = Fgethash (block_name, comp.func_blocks_h, Qnil);
 
@@ -2111,7 +2111,7 @@ emit_limple_push_exception (gcc_jit_rvalue *handler, gcc_jit_rvalue *handler_typ
 			    gcc_jit_block *handler_bb, gcc_jit_block *guarded_bb,
 			    Lisp_Object clobbered_mvar)
 {
-   /* struct handler *c = push_exception (POP, type);  */
+  /* struct handler *c = push_exception (POP, type);  */
 
   gcc_jit_rvalue *args[] = { handler, handler_type };
   gcc_jit_block_add_assignment (
@@ -2153,7 +2153,7 @@ emit_limple_insn (Lisp_Object insn)
   if (EQ (op, Qjump))
     {
       /* Unconditional branch.  */
-      gcc_jit_block *target = retrive_block (arg[0]);
+      gcc_jit_block *target = retrieve_block (arg[0]);
       gcc_jit_block_end_with_jump (comp.block, NULL, target);
     }
   else if (EQ (op, Qcond_jump))
@@ -2161,8 +2161,8 @@ emit_limple_insn (Lisp_Object insn)
       /* Conditional branch.  */
       gcc_jit_rvalue *a = emit_mvar_rval (arg[0]);
       gcc_jit_rvalue *b = emit_mvar_rval (arg[1]);
-      gcc_jit_block *target1 = retrive_block (arg[2]);
-      gcc_jit_block *target2 = retrive_block (arg[3]);
+      gcc_jit_block *target1 = retrieve_block (arg[2]);
+      gcc_jit_block *target2 = retrieve_block (arg[3]);
 
       emit_cond_jump (emit_EQ (a, b), target1, target2);
     }
@@ -2179,8 +2179,8 @@ emit_limple_insn (Lisp_Object insn)
 	gcc_jit_context_new_rvalue_from_int (comp.ctxt,
 					     comp.ptrdiff_type,
 					     XFIXNUM (arg[0]));
-      gcc_jit_block *target1 = retrive_block (arg[1]);
-      gcc_jit_block *target2 = retrive_block (arg[2]);
+      gcc_jit_block *target1 = retrieve_block (arg[1]);
+      gcc_jit_block *target2 = retrieve_block (arg[2]);
       gcc_jit_rvalue *test = gcc_jit_context_new_comparison (
 			       comp.ctxt,
 			       NULL,
@@ -2196,23 +2196,40 @@ emit_limple_insn (Lisp_Object insn)
   else if (EQ (op, Qpush_exception))
     {
       /* (push-handler condition-case #s(comp-mvar 0 3 t (arith-error) cons nil) 1 bb_2 bb_1) */
+      const Lisp_Object handler_spec = arg[0];
       int h_num UNINIT;
-      Lisp_Object handler_spec = arg[0];
-      gcc_jit_rvalue *handler = emit_mvar_rval (arg[1]);
       if (EQ (handler_spec, Qcatcher))
 	h_num = CATCHER;
       else if (EQ (handler_spec, Qcondition_case))
 	h_num = CONDITION_CASE;
       else
 	xsignal2 (Qnative_ice, build_string ("incoherent insn"), insn);
-      gcc_jit_rvalue *handler_type =
-	gcc_jit_context_new_rvalue_from_int (comp.ctxt,
-					     comp.int_type,
-					     h_num);
-      gcc_jit_block *handler_bb = retrive_block (arg[2]);
-      gcc_jit_block *guarded_bb = retrive_block (arg[3]);
-      emit_limple_push_exception (handler, handler_type, handler_bb, guarded_bb,
-				  arg[0]);
+      emit_limple_push_exception (emit_mvar_rval (arg[1]), /* handler */
+				  gcc_jit_context_new_rvalue_from_int
+				  (comp.ctxt, comp.int_type, h_num), /* type */
+				  retrieve_block (arg[2]), /* handler block */
+				  retrieve_block (arg[3]), /* guarded block */
+				  handler_spec);
+    }
+  else if (EQ (op, Qpop_exception))
+    {
+      /* C: exception_stack_pop (thr);  */
+      gcc_jit_lvalue *m_handlerlist =
+	gcc_jit_rvalue_dereference_field (
+	  gcc_jit_lvalue_as_rvalue (
+	    gcc_jit_rvalue_dereference (comp.current_thread_ref, NULL)),
+	  NULL,
+	  comp.m_handlerlist);
+
+      gcc_jit_block_add_assignment (
+	comp.block,
+	NULL,
+	m_handlerlist,
+	gcc_jit_lvalue_as_rvalue (
+	  gcc_jit_rvalue_dereference_field (
+	    gcc_jit_lvalue_as_rvalue (m_handlerlist),
+	    NULL,
+	    comp.handler_next_field)));
     }
   else if (EQ (op, Qcall))
     {
@@ -3947,10 +3964,10 @@ compile_function (Lisp_Object func)
 
   comp.scratch = NULL;
 
-  comp.loc_handler =  gcc_jit_function_new_local (comp.func,
-						  NULL,
-						  comp.handler_ptr_type,
-						  "c");
+  comp.loc_handler = gcc_jit_function_new_local (comp.func,
+						 NULL,
+						 comp.handler_ptr_type,
+						 "c");
 
   comp.func_blocks_h = CALLN (Fmake_hash_table);
 
@@ -3966,7 +3983,7 @@ compile_function (Lisp_Object func)
 	declare_block (block_name);
     }
 
-  gcc_jit_block_add_assignment (retrive_block (Qentry),
+  gcc_jit_block_add_assignment (retrieve_block (Qentry),
 				NULL,
 				comp.func_relocs_local,
 				gcc_jit_lvalue_as_rvalue (comp.func_relocs));
@@ -3981,7 +3998,7 @@ compile_function (Lisp_Object func)
 	xsignal1 (Qnative_ice,
 		  build_string ("basic block is missing or empty"));
 
-      comp.block = retrive_block (block_name);
+      comp.block = retrieve_block (block_name);
       while (CONSP (insns))
 	{
 	  Lisp_Object insn = XCAR (insns);
@@ -5312,6 +5329,8 @@ natively-compiled one.  */);
   DEFSYM (Qcond_jump_narg_leq, "cond-jump-narg-leq");
   /* Others.  */
   DEFSYM (Qpush_exception, "push-exception");
+  DEFSYM (Qpop_exception, "pop-exception");
+  DEFSYM (Qfetch_exception, "fetch-exception");
   DEFSYM (Qcondition_case, "condition-case");
   /* call operands.  */
   DEFSYM (Qcatcher, "catcher");
