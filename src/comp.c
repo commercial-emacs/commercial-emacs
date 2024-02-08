@@ -605,6 +605,7 @@ typedef struct {
   gcc_jit_lvalue *loc_handler;
   /* struct thread_state.  */
   gcc_jit_struct *thread_state_s;
+  gcc_jit_field *exception_stack_top;
   gcc_jit_type *thread_state_ptr_type;
   gcc_jit_rvalue *current_thread_ref;
   /* Other globals.  */
@@ -3096,6 +3097,37 @@ define_handler_struct (void)
 static void
 define_thread_state_struct (void)
 {
+  /* Partially opaque definition for thread_state.  We just need
+     exception_stack_top so hopefully this requires less maintenance
+     than the full definition.  */
+
+  comp.exception_stack_top = gcc_jit_context_new_field (comp.ctxt,
+							NULL,
+							comp.handler_ptr_type,
+							"exception_stack_top");
+  gcc_jit_field *fields[] =
+    { gcc_jit_context_new_field (
+	comp.ctxt,
+	NULL,
+	gcc_jit_context_new_array_type (comp.ctxt,
+					NULL,
+					comp.char_type,
+					offsetof (struct thread_state,
+						  exception_stack_top)),
+	"pad0"),
+      comp.exception_stack_top,
+      gcc_jit_context_new_field (
+	comp.ctxt,
+	NULL,
+	gcc_jit_context_new_array_type (
+	  comp.ctxt,
+	  NULL,
+	  comp.char_type,
+	  sizeof (struct thread_state)
+	  - offsetof (struct thread_state, exception_stack_top)
+	  - sizeof (((struct thread_state *) 0)->exception_stack_top)),
+	"pad1") };
+
   comp.thread_state_s =
     gcc_jit_context_new_struct_type (comp.ctxt,
 				     NULL,
