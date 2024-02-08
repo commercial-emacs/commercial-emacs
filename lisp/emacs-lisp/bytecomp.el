@@ -653,8 +653,6 @@ Each element is (INDEX . VALUE)")
   "Non-nil while native compiling.")
 (defvar byte-native-qualities nil
   "To spill default qualities from the compiled file.")
-(defvar byte+native-compile nil
-  "Non-nil while producing at the same time byte and native code.")
 (defvar byte-to-native-lambdas-h nil
   "Hash byte-code -> byte-to-native-lambda.")
 (defvar byte-to-native-top-level-forms nil
@@ -2166,9 +2164,7 @@ See also `emacs-lisp-byte-compile-and-load'."
 	      (message "Compiling %s...done" filename))
 	    (kill-buffer input-buffer)
 	    (with-current-buffer output-buffer
-              (when (and target-file
-                         (or (not byte-native-compiling)
-                             (and byte-native-compiling byte+native-compile)))
+              (when (and target-file (not byte-native-compiling))
 	        (goto-char (point-max))
 	        (insert "\n")
 	        (cond
@@ -5412,24 +5408,6 @@ already up-to-date."
         (let ((destfile (byte-compile-dest-file file)))
           (when (file-exists-p destfile)
             (delete-file destfile)))))))
-
-(defun byte-compile-refresh-preloaded ()
-  "Reload any Lisp file that was changed since Emacs was dumped.
-Use with caution."
-  (let* ((argv0 (car command-line-args))
-         (emacs-file (or (and (fboundp 'pdumper-stats)
-                              (cdr (nth 2 (pdumper-stats))))
-                         (executable-find argv0))))
-    (if (not (and emacs-file (file-exists-p emacs-file)))
-        (message "Can't find %s to refresh preloaded Lisp files" argv0)
-      (dolist (f (reverse load-history))
-        (setq f (car f))
-        (when (string-match-p "elc\\'" f)
-          (setq f (substring f 0 -1)))
-        (when (and (file-readable-p f)
-                   (file-newer-than-file-p f emacs-file))
-          (message "Loading newer %s over pdumped version" (file-name-nondirectory f))
-          (ignore-errors (load f 'noerror nil 'nosuffix )))))))
 
 ;;;###autoload
 (defun batch-byte-recompile-directory (&optional arg)

@@ -227,10 +227,8 @@ This invokes a synchronous native-compilation of the file that is
 visited by the current buffer."
   (interactive nil emacs-lisp-mode)
   (emacs-lisp--before-compile-buffer)
-  (let* ((byte+native-compile t)
-         (byte-to-native-output-buffer-file nil)
-         (eln (native-compile buffer-file-name)))
-    (when eln
+  (let (byte-to-native-output-buffer-file)
+    (when-let ((eln (native-compile buffer-file-name)))
       (comp--write-bytecode-file eln))))
 
 (defun emacs-lisp-native-compile-and-load ()

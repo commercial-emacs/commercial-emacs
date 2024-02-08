@@ -226,24 +226,19 @@ TAGS: ${ETAGS} ${tagsfiles}
 	$(AM_V_at)touch $@
 	$(AM_V_at)ls ${tagsfiles} | xargs $(XARGS_LIMIT) "${ETAGS}" -a -o $@
 
-ifeq ($(HAVE_NATIVE_COMP),yes)
-# Two passes, first to .elc, second to .eln.  acm claims this is faster
-# than direct to .eln from .el.
-$(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
-	$(AM_V_ELC)NATIVE_DISABLED=$(NATIVE_SKIP_NONDUMP) \
-	  $(emacs) $(BYTE_COMPILE_FLAGS) -l comp -f batch-byte-compile $<
-	$(AM_V_ELC)NATIVE_DISABLED=$(NATIVE_SKIP_NONDUMP) \
-	  $(emacs) $(BYTE_COMPILE_FLAGS) -l comp -f batch-byte+native-compile $<
-%.elc: %.el $(BYTE_COMPILER_EL:.el=.elc)
-	$(AM_V_ELC)NATIVE_DISABLED=$(NATIVE_SKIP_NONDUMP) \
-	  $(emacs) $(BYTE_COMPILE_FLAGS) -l comp -f batch-byte-compile $<
-	$(AM_V_ELC)NATIVE_DISABLED=$(NATIVE_SKIP_NONDUMP) \
-	  $(emacs) $(BYTE_COMPILE_FLAGS) -l comp -f batch-byte+native-compile $<
-else
-$(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
+define compile-el
 	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile $<
+endef
+
+$(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
+	$(call compile-el)
 %.elc: %.el $(BYTE_COMPILER_EL:.el=.elc)
-	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile $<
+	$(call compile-el)
+
+ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
+%.eln: %.el
+	$(AM_V_ELN)$(emacs) $(BYTE_COMPILE_FLAGS) -l comp \
+	    --eval "(comp-write-bytecode-file (car (batch-native-compile t)))" $<
 endif
 
 define compile-rest
@@ -286,11 +281,6 @@ compile-always:
 	@$(MAKE) compile
 
 ifeq ($(HAVE_NATIVE_COMP),yes)
-%.eln: %.el
-	$(AM_V_ELN)$(emacs) $(BYTE_COMPILE_FLAGS) \
-		-l comp -f byte-compile-refresh-preloaded \
-		--eval "(batch-native-compile t)" $<
-
 .PHONY: trampolines compile-eln-aot
 trampolines: compile
 	$(emacs) -l comp -f comp-compile-all-trampolines

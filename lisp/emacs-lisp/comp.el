@@ -3499,53 +3499,23 @@ last directory in `native-comp-eln-load-path')."
              (car (last native-comp-eln-load-path))
            native-compile-target-directory)))
     (cl-loop for file in command-line-args-left
-             if (or (null byte+native-compile)
-                    (cl-notany (lambda (re) (string-match re file))
-                               native-comp-bootstrap-deny-list))
-             collect (comp--native-compile file)
-             else
-             collect (byte-compile-file file))))
+             unless (cl-some (lambda (re) (string-match-p re file))
+                             native-comp-bootstrap-deny-list)
+             collect (comp--native-compile file))))
 
 ;; In use by elisp-mode.el
 (defun comp--write-bytecode-file (eln-file)
-  "After native compilation write the bytecode file for ELN-FILE.
-Make sure that eln file is younger than byte-compiled one and
-return the filename of this last.
-
-This function can be used only in conjunction with
-`byte+native-compile' `byte-to-native-output-buffer-file' (see
-`batch-byte+native-compile')."
+  "After native compilation write the bytecode file for ELN-FILE."
   (pcase byte-to-native-output-buffer-file
     (`(,temp-buffer . ,target-file)
      (unwind-protect
          (progn
            (byte-write-target-file temp-buffer target-file)
-           ;; Touch the .eln in order to have it older than the
-           ;; corresponding .elc.
+           ;; Touch the .eln newer than .elc
            (when (stringp eln-file)
              (set-file-times eln-file)))
        (kill-buffer temp-buffer))
      target-file)))
-
-;;;###autoload
-(defun batch-byte+native-compile ()
-  "Like `batch-native-compile', but used for bootstrap.
-Generate .elc files in addition to the .eln files.
-Force the produced .eln to be outputted in the eln system
-directory (the last entry in `native-comp-eln-load-path') unless
-`native-compile-target-directory' is non-nil.  If the environment
-variable \"NATIVE_DISABLED\" is set, only byte compile."
-  (comp-ensure-native-compiler)
-  (if (equal (getenv "NATIVE_DISABLED") "1")
-      (batch-byte-compile)
-    (cl-assert (length= command-line-args-left 1))
-    (let* ((byte+native-compile t)
-           (native-compile-target-directory
-            (car (last native-comp-eln-load-path)))
-           (byte-to-native-output-buffer-file nil)
-           (eln-file (car (batch-native-compile))))
-      (comp--write-bytecode-file eln-file)
-      (setq command-line-args-left (cdr command-line-args-left)))))
 
 (defun native-compile-prune-cache ()
   "Remove .eln files that aren't applicable to the current Emacs invocation."
