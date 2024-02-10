@@ -3269,15 +3269,12 @@ and `inhibit-local-variables-suffixes'.  If
     ;; Optional group 1: env(1) invocation.
     "\\("
     "[^ \t\n]*/bin/env[ \t]*"
-    ;; Within group 1: possible -S/--split-string and environment
-    ;; adjustments.
+    ;; Within group 1: possible -S/--split-string.
     "\\(?:"
     ;; -S/--split-string
     "\\(?:-[0a-z]*S[ \t]*\\|--split-string=\\)"
     ;; More env arguments.
     "\\(?:-[^ \t\n]+[ \t]+\\)*"
-    ;; Interpreter environment modifications.
-    "\\(?:[^ \t\n]+=[^ \t\n]*[ \t]+\\)*"
     "\\)?"
     "\\)?"
     ;; Group 2: interpreter.
