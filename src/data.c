@@ -333,6 +333,7 @@ for example, (type-of 1) returns `integer'.  */)
         case PVEC_BOOL_VECTOR: return Qbool_vector;
         case PVEC_FRAME: return Qframe;
         case PVEC_HASH_TABLE: return Qhash_table;
+        case PVEC_OBARRAY: return Qobarray;
         case PVEC_FONT:
           if (FONT_SPEC_P (object))
 	    return Qfont_spec;
@@ -3906,6 +3907,7 @@ syms_of_data (void)
   DEFSYM (Qtree_sitter_node, "tree-sitter-node");
   DEFSYM (Qtree_sitter_cursor, "tree-sitter-cursor");
   DEFSYM (Qsqlite, "sqlite");
+  DEFSYM (Qobarray, "obarray");
 
   DEFSYM (Qdefun, "defun");
 

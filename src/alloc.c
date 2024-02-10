@@ -131,13 +131,13 @@ PER_THREAD_STATIC struct
   size_t total_floats, total_free_floats;
   size_t total_intervals, total_free_intervals;
   size_t total_buffers;
-  /* Size of the ancillary arrays of live hash-table objects.
+  /* Size of the ancillary arrays of live hash-table and obarray objects.
      The objects themselves are not included (counted as vectors above).  */
   size_t total_hash_table_bytes;
 } gcstat;
 
-/* Total size of ancillary arrays of all allocated hash-table objects,
-   both dead and alive.  This number is always kept up-to-date.  */
+/* Total size of ancillary arrays of all allocated hash-table and obarray
+   objects, both dead and alive.  This number is always kept up-to-date.  */
 static ptrdiff_t hash_table_allocated_bytes = 0;
 
 enum _GL_ATTRIBUTE_PACKED sdata_type
@@ -2161,6 +2161,14 @@ free_by_pvtype (struct Lisp_Vector *vector)
 	  }
       }
       break;
+    case PVEC_OBARRAY:
+      {
+	struct Lisp_Obarray *o = PSEUDOVEC_STRUCT (vector, Lisp_Obarray);
+	xfree (o->buckets);
+	ptrdiff_t bytes = obarray_size (o) * sizeof *o->buckets;
+	hash_table_allocated_bytes -= bytes;
+      }
+      break;
 #ifdef HAVE_TREE_SITTER
     case PVEC_TREE_SITTER:
       {
@@ -3678,7 +3686,8 @@ valid_lisp_object_p (Lisp_Object obj)
   return 0;
 }
 
-/* Like xmalloc, but makes allocation count toward the total consing.
+/* Like xmalloc, but makes allocation count toward the total consing
+   and hash table or obarray usage.
    Return NULL for a zero-sized allocation.  */
 void *
 hash_table_alloc_bytes (ptrdiff_t nbytes)
@@ -4984,6 +4993,13 @@ process_mark_stack (ptrdiff_t base_sp)
 			  h->next_weak = weak_hash_tables;
 			  weak_hash_tables = h;
 			}
+		    }
+		    break;
+		  case PVEC_OBARRAY:
+		    {
+		      struct Lisp_Obarray *o = (struct Lisp_Obarray *)ptr;
+		      set_vector_marked (ptr);
+		      mark_stack_push_values (o->buckets, obarray_size (o));
 		    }
 		    break;
 		  case PVEC_CHAR_TABLE:
