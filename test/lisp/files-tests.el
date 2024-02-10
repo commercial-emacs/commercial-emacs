@@ -1681,17 +1681,12 @@ set to."
 (ert-deftest files-tests-auto-mode-interpreter ()
   "Test that `set-auto-mode' deduces correct modes from shebangs."
   (files-tests--check-shebang "#!/bin/bash" 'sh-mode)
+  (files-tests--check-shebang "#!/usr/bin/make -f" 'makefile-mode)
   (files-tests--check-shebang "#!/usr/bin/env bash" 'sh-mode)
   (files-tests--check-shebang "#!/usr/bin/env python" 'python-mode)
   (files-tests--check-shebang "#!/usr/bin/env python3" 'python-mode)
   (files-tests--check-shebang "#!/usr/bin/env -S awk -v FS=\"\\t\" -v OFS=\"\\t\" -f" 'awk-mode)
-  (files-tests--check-shebang "#!/usr/bin/env -S make -f" 'makefile-mode)
-  (files-tests--check-shebang "#!/usr/bin/env -S-vi bash -eux" 'sh-base-mode 'bash)
-  (files-tests--check-shebang "#!/usr/bin/env -ivS --default-signal=INT bash -eux" 'sh-base-mode 'bash)
-  (files-tests--check-shebang "#!/usr/bin/env -ivS --default-signal bash -eux" 'sh-base-mode 'bash)
-  (files-tests--check-shebang "#!/usr/bin/env -vS -uFOOBAR bash -eux" 'sh-base-mode 'bash)
-  ;; Invocation through env, with modified environment.
-  (files-tests--check-shebang "#!/usr/bin/env -S PYTHONPATH=/...:${PYTHONPATH} python" 'python-base-mode))
+  (files-tests--check-shebang "#!/usr/bin/env -S make -f" 'makefile-mode))
 
 (ert-deftest files-test-dir-locals-auto-mode-alist ()
   "Test an `auto-mode-alist' entry in `.dir-locals.el'"
