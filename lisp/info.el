@@ -502,6 +502,7 @@ or `Info-virtual-nodes'."
        (".info.bz2"  . ("bzip2" "-dc"))
        (".info.xz"   . "unxz")
        (".info.zst"  . ("zstd" "-dc"))
+       (".info.lz"   . ("lzip" "-dc"))
        (".info"      . nil)
        ("-info.Z"    . "uncompress")
        ("-info.Y"    . "unyabba")
@@ -510,6 +511,7 @@ or `Info-virtual-nodes'."
        ("-info.z"    . "gunzip")
        ("-info.xz"   . "unxz")
        ("-info.zst"  . ("zstd" "-dc"))
+       ("-info.lz"   . ("lzip" "-dc"))
        ("-info"      . nil)
        ("/index.Z"   . "uncompress")
        ("/index.Y"   . "unyabba")
@@ -518,6 +520,7 @@ or `Info-virtual-nodes'."
        ("/index.bz2" . ("bzip2" "-dc"))
        ("/index.xz"  . "unxz")
        ("/index.zst" . ("zstd" "-dc"))
+       ("/index.lz"  . ("lzip" "-dc"))
        ("/index"     . nil)
        (".Z"         . "uncompress")
        (".Y"         . "unyabba")
@@ -526,6 +529,7 @@ or `Info-virtual-nodes'."
        (".bz2"       . ("bzip2" "-dc"))
        (".xz"        . "unxz")
        (".zst"       . ("zstd" "-dc"))
+       (".lz"        . ("lzip" "-dc"))
        (""           . nil)))
   "List of file name suffixes and associated decoding commands.
 Each entry should be (SUFFIX . STRING); the file is given to
