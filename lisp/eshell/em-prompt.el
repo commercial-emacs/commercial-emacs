@@ -107,6 +107,14 @@ arriving, or after."
 
 ;;; Functions:
 
+(defun eshell-outline-search (&optional bound move backward looking-at)
+  "Search for outline headings.  See `outline-search-function'."
+  ;; FIXME: This probably isn't the right way to do things.  Does it
+  ;; work with multiline prompts?  Still, it's useful for a proof of
+  ;; concept.
+  (outline-search-text-property 'field 'prompt bound move backward
+                                looking-at))
+
 (define-minor-mode eshell-prompt-mode
   "Minor mode for eshell-prompt module.
 
@@ -117,7 +125,11 @@ arriving, or after."
   "Initialize the prompting code."
   (unless eshell-non-interactive-p
     (add-hook 'eshell-post-command-hook 'eshell-emit-prompt nil t)
-    (eshell-prompt-mode)))
+    (eshell-prompt-mode)
+
+    (setq-local outline-search-function #'eshell-outline-search
+                outline-level (lambda () 1)
+                outline-minor-mode-use-buttons 'in-margins)))
 
 (defun eshell-emit-prompt ()
   "Emit a prompt if eshell is being used interactively."
