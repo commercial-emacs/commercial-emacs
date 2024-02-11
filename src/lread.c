@@ -5085,8 +5085,7 @@ DEFUN ("internal--obarray-buckets",
 void
 init_obarray_once (void)
 {
-  /* FIXME: use PVEC_OBARRAY */
-  Vobarray = initialize_vector (OBARRAY_SIZE, make_fixnum (0));
+  Vobarray = make_obarray (15);
   initial_obarray = Vobarray;
   staticpro (&initial_obarray);
 
