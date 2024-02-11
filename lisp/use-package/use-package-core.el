@@ -346,6 +346,15 @@ undefined variables."
   :type 'boolean
   :group 'use-package)
 
+(defcustom use-package-vc-prefer-newest nil
+  "Prefer the newest commit over the latest release.
+If non-nil, the `:vc' keyword will prefer the latest commit of a
+package instead of the latest stable release.  This has the same
+effect as specifying `:rev :newest' in every invocation of `:vc'."
+  :type 'boolean
+  :version "30.1"
+  :group 'use-package)
+
 (defvar use-package-statistics (make-hash-table))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1649,9 +1658,11 @@ indicating the latest commit) revision."
                (if (and s (stringp s)) (intern s) s))
              (normalize (k v)
                (pcase k
-                 (:rev (cond ((or (eq v :last-release) (not v)) :last-release)
-                             ((eq v :newest) nil)
-                             (t (ensure-string v))))
+                 (:rev (pcase v
+                         ('nil (if use-package-vc-prefer-newest nil :last-release))
+                         (:last-release :last-release)
+                         (:newest nil)
+                         (_ (ensure-string v))))
                  (:vc-backend (ensure-symbol v))
                  (_ (ensure-string v)))))
     (pcase-let ((valid-kws '(:url :branch :lisp-dir :main-file :vc-backend :rev))
