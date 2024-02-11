@@ -318,5 +318,19 @@ Edebug symbols (Bug#42672)."
       (goto-char (point-min))
       (should (re-search-forward "Stray .*declare" nil t)))))
 
+(cl-defmethod cl-generic-tests--print-quoted-method ((function (eql '4)))
+  (+ function 1))
+
+(ert-deftest cl-generic-tests--print-quoted ()
+  (with-temp-buffer
+    (cl--generic-describe 'cl-generic-tests--print-quoted-method)
+    (goto-char (point-min))
+    ;; Bug#54628: We don't want (function (eql '4)) to turn into #'(eql '4)
+    (should-not (re-search-forward "#'" nil t))
+    (goto-char (point-min))
+    ;; But we don't want (eql '4) to turn into (eql (quote 4)) either.
+    (should (re-search-forward "(eql '4)" nil t))))
+    
+
 (provide 'cl-generic-tests)
 ;;; cl-generic-tests.el ends here
