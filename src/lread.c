@@ -4564,24 +4564,23 @@ check_obarray (Lisp_Object obarray)
 static Lisp_Object
 intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
 {
-  Lisp_Object *ptr;
+  struct Lisp_Symbol *s = XBARE_SYMBOL (sym);
+  s->u.s.interned = (BASE_EQ (obarray, initial_obarray)
+		     ? SYMBOL_INTERNED_IN_INITIAL_OBARRAY
+		     : SYMBOL_INTERNED);
 
-  XSYMBOL (sym)->u.s.interned = (EQ (obarray, initial_obarray)
-				 ? SYMBOL_INTERNED_IN_INITIAL_OBARRAY
-				 : SYMBOL_INTERNED);
-
-  if (SREF (SYMBOL_NAME (sym), 0) == ':' && EQ (obarray, initial_obarray))
+  if (SREF (s->u.s.name, 0) == ':' && BASE_EQ (obarray, initial_obarray))
     {
       make_symbol_constant (sym);
       XSYMBOL (sym)->u.s.type = SYMBOL_PLAINVAL;
       /* Mark keywords as special.  This makes (let ((:key 'foo)) ...)
 	 in lexically bound elisp signal an error, as documented.  */
-      XSYMBOL (sym)->u.s.declared_special = true;
-      SET_SYMBOL_VAL (XSYMBOL (sym), sym);
+      s->u.s.declared_special = true;
+      SET_SYMBOL_VAL (s, sym);
     }
 
-  ptr = aref_addr (obarray, XFIXNUM (index));
-  set_symbol_next (sym, SYMBOLP (*ptr) ? XSYMBOL (*ptr) : NULL);
+  Lisp_Object *ptr = aref_addr (obarray, XFIXNUM (index));
+  s->u.s.next = BARE_SYMBOL_P (*ptr) ? XBARE_SYMBOL (*ptr) : NULL;
   *ptr = sym;
   return sym;
 }
@@ -4591,7 +4590,7 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
 Lisp_Object
 intern_driver (Lisp_Object string, Lisp_Object obarray, Lisp_Object index)
 {
-  SET_SYMBOL_VAL (XSYMBOL (Qobarray_cache), Qnil);
+  SET_SYMBOL_VAL (XBARE_SYMBOL (Qobarray_cache), Qnil);
   return intern_sym (Fmake_symbol (string), obarray, index);
 }
 
@@ -4605,7 +4604,7 @@ intern (const char *str)
   Lisp_Object obarray = check_obarray (Vobarray);
   Lisp_Object tem = oblookup (obarray, str, len, len);
 
-  return (SYMBOLP (tem) ? tem
+  return (BARE_SYMBOL_P (tem) ? tem
 	  /* The above `oblookup' was done on the basis of nchars==nbytes, so
 	     the string has to be unibyte.  */
 	  : intern_driver (make_unibyte_string (str, len),
@@ -4661,7 +4660,7 @@ it defaults to the value of `obarray'.  */)
 					&longhand, &longhand_chars,
 					&longhand_bytes);
 
-  if (!SYMBOLP (tem))
+  if (!BARE_SYMBOL_P (tem))
     {
       if (longhand)
 	{
@@ -4733,7 +4732,11 @@ usage: (unintern NAME OBARRAY)  */)
   obarray = check_obarray (obarray);
 
   if (SYMBOLP (name))
-    string = SYMBOL_NAME (name);
+    {
+      if (!BARE_SYMBOL_P (name))
+	name = XSYMBOL_WITH_POS (name)->sym;
+      string = SYMBOL_NAME (name);
+    }
   else
     {
       CHECK_STRING (name);
@@ -4753,7 +4756,7 @@ usage: (unintern NAME OBARRAY)  */)
   if (FIXNUMP (tem))
     return Qnil;
   /* If arg was a symbol, don't delete anything but that symbol itself.  */
-  if (SYMBOLP (name) && !EQ (name, tem))
+  if (BARE_SYMBOL_P (name) && !BASE_EQ (name, tem))
     return Qnil;
 
   /* There are plenty of other symbols which will screw up the Emacs
@@ -4763,16 +4766,16 @@ usage: (unintern NAME OBARRAY)  */)
   /* if (NILP (tem) || EQ (tem, Qt))
        error ("Attempt to unintern t or nil"); */
 
-  XSYMBOL (tem)->u.s.interned = SYMBOL_UNINTERNED;
+  XBARE_SYMBOL (tem)->u.s.interned = SYMBOL_UNINTERNED;
 
   hash = oblookup_last_bucket_number;
 
-  if (EQ (AREF (obarray, hash), tem))
+  if (BASE_EQ (AREF (obarray, hash), tem))
     {
-      if (XSYMBOL (tem)->u.s.next)
+      if (XBARE_SYMBOL (tem)->u.s.next)
 	{
 	  Lisp_Object sym;
-	  XSETSYMBOL (sym, XSYMBOL (tem)->u.s.next);
+	  XSETSYMBOL (sym, XBARE_SYMBOL (tem)->u.s.next);
 	  ASET (obarray, hash, sym);
 	}
       else
@@ -4783,13 +4786,13 @@ usage: (unintern NAME OBARRAY)  */)
       Lisp_Object tail, following;
 
       for (tail = AREF (obarray, hash);
-	   XSYMBOL (tail)->u.s.next;
+	   XBARE_SYMBOL (tail)->u.s.next;
 	   tail = following)
 	{
-	  XSETSYMBOL (following, XSYMBOL (tail)->u.s.next);
-	  if (EQ (following, tem))
+	  XSETSYMBOL (following, XBARE_SYMBOL (tail)->u.s.next);
+	  if (BASE_EQ (following, tem))
 	    {
-	      set_symbol_next (tail, XSYMBOL (following)->u.s.next);
+	      set_symbol_next (tail, XBARE_SYMBOL (following)->u.s.next);
 	      break;
 	    }
 	}
@@ -4821,18 +4824,19 @@ oblookup (Lisp_Object obarray, register const char *ptr, ptrdiff_t size, ptrdiff
   oblookup_last_bucket_number = hash;
   if (EQ (bucket, make_fixnum (0)))
     ;
-  else if (!SYMBOLP (bucket))
+  else if (!BARE_SYMBOL_P (bucket))
     /* Like CADR error message.  */
     xsignal2 (Qwrong_type_argument, Qobarrayp,
 	      build_string ("Bad data in guts of obarray"));
   else
-    for (tail = bucket; ; XSETSYMBOL (tail, XSYMBOL (tail)->u.s.next))
+    for (tail = bucket; ; XSETSYMBOL (tail, XBARE_SYMBOL (tail)->u.s.next))
       {
-	if (SBYTES (SYMBOL_NAME (tail)) == size_byte
-	    && SCHARS (SYMBOL_NAME (tail)) == size
-	    && !memcmp (SDATA (SYMBOL_NAME (tail)), ptr, size_byte))
+	Lisp_Object name = XBARE_SYMBOL (tail)->u.s.name;
+	if (SBYTES (name) == size_byte
+	    && SCHARS (name) == size
+	    && !memcmp (SDATA (name), ptr, size_byte))
 	  return tail;
-	else if (XSYMBOL (tail)->u.s.next == 0)
+	else if (XBARE_SYMBOL (tail)->u.s.next == 0)
 	  break;
       }
   XSETINT (tem, hash);
@@ -4912,13 +4916,13 @@ map_obarray (Lisp_Object obarray, void (*fn) (Lisp_Object, Lisp_Object), Lisp_Ob
   for (i = ASIZE (obarray) - 1; i >= 0; i--)
     {
       tail = AREF (obarray, i);
-      if (SYMBOLP (tail))
+      if (BARE_SYMBOL_P (tail))
 	while (1)
 	  {
 	    (*fn) (tail, arg);
-	    if (XSYMBOL (tail)->u.s.next == 0)
+	    if (XBARE_SYMBOL (tail)->u.s.next == 0)
 	      break;
-	    XSETSYMBOL (tail, XSYMBOL (tail)->u.s.next);
+	    XSETSYMBOL (tail, XBARE_SYMBOL (tail)->u.s.next);
 	  }
     }
 }
@@ -4954,14 +4958,14 @@ init_obarray_once (void)
   DEFSYM (Qunbound, "unbound");
 
   DEFSYM (Qnil, "nil");
-  SET_SYMBOL_VAL (XSYMBOL (Qnil), Qnil);
+  SET_SYMBOL_VAL (XBARE_SYMBOL (Qnil), Qnil);
   make_symbol_constant (Qnil);
-  XSYMBOL (Qnil)->u.s.declared_special = true;
+  XBARE_SYMBOL (Qnil)->u.s.declared_special = true;
 
   DEFSYM (Qt, "t");
-  SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
+  SET_SYMBOL_VAL (XBARE_SYMBOL (Qt), Qt);
   make_symbol_constant (Qt);
-  XSYMBOL (Qt)->u.s.declared_special = true;
+  XBARE_SYMBOL (Qt)->u.s.declared_special = true;
 
   DEFSYM (Qvariable_documentation, "variable-documentation");
 }
@@ -5270,6 +5274,7 @@ syms_of_lread (void)
   defsubr (&Sget_file_char);
   defsubr (&Smapatoms);
   defsubr (&Slocate_file_internal);
+  defsubr (&Sinternal__obarray_buckets);
 
   DEFVAR_LISP ("obarray", Vobarray,
 	       doc: /* Symbol table for use by `intern' and `read'.
@@ -5281,7 +5286,7 @@ to find all the symbols in an obarray, use `mapatoms'.  */);
 	       doc: /* List of values of all expressions which were read, evaluated and printed.
 Order is reverse chronological.
 This variable is obsolete as of Emacs 28.1 and should not be used.  */);
-  XSYMBOL (intern ("values"))->u.s.declared_special = false;
+  XBARE_SYMBOL (intern ("values"))->u.s.declared_special = false;
 
   DEFVAR_LISP ("standard-input", Vstandard_input,
 	       doc: /* Stream for read to get input from.
