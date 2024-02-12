@@ -1228,6 +1228,26 @@ If OTHER-WINDOW is non-nil, display in another window."
       (message "`%s' is an alias for `%s'" symbol basevar))))
 
 ;;;###autoload
+(defun customize-toggle-option (opt)
+  "Toggle the value of boolean option OPT for this session."
+  (interactive (let (opts)
+		 (mapatoms
+		  (lambda (sym)
+		    (when (eq (get sym 'custom-type) 'boolean)
+		      (push sym opts))))
+		 (list (intern (completing-read "Option: " opts)))))
+  (message "%s user options '%s'."
+	   (if (funcall (or (get opt 'custom-set) #'set-default)
+			opt (not (funcall (or (get opt 'custom-get)
+					      #'symbol-value)
+					  opt)))
+	       "Enabled" "Disabled")
+	   opt))
+
+;;;###autoload
+(defalias 'toggle-option #'customize-toggle-option)
+
+;;;###autoload
 (defalias 'customize-variable-other-window 'customize-option-other-window)
 
 ;;;###autoload
