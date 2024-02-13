@@ -366,8 +366,6 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_VECTORLIKEP(x) TAGGEDP (x, Lisp_Vectorlike)
 #define lisp_h_XCAR(c) XCONS (c)->u.s.car
 #define lisp_h_XCDR(c) XCONS (c)->u.s.u.cdr
-#define lisp_h_XCONS(a) \
-   (eassert (CONSP (a)), XUNTAG (a, Lisp_Cons, struct Lisp_Cons))
 #define lisp_h_XHASH(a) XUFIXNUM_RAW (a)
 #if USE_LSB_TAG
 # define lisp_h_make_fixnum_wrap(n) \
@@ -1103,9 +1101,12 @@ make_fixed_natnum (EMACS_INT n)
 }
 
 INLINE bool
-(EQ) (Lisp_Object x, Lisp_Object y)
+EQ (Lisp_Object x, Lisp_Object y)
 {
-  return lisp_h_EQ (x, y);
+  return BASE_EQ ((symbols_with_pos_enabled && SYMBOL_WITH_POS_P (x)
+		   ? XSYMBOL_WITH_POS_SYM (x) : x),
+		  (symbols_with_pos_enabled && SYMBOL_WITH_POS_P (y)
+		   ? XSYMBOL_WITH_POS_SYM (y) : y));
 }
 
 INLINE intmax_t
@@ -1241,9 +1242,10 @@ CHECK_CONS (Lisp_Object x)
 }
 
 INLINE struct Lisp_Cons *
-(XCONS) (Lisp_Object a)
+XCONS (Lisp_Object a)
 {
-  return lisp_h_XCONS (a);
+  eassert (CONSP (a));
+  return XUNTAG (a, Lisp_Cons, struct Lisp_Cons);
 }
 
 /* Take the car or cdr of something known to be a cons cell.  */
@@ -1996,9 +1998,10 @@ typedef jmp_buf sys_jmp_buf;
 /* Value is name of symbol.  */
 
 INLINE Lisp_Object
-(SYMBOL_VAL) (struct Lisp_Symbol *sym)
+SYMBOL_VAL (struct Lisp_Symbol *sym)
 {
-  return lisp_h_SYMBOL_VAL (sym);
+  eassert (sym->u.s.redirect == SYMBOL_PLAINVAL);
+  return sym->u.s.val.value;
 }
 
 INLINE struct Lisp_Symbol *
@@ -2015,9 +2018,10 @@ SYMBOL_FWD (struct Lisp_Symbol *sym)
 }
 
 INLINE void
-(SET_SYMBOL_VAL) (struct Lisp_Symbol *sym, Lisp_Object v)
+SET_SYMBOL_VAL (struct Lisp_Symbol *sym, Lisp_Object v)
 {
-  lisp_h_SET_SYMBOL_VAL (sym, v);
+  eassert (sym->u.s.redirect == SYMBOL_PLAINVAL);
+  sym->u.s.val.value = v;
 }
 
 INLINE void
