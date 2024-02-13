@@ -168,13 +168,10 @@ LOAD and SELECTOR work as described in `native--compile-async'."
   "Return the number of async compilations currently running.
 This function has the side effect of cleaning-up finished
 processes from `comp-async-compilations'"
-  (cl-loop
-   for file-name in (cl-loop
-                     for file-name being each hash-key of comp-async-compilations
-                     for prc = (gethash file-name comp-async-compilations)
-                     unless (process-live-p prc)
-                     collect file-name)
-   do (remhash file-name comp-async-compilations))
+  (maphash (lambda (key val)
+             (unless (process-live-p val)
+               (remhash key comp-async-compilations)))
+           comp-async-compilations)
   (hash-table-count comp-async-compilations))
 
 (defvar comp-num-cpus nil)
@@ -182,8 +179,7 @@ processes from `comp-async-compilations'"
   "Compute the effective number of async jobs."
   (if (zerop native-comp-async-jobs-number)
       (or comp-num-cpus
-          (setf comp-num-cpus
-		(max 1 (/ (num-processors) 2))))
+          (setf comp-num-cpus (max 1 (/ (num-processors) 2))))
     native-comp-async-jobs-number))
 
 (defvar comp-last-scanned-async-output nil)

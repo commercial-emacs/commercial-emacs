@@ -2371,17 +2371,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 	      break;
 	    }
 	}
-
-#ifdef HAVE_NATIVE_COMP
-      /* If we are going to load stuff in a non-initialized Emacs,
-	 update the value of native-comp-eln-load-path, so that the
-	 *.eln files will be found if they are there.  */
-      if (!will_dump_p ())
-	Vnative_comp_eln_load_path =
-	  Fcons (Fexpand_file_name (XCAR (Vnative_comp_eln_load_path),
-				    Vinvocation_directory),
-		 Qnil);
-#endif
     }
 
   /* Set up for profiling.  This is known to work on FreeBSD,
@@ -2771,7 +2760,7 @@ killed.  */
       unlink (SSDATA (listfile));
     }
 
-#ifdef HAVE_NATIVE_COMP
+#if defined HAVE_NATIVE_COMP && defined WINDOWSNT
   eln_load_path_final_clean_up ();
 #endif
 

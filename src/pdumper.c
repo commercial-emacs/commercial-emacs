@@ -5191,34 +5191,27 @@ dump_do_dump_relocation (const uintptr_t dump_base,
     case RELOC_NATIVE_COMP_UNIT:
       {
 	static enum { UNKNOWN, LOCAL_BUILD, INSTALLED } installation_state;
-	struct Lisp_Native_Comp_Unit *comp_u =
+	struct Lisp_Native_Comp_Unit *comp_unit =
 	  dump_ptr (dump_base, reloc_offset);
-	comp_u->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
-	if (STRINGP (comp_u->file))
+	comp_unit->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
+	if (STRINGP (comp_unit->file))
 	  error ("trying to load incoherent dumped eln file %s",
-		 SSDATA (comp_u->file));
+		 SSDATA (comp_unit->file));
 
-	if (!CONSP (comp_u->file))
+	if (!CONSP (comp_unit->file))
 	  error ("incoherent compilation unit for dump was dumped");
 
-	/* emacs_execdir is always unibyte, but the file names in
-	   comp_u->file could be multibyte, so we need to encode
-	   them.  */
-	Lisp_Object cu_file1 = ENCODE_FILE (XCAR (comp_u->file));
-	Lisp_Object cu_file2 = ENCODE_FILE (XCDR (comp_u->file));
-	ptrdiff_t fn1_len = SBYTES (cu_file1), fn2_len = SBYTES (cu_file2);
 	Lisp_Object eln_fname;
-	char *fndata;
+	Lisp_Object fn1 = ENCODE_FILE (XCAR (comp_unit->file));
+	Lisp_Object fn2 = ENCODE_FILE (XCDR (comp_unit->file));
+	ptrdiff_t fn1_len = SBYTES (fn1), fn2_len = SBYTES (fn2);
 
-	/* Check just once if this is a local build or Emacs was installed.  */
-	/* Can't use expand-file-name here, because we are too early
-	   in the startup, and we will crash at least on WINDOWSNT.  */
 	if (installation_state == UNKNOWN)
 	  {
 	    eln_fname = make_unibyte_string (NULL, execdir_len + fn1_len);
-	    fndata = SSDATA (eln_fname);
+	    char *fndata = SSDATA (eln_fname);
 	    memcpy (fndata, emacs_execdir, execdir_len);
-	    memcpy (fndata + execdir_len, SSDATA (cu_file1), fn1_len);
+	    memcpy (fndata + execdir_len, SSDATA (fn1), fn1_len);
 	    if (file_access_p (fndata, F_OK))
 	      installation_state = INSTALLED;
 	    else
@@ -5226,39 +5219,27 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 		eln_fname = make_unibyte_string (NULL, execdir_len + fn2_len);
 		fndata = SSDATA (eln_fname);
 		memcpy (fndata, emacs_execdir, execdir_len);
-		memcpy (fndata + execdir_len, SSDATA (cu_file2), fn2_len);
+		memcpy (fndata + execdir_len, SSDATA (fn2), fn2_len);
 		installation_state = LOCAL_BUILD;
 	      }
-	    fixup_eln_load_path (eln_fname);
 	  }
 	else
 	  {
-	    ptrdiff_t fn_len =
+	    const ptrdiff_t fn_len =
 	      installation_state == INSTALLED ? fn1_len : fn2_len;
-	    Lisp_Object cu_file =
-	      installation_state == INSTALLED ? cu_file1 : cu_file2;
+	    const Lisp_Object file =
+	      installation_state == INSTALLED ? fn1 : fn2;
 	    eln_fname = make_unibyte_string (NULL, execdir_len + fn_len);
-	    fndata = SSDATA (eln_fname);
+	    char *fndata = SSDATA (eln_fname);
 	    memcpy (fndata, emacs_execdir, execdir_len);
-	    memcpy (fndata + execdir_len, SSDATA (cu_file), fn_len);
+	    memcpy (fndata + execdir_len, SSDATA (file), fn_len);
 	  }
 
-	/* FIXME: This records the names of the *.eln files in an
-	   unexpanded form, with one or more ".." elements (and on
-	   Windows with the first part using backslashes).  The file
-	   names are also unibyte.  If we care about this, we need to
-	   loop in startup.el over all the preloaded modules and run
-	   their file names through expand-file-name and
-	   decode-coding-string.  */
-	comp_u->file = eln_fname;
-	comp_u->handle = dynlib_open_for_eln (SSDATA (eln_fname));
-	if (!comp_u->handle)
-	  {
-	    fprintf (stderr, "Error using execdir %s:\n",
-		     emacs_execdir);
-	    error ("%s", dynlib_error ());
-	  }
-	load_comp_unit (comp_u, true, false);
+	comp_unit->file = eln_fname;
+	comp_unit->handle = dynlib_open_for_eln (SSDATA (eln_fname));
+	if (!comp_unit->handle)
+	  error ("%s: %s", emacs_execdir, dynlib_error ());
+	load_comp_unit (comp_unit, true, false);
 	break;
       }
     case RELOC_NATIVE_SUBR:
@@ -5268,19 +5249,19 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 	   a 'top_level_run' mechanism, we revive them one-by-one
 	   here.  */
 	struct Lisp_Subr *subr = dump_ptr (dump_base, reloc_offset);
-	struct Lisp_Native_Comp_Unit *comp_u =
+	struct Lisp_Native_Comp_Unit *comp_unit =
 	  XNATIVE_COMP_UNIT (subr->native_comp_u);
-	if (!comp_u->handle)
-	  error ("NULL handle in compilation unit %s", SSDATA (comp_u->file));
+	if (!comp_unit->handle)
+	  error ("NULL handle in compilation unit %s", SSDATA (comp_unit->file));
 	const char *c_name = subr->native_c_name;
 	eassert (c_name);
-	void *func = dynlib_sym (comp_u->handle, c_name);
+	void *func = dynlib_sym (comp_unit->handle, c_name);
 	if (!func)
 	  error ("can't find function \"%s\" in compilation unit %s", c_name,
-		 SSDATA (comp_u->file));
+		 SSDATA (comp_unit->file));
 	subr->function.a0 = func;
 	Lisp_Object lambda_data_idx =
-	  Fgethash (build_string (c_name), comp_u->lambda_c_name_idx_h, Qnil);
+	  Fgethash (build_string (c_name), comp_unit->lambda_c_name_idx_h, Qnil);
 	if (! NILP (lambda_data_idx))
 	  {
 	    /* This is an anonymous lambda.
@@ -5289,10 +5270,10 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 	    Lisp_Object tem;
 	    XSETSUBR (tem, subr);
 	    Lisp_Object *fixup =
-	      &(comp_u->data_imp_relocs[XFIXNUM (lambda_data_idx)]);
+	      &(comp_unit->data_imp_relocs[XFIXNUM (lambda_data_idx)]);
 	    eassert (EQ (*fixup, Qlambda_fixup));
 	    *fixup = tem;
-	    Fputhash (tem, Qt, comp_u->lambda_gc_guard_h);
+	    Fputhash (tem, Qt, comp_unit->lambda_gc_guard_h);
 	  }
 	break;
       }

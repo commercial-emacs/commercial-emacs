@@ -3080,8 +3080,8 @@ instead."
 				      (comp-el-to-eln-rel-filename el-file))))
 		       ;; Emacs will not load an outdated .eln file,
 		       ;; so we mimic this behavior here.
-		       (if (file-newer-than-file-p eln-file el-file)
-			   eln-file)))))
+		       (when (file-newer-than-file-p eln-file el-file)
+			 eln-file)))))
 	    elc-file)))))
 
 (declare-function read-library-name "find-func" nil)

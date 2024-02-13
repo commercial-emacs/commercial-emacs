@@ -51,6 +51,7 @@ lwlibdir = ../lwlib
 config_h = config.h $(srcdir)/conf_post.h
 
 HAVE_NATIVE_COMP = @HAVE_NATIVE_COMP@
+NATIVE_COMPILATION_AOT = @NATIVE_COMPILATION_AOT@
 
 ## Flags to pass for profiling builds
 PROFILING_CFLAGS = @PROFILING_CFLAGS@
@@ -470,10 +471,6 @@ ALLOBJS = $(FIRSTFILE_OBJ) $(VMLIMIT_OBJ) $(obj) $(otherobj)
 .PHONY: all
 all: emacs.pdmp ../lisp/emacs-lisp/cldefs.el
 
-ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
-all: native-comp
-endif
-
 ifeq ($(HAVE_BE_APP),yes)
 all: Emacs Emacs.pdmp
 Emacs: emacs$(EXEEXT) $(libsrc)/be-resources
@@ -506,14 +503,7 @@ define pdump
 	  $(if $(ELN_DESTDIR),--eln-dest $(ELN_DESTDIR),)$(2)
 endef
 
-define print-loaded
-	../src/emacs$(EXEEXT) --batch --no-site-file --no-site-lisp \
-	   --eval "(dolist (el (mapcar (function car) load-history)) \
-	             (when (equal \"elc\" (file-name-extension el)) \
-	               (princ (format \"%s\n\" el))))"
-endef
-
-define compile-loaded
+define byte-compile-loaded
 	../src/$(@:.pdmp=)$(EXEEXT) --batch --no-site-file --no-site-lisp \
 	   --eval "(dolist (el (mapcar (function car) load-history)) \
 	             (when (equal \"el\" (file-name-extension el)) \
@@ -525,7 +515,7 @@ emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.elc ../lisp/international/charprop.e
 bootstrap-emacs.pdmp emacs.pdmp:
 	# this run figures out packages loaded
 	$(call pdump,$@, 2>/dev/null)
-	$(call compile-loaded)
+	$(call byte-compile-loaded)
 	# this run ensures only compiled packages loaded
 	$(call pdump,$@)
 install-emacs.pdmp: emacs.pdmp
@@ -695,22 +685,6 @@ TAGS: ${ETAGS} $(ctagsfiles1) $(ctagsfiles2)
 
 .PHONY: tags
 tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS $(lib)/TAGS
-
-NATIVE_COMPILATION_AOT = @NATIVE_COMPILATION_AOT@
-ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
-## This was obviously the wrong way to do this.
-.PHONY: native-comp
-native-comp: | emacs.pdmp
-	if test $(NATIVE_COMPILATION_AOT) = yes; then \
-	  $(MAKE) $(AM_V_NO_PD) -C ../lisp compile-eln-aot; \
-	else \
-	  elnlisp=`$(call print-loaded,$|) | sed -e 's/\.elc\b/.eln/g'`; \
-	  $(MAKE) $(AM_V_NO_PD) -C ../lisp $${elnlisp}; \
-	fi
-	if test $(SYSTEM_TYPE) = cygwin; then \
-	  find $@ -name '*.eln' | rebase -v -O -T -; \
-	fi
-endif
 
 ../lisp/emacs-lisp/cldefs.el: | emacs.pdmp
 	$(MAKE) -C ../lisp cldefs

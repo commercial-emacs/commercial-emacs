@@ -112,6 +112,9 @@ COMPILE_FIRST = ./emacs-lisp/loaddefs-gen.el ./emacs-lisp/radix-tree.el \
   ./org/ox.el ./org/ox-texinfo.el ./org/org-macro.el ./org/org-element.el \
   ./org/oc.el ./org/ol.el ./emacs-lisp/cl-lib.el
 all: compile ./cus-load.el ./finder-inf.el ./leim/ja-dic/ja-dic.elc ../doc/misc/org.texi ../doc/misc/modus-themes.texi
+ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
+all: compile-native
+endif
 
 PHONY_EXTRAS =
 .PHONY: all custom-deps finder-data update-subdirs $(PHONY_EXTRAS)
@@ -226,19 +229,19 @@ TAGS: ${ETAGS} ${tagsfiles}
 	$(AM_V_at)touch $@
 	$(AM_V_at)ls ${tagsfiles} | xargs $(XARGS_LIMIT) "${ETAGS}" -a -o $@
 
-define compile-el
+define byte-compile
 	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile $<
 endef
 
 $(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
-	$(call compile-el)
+	$(call byte-compile)
 %.elc: %.el $(BYTE_COMPILER_EL:.el=.elc)
-	$(call compile-el)
+	$(call byte-compile)
 
 ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
-%.eln: %.el
+%.eln: %.el $(BYTE_COMPILER_EL:.el=.elc)
 	$(AM_V_ELN)$(emacs) $(BYTE_COMPILE_FLAGS) -l comp \
-	    --eval "(comp-write-bytecode-file (car (batch-native-compile t)))" $<
+	    --eval "(native-compile \"./$<\" \"./$@\")"
 endif
 
 define compile-rest
@@ -259,6 +262,11 @@ compile-compiler: $(BYTE_COMPILER_EL:.el=.elc)
 .SECONDEXPANSION:
 .PHONY: compile
 compile: compile-clean compile-compiler $(COMPILE_FIRST:.el=.elc) $$(compile-rest)
+
+ifeq ($(HAVE_NATIVE_COMP),yes)
+.PHONY: compile-native
+compile-native: $(compile-rest:.elc=.eln)
+endif
 
 .PHONY: compile-clean
 # Erase left-over .elc files that do not have a corresponding .el file.

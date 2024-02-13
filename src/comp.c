@@ -83,6 +83,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #undef gcc_jit_context_new_rvalue_from_int
 #undef gcc_jit_context_new_rvalue_from_long
 #undef gcc_jit_context_new_rvalue_from_ptr
+#undef gcc_jit_context_null
 #undef gcc_jit_context_new_string_literal
 #undef gcc_jit_context_new_struct_type
 #undef gcc_jit_context_new_unary_op
@@ -198,6 +199,8 @@ DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_rvalue_from_long,
 DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_rvalue_from_ptr,
             (gcc_jit_context *ctxt, gcc_jit_type *pointer_type, void *value));
 #endif
+DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_null,
+            (gcc_jit_context *ctxt, gcc_jit_type *pointer_type));
 DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_string_literal,
             (gcc_jit_context *ctxt, const char *value));
 DEF_DLL_FN (gcc_jit_rvalue *, gcc_jit_context_new_unary_op,
@@ -322,6 +325,7 @@ init_gccjit_functions (void)
 #if LISP_WORDS_ARE_POINTERS
   LOAD_DLL_FN (library, gcc_jit_context_new_rvalue_from_ptr);
 #endif
+  LOAD_DLL_FN (library, gcc_jit_context_null);
   LOAD_DLL_FN (library, gcc_jit_context_new_string_literal);
   LOAD_DLL_FN (library, gcc_jit_context_new_struct_type);
   LOAD_DLL_FN (library, gcc_jit_context_new_unary_op);
@@ -403,6 +407,7 @@ init_gccjit_functions (void)
 #if LISP_WORDS_ARE_POINTERS
 # define gcc_jit_context_new_rvalue_from_ptr fn_gcc_jit_context_new_rvalue_from_ptr
 #endif
+#define gcc_jit_context_null fn_gcc_jit_context_null
 #define gcc_jit_context_new_string_literal fn_gcc_jit_context_new_string_literal
 #define gcc_jit_context_new_struct_type fn_gcc_jit_context_new_struct_type
 #define gcc_jit_context_new_unary_op fn_gcc_jit_context_new_unary_op
@@ -546,7 +551,7 @@ typedef struct {
 static f_reloc_t freloc;
 
 #ifndef LIBGCCJIT_HAVE_gcc_jit_context_new_bitcast
-# define NUM_CAST_TYPES 15
+# define NUM_CAST_TYPES 16
 #endif
 
 typedef struct {
@@ -605,9 +610,11 @@ typedef struct {
   gcc_jit_lvalue *loc_handler;
   /* struct thread_state.  */
   gcc_jit_struct *thread_state_s;
+  gcc_jit_field *exception_stack_bottom;
   gcc_jit_field *exception_stack_top;
   gcc_jit_type *thread_state_ptr_type;
   gcc_jit_rvalue *current_thread_ref;
+  gcc_jit_lvalue *loc_stack_top;
   /* Other globals.  */
   gcc_jit_rvalue *pure_ptr;
 #ifndef LIBGCCJIT_HAVE_gcc_jit_context_new_bitcast
@@ -1097,10 +1104,10 @@ emit_cond_jump (gcc_jit_rvalue *test,
 {
   if (gcc_jit_rvalue_get_type (test) == comp.bool_type)
     gcc_jit_block_end_with_conditional (comp.block,
-				      NULL,
-				      test,
-				      then_target,
-				      else_target);
+					NULL,
+					test,
+					then_target,
+					else_target);
   else
     /* In case test is not bool we do a logical negation to obtain a bool as
        result.  */
@@ -1334,7 +1341,8 @@ emit_rvalue_from_lisp_obj (Lisp_Object obj)
 
 static gcc_jit_rvalue *
 emit_ptr_arithmetic (gcc_jit_rvalue *ptr, gcc_jit_type *ptr_type,
-		     int size_of_ptr_ref, gcc_jit_rvalue *i)
+		     int size_of_ptr_ref, enum gcc_jit_binary_op op,
+		     gcc_jit_rvalue *i)
 {
   emit_comment ("ptr_arithmetic");
 
@@ -1351,7 +1359,7 @@ emit_ptr_arithmetic (gcc_jit_rvalue *ptr, gcc_jit_type *ptr_type,
     emit_coerce (
       ptr_type,
       emit_binary_op (
-	GCC_JIT_BINARY_OP_PLUS,
+	op,
 	comp.uintptr_type,
 	ptr,
 	offset));
@@ -2135,6 +2143,75 @@ emit_limple_push_exception (gcc_jit_rvalue *handler, gcc_jit_rvalue *handler_typ
 }
 
 static void
+emit_exception_stack_pop (void)
+{
+  /* C: exception_stack_pop (thr);  */
+
+  gcc_jit_lvalue *exception_stack_top =
+    gcc_jit_rvalue_dereference_field
+    (gcc_jit_lvalue_as_rvalue (gcc_jit_rvalue_dereference
+			       (comp.current_thread_ref, NULL)),
+     NULL,
+     comp.exception_stack_top);
+
+  gcc_jit_rvalue *exception_stack_bottom =
+    gcc_jit_lvalue_as_rvalue
+    (gcc_jit_rvalue_dereference_field
+     (gcc_jit_lvalue_as_rvalue (gcc_jit_rvalue_dereference
+				(comp.current_thread_ref, NULL)),
+      NULL,
+      comp.exception_stack_bottom));
+
+  gcc_jit_param *param[] = {};
+  comp.func = gcc_jit_context_new_function (comp.ctxt, NULL,
+					    GCC_JIT_FUNCTION_INTERNAL,
+					    comp.void_type,
+					    "pop_exception",
+					    0, param, 0);
+  DECL_BLOCK (entry_block, comp.func);
+  DECL_BLOCK (terminal_block, comp.func);
+  DECL_BLOCK (decrement_block, comp.func);
+
+  comp.block = entry_block;
+
+  /*
+    struct handler *popped = thr->exception_stack_top;
+    if (popped == thr->exception_stack_bottom)
+    thr->exception_stack_top = NULL;
+    else if (popped > thr->exception_stack_bottom)
+    --thr->exception_stack_top;
+    return popped;
+  */
+  emit_cond_jump
+    (gcc_jit_context_new_comparison(comp.ctxt,
+				    NULL,
+				    GCC_JIT_COMPARISON_EQ,
+				    gcc_jit_lvalue_as_rvalue (exception_stack_top),
+				    exception_stack_bottom),
+     terminal_block,
+     decrement_block);
+
+  comp.block = terminal_block;
+  gcc_jit_block_add_assignment (terminal_block,
+				NULL,
+				exception_stack_top,
+				gcc_jit_context_null (comp.ctxt, comp.handler_ptr_type));
+  gcc_jit_block_end_with_void_return (terminal_block, NULL);
+
+  comp.block = decrement_block;
+  gcc_jit_block_add_assignment (decrement_block,
+				NULL,
+				exception_stack_top,
+				emit_ptr_arithmetic
+				(gcc_jit_lvalue_as_rvalue (exception_stack_top),
+				 comp.handler_ptr_type,
+				 sizeof (struct handler),
+				 GCC_JIT_BINARY_OP_MINUS,
+				 comp.one));
+  gcc_jit_block_end_with_void_return (decrement_block, NULL);
+}
+
+static void
 emit_limple_insn (Lisp_Object insn)
 {
   Lisp_Object op = XCAR (insn);
@@ -2214,23 +2291,31 @@ emit_limple_insn (Lisp_Object insn)
     }
   else if (EQ (op, Qpop_exception))
     {
-      /* C: exception_stack_pop (thr);  */
-      gcc_jit_lvalue *m_handlerlist =
-	gcc_jit_rvalue_dereference_field (
-	  gcc_jit_lvalue_as_rvalue (
-	    gcc_jit_rvalue_dereference (comp.current_thread_ref, NULL)),
-	  NULL,
-	  comp.m_handlerlist);
+      emit_exception_stack_pop ();
+    }
+  else if (EQ (op, Qfetch_exception))
+    {
+      gcc_jit_lvalue *exception_stack_top =
+	gcc_jit_rvalue_dereference_field
+	(gcc_jit_lvalue_as_rvalue (gcc_jit_rvalue_dereference
+				   (comp.current_thread_ref, NULL)),
+	 NULL,
+	 comp.exception_stack_top);
 
-      gcc_jit_block_add_assignment (
-	comp.block,
-	NULL,
-	m_handlerlist,
+      gcc_jit_block_add_assignment (comp.block,
+				    NULL,
+				    comp.loc_handler,
+				    gcc_jit_lvalue_as_rvalue (exception_stack_top));
+
+      emit_exception_stack_pop ();
+
+      emit_frame_assignment (
+	arg[0],
 	gcc_jit_lvalue_as_rvalue (
 	  gcc_jit_rvalue_dereference_field (
-	    gcc_jit_lvalue_as_rvalue (m_handlerlist),
+	    gcc_jit_lvalue_as_rvalue (comp.loc_handler),
 	    NULL,
-	    comp.handler_next_field)));
+	    comp.handler_val_field)));
     }
   else if (EQ (op, Qcall))
     {
@@ -2349,6 +2434,7 @@ emit_limple_insn (Lisp_Object insn)
 				      gcc_jit_lvalue_as_rvalue (args),
 				      comp.lisp_obj_ptr_type,
 				      sizeof (Lisp_Object),
+				      GCC_JIT_BINARY_OP_PLUS,
 				      comp.one));
     }
   else if (EQ (op, Qsetimm))
@@ -3066,10 +3152,6 @@ define_handler_struct (void)
 						      NULL,
 						      comp.lisp_obj_type,
 						      "val");
-  comp.handler_next_field = gcc_jit_context_new_field (comp.ctxt,
-						       NULL,
-						       comp.handler_ptr_type,
-						       "next");
   gcc_jit_field *fields[] =
     { gcc_jit_context_new_field (
 	comp.ctxt,
@@ -3080,7 +3162,6 @@ define_handler_struct (void)
 					offsetof (struct handler, val)),
 	"pad0"),
       comp.handler_val_field,
-      comp.handler_next_field,
       gcc_jit_context_new_field (
 	comp.ctxt,
 	NULL,
@@ -3088,8 +3169,8 @@ define_handler_struct (void)
 					NULL,
 					comp.char_type,
 					offsetof (struct handler, jmp)
-					- offsetof (struct handler, next)
-					- sizeof (((struct handler *) 0)->parent)),
+					- offsetof (struct handler, val)
+					- sizeof (((struct handler *) 0)->val)),
 	"pad1"),
       comp.handler_jmp_field,
       gcc_jit_context_new_field (
@@ -3113,9 +3194,13 @@ static void
 define_thread_state_struct (void)
 {
   /* Partially opaque definition for thread_state.  We just need
-     exception_stack_top so hopefully this requires less maintenance
-     than the full definition.  */
+     exception_stack_bottom and top so hopefully this requires less
+     maintenance than the full definition.  */
 
+  comp.exception_stack_bottom = gcc_jit_context_new_field (comp.ctxt,
+							   NULL,
+							   comp.handler_ptr_type,
+							   "exception_stack_bottom");
   comp.exception_stack_top = gcc_jit_context_new_field (comp.ctxt,
 							NULL,
 							comp.handler_ptr_type,
@@ -3128,8 +3213,9 @@ define_thread_state_struct (void)
 					NULL,
 					comp.char_type,
 					offsetof (struct thread_state,
-						  exception_stack_top)),
+						  exception_stack_bottom)),
 	"pad0"),
+      comp.exception_stack_bottom,
       comp.exception_stack_top,
       gcc_jit_context_new_field (
 	comp.ctxt,
@@ -3257,7 +3343,8 @@ define_cast_functions (void)
         { comp.unsigned_long_long_type, "unsigned_long_long", false },
         { comp.unsigned_long_type, "unsigned_long", false },
         { comp.unsigned_type, "unsigned", false },
-        { comp.void_ptr_type, "void_ptr", true } };
+        { comp.void_ptr_type, "void_ptr", true },
+	{ comp.handler_ptr_type, "handler_ptr", true } };
   gcc_jit_field *cast_union_fields[2];
 
   /* Define the union used for type punning.  */
@@ -3565,7 +3652,6 @@ define_add1_sub1 (void)
       comp.block = inline_block;
       gcc_jit_rvalue *inline_res =
 	emit_binary_op (op[i], comp.emacs_int_type, n_fixnum, comp.one);
-
       gcc_jit_block_end_with_return (inline_block,
 				     NULL,
 				     emit_make_fixnum (inline_res));
@@ -4117,26 +4203,19 @@ one for the file name and another for its contents, followed by .eln.  */)
   if (suffix_p (filename, ".gz"))
     filename = Fsubstring (filename, Qnil, make_fixnum (-3));
 
-  /* We create eln filenames with an hash in order to look-up these
-     starting from the source filename, IOW have a relation
+  /* /absolute/path/filename.el + content
+     -> eln-cache/filename-path_hash-content_hash.eln
 
-     /absolute/path/filename.el + content ->
-     eln-cache/filename-path_hash-content_hash.eln.
+     To prevent two different versions of filename.el hashing
+     to same eln, included source file content?
 
-     'dlopen' can return the same handle if two shared with the same
-     filename are loaded in two different times (even if the first was
-     deleted!).  To prevent this scenario the source file content is
-     included in the hashing algorithm.
+     Possible to delete all filename-path_hash-* except the most recent?
 
-     As at any point in time no more then one file can exist with the
-     same filename, should be possible to clean up all
-     filename-path_hash-* except the most recent one (or the new one
-     being recompiled).
-
-     As installing .eln files compiled during the build changes their
-     absolute path we need an hashing mechanism that is not sensitive
-     to that.  For this we replace if match PATH_DUMPLOADSEARCH or
-     *PATH_REL_LOADSEARCH with '//' before computing the hash.  */
+     A particular .el filename should hash the same regardless whether
+     it originates from PATH_REL_LOADSEARCH (the installed path) or
+     PATH_DUMPLOADSEARCH (the repository path).  To that end, we
+     collapse both "epaths" string constants to "//".
+  */
 
   if (NILP (loadsearch_re_list))
     {
@@ -4153,98 +4232,60 @@ one for the file name and another for its contents, followed by .eln.  */)
 
   Lisp_Object lds_re_tail = loadsearch_re_list;
   FOR_EACH_TAIL (lds_re_tail)
-    {
-      Lisp_Object match_idx =
-	Fstring_match (XCAR (lds_re_tail), filename, Qnil, Qnil);
-      if (EQ (match_idx, make_fixnum (0)))
-	{
-	  filename =
-	    Freplace_match (build_string ("//"), Qt, Qt, filename, Qnil);
-	  break;
-	}
-    }
+    if (EQ (make_fixnum (0),
+	    Fstring_match (XCAR (lds_re_tail), filename, Qnil, Qnil)))
+      {
+	filename = Freplace_match (build_string ("//"), Qt, Qt, filename, Qnil);
+	break;
+      }
+
   Lisp_Object separator = build_string ("-");
-  Lisp_Object path_hash = comp_hash_string (filename);
-  filename = concat2 (Ffile_name_nondirectory (Fsubstring (filename, Qnil,
-							   make_fixnum (-3))),
-		      separator);
-  Lisp_Object hash = concat3 (path_hash, separator, content_hash);
-  return concat3 (filename, hash, build_string (NATIVE_ELISP_SUFFIX));
+  return Fconcat
+    (6, (Lisp_Object []) {
+      Ffile_name_nondirectory (Fsubstring (filename, Qnil, make_fixnum (-3))),
+      separator,
+      comp_hash_string (filename),
+      separator,
+      content_hash,
+      build_string (NATIVE_ELISP_SUFFIX)
+    });
 }
 
 DEFUN ("comp-el-to-eln-filename", Fcomp_el_to_eln_filename,
        Scomp_el_to_eln_filename, 1, 2, 0,
-       doc: /* Return the absolute .eln file name for source FILENAME.
-The resulting .eln file name is intended to be used for natively
-compiling FILENAME.  FILENAME must exist and be readable, but other
-than that, its leading directories are ignored when constructing
-the name of the .eln file.
-If BASE-DIR is non-nil, use it as the directory for the .eln file;
-non-absolute BASE-DIR is interpreted as relative to `invocation-directory'.
-If BASE-DIR is omitted or nil, look for the first writable directory
-in `native-comp-eln-load-path', and use as BASE-DIR its subdirectory
-whose name is given by `comp-native-version-dir'.
-If FILENAME specifies a preloaded file, the directory for the .eln
-file is the \"preloaded/\" subdirectory of the directory determined
-as described above.  FILENAME is considered to be a preloaded file if
-the value of `comp-file-preloaded-p' is non-nil, or if FILENAME
-appears in the value of the environment variable LISP_PRELOADED;
-the latter is supposed to be used by the Emacs build procedure.  */)
+       doc: /* Return the absolute .eln corresponding to .el.  */)
   (Lisp_Object filename, Lisp_Object base_dir)
 {
-  Lisp_Object source_filename = filename;
-  filename = Fcomp_el_to_eln_rel_filename (filename);
-
-  /* If base_dir was not specified search inside Vnative_comp_eln_load_path
-     for the first directory where we have write access.  */
   if (NILP (base_dir))
     {
-      Lisp_Object eln_load_paths = Vnative_comp_eln_load_path;
-      FOR_EACH_TAIL (eln_load_paths)
+      /* Figure out suitable BASE_DIR if unspecified.  */
+      Lisp_Object paths = Vnative_comp_eln_load_path;
+      FOR_EACH_TAIL (paths)
 	{
-	  Lisp_Object dir = XCAR (eln_load_paths);
-	  if (!NILP (Ffile_exists_p (dir)))
+	  Lisp_Object path = XCAR (paths);
+	  bool q_extant = !NILP (Ffile_exists_p (path));
+	  bool q_created = !q_extant
+	    && NILP (internal_condition_case_1 (make_directory_wrapper,
+						path, Qt,
+						make_directory_wrapper_1));
+	  bool q_writable = q_extant
+	    && !NILP (Ffile_writable_p (path));
+	  if (q_created || q_writable)
 	    {
-	      if (!NILP (Ffile_writable_p (dir)))
-		{
-		  base_dir = dir;
-		  break;
-		}
-	    }
-	  else
-	    {
-	      /* Try to create the directory and if succeeds use it.  */
-	      if (NILP (internal_condition_case_1 (make_directory_wrapper,
-						   dir, Qt,
-						   make_directory_wrapper_1)))
-		{
-		  base_dir = dir;
-		  break;
-		}
+	      base_dir = path;
+	      break;
 	    }
 	}
-      if (NILP (base_dir))
-	error ("Cannot find suitable directory for output in "
-	       "`native-comp-eln-load-path'.");
     }
+
+  if (NILP (base_dir))
+    error ("Cannot find suitable directory for output in "
+	   "`native-comp-eln-load-path'.");
 
   if (!file_name_absolute_p (SSDATA (base_dir)))
     base_dir = Fexpand_file_name (base_dir, Vinvocation_directory);
 
-  /* In case the file being compiled is found in 'LISP_PRELOADED' or
-     `comp-file-preloaded-p' is non-nil target for output the
-     'preloaded' subfolder.  */
-  Lisp_Object lisp_preloaded =
-    Fgetenv_internal (build_string ("LISP_PRELOADED"), Qnil);
-  base_dir = Fexpand_file_name (Vcomp_native_version_dir, base_dir);
-  if (comp_file_preloaded_p
-      || (!NILP (lisp_preloaded)
-	  && !NILP (Fmember (CALL1I (file-name-base, source_filename),
-			     Fmapcar (intern_c_string ("file-name-base"),
-				      CALL1I (split-string, lisp_preloaded))))))
-    base_dir = Fexpand_file_name (build_string ("preloaded"), base_dir);
-
-  return Fexpand_file_name (filename, base_dir);
+  return Fexpand_file_name (Fcomp_el_to_eln_rel_filename (filename), base_dir);
 }
 
 DEFUN ("comp--install-trampoline", Fcomp__install_trampoline,
@@ -4764,8 +4805,6 @@ helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code)
   return PSEUDOVECTORP (a, code);
 }
 
-/* `native-comp-eln-load-path' clean-up support code.  */
-
 #ifdef WINDOWSNT
 static Lisp_Object
 return_nil (Lisp_Object arg)
@@ -4778,33 +4817,25 @@ directory_files_matching (Lisp_Object name, Lisp_Object match)
 {
   return Fdirectory_files (name, Qt, match, Qnil, Qnil);
 }
-#endif
 
-/* Windows does not let us delete a .eln file that is currently loaded
-   by a process.  The strategy is to rename .eln files into .old.eln
-   instead of removing them when this is not possible and clean-up
-   `native-comp-eln-load-path' when exiting.
-
-   Any error is ignored because it may be due to the file being loaded
-   in another Emacs instance.  */
+/* Reap what `comp-delete-or-replace-file' sowed.  Insane.  */
 void
 eln_load_path_final_clean_up (void)
 {
-#ifdef WINDOWSNT
-  Lisp_Object dir_tail = Vnative_comp_eln_load_path;
-  FOR_EACH_TAIL (dir_tail)
+  Lisp_Object paths = Vnative_comp_eln_load_path;
+  FOR_EACH_TAIL (paths)
     {
-      Lisp_Object files_in_dir =
+      Lisp_Object files =
 	internal_condition_case_2 (directory_files_matching,
 				   Fexpand_file_name (Vcomp_native_version_dir,
-						      XCAR (dir_tail)),
+						      XCAR (paths)),
 				   build_string ("\\.eln\\.old\\'"),
 				   Qt, return_nil);
-      FOR_EACH_TAIL (files_in_dir)
-	internal_delete_file (XCAR (files_in_dir));
+      FOR_EACH_TAIL (files)
+	internal_delete_file (XCAR (files));
     }
-#endif
 }
+#endif /* ifdef WINDOWSNT */
 
 /* This function puts the compilation unit in the
   `Vcomp_loaded_comp_units_h` hashmap.  */
@@ -4831,27 +4862,6 @@ void
 maybe_defer_native_compilation (Lisp_Object function_name,
 				Lisp_Object definition)
 {
-#if 0
-#include <sys/types.h>
-#include <unistd.h>
-  if (!NILP (function_name) &&
-      STRINGP (Vload_true_file_name))
-    {
-      static FILE *f;
-      if (!f)
-	{
-	  char str[128];
-	  sprintf (str, "log_%d", getpid ());
-	  f = fopen (str, "w");
-	}
-      if (!f)
-	exit (1);
-      fprintf (f, "function %s file %s\n",
-	       SSDATA (Fsymbol_name (function_name)),
-	       SSDATA (Vload_true_file_name));
-      fflush (f);
-    }
-#endif
   if (! load_gccjit_if_necessary (false))
     return;
 
@@ -4864,9 +4874,8 @@ maybe_defer_native_compilation (Lisp_Object function_name,
       || !NILP (Fgethash (Vload_true_file_name, V_comp_no_native_file_h, Qnil)))
     return;
 
-  Lisp_Object src =
-    concat2 (CALL1I (file-name-sans-extension, Vload_true_file_name),
-	     build_pure_c_string (".el"));
+  Lisp_Object src = concat2 (CALL1I (file-name-sans-extension, Vload_true_file_name),
+			     build_pure_c_string (".el"));
   if (NILP (Ffile_exists_p (src)))
     {
       src = concat2 (src, build_pure_c_string (".gz"));
@@ -4876,40 +4885,14 @@ maybe_defer_native_compilation (Lisp_Object function_name,
 
   Fputhash (function_name, definition, Vcomp_deferred_pending_h);
 
-  pending_funcalls
-    = Fcons (list (Qnative__compile_async, src, Qnil, Qlate),
-             pending_funcalls);
+  pending_funcalls = Fcons (list (Qnative__compile_async, src, Qnil, Qlate),
+			    pending_funcalls);
 }
 
 
 /**************************************/
 /* Functions used to load eln files.  */
 /**************************************/
-
-/* Fixup the system eln-cache directory, which is the last entry in
-   `native-comp-eln-load-path'.  Argument is a .eln file in that directory.  */
-void
-fixup_eln_load_path (Lisp_Object eln_filename)
-{
-  Lisp_Object last_cell = Qnil;
-  Lisp_Object tem = Vnative_comp_eln_load_path;
-  FOR_EACH_TAIL (tem)
-    if (CONSP (tem))
-      last_cell = tem;
-
-  const char preloaded[] = "/preloaded/";
-  Lisp_Object eln_cache_sys = Ffile_name_directory (eln_filename);
-  const char *p_preloaded =
-    SSDATA (eln_cache_sys) + SBYTES (eln_cache_sys) - sizeof (preloaded) + 1;
-  bool preloaded_p = strcmp (p_preloaded, preloaded) == 0;
-
-  /* One or two directories up...  */
-  for (int i = 0; i < (preloaded_p ? 2 : 1); i++)
-    eln_cache_sys =
-      Ffile_name_directory (Fsubstring_no_properties (eln_cache_sys, Qnil,
-						      make_fixnum (-1)));
-  Fsetcar (last_cell, eln_cache_sys);
-}
 
 typedef char *(*comp_lit_str_func) (void);
 
@@ -5262,62 +5245,37 @@ This gets called by late_top_level_run during the load phase.  */)
   return Qnil;
 }
 
-static bool
-file_in_eln_sys_dir (Lisp_Object filename)
-{
-  Lisp_Object eln_sys_dir = Qnil;
-  Lisp_Object tmp = Vnative_comp_eln_load_path;
-  FOR_EACH_TAIL (tmp)
-    eln_sys_dir = XCAR (tmp);
-  return !NILP (Fstring_match (Fregexp_quote (Fexpand_file_name (eln_sys_dir,
-								 Qnil)),
-			       Fexpand_file_name (filename, Qnil),
-			       Qnil, Qnil));
-}
-
-/* Load related routines.  */
 DEFUN ("native-elisp-load", Fnative_elisp_load, Snative_elisp_load, 1, 2, 0,
-       doc: /* Load native elisp code FILENAME.
-LATE-LOAD has to be non-nil when loading for deferred compilation.  */)
+       doc: /* Load FILENAME.
+Set LATE-LOAD for deferred compilation.  */)
   (Lisp_Object filename, Lisp_Object late_load)
 {
   CHECK_STRING (filename);
   if (NILP (Ffile_exists_p (filename)))
-    xsignal2 (Qnative_lisp_load_failed, build_string ("file does not exists"),
+    xsignal2 (Qnative_lisp_load_failed, build_string ("file does not exist"),
 	      filename);
-  struct Lisp_Native_Comp_Unit *comp_u = allocate_native_comp_unit ();
-  Lisp_Object encoded_filename = ENCODE_FILE (filename);
-
+  struct Lisp_Native_Comp_Unit *comp_unit = allocate_native_comp_unit ();
   if (!NILP (Fgethash (filename, Vcomp_loaded_comp_units_h, Qnil))
-      && !file_in_eln_sys_dir (filename)
       && !NILP (Ffile_writable_p (filename)))
     {
-      /* If in this session there was ever a file loaded with this
-	 name, rename it before loading, to make sure we always get a
-	 new handle!  */
-      Lisp_Object tmp_filename =
-	Fmake_temp_file_internal (filename, Qnil, build_string (".eln.tmp"),
-				  Qnil);
-      if (NILP (Ffile_writable_p (tmp_filename)))
-	comp_u->handle = dynlib_open_for_eln (SSDATA (encoded_filename));
-      else
-	{
-	  Frename_file (filename, tmp_filename, Qt);
-	  comp_u->handle = dynlib_open_for_eln (SSDATA (ENCODE_FILE (tmp_filename)));
-	  Frename_file (tmp_filename, filename, Qnil);
-	}
+      /* FILENAME seen before.  Rename grabass ensures new file handle.  */
+      Lisp_Object temp = Fmake_temp_file_internal (filename, Qnil,
+						   build_string (".eln.tmp"),
+						   Qnil);
+      Frename_file (filename, temp, Qt);
+      comp_unit->handle = dynlib_open_for_eln (SSDATA (ENCODE_FILE (temp)));
+      Frename_file (temp, filename, Qnil);
     }
   else
-    comp_u->handle = dynlib_open_for_eln (SSDATA (encoded_filename));
+    comp_unit->handle = dynlib_open_for_eln (SSDATA (ENCODE_FILE (filename)));
 
-  if (!comp_u->handle)
-    xsignal2 (Qnative_lisp_load_failed, filename,
-	      build_string (dynlib_error ()));
-  comp_u->file = filename;
-  comp_u->data_vec = Qnil;
-  comp_u->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
-  comp_u->lambda_c_name_idx_h = CALLN (Fmake_hash_table, QCtest, Qequal);
-  return load_comp_unit (comp_u, false, !NILP (late_load));
+  if (!comp_unit->handle)
+    xsignal2 (Qnative_lisp_load_failed, filename, build_string (dynlib_error ()));
+  comp_unit->file = filename;
+  comp_unit->data_vec = Qnil;
+  comp_unit->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
+  comp_unit->lambda_c_name_idx_h = CALLN (Fmake_hash_table, QCtest, Qequal);
+  return load_comp_unit (comp_unit, false, !NILP (late_load));
 }
 
 #endif /* HAVE_NATIVE_COMP */
@@ -5412,8 +5370,6 @@ natively-compiled one.  */);
   DEFSYM (Qlambda_fixup, "lambda-fixup");
   DEFSYM (Qgccjit, "gccjit");
   DEFSYM (Qcomp_subr_trampoline_install, "comp-subr-trampoline-install");
-  DEFSYM (Qnative_comp_warning_on_missing_source,
-	  "native-comp-warning-on-missing-source");
 
   /* To be signaled by the compiler.  */
   DEFSYM (Qnative_compiler_error, "native-compiler-error");
@@ -5486,94 +5442,54 @@ natively-compiled one.  */);
 	       doc: /* The compiler context.  */);
   Vcomp_ctxt = Qnil;
 
-  /* FIXME should be initialized but not here...  Plus this don't have
-     to be necessarily exposed to lisp but can easy debug for now.  */
   DEFVAR_LISP ("comp-subr-list", Vcomp_subr_list,
-    doc: /* List of all defined subrs.  */);
+	       doc: /* List of all defined subrs.  */);
   DEFVAR_LISP ("comp-abi-hash", Vcomp_abi_hash,
-    doc: /* String signing the .eln files ABI.  */);
+	       doc: /* String signing the .eln files ABI.  */);
   Vcomp_abi_hash = Qnil;
   DEFVAR_LISP ("comp-native-version-dir", Vcomp_native_version_dir,
-    doc: /* Directory in use to disambiguate eln compatibility.  */);
+	       doc: /* Directory named after compatibility has.
+The hash derives from both the `comp-subr-list' and `comp-abi-hash'.  */);
   Vcomp_native_version_dir = Qnil;
 
   DEFVAR_LISP ("comp-deferred-pending-h", Vcomp_deferred_pending_h,
-    doc: /* Hash table symbol-name -> function-value.
+	       doc: /* Hash symbol-name to function-value.
 For internal use.  */);
   Vcomp_deferred_pending_h = CALLN (Fmake_hash_table, QCtest, Qeq);
 
   DEFVAR_LISP ("comp-eln-to-el-h", Vcomp_eln_to_el_h,
-    doc: /* Hash table eln-filename -> el-filename.  */);
+	       doc: /* Hash eln-filename to el-filename.  */);
   Vcomp_eln_to_el_h = CALLN (Fmake_hash_table, QCtest, Qequal);
 
   DEFVAR_LISP ("native-comp-eln-load-path", Vnative_comp_eln_load_path,
-    doc: /* List of directories to look for natively-compiled *.eln files.
+	       doc: /* List of paths containing `comp-native-version-dir'.
+Paths are relative to `invocation-directory' unless absolute.  */);
 
-The *.eln files are actually looked for in a version-specific
-subdirectory of each directory in this list.  That subdirectory
-is determined by the value of `comp-native-version-dir'.
-If the name of a directory in this list is not absolute, it is
-assumed to be relative to `invocation-directory'.
-The last directory of this list is assumed to be the one holding
-the system *.eln files, which are the files produced when building
-Emacs.  */);
-
-  /* Temporary value in use for bootstrap.  We can't do better as
-     `invocation-directory' is still unset, will be fixed up during
-     dump reload.  */
-  Vnative_comp_eln_load_path = Fcons (build_string ("../native-lisp/"), Qnil);
+  Vnative_comp_eln_load_path = Qnil;
 
   DEFVAR_LISP ("native-comp-enable-subr-trampolines",
 	       Vnative_comp_enable_subr_trampolines,
-    doc: /* If non-nil, enable generation of trampolines for calling primitives.
-Trampolines are needed so that Emacs respects redefinition or advice of
-primitive functions when they are called from Lisp code natively-compiled
-at `native-comp-speed' of 2.
-
-By default, the value is t, and when Emacs sees a redefined or advised
-primitive called from natively-compiled Lisp, it generates a trampoline
-for it on-the-fly.
-
-If the value is a file name (a string), it specifies the directory in
-which to deposit the generated trampolines, overriding the directories
-in `native-comp-eln-load-path'.
-
-When this variable is nil, generation of trampolines is disabled.
-
-Disabling the generation of trampolines, when a trampoline for a redefined
-or advised primitive is not already available from previous compilations,
-means that such redefinition or advice will not have effect when calling
-primitives from natively-compiled Lisp code.  That is, calls to primitives
-without existing trampolines from natively-compiled Lisp will behave as if
-the primitive was called directly from C, and will ignore its redefinition
-and advice.  */);
+	       doc: /* Generate code for advised or redefined primitives.
+Such "trampoline" functions are generated on the fly at runtime.  A
+string value specifies an alternative directory for storing trampolines
+and overrides `native-comp-eln-load-path'.  */);
 
   DEFVAR_LISP ("comp-installed-trampolines-h", Vcomp_installed_trampolines_h,
-    doc: /* Hash table subr-name -> installed trampoline.
-This is used to prevent double trampoline instantiation, and also to
-protect the trampolines against GC.  */);
+	       doc: /* Hash primitive name to trampoline.  */);
   Vcomp_installed_trampolines_h = CALLN (Fmake_hash_table);
 
   DEFVAR_LISP ("comp-no-native-file-h", V_comp_no_native_file_h,
-    doc: /* Files for which no deferred compilation should be performed.
-These files' compilation should not be deferred because the bytecode
-version was explicitly requested by the user during load.
+	       doc: /* Elisp files excluded from deferred compilation.
 For internal use.  */);
   V_comp_no_native_file_h = CALLN (Fmake_hash_table, QCtest, Qequal);
 
-  DEFVAR_BOOL ("comp-file-preloaded-p", comp_file_preloaded_p,
-    doc: /* When non-nil, assume the file being compiled to be preloaded.  */);
-
   DEFVAR_LISP ("comp-loaded-comp-units-h", Vcomp_loaded_comp_units_h,
-    doc: /* Hash table recording all loaded compilation units, file -> CU.  */);
+	       doc: /* Hash file name to compilation unit.  */);
   Vcomp_loaded_comp_units_h =
     CALLN (Fmake_hash_table, QCweakness, Qvalue, QCtest, Qequal);
 
   DEFVAR_LISP ("comp-subr-arities-h", Vcomp_subr_arities_h,
-    doc: /* Hash table recording the arity of Lisp primitives.
-This is in case they are redefined so the compiler still knows how to
-compile calls to them.
-subr-name -> arity
+	       doc: /* Hash primitive name to its arity.
 For internal use.  */);
   Vcomp_subr_arities_h = CALLN (Fmake_hash_table, QCtest, Qequal);
 

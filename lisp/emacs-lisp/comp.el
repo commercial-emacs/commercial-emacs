@@ -117,12 +117,7 @@ the .eln output directory."
   :type 'boolean
   :version "28.1")
 
-(defcustom native-comp-warning-on-missing-source t
-  "Emit a warning if a byte-code file being loaded has no corresponding source.
-The source file is necessary for native code file look-up and deferred
-compilation mechanism."
-  :type 'boolean
-  :version "28.1")
+(make-obsolete 'native-comp-warning-on-missing-source nil "30.1")
 
 (defvar no-native-compile nil
   "Non-nil to prevent native-compiling of Emacs Lisp code.
@@ -135,7 +130,7 @@ Emacs Lisp file:
 ;;;###autoload(put 'no-native-compile 'safe-local-variable 'booleanp)
 
 (defvar native-compile-target-directory nil
-  "When non-nil force the target directory for the eln files being compiled.")
+  "The parent directory of `comp-native-version-dir'.")
 
 (defvar comp-log-time-report nil
   "If non-nil, log a time report for each pass.")
@@ -1112,7 +1107,7 @@ Return value is the fall-through block name."
       ;; Emit the basic block to pop the handler if we got the non local.
       (puthash (comp-block-name pop-bb) pop-bb (comp-func-blocks comp-func))
       (setf (comp-limplify-curr-block comp-pass) pop-bb)
-      (comp--emit `(fetch-handler ,(comp-slot+1)))
+      (comp--emit `(fetch-exception ,(comp-slot+1)))
       (comp--emit `(jump ,(comp-block-name handler-bb)))
       (comp--mark-curr-bb-closed))))
 
@@ -2373,9 +2368,9 @@ blocks."
                       for op = (car insn)
                       when (or (and (comp--assign-op-p op)
                                 (eql slot-n (comp-mvar-slot (cadr insn))))
-                               ;; fetch-handler is after a non local
+                               ;; fetch-exception is after a non local
                                ;; therefore clobbers all frame!!!
-                               (eq op 'fetch-handler))
+                               (eq op 'fetch-exception))
                         return t)))
 
     (cl-loop for i from (- (comp-func-vframe-size comp-func))
@@ -2441,7 +2436,7 @@ PRE-LAMBDA and POST-LAMBDA are called in pre or post-order if non-nil."
         (let ((mvar (comp-vec-aref frame slot-n)))
           (setf (cddr insn) (cl-nsubst-if mvar #'targetp (cddr insn))))
         (new-lvalue))
-       (`(fetch-handler . ,_)
+       (`(fetch-exception . ,_)
         ;; Clobber all no matter what!
         (setf (comp-vec-aref frame slot-n) (make-comp-ssa-mvar :slot slot-n)))
        (`(phi ,n)
@@ -3299,9 +3294,7 @@ Prepare every function for final compilation and drive the C back-end."
          (byte-optimize nil)
          (native-comp-speed 1)
          (lexical-binding t))
-    (comp--native-compile
-     form nil
-     (comp--trampoline-abs-filename subr-name))))
+    (comp--native-compile form nil (comp--trampoline-abs-filename subr-name))))
 
 
 ;; Some entry point support code.
@@ -3329,43 +3322,32 @@ filename (including FILE)."
 ;; In use by comp.c.
 (defun comp-delete-or-replace-file (oldfile &optional newfile)
   "Replace OLDFILE with NEWFILE.
-When NEWFILE is nil just delete OLDFILE.
-Takes the necessary steps when dealing with OLDFILE being a
-shared library that might be currently loaded into a running Emacs
-session."
+When NEWFILE is nil just delete OLDFILE."
   (cond ((eq 'windows-nt system-type)
+         ;; Windows won't allow deletion of .eln if currently
+         ;; loaded by a process.  Brutal workaround: rename to
+         ;; .eln.old and wait for eln_load_path_final_clean_up().
          (ignore-errors (delete-file oldfile))
-         (while
-             (condition-case _
-                 (progn
-                   ;; oldfile maybe recreated by another Emacs in
-                   ;; between the following two rename-file calls
-                   (if (file-exists-p oldfile)
-                       (rename-file oldfile (make-temp-file-internal
-                                             (file-name-sans-extension oldfile)
-                                             nil ".eln.old" nil)
-                                    t))
-                   (when newfile
-                     (rename-file newfile oldfile nil))
-                   ;; Keep on trying.
-                   nil)
-               (file-already-exists
-                ;; Done
-                t))))
-        ;; Remove the old eln instead of copying the new one into it
-        ;; to get a new inode and prevent crashes in case the old one
-        ;; is currently loaded.
+         (while (condition-case nil
+                                        ;sustain while
+                    (prog1 nil
+                      (when (file-exists-p oldfile)
+                        (rename-file oldfile
+                                     (make-temp-file-internal
+                                      (file-name-sans-extension oldfile)
+                                      nil ".eln.old" nil)
+                                     t))
+                      (when newfile
+                        (rename-file newfile oldfile nil)))
+                                        ;exit while
+                  (file-already-exists t))))
         (t (if newfile
                (rename-file newfile oldfile t)
              (delete-file oldfile)))))
 
 (defun comp--native-compile (function-or-file &optional with-late-load output)
   "Compile FUNCTION-OR-FILE into native code.
-When WITH-LATE-LOAD is non-nil, mark the compilation unit for late
-load once it finishes compiling.
-This serves as internal implementation of `native-compile' but
-allowing for WITH-LATE-LOAD to be controlled is in use also for
-the deferred compilation mechanism."
+Wtf is late loading."
   (comp-ensure-native-compiler)
   (unless (or (functionp function-or-file)
               (stringp function-or-file))
@@ -3424,16 +3406,15 @@ the deferred compilation mechanism."
 			                 ;; FIXME: `err-val' is supposed to be
 			                 ;; a list, so it can only be nil here!
 			                 (list function-or-file err-val)))))))
-                      (if (stringp function-or-file)
-                          data
-                        ;; So we return the compiled function.
-                        (native-elisp-load data)))
+              (if (stringp function-or-file)
+                  data
+                ;; So we return the compiled function.
+                (native-elisp-load data)))
           (when (and (not (stringp function-or-file))
                      (not output)
                      comp-ctxt
                      (comp-ctxt-output comp-ctxt)
                      (file-exists-p (comp-ctxt-output comp-ctxt)))
-            ;; NOTE: Not sure if we want to remove this or being cautious.
             (cond ((eq 'windows-nt system-type)
                    ;; We may still be using the temporary .eln file.
                    (ignore-errors (delete-file (comp-ctxt-output comp-ctxt))))
@@ -3470,38 +3451,23 @@ Search happens in `native-comp-eln-load-path'."
 
 ;;;###autoload
 (defun native-compile (function-or-file &optional output)
-  "Compile FUNCTION-OR-FILE into native code.
-This is the synchronous entry-point for the Emacs Lisp native
-compiler.  FUNCTION-OR-FILE is a function symbol, a form, or the
-filename of an Emacs Lisp source file.  If OUTPUT is non-nil, use
-it as the filename for the compiled object.  If FUNCTION-OR-FILE
-is a filename, if the compilation was successful return the
-filename of the compiled object.  If FUNCTION-OR-FILE is a
-function symbol or a form, if the compilation was successful
-return the compiled function."
+  "Synchronous entry into native compilation.
+FUNCTION-OR-FILE is a function symbol, form, or file name.  OUTPUT is the
+optional file name for the compiled object.  Returns FUNCTION-OR-FILE if
+a file name, else the compiled object."
   (comp--native-compile function-or-file nil output))
 
 ;;;###autoload
-(defun batch-native-compile (&optional for-tarball)
-  "Perform batch native compilation of remaining command-line arguments.
-
-Native compilation equivalent of `batch-byte-compile'.
-Use this from the command line, with `-batch'; it won't work
-in an interactive Emacs session.
-Optional argument FOR-TARBALL non-nil means the file being compiled
-as part of building the source tarball, in which case the .eln file
-will be placed under the native-lisp/ directory (actually, in the
-last directory in `native-comp-eln-load-path')."
+(defun batch-native-compile (&optional _unused)
+  "Compile remaining command-line arguments.
+Equivalent of `batch-byte-compile' for native compilation.  Returns list
+of file names not excluded by `native-comp-bootstrap-deny-list'."
   (comp-ensure-native-compiler)
-  (let ((comp-running-batch-compilation t)
-        (native-compile-target-directory
-         (if for-tarball
-             (car (last native-comp-eln-load-path))
-           native-compile-target-directory)))
-    (cl-loop for file in command-line-args-left
-             unless (cl-some (lambda (re) (string-match-p re file))
-                             native-comp-bootstrap-deny-list)
-             collect (comp--native-compile file))))
+  (cl-loop with comp-running-batch-compilation = t
+           for file in command-line-args-left
+           unless (cl-some (lambda (re) (string-match-p re file))
+                           native-comp-bootstrap-deny-list)
+           collect (comp--native-compile file)))
 
 ;; In use by elisp-mode.el
 (defun comp--write-bytecode-file (eln-file)

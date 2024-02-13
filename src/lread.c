@@ -1612,115 +1612,48 @@ directories, make sure the PREDICATE function returns `dir-ok' for them.  */)
 }
 
 #ifdef HAVE_NATIVE_COMP
-static bool
-maybe_swap_for_eln1 (Lisp_Object src_name, Lisp_Object eln_name,
-		     Lisp_Object *filename, int *fd, struct timespec mtime)
-{
-  struct stat eln_st;
-  int eln_fd = emacs_open (SSDATA (ENCODE_FILE (eln_name)), O_RDONLY, 0);
-
-  if (eln_fd > 0)
-    {
-      if (fstat (eln_fd, &eln_st) || S_ISDIR (eln_st.st_mode))
-	emacs_close (eln_fd);
-      else
-	{
-	  struct timespec eln_mtime = get_stat_mtime (&eln_st);
-	  if (timespec_cmp (eln_mtime, mtime) >= 0)
-	    {
-	      emacs_close (*fd);
-	      *fd = eln_fd;
-	      *filename = eln_name;
-	      /* Store the eln -> el relation.  */
-	      Fputhash (Ffile_name_nondirectory (eln_name),
-			src_name, Vcomp_eln_to_el_h);
-	      return true;
-	    }
-	  else
-	    emacs_close (eln_fd);
-	}
-    }
-
-  return false;
-}
-#endif
-
-/* Look for a suitable .eln file to be loaded in place of FILENAME.
-   If found replace the content of FILENAME and FD. */
-
+/* Populate *FILENAME and *FD with .eln generated after MTIME. */
 static void
-maybe_swap_for_eln (bool no_native, Lisp_Object *filename, int *fd,
-		    struct timespec mtime)
+maybe_swap_for_eln (Lisp_Object *filename, int *fd, struct timespec mtime)
 {
-#ifdef HAVE_NATIVE_COMP
-
-  if (no_native
-      || load_no_native)
-    Fputhash (*filename, Qt, V_comp_no_native_file_h);
-  else
-    Fremhash (*filename, V_comp_no_native_file_h);
-
-  if (no_native
-      || load_no_native
-      || !suffix_p (*filename, ".elc"))
+  Fremhash (*filename, V_comp_no_native_file_h);
+  if (!suffix_p (*filename, ".elc"))
     return;
-
-  /* Search eln in the eln-cache directories.  */
-  Lisp_Object eln_path_tail = Vnative_comp_eln_load_path;
-  Lisp_Object src_name =
-    Fsubstring (*filename, Qnil, make_fixnum (-1));
-  if (NILP (Ffile_exists_p (src_name)))
+  Lisp_Object el = Fsubstring (*filename, Qnil, make_fixnum (-1));
+  if (!NILP (Ffile_exists_p (el))
+      || !NILP (Ffile_exists_p (concat2 (el, build_string (".gz")))))
     {
-      src_name = concat2 (src_name, build_string (".gz"));
-      if (NILP (Ffile_exists_p (src_name)))
+      Lisp_Object eln_rel = Fcomp_el_to_eln_rel_filename (el);
+      Lisp_Object tail = Vnative_comp_eln_load_path;
+      FOR_EACH_TAIL_SAFE (tail)
 	{
-	  if (! NILP (find_symbol_value (XSYMBOL (Qnative_comp_warning_on_missing_source),
-					 NULL)))
+	  Lisp_Object path = XCAR (tail);
+	  Lisp_Object eln = Fexpand_file_name
+	    (eln_rel, Fexpand_file_name (Vcomp_native_version_dir, path));
+	  int eln_fd = emacs_open (SSDATA (ENCODE_FILE (eln)), O_RDONLY, 0);
+	  if (eln_fd > 0)
 	    {
-	      /* If we have an installation without any .el files,
-		 there's really no point in giving a warning here,
-		 because that will trigger a cascade of warnings.  So
-		 just do a sanity check and refuse to do anything if we
-		 can't find even central .el files.  */
-	      if (NILP (Flocate_file_internal (build_string ("simple.el"),
-					       Vload_path,
-					       Qnil, Qnil)))
-		return;
-	      Vdelayed_warnings_list
-		= Fcons (list2
-			 (Qcomp,
-			  CALLN (Fformat,
-				 build_string ("Cannot look up eln "
-					       "file as no source file "
-					       "was found for %s"),
-				 *filename)),
-			 Vdelayed_warnings_list);
-	      return;
+	      struct stat eln_st;
+	      if (0 == fstat (eln_fd, &eln_st)
+		  && !S_ISDIR (eln_st.st_mode))
+		{
+		  struct timespec eln_mtime = get_stat_mtime (&eln_st);
+		  if (timespec_cmp (eln_mtime, mtime) >= 0)
+		    {
+		      emacs_close (*fd);
+		      *fd = eln_fd;
+		      *filename = eln;
+		      Fputhash (Ffile_name_nondirectory (eln),
+				el, Vcomp_eln_to_el_h);
+		      break;
+		    }
+		}
+	      emacs_close (eln_fd);
 	    }
 	}
     }
-  Lisp_Object eln_rel_name = Fcomp_el_to_eln_rel_filename (src_name);
-
-  Lisp_Object dir = Qnil;
-  FOR_EACH_TAIL_SAFE (eln_path_tail)
-    {
-      dir = XCAR (eln_path_tail);
-      Lisp_Object eln_name =
-	Fexpand_file_name (eln_rel_name,
-			   Fexpand_file_name (Vcomp_native_version_dir, dir));
-      if (maybe_swap_for_eln1 (src_name, eln_name, filename, fd, mtime))
-	return;
-    }
-
-  /* Look also in preloaded subfolder of the last entry in
-     `comp-eln-load-path'.  */
-  dir = Fexpand_file_name (build_string ("preloaded"),
-			   Fexpand_file_name (Vcomp_native_version_dir,
-					      dir));
-  maybe_swap_for_eln1 (src_name, Fexpand_file_name (eln_rel_name, dir),
-		       filename, fd, mtime);
-#endif
 }
+#endif
 
 /* Search for a file whose name is STR, looking in directories
    in the Lisp list PATH, and trying suffixes from SUFFIX.
@@ -1959,8 +1892,12 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 		  }
 		else
 		  {
-		    maybe_swap_for_eln (no_native, &string, &fd,
-					get_stat_mtime (&st));
+#ifdef HAVE_NATIVE_COMP
+		    if (no_native || load_no_native)
+		      Fputhash (string, Qt, V_comp_no_native_file_h);
+		    else
+		      maybe_swap_for_eln (&string, &fd, get_stat_mtime (&st));
+#endif
 		    /* We succeeded; return this descriptor and filename.  */
 		    if (storeptr)
 		      *storeptr = string;
@@ -1972,8 +1909,12 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 	    /* No more suffixes.  Return the newest.  */
 	    if (0 <= save_fd && !CONSP (XCDR (tail)))
 	      {
-		maybe_swap_for_eln (no_native, &save_string, &save_fd,
-				    save_mtime);
+#ifdef HAVE_NATIVE_COMP
+		if (no_native || load_no_native)
+		  Fputhash (save_string, Qt, V_comp_no_native_file_h);
+		else
+		  maybe_swap_for_eln (&save_string, &save_fd, save_mtime);
+#endif
 		if (storeptr)
 		  *storeptr = save_string;
 		SAFE_FREE ();
