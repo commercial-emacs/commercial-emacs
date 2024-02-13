@@ -194,6 +194,12 @@ executable, if it exists.  This should remove the need to change its
 value when installing GNU coreutils using something like ports or
 Homebrew.
 
+---
+** New command 'kill-region-or-word'.
+This command will kill a region, if it is active, or delete the last
+word.  As such, it is a convenient alternative binding for C-w,
+providing a DWIM behaviour for both Emacs and Unix users.
+
 +++
 ** cl-print
 

@@ -8755,6 +8755,15 @@ With argument ARG, do this that many times."
   (interactive "p")
   (kill-word (- arg)))
 
+(defun kill-region-or-word ()
+  "Call `kill-region' if there is an active region.
+Otherwise kill the last word, just like Unix."
+  (interactive)
+  (call-interactively
+   (if (use-region-p)
+       #'kill-region
+     #'backward-kill-word)))
+
 (defun current-word (&optional strict really-word)
   "Return the word at or near point, as a string.
 The return value includes no text properties.
