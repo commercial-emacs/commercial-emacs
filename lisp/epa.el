@@ -73,6 +73,18 @@ The command `epa-mail-encrypt' uses this."
   :group 'epa
   :version "24.4")
 
+(defcustom epa-keys-select-method 'buffer
+  "Method used to select keys.
+It can have two values: buffer or minibuffer.
+Can have two values: buffer or minibuffer.  In the first case, the keys
+can be selected via a pop-up buffer. In the second case, the keys
+can be selected via a minibuffer and `completing-read-multiple' will be
+used."
+  :type '(choice (const :tag "Read keys from buffer" buffer)
+		 (const :tag "Read keys from minibuffer" minibuffer))
+  :group 'epa
+  :version "30.1")
+
 ;;; Faces
 
 (defgroup epa-faces nil
@@ -450,6 +462,19 @@ q  trust status questionable.  -  trust status unspecified.
 	    (epa--marked-keys))
         (kill-buffer epa-keys-buffer)))))
 
+(defun epa--select-keys-in-minibuffer (prompt keys)
+  (let* ((keys-alist
+          (seq-map
+           (lambda (key)
+             (cons (substring-no-properties
+                    (epa--button-key-text key))
+                   key))
+           keys))
+         (selected-keys (completing-read-multiple prompt keys-alist)))
+    (seq-map
+     (lambda (key) (cdr (assoc key keys-alist)))
+     selected-keys)))
+
 ;;;###autoload
 (defun epa-select-keys (context prompt &optional names secret)
   "Display a user's keyring and ask him to select keys.
@@ -459,7 +484,10 @@ NAMES is a list of strings to be matched with keys.  If it is nil, all
 the keys are listed.
 If SECRET is non-nil, list secret keys instead of public keys."
   (let ((keys (epg-list-keys context names secret)))
-    (epa--select-keys prompt keys)))
+    (pcase epa-keys-select-method
+      ('buffer (epa--select-keys prompt keys))
+      ('minibuffer (epa--select-keys-in-minibuffer prompt keys))
+      (_ (error "Wrong method for key selection is specified")))))
 
 ;;;; Key Details
 

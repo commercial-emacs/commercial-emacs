@@ -1220,6 +1220,14 @@ characters, such as ½ (U+00BD VULGAR FRACTION ONE HALF), are also
 recognized as rational fractions.  They have been since 2004, but it
 looks like it was never mentioned in the NEWS, or even the manual.
 
+** EasyPG
+
+---
+*** New user option 'epa-keys-select-method'
+This allows the user to customize the key selection method, a minibuffer
+or buffer option is available, which is set by default and was used in
+all earlier versions.
+
 
 * New Modes and Packages in Emacs 30.1
 
