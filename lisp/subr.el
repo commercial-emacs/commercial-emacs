@@ -3002,25 +3002,17 @@ This function looks in directories named by `native-comp-eln-load-path'."
        (concat comp-native-version-dir "/preloaded/" eln-file)
        (last native-comp-eln-load-path))))
 
-(defun symbol-file (symbol &optional type native-p)
+(defun symbol-file (symbol &optional type)
   "Return the name of the file that defined SYMBOL.
 The value is normally an absolute file name.  It can also be nil,
 if the definition is not associated with any file.  If SYMBOL
 specifies an autoloaded function, the value can be a relative
 file name without extension.
 
-If TYPE is nil, then any kind of SYMBOL's definition is acceptable.
-If TYPE is `defun', `defvar', or `defface', that specifies function
+If TYPE is nil, then any kind of definition is acceptable.  If
+TYPE is `defun', `defvar', or `defface', that specifies function
 definition, variable definition, or face definition only.
 Otherwise TYPE is assumed to be a symbol property.
-
-If NATIVE-P is non-nil, and SYMBOL was loaded from a .eln file,
-this function will return the absolute file name of that .eln file,
-if found.  Note that if the .eln file is older than its source .el
-file, Emacs won't load such an outdated .eln file, and this function
-will not return it.  If the .eln file couldn't be found, or is
-outdated, the function returns the corresponding .elc or .el file
-instead.
 
 This function only works for symbols defined in Lisp files.  For
 symbols that are defined in C files, use `help-C-file-name'
@@ -3030,59 +3022,24 @@ instead."
 	   (symbolp symbol)
 	   (autoloadp (symbol-function symbol)))
       (nth 1 (symbol-function symbol))
-    (if (and native-p (or (null type) (eq type 'defun))
-	     (symbolp symbol)
-	     (native-comp-available-p)
-	     ;; If it's a defun, we have a shortcut.
-	     (subr-native-elisp-p (symbol-function symbol)))
-	;; native-comp-unit-file returns unnormalized file names.
-	(expand-file-name (native-comp-unit-file (subr-native-comp-unit
-						  (symbol-function symbol))))
-      (let ((elc-file
-	     (catch 'found
-	       (pcase-dolist (`(,file . ,elems) load-history)
-		 (when (if type
-			   (if (eq type 'defvar)
-			       ;; Variables are present just as their
-			       ;; names.
-			       (member symbol elems)
-			     ;; Many other types are represented as
-			     ;; (TYPE . NAME).
-			     (or (member (cons type symbol) elems)
-				 (memq
-				  symbol
-				  (alist-get type
-					     (alist-get 'define-symbol-props
-							elems)))))
-			 ;; We accept all types, so look for variable def
-			 ;; and then for any other kind.
-			 (or (member symbol elems)
-			     (let ((match (rassq symbol elems)))
-			       (and match
-				    (not (eq 'require (car match)))))))
-		   (throw 'found file))))))
-	;; If they asked for the .eln file, try to find it.
-	(or (and elc-file
-		 native-p
-		 (native-comp-available-p)
-		 (let* ((sans-ext (file-name-sans-extension elc-file))
-			(el-file
-			 (and (fboundp 'zlib-available-p)
-			      (zlib-available-p)
-			      (concat sans-ext ".el.gz")))
-			(el-file-backup (concat sans-ext ".el")))
-		   (or (and el-file (file-exists-p el-file))
-		       (and (file-exists-p el-file-backup)
-			    (setq el-file el-file-backup))
-		       (setq el-file nil))
-		   (when (stringp el-file)
-		     (let ((eln-file (locate-eln-file
-				      (comp-el-to-eln-rel-filename el-file))))
-		       ;; Emacs will not load an outdated .eln file,
-		       ;; so we mimic this behavior here.
-		       (when (file-newer-than-file-p eln-file el-file)
-			 eln-file)))))
-	    elc-file)))))
+    (catch 'found
+      (pcase-dolist (`(,file . ,elems) load-history)
+	(when (if type
+		  (if (eq type 'defvar)
+		      ;; Variables are present just as their names.
+		      (member symbol elems)
+		    ;; Many other types are represented as (TYPE . NAME).
+		    (or (member (cons type symbol) elems)
+                        (memq symbol (alist-get type
+                                                (alist-get 'define-symbol-props
+                                                           elems)))))
+	        ;; We accept all types, so look for variable def
+	        ;; and then for any other kind.
+	        (or (member symbol elems)
+                    (let ((match (rassq symbol elems)))
+		      (and match
+		           (not (eq 'require (car match)))))))
+          (throw 'found file))))))
 
 (declare-function read-library-name "find-func" nil)
 
