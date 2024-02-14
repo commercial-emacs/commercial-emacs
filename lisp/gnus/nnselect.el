@@ -285,8 +285,7 @@ parameters."
         (gnus-search-error
          (signal (car err) (cdr err)))
         (error
-         (gnus-error 3 "nnselect-generate-artlist: %s on %s gave error %s"
-                     function args err))))
+         (gnus-error 3 "nnselect-generate-artlist (%s): %s" f err))))
     result))
 
 (defmacro nnselect-get-artlist (group)

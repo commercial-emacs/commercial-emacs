@@ -1107,7 +1107,7 @@ Return value is the fall-through block name."
       ;; Emit the basic block to pop the handler if we got the non local.
       (puthash (comp-block-name pop-bb) pop-bb (comp-func-blocks comp-func))
       (setf (comp-limplify-curr-block comp-pass) pop-bb)
-      (comp--emit `(fetch-exception ,(comp-slot+1)))
+      (comp--emit `(fetch-exception ,(comp--slot+1)))
       (comp--emit `(jump ,(comp-block-name handler-bb)))
       (comp--mark-curr-bb-closed))))
 
@@ -2438,7 +2438,7 @@ PRE-LAMBDA and POST-LAMBDA are called in pre or post-order if non-nil."
         (new-lvalue))
        (`(fetch-exception . ,_)
         ;; Clobber all no matter what!
-        (setf (comp-vec-aref frame slot-n) (make-comp-ssa-mvar :slot slot-n)))
+        (setf (comp-vec-aref frame slot-n) (make--comp--ssa-mvar :slot slot-n)))
        (`(phi ,n)
         (when (equal n slot-n)
           (new-lvalue)))
