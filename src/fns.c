@@ -5158,14 +5158,9 @@ sxhash_obj (Lisp_Object obj, int depth)
 	    return hash;
 	  }
 	else
-	  {
-	    if (symbols_with_pos_enabled && pvec_type == PVEC_SYMBOL_WITH_POS)
-	      obj = XSYMBOL_WITH_POS_SYM (obj);
-
-	    /* Others are 'equal' if they are 'eq', so take their
-	       address as hash.  */
-	    return XHASH (obj);
-	  }
+	  /* Others are 'equal' if they are 'eq', so take their
+	     address as hash.  */
+	  return XHASH (obj);
       }
 
     case Lisp_Cons:
