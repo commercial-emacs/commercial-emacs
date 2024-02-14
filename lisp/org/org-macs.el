@@ -36,7 +36,7 @@
 
 ;;; Org version verification.
 
-(defvar org--inhibit-version-check nil
+(defvar org--inhibit-version-check t
   "When non-nil, skip the detection of mixed-versions situations.
 For internal use only.  See Emacs bug #62762.
 This variable is only supposed to be changed by Emacs build scripts.

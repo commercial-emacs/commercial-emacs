@@ -714,7 +714,7 @@ Each element is (INDEX . VALUE)")
 (byte-defop  40  0 byte-unbind	"for unbinding special bindings")
 ;; codes 8-47 are consumed by the preceding opcodes
 
-(byte-defop  48  0 byte-pophandler)
+(byte-defop  48  0 byte-popexception)
 (byte-defop  49 -1 byte-pushconditioncase)
 (byte-defop  50 -1 byte-pushcatch)
 
@@ -4665,7 +4665,7 @@ binding slots have been popped."
   (let ((endtag (byte-compile-make-tag)))
     (byte-compile-goto 'byte-pushcatch endtag)
     (byte-compile-body (cddr form) nil)
-    (byte-compile-out 'byte-pophandler)
+    (byte-compile-out 'byte-popexception)
     (byte-compile-out-tag endtag)))
 
 (defun byte-compile-unwind-protect (form)
@@ -4717,7 +4717,7 @@ binding slots have been popped."
       (byte-compile-goto 'byte-pushconditioncase (car clause)))
 
     (byte-compile-form body) ;; byte-compile--for-effect
-    (dolist (_ clauses) (byte-compile-out 'byte-pophandler))
+    (dolist (_ clauses) (byte-compile-out 'byte-popexception))
 
     (let ((compile-handler-body
            (lambda (body)
@@ -4747,7 +4747,7 @@ binding slots have been popped."
         (let ((clause (pop clauses)))
           (setq byte-compile-depth (1+ depth))
           (byte-compile-out-tag (pop clause))
-          (dolist (_ clauses) (byte-compile-out 'byte-pophandler))
+          (dolist (_ clauses) (byte-compile-out 'byte-popexception))
           (funcall compile-handler-body (cdr clause))
           (byte-compile-goto 'byte-goto endtag)))
 

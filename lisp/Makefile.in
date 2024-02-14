@@ -56,7 +56,7 @@ EMACS = ../src/emacs${EXEEXT}
 
 # Command line flags for Emacs.
 
-EMACSOPT = -batch --no-site-file --no-site-lisp
+EMACSOPT = -Q -batch
 
 # Extra flags to pass to the byte compiler
 BYTE_COMPILE_EXTRA_FLAGS =
@@ -72,8 +72,8 @@ AUTOGENEL = ${loaddefs} ${srcdir}/cus-load.el ${srcdir}/finder-inf.el \
   ${srcdir}/leim/leim-list.el
 
 BYTE_COMPILE_FLAGS = \
-  --eval "(setq load-prefer-newer t byte-compile-warnings 'all)" \
-  --eval "(setq org--inhibit-version-check t)" $(BYTE_COMPILE_EXTRA_FLAGS)
+  --eval "(custom-set-variables (quote (byte-compile-warnings (quote all))))" \
+  $(BYTE_COMPILE_EXTRA_FLAGS)
 
 BYTE_COMPILER_EL = \
 	emacs-lisp/macroexp.el \

@@ -1109,8 +1109,8 @@ emit_cond_jump (gcc_jit_rvalue *test,
 					then_target,
 					else_target);
   else
-    /* In case test is not bool we do a logical negation to obtain a bool as
-       result.  */
+    /* Effectively cast TEST result to bool with logical negate,
+       and reverse then and else clauses.  */
     gcc_jit_block_end_with_conditional (
       comp.block,
       NULL,
@@ -2146,7 +2146,7 @@ static void
 emit_exception_stack_pop (void)
 {
   /* C: exception_stack_pop (thr);  */
-
+  gcc_jit_block *bb_orig = comp.block;
   gcc_jit_lvalue *exception_stack_top =
     gcc_jit_rvalue_dereference_field
     (gcc_jit_lvalue_as_rvalue (gcc_jit_rvalue_dereference
@@ -2165,7 +2165,7 @@ emit_exception_stack_pop (void)
   gcc_jit_param *param[] = {};
   comp.func = gcc_jit_context_new_function (comp.ctxt, NULL,
 					    GCC_JIT_FUNCTION_INTERNAL,
-					    comp.void_type,
+					    comp.handler_ptr_type,
 					    "pop_exception",
 					    0, param, 0);
   DECL_BLOCK (entry_block, comp.func);
@@ -2183,11 +2183,11 @@ emit_exception_stack_pop (void)
     return popped;
   */
   emit_cond_jump
-    (gcc_jit_context_new_comparison(comp.ctxt,
-				    NULL,
-				    GCC_JIT_COMPARISON_EQ,
-				    gcc_jit_lvalue_as_rvalue (exception_stack_top),
-				    exception_stack_bottom),
+    (gcc_jit_context_new_comparison (comp.ctxt,
+				     NULL,
+				     GCC_JIT_COMPARISON_EQ,
+				     gcc_jit_lvalue_as_rvalue (exception_stack_top),
+				     exception_stack_bottom),
      terminal_block,
      decrement_block);
 
@@ -2196,7 +2196,9 @@ emit_exception_stack_pop (void)
 				NULL,
 				exception_stack_top,
 				gcc_jit_context_null (comp.ctxt, comp.handler_ptr_type));
-  gcc_jit_block_end_with_void_return (terminal_block, NULL);
+  gcc_jit_block_end_with_return (terminal_block,
+				 NULL,
+				 gcc_jit_lvalue_as_rvalue (exception_stack_top));
 
   comp.block = decrement_block;
   gcc_jit_block_add_assignment (decrement_block,
@@ -2208,7 +2210,10 @@ emit_exception_stack_pop (void)
 				 sizeof (struct handler),
 				 GCC_JIT_BINARY_OP_MINUS,
 				 comp.one));
-  gcc_jit_block_end_with_void_return (decrement_block, NULL);
+  gcc_jit_block_end_with_return (decrement_block,
+				 NULL,
+				 gcc_jit_lvalue_as_rvalue (exception_stack_top));
+  comp.block = bb_orig;
 }
 
 static void
@@ -2309,13 +2314,12 @@ emit_limple_insn (Lisp_Object insn)
 
       emit_exception_stack_pop ();
 
-      emit_frame_assignment (
-	arg[0],
-	gcc_jit_lvalue_as_rvalue (
-	  gcc_jit_rvalue_dereference_field (
-	    gcc_jit_lvalue_as_rvalue (comp.loc_handler),
-	    NULL,
-	    comp.handler_val_field)));
+      emit_frame_assignment (arg[0],
+			     gcc_jit_lvalue_as_rvalue
+			     (gcc_jit_rvalue_dereference_field
+			      (gcc_jit_lvalue_as_rvalue (comp.loc_handler),
+			       NULL,
+			       comp.handler_val_field)));
     }
   else if (EQ (op, Qcall))
     {

@@ -207,7 +207,7 @@
   (error "Foo"))
 
 (defun comp-tests-condition-case-0-f ()
-  ;; Bpushhandler Bpophandler
+  ;; Bpushhandler Bpopexception
   (condition-case
       err
       (comp-tests-err-arith-f)
@@ -218,7 +218,7 @@
                    (error-message-string err)
                    " caught"))))
 (defun comp-tests-condition-case-1-f ()
-  ;; Bpushhandler Bpophandler
+  ;; Bpushhandler Bpopexception
   (condition-case
       err
       (comp-tests-err-foo-f)

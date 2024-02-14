@@ -128,7 +128,7 @@ DEFINE (Bunbind5, 055)							\
 DEFINE (Bunbind6, 056)							\
 DEFINE (Bunbind7, 057)							\
 									\
-DEFINE (Bpophandler, 060)						\
+DEFINE (Bpopexception, 060)						\
 DEFINE (Bpushconditioncase, 061)					\
 DEFINE (Bpushcatch, 062)						\
 									\
@@ -963,7 +963,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	    NEXT;
 	  }
 
-	CASE (Bpophandler):	/* New in 24.4.  */
+	CASE (Bpopexception):	/* New in 24.4.  */
 	  exception_stack_pop (current_thread);
 	  NEXT;
 

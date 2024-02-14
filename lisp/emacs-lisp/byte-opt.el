@@ -1995,7 +1995,7 @@ See Info node `(elisp) Integer Basics'."
   "Don't call this!"
   ;; Fetch and return the offset for the current opcode.
   ;; Return nil if this opcode has no offset.
-  (cond ((< bytedecomp-op byte-pophandler)
+  (cond ((< bytedecomp-op byte-popexception)
 	 (let ((tem (logand bytedecomp-op 7)))
 	   (setq bytedecomp-op (logand bytedecomp-op 248))
 	   (cond ((eq tem 6)

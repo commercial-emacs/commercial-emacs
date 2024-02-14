@@ -1294,8 +1294,8 @@ and the annotation emission."
       (byte-unbind
        (comp--emit (comp--call 'helper_unbind_n
                              (make--comp-mvar :constant arg))))
-      (byte-pophandler
-       (comp--emit '(pop-handler)))
+      (byte-popexception
+       (comp--emit '(pop-exception)))
       (byte-pushconditioncase
        (comp--emit-handler (cddr insn) 'condition-case))
       (byte-pushcatch
