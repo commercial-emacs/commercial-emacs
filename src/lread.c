@@ -4953,11 +4953,11 @@ DEFUN ("internal--obarray-buckets",
     {
       Lisp_Object bucket = Qnil;
       Lisp_Object sym = AREF (obarray, i);
-      if (BARE_SYMBOL_P (sym))
+      if (SYMBOL_P (sym))
 	while (1)
 	  {
 	    bucket = Fcons (sym, bucket);
-	    struct Lisp_Symbol *s = XBARE_SYMBOL(sym)->u.s.next;
+	    struct Lisp_Symbol *s = SYMBOL(sym)->u.s.next;
 	    if (!s)
 	      break;
 	    sym = make_lisp_symbol (s);
