@@ -125,9 +125,9 @@
 ;; receiving escape sequences (with some limitations, i.e. completion
 ;; in blocks does not work).  The code executed for the "fallback"
 ;; completion can be found in `python-shell-completion-setup-code' and
-;; `python-shell-completion-string-code' variables.  Their default
-;; values enable completion for both CPython and IPython, and probably
-;; any readline based shell (it's known to work with PyPy).  If your
+;; `python-shell-completion-get-completions'.  Their default values
+;; enable completion for both CPython and IPython, and probably any
+;; readline based shell (it's known to work with PyPy).  If your
 ;; Python installation lacks readline (like CPython for Windows),
 ;; installing pyreadline (URL `https://ipython.org/pyreadline.html')
 ;; should suffice.  To troubleshoot why you are not getting any
@@ -3185,7 +3185,6 @@ interpreter is run.  Variables
 `python-shell-prompt-block-regexp',
 `python-shell-font-lock-enable',
 `python-shell-completion-setup-code',
-`python-shell-completion-string-code',
 `python-eldoc-setup-code',
 `python-ffap-setup-code' can
 customize this mode for different Python interpreters.
@@ -3825,8 +3824,9 @@ def __PYTHON_EL_get_completions(text):
     completions = []
     completer = None
 
+    import json
     try:
-        import readline
+        import readline, re
 
         try:
             import __builtin__
@@ -3837,16 +3837,29 @@ def __PYTHON_EL_get_completions(text):
 
         is_ipython = ('__IPYTHON__' in builtins or
                       '__IPYTHON__active' in builtins)
-        splits = text.split()
-        is_module = splits and splits[0] in ('from', 'import')
 
-        if is_ipython and is_module:
-            from IPython.core.completerlib import module_completion
-            completions = module_completion(text.strip())
-        elif is_ipython and '__IP' in builtins:
-            completions = __IP.complete(text)
-        elif is_ipython and 'get_ipython' in builtins:
-            completions = get_ipython().Completer.all_completions(text)
+        if is_ipython and 'get_ipython' in builtins:
+            def filter_c(prefix, c):
+                if re.match('_+(i?[0-9]+)?$', c):
+                    return False
+                elif c[0] == '%' and not re.match('[%a-zA-Z]+$', prefix):
+                    return False
+                return True
+
+            import IPython
+            try:
+                if IPython.version_info[0] >= 6:
+                    from IPython.core.completer import provisionalcompleter
+                    with provisionalcompleter():
+                        completions = [
+                            [c.text, c.start, c.end, c.type or '?', c.signature or '']
+                             for c in get_ipython().Completer.completions(text, len(text))
+                             if filter_c(text, c.text)]
+                else:
+                    part, matches = get_ipython().Completer.complete(line_buffer=text)
+                    completions = [text + m[len(part):] for m in matches if filter_c(text, m)]
+            except:
+                pass
         else:
             # Try to reuse current completer.
             completer = readline.get_completer()
@@ -3869,7 +3882,7 @@ def __PYTHON_EL_get_completions(text):
     finally:
         if getattr(completer, 'PYTHON_EL_WRAPPED', False):
             completer.print_mode = True
-    return completions"
+    return json.dumps(completions)"
   "Code used to setup completion in inferior Python processes."
   :type 'string)
 
@@ -3910,6 +3923,79 @@ When a match is found, native completion is disabled."
   :version "25.1"
   :type 'float)
 
+(defcustom python-shell-readline-completer 'auto
+  "The readline completer used for Python shell completion.
+If the value is non-nil, Python shell will setup the readline
+completer unless it has been set elsewhere (e.g. in the
+PYTHONSTARTUP file).  Below are possible values:
+- `auto': the completer is determined according to the
+interpreter.  Specifically, the IPython completer, defined in
+`python-shell-readline-ipython-setup-code', is used when the
+interpreter is ipython, otherwise the Jedi completer is used.
+- a string: Python code to setup the readline. It should define
+the function `__PYTHON_EL_setup_readline_completer'.  See
+`python-shell-readline-jedi-setup-code' for reference.
+- `nil': Python shell will do nothing.
+
+In any case, if the completer is not set successfully in the end,
+fallback to the built-in rlcompleter."
+  :type '(choice (const  :tag "Automatic" auto)
+                 (const  :tag "No configuration" nil)
+                 (string :tag "Python setup code"))
+  :version "30.1")
+
+(defvar python-shell-readline-completer-delims nil
+  "Word delimiters used by the readline completer.
+It is automatically set by Python shell.")
+
+(defconst python-shell-readline-jedi-setup-code
+  "
+def __PYTHON_EL_setup_readline_completer():
+    from jedi.utils import setup_readline
+    setup_readline()"
+  "Code used to setup readline completer with Jedi.")
+
+(defconst python-shell-readline-ipython-setup-code
+  "
+def __PYTHON_EL_setup_readline_completer():
+    import readline, re, json, IPython
+
+    class __ipython_RL:
+        def __init__(self, v):
+            self.version = v
+
+        def filter(self, prefix, c):
+            if re.match('_+(i?[0-9]+)?$', c):
+                return False
+            elif c[0] == '%' and not re.match('[%a-zA-Z]+$', prefix):
+                return False
+            return True
+
+        def complete(self, text, state):
+            if state == 0:
+                try:
+                    if self.version >= 6:
+                        from IPython.core.completer import provisionalcompleter
+                        with provisionalcompleter():
+                            self.matches = [json.dumps([
+                                [c.text, c.start, c.end, c.type or '?', c.signature or '']
+                                for c in get_ipython().Completer.completions(text, len(text))
+                                if self.filter(text, c.text)])]
+                    else:
+                        part, matches = get_ipython().Completer.complete(line_buffer=text)
+                        self.matches = [text + m[len(part):] for m in matches
+                                        if self.filter(text, m)]
+                except Exception:
+                    pass
+            try:
+                return self.matches[state]
+            except IndexError:
+                return None
+
+    readline.set_completer(__ipython_RL(IPython.version_info[0]).complete)
+    readline.set_completer_delims('')"
+  "Code used to setup readline completer for IPython.")
+
 (defvar python-shell-completion-native-redirect-buffer
   " *Python completions redirect*"
   "Buffer to be used to redirect output of readline commands.")
@@ -3933,7 +4019,20 @@ When a match is found, native completion is disabled."
 (defun python-shell-completion-native-setup ()
   "Try to setup native completion, return non-nil on success."
   (let* ((process (python-shell-get-process))
-         (output (python-shell-send-string-no-output "
+         (completer (pcase python-shell-readline-completer
+                      ('auto
+                       (if (string-match-p "ipython[23]?\\'" python-shell-interpreter)
+                           python-shell-readline-ipython-setup-code
+                         python-shell-readline-jedi-setup-code))
+                      ((pred stringp) python-shell-readline-completer)
+                      (_ "")))
+         (output (python-shell-send-string-no-output
+                  (concat "
+try:
+    del __PYTHON_EL_setup_readline_completer
+except:
+    pass
+" completer "
 def __PYTHON_EL_native_completion_setup():
     try:
         import readline
@@ -4006,11 +4105,23 @@ def __PYTHON_EL_native_completion_setup():
                 else:
                     return completion
 
+        def is_rlcompleter(completer):
+            try:
+                if completer.__self__.__module__ == 'rlcompleter':
+                    return True
+                else:
+                    return False
+            except Exception:
+                return False
+
         completer = readline.get_completer()
 
-        if not completer:
-            # Used as last resort to avoid breaking customizations.
-            import rlcompleter
+        if not completer or is_rlcompleter(completer):
+            try:
+                __PYTHON_EL_setup_readline_completer()
+            except:
+                # Used as last resort to avoid breaking customizations.
+                import rlcompleter
             completer = readline.get_completer()
 
         if completer and not getattr(completer, 'PYTHON_EL_WRAPPED', False):
@@ -4045,9 +4156,13 @@ def __PYTHON_EL_native_completion_setup():
         print ('python.el: native completion setup failed, %s: %s'
                % sys.exc_info()[:2])
 
-__PYTHON_EL_native_completion_setup()" process)))
+__PYTHON_EL_native_completion_setup()") process)))
     (when (string-match-p "python\\.el: native completion setup loaded"
                           output)
+      (setq-local python-shell-readline-completer-delims
+                  (string-trim-right
+                   (python-shell-send-string-no-output
+                    "import readline; print(readline.get_completer_delims())")))
       (python-shell-completion-native-try))))
 
 (defun python-shell-completion-native-turn-off (&optional msg)
@@ -4115,6 +4230,8 @@ With argument MSG show activation/deactivation message."
     (let* ((original-filter-fn (process-filter process))
            (redirect-buffer (get-buffer-create
                              python-shell-completion-native-redirect-buffer))
+           (sep (if (string= python-shell-readline-completer-delims "")
+                    "[\n\r]+" "[ \f\t\n\r\v()]+"))
            (trigger "\t")
            (new-input (concat input trigger))
            (input-length
@@ -4157,31 +4274,62 @@ With argument MSG show activation/deactivation message."
                      process python-shell-completion-native-output-timeout
                      comint-redirect-finished-regexp)
                 (re-search-backward "0__dummy_completion__" nil t)
-                (cl-remove-duplicates
-                 (split-string
-                  (buffer-substring-no-properties
-                   (line-beginning-position) (point-min))
-                  "[ \f\t\n\r\v()]+" t)
-                 :test #'string=))))
+                (let ((str (buffer-substring-no-properties
+                            (line-beginning-position) (point-min))))
+                  (if (string= "[" (substring str 0 1))
+                      (condition-case nil
+                          (python--parse-json-array str)
+                        (t (cl-remove-duplicates (split-string str sep t)
+                                                 :test #'string=)))
+                    (cl-remove-duplicates (split-string str sep t)
+                                          :test #'string=))))))
         (set-process-filter process original-filter-fn)))))
 
 (defun python-shell-completion-get-completions (process input)
   "Get completions of INPUT using PROCESS."
   (with-current-buffer (process-buffer process)
-    (let ((completions
-           (python-util-strip-string
-            (python-shell-send-string-no-output
-             (format
-              "%s\nprint(';'.join(__PYTHON_EL_get_completions(%s)))"
+    (python--parse-json-array
+     (python-shell-send-string-no-output
+      (format "%s\nprint(__PYTHON_EL_get_completions(%s))"
               python-shell-completion-setup-code
               (python-shell--encode-string input))
-             process))))
-      (when (> (length completions) 2)
-        (split-string completions
-                      "^'\\|^\"\\|;\\|'$\\|\"$" t)))))
+      process))))
 
 (defvar-local python-shell--capf-cache nil
   "Variable to store cached completions and invalidation keys.")
+
+(defun python-shell--get-multiline-input ()
+  "Return lines at a multi-line input in Python shell."
+  (save-excursion
+    (let ((p (point)) lines)
+      (when (progn
+              (beginning-of-line)
+              (looking-back python-shell-prompt-block-regexp (pos-bol)))
+        (push (buffer-substring-no-properties (point) p) lines)
+        (while (progn (comint-previous-prompt 1)
+                      (looking-back python-shell-prompt-block-regexp (pos-bol)))
+          (push (buffer-substring-no-properties (point) (pos-eol)) lines))
+        (push (buffer-substring-no-properties (point) (pos-eol)) lines))
+      lines)))
+
+(defun python-shell--extra-completion-context ()
+  "Return extra completion context of current line in Python shell.
+It currently supports multi-line function call."
+  (let ((lines (python-shell--get-multiline-input)) beg)
+    (when (not (zerop (length lines)))
+      (with-temp-buffer
+        (delay-mode-hooks
+          (insert (string-join lines "\n"))
+          (python-mode)
+          (setq beg (pos-bol))
+          (python-nav-up-list -1)
+          (when (< (point) beg)
+            (while (re-search-backward
+                    (python-rx symbol-name) (pos-bol) t))
+            (string-replace
+             "\n" "" (buffer-substring-no-properties
+                      (point)
+                      (progn (goto-char (point-max)) (pos-eol 0))))))))))
 
 (defun python-shell-completion-at-point (&optional process)
   "Function for `completion-at-point-functions' in `inferior-python-mode'.
@@ -4193,21 +4341,21 @@ using that one instead of current buffer's process."
                          ;; Working on a shell buffer: use prompt end.
                          (cdr (python-util-comint-last-prompt))
                        (line-beginning-position)))
-         (import-statement
-          (when (string-match-p
-                 (rx (* space) word-start (or "from" "import") word-end space)
-                 (buffer-substring-no-properties line-start (point)))
-            (buffer-substring-no-properties line-start (point))))
+         (no-delims (with-current-buffer (process-buffer process)
+                      (if python-shell-completion-native-enable
+                          (string= python-shell-readline-completer-delims "")
+                        (string-match-p "ipython[23]?\\'" python-shell-interpreter))))
          (start
           (if (< (point) line-start)
               (point)
             (save-excursion
-              (if (not (re-search-backward
-                        (python-rx
-                         (or whitespace open-paren close-paren
-                             string-delimiter simple-operator))
-                        line-start
-                        t 1))
+              (if (or no-delims
+                      (not (re-search-backward
+                            (python-rx
+                             (or whitespace open-paren close-paren
+                                 string-delimiter simple-operator))
+                            line-start
+                            t 1)))
                   line-start
                 (forward-char (length (match-string-no-properties 0)))
                 (point)))))
@@ -4247,18 +4395,58 @@ using that one instead of current buffer's process."
                   (t #'python-shell-completion-native-get-completions))))
          (prev-prompt (car python-shell--capf-cache))
          (re (or (cadr python-shell--capf-cache) regexp-unmatchable))
-         (prefix (buffer-substring-no-properties start end)))
+         (prefix (buffer-substring-no-properties start end))
+         (prefix-offset 0)
+         ;; Send extra context for cases like completing function
+         ;; parameters for multi-line function call.
+         (extra-context (and no-delims
+                             (python-shell--extra-completion-context)))
+         (extra-offset (length extra-context)))
+    (unless (zerop extra-offset)
+      (setq prefix (concat extra-context prefix)))
     ;; To invalidate the cache, we check if the prompt position or the
     ;; completion prefix changed.
     (unless (and (equal prev-prompt (car prompt-boundaries))
-                 (string-match re prefix))
+                 (string-match re prefix)
+                 (setq prefix-offset (- (length prefix) (match-end 1))))
       (setq python-shell--capf-cache
             `(,(car prompt-boundaries)
               ,(if (string-empty-p prefix)
                    regexp-unmatchable
-                 (concat "\\`" (regexp-quote prefix) "\\(?:\\sw\\|\\s_\\)*\\'"))
-              ,@(funcall completion-fn process (or import-statement prefix)))))
-    (list start end (cddr python-shell--capf-cache))))
+                 (concat "\\`\\(" (regexp-quote prefix) "\\)\\(?:\\sw\\|\\s_\\)*\\'"))
+              ,@(funcall completion-fn process prefix))))
+    (let ((cands (cddr python-shell--capf-cache)))
+      (cond
+       ((stringp (car cands))
+        (if no-delims
+            ;; Reduce completion candidates due to long prefix.
+            (if-let ((Lp (length prefix))
+                     ((string-match "\\(\\sw\\|\\s_\\)+\\'" prefix))
+                     (L (match-beginning 0)))
+                ;; If extra-offset is not zero:
+                ;;                  start              end
+                ;; o------------------o---------o-------o
+                ;; |<- extra-offset ->|
+                ;; |<----------- L ------------>|
+                ;;                          new-start
+                (list (+ start L (- extra-offset)) end
+                      (mapcar (lambda (s) (substring s L)) cands))
+              (list end end (mapcar (lambda (s) (substring s Lp)) cands)))
+          (list start end cands)))
+       ;; python-shell-completion(-native)-get-completions may produce
+       ;; a list of (text start end type signature) for completion.
+       ;; See `python-shell-readline-ipython-setup-code' and
+       ;; `python-shell-completion-setup-code'.
+       ((consp (car cands))
+        (list (+ start (nth 1 (car cands)) (- extra-offset))
+              ;; Candidates may be cached, so the end position should
+              ;; be adjusted according to current completion prefix.
+              (+ start (nth 2 (car cands)) (- extra-offset) prefix-offset)
+              cands
+              :annotation-function
+              (lambda (c) (concat " " (nth 3 (assoc c cands))))
+              :company-docsig
+              (lambda (c) (nth 4 (assoc c cands)))))))))
 
 (define-obsolete-function-alias
   'python-shell-completion-complete-at-point

@@ -4804,6 +4804,84 @@ def foo():
      (end-of-line 0)
      (should-not (nth 2 (python-shell-completion-at-point))))))
 
+(defun python-shell-completion-module ()
+  "Check if modules can be completed in Python shell."
+  (insert "import datet")
+  (completion-at-point)
+  (beginning-of-line)
+  (should (looking-at-p "import datetime"))
+  (kill-line)
+  (insert "from datet")
+  (completion-at-point)
+  (beginning-of-line)
+  (should (looking-at-p "from datetime"))
+  (end-of-line)
+  (insert " import timed")
+  (completion-at-point)
+  (beginning-of-line)
+  (should (looking-at-p "from datetime import timedelta"))
+  (kill-line))
+
+(defun python-shell-completion-parameters ()
+  "Check if parameters can be completed in Python shell."
+  (insert "import re")
+  (comint-send-input)
+  (python-tests-shell-wait-for-prompt)
+  (insert "re.split('b', 'abc', maxs")
+  (completion-at-point)
+  (should (string= "re.split('b', 'abc', maxsplit="
+                   (buffer-substring (line-beginning-position) (point))))
+  (insert "0, ")
+  (should (python-shell-completion-at-point))
+  ;; Test if cache is used.
+  (cl-letf (((symbol-function 'python-shell-completion-get-completions)
+             'ignore)
+            ((symbol-function 'python-shell-completion-native-get-completions)
+             'ignore))
+    (insert "fla")
+    (completion-at-point)
+    (should (string= "re.split('b', 'abc', maxsplit=0, flags="
+                     (buffer-substring (line-beginning-position) (point)))))
+  (beginning-of-line)
+  (kill-line))
+
+(defun python-shell-completion-multi-line-function-call ()
+  "Check if parameters can be completed in multi-line function call."
+  (insert "re.split('b', 'abc',")
+  (comint-send-input)
+  (python-tests-shell-wait-for-prompt)
+  (insert "maxs")
+  (completion-at-point)
+  (should (string= "maxsplit="
+                   (buffer-substring (line-beginning-position) (point)))))
+
+(ert-deftest python-shell-completion-at-point-jedi-completer ()
+  "Check if Python shell completion works with Jedi."
+  (skip-unless (executable-find python-tests-shell-interpreter))
+  (python-tests-with-temp-buffer-with-shell
+   ""
+   (python-shell-with-shell-buffer
+     (python-shell-completion-native-turn-on)
+     (skip-unless (string= python-shell-readline-completer-delims ""))
+     (python-shell-completion-module)
+     (python-shell-completion-parameters)
+     (python-shell-completion-multi-line-function-call))))
+
+(ert-deftest python-shell-completion-at-point-ipython ()
+  "Check if Python shell completion works for IPython."
+  (let ((python-shell-interpreter "ipython")
+        (python-shell-interpreter-args "-i --simple-prompt"))
+    (skip-unless (executable-find python-shell-interpreter))
+    (python-tests-with-temp-buffer-with-shell
+     ""
+     (python-shell-with-shell-buffer
+       (python-shell-completion-native-turn-off)
+       (python-shell-completion-module)
+       (python-shell-completion-parameters)
+       (python-shell-completion-native-turn-on)
+       (python-shell-completion-module)
+       (python-shell-completion-parameters)
+       (python-shell-completion-multi-line-function-call)))))
 
 
 ;;; PDB Track integration

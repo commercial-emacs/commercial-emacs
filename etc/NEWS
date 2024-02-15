@@ -972,6 +972,12 @@ instead of:
 This allows the user to specify command line arguments to the non
 interactive Python interpreter specified by 'python-interpreter'.
 
+*** New user option 'python-shell-readline-completer'.
+This allows the user to specify the readline completer used for Python
+shell completion.  The default is 'auto', which means a suitable
+completer will be configured automatically according to the Python
+interpreter.
+
 ** use-package
 
 +++
