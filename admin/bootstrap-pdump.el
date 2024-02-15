@@ -383,44 +383,6 @@
 ;; At this point, we're ready to resume undo recording for scratch.
 (buffer-enable-undo "*scratch*")
 
-(defvar load--bin-dest-dir nil
-  "Store the original value passed by \"--bin-dest\" during dump.
-Internal use only.")
-(defvar load--eln-dest-dir nil
-  "Store the original value passed by \"--eln-dest\" during dump.
-Internal use only.")
-
-(defun load--fixup-all-elns ()
-  "Fix all compilation unit filename.
-This to have it working when installed or if Emacs source
-directory got moved.  This is set to be a pair in the form of:
-\(rel-filename-from-install-bin . rel-filename-from-local-bin)."
-  (when (and load--bin-dest-dir load--eln-dest-dir)
-      (setq eln-dest-dir
-          (concat load--eln-dest-dir "native-lisp/" comp-native-version-dir "/"))
-      (maphash (lambda (_ cu)
-               (when (stringp (native-comp-unit-file cu))
-                 (let* ((file (native-comp-unit-file cu))
-                        (preloaded (equal (substring (file-name-directory file)
-                                                     -10 -1)
-                                          "preloaded"))
-                        (eln-dest-dir-eff (if preloaded
-                                              (expand-file-name "preloaded"
-                                                                eln-dest-dir)
-                                            eln-dest-dir)))
-                   (native-comp-unit-set-file
-                    cu
-	            (cons
-                     ;; Relative filename from the installed binary.
-                     (file-relative-name (expand-file-name
-                                          (file-name-nondirectory
-                                           file)
-                                          eln-dest-dir-eff)
-                                         load--bin-dest-dir)
-                     ;; Relative filename from the built uninstalled binary.
-                     (file-relative-name file invocation-directory))))))
-	     comp-loaded-comp-units-h)))
-
 (defvar comp-subr-arities-h)
 (when (featurep 'native-compile)
   ;; Save the arity for all primitives so the compiler can always
@@ -428,8 +390,6 @@ directory got moved.  This is set to be a pair in the form of:
   (mapatoms (lambda (f)
               (when (subr-primitive-p (symbol-function f))
                 (puthash f (func-arity f) comp-subr-arities-h))))
-  (setq load--bin-dest-dir (cadr (member "--bin-dest" command-line-args)))
-  (setq load--eln-dest-dir (cadr (member "--eln-dest" command-line-args)))
   ;; Set up the mechanism to allow inhibiting native-comp via
   ;; file-local variables.
   (defvar comp--no-native-compile (make-hash-table :test #'equal)))

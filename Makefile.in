@@ -250,11 +250,6 @@ INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_INFO = @INSTALL_INFO@
-ifeq ($(SYSTEM_TYPE),cygwin)
-  INSTALL_ELN = $(INSTALL)
-else
-  INSTALL_ELN = $(INSTALL_DATA)
-endif
 # By default, we uphold the dignity of our programs.
 INSTALL_STRIP =
 MKDIR_P = @MKDIR_P@
@@ -299,14 +294,6 @@ CONFIG_STATUS_FILES_IN = \
 # separately.
 COPYDIR = ${srcdir}/etc ${srcdir}/lisp
 COPYDESTS = "$(DESTDIR)${etcdir}" "$(DESTDIR)${lispdir}"
-
-ifeq (${ns_self_contained},no)
-BIN_DESTDIR='$(DESTDIR)${bindir}/'
-ELN_DESTDIR = $(DESTDIR)${libdir}/emacs/${version}/
-else
-BIN_DESTDIR='${ns_appbindir}/'
-ELN_DESTDIR = ${ns_applibdir}/
-endif
 
 gsettings_SCHEMAS = etc/org.gnu.emacs.defaults.gschema.xml
 
@@ -416,11 +403,11 @@ ifeq ($(HAVE_NATIVE_COMP),yes)
 endif
 
 src: Makefile
-	$(MAKE) -C $@ BIN_DESTDIR='$(BIN_DESTDIR)' ELN_DESTDIR='$(ELN_DESTDIR)' all
+	$(MAKE) -C $@ all
 
 .PHONY: pdump
 pdump: | src
-	$(MAKE) -C src BIN_DESTDIR='$(BIN_DESTDIR)' ELN_DESTDIR='$(ELN_DESTDIR)' install-emacs.pdmp
+	$(MAKE) -C src install-emacs.pdmp
 
 blessmail: Makefile src
 	$(MAKE) -C lib-src maybe-blessmail
@@ -445,10 +432,10 @@ $(srcdir)/configure: $(srcdir)/configure.ac $(srcdir)/m4/*.m4
 	cd $(srcdir) && ./autogen.sh autoconf
 
 .PHONY: install install-arch-dep install-arch-indep install-etcdoc install-info
-.PHONY: install-man install-etc install-strip install-$(NTDIR) install-eln
+.PHONY: install-man install-etc install-strip install-$(NTDIR)
 .PHONY: uninstall uninstall-$(NTDIR)
 
-install: install-arch-indep install-etcdoc install-arch-dep install-$(NTDIR) blessmail install-eln install-gsettings-schemas
+install: install-arch-indep install-etcdoc install-arch-dep install-$(NTDIR) blessmail install-gsettings-schemas
 
 ## Ensure that $subdir contains a subdirs.el file.
 ## Here and elsewhere, we set the umask so that any created files are
@@ -471,7 +458,11 @@ write_subdir=if [ -f "$${subdir}/subdirs.el" ]; \
 install-arch-dep: src pdump install-arch-indep install-etcdoc install-$(NTDIR)
 	umask 022; ${MKDIR_P} "$(DESTDIR)${bindir}"
 	$(MAKE) -C lib-src install
-ifeq (${ns_self_contained},no)
+ifeq (${ns_self_contained},yes)
+	${INSTALL_DATA} src/install-emacs.pdmp "$(DESTDIR)${libexecdir}/Emacs.pdmp"
+	subdir=${ns_appresdir}/site-lisp && ${write_subdir}
+	rm -rf ${ns_appresdir}/share
+else
 	${INSTALL_PROGRAM} $(INSTALL_STRIP) src/emacs${EXEEXT} "$(DESTDIR)${bindir}/$(EMACSFULL)"
 	${INSTALL_DATA} src/install-emacs.pdmp "$(DESTDIR)${libexecdir}/emacs/${version}/${configuration}"/emacs-${EMACS_PDMP}
 	-chmod 755 "$(DESTDIR)${bindir}/$(EMACSFULL)"
@@ -479,10 +470,6 @@ ifndef NO_BIN_LINK
 	rm -f "$(DESTDIR)${bindir}/$(EMACS)"
 	cd "$(DESTDIR)${bindir}" && $(LN_S_FILEONLY) "$(EMACSFULL)" "$(EMACS)"
 endif
-else
-	${INSTALL_DATA} src/install-emacs.pdmp "$(DESTDIR)${libexecdir}/Emacs.pdmp"
-	subdir=${ns_appresdir}/site-lisp && ${write_subdir}
-	rm -rf ${ns_appresdir}/share
 endif
 
 ### Windows-specific install target for installing programs produced
@@ -748,14 +735,6 @@ install-etc:
 	  done ; \
 	done
 
-### Install native compiled Lisp files.
-install-eln: lisp
-ifeq ($(HAVE_NATIVE_COMP),yes)
-	umask 022 ; \
-	find native-lisp -type d -exec $(MKDIR_P) "$(ELN_DESTDIR){}" \; ; \
-	find native-lisp -type f -exec ${INSTALL_ELN} "{}" "$(ELN_DESTDIR){}" \;
-endif
-
 ### Build Emacs and install it, stripping binaries while installing them.
 install-strip:
 	$(MAKE) INSTALL_STRIP=-s install
@@ -768,7 +747,7 @@ uninstall: uninstall-$(NTDIR) uninstall-doc uninstall-gsettings-schemas
 	rm -f "$(DESTDIR)$(includedir)/emacs-module.h"
 	$(MAKE) -C lib-src uninstall
 	-unset CDPATH; \
-	for dir in "$(DESTDIR)${lispdir}" "$(DESTDIR)${etcdir}" "$(ELN_DESTDIR)" ; do 	\
+	for dir in "$(DESTDIR)${lispdir}" "$(DESTDIR)${etcdir}" ; do 	\
 	  if [ -d "$${dir}" ]; then			\
 	    case `cd "$${dir}" ; pwd -P` in		\
 	      "`cd ${srcdir} ; pwd -P`"* ) ;;		\

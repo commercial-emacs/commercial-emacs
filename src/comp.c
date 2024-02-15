@@ -4155,9 +4155,6 @@ compile_function (Lisp_Object func)
 /* Entry points exposed to lisp.  */
 /**********************************/
 
-/* In use by Fcomp_el_to_eln_filename.  */
-static Lisp_Object loadsearch_re_list;
-
 static Lisp_Object
 make_directory_wrapper (Lisp_Object directory)
 {
@@ -4173,75 +4170,23 @@ make_directory_wrapper_1 (Lisp_Object ignore)
 
 DEFUN ("comp-el-to-eln-rel-filename", Fcomp_el_to_eln_rel_filename,
        Scomp_el_to_eln_rel_filename, 1, 1, 0,
-       doc: /* Return the relative name of the .eln file for FILENAME.
-FILENAME must exist, and if it's a symlink, the target must exist.
-If FILENAME is compressed, it must have the \".gz\" extension,
-and Emacs must have been compiled with zlib; the file will be
-uncompressed on the fly to hash its contents.
-Value includes the original base name, followed by 2 hash values,
-one for the file name and another for its contents, followed by .eln.  */)
+       doc: /* Append two hashes to FILENAME, tack on .eln extension.  */)
   (Lisp_Object filename)
 {
-  CHECK_STRING (filename);
-
   /* Resolve possible symlinks in FILENAME, so that path_hash below
      always compares equal. (Bug#44701).  */
-  filename = Fexpand_file_name (filename, Qnil);
-  char *file_normalized = realpath (SSDATA (ENCODE_FILE (filename)), NULL);
-  if (file_normalized)
-    {
-      filename = DECODE_FILE (make_unibyte_string (file_normalized,
-						   strlen (file_normalized)));
-      xfree (file_normalized);
-    }
-
-  if (NILP (Ffile_exists_p (filename)))
-    xsignal1 (Qfile_missing, filename);
-
-#ifdef WINDOWSNT
-  filename = Fw32_long_file_name (filename);
-#endif
-
-  Lisp_Object content_hash = comp_hash_source_file (filename);
 
   if (suffix_p (filename, ".gz"))
     filename = Fsubstring (filename, Qnil, make_fixnum (-3));
 
   /* /absolute/path/filename.el + content
-     -> eln-cache/filename-path_hash-content_hash.eln
+     -> eln-cache/filename-hash-hash.eln
 
      To prevent two different versions of filename.el hashing
      to same eln, included source file content?
 
      Possible to delete all filename-path_hash-* except the most recent?
-
-     A particular .el filename should hash the same regardless whether
-     it originates from PATH_REL_LOADSEARCH (the installed path) or
-     PATH_DUMPLOADSEARCH (the repository path).  To that end, we
-     collapse both "epaths" string constants to "//".
   */
-
-  if (NILP (loadsearch_re_list))
-    {
-      Lisp_Object sys_re =
-	concat2 (build_string ("\\`[[:ascii:]]+"),
-		 Fregexp_quote (build_string ("/" PATH_REL_LOADSEARCH "/")));
-      Lisp_Object dump_load_search =
-	Fexpand_file_name (build_string (PATH_DUMPLOADSEARCH "/"), Qnil);
-#ifdef WINDOWSNT
-      dump_load_search = Fw32_long_file_name (dump_load_search);
-#endif
-      loadsearch_re_list = list2 (sys_re, Fregexp_quote (dump_load_search));
-    }
-
-  Lisp_Object lds_re_tail = loadsearch_re_list;
-  FOR_EACH_TAIL (lds_re_tail)
-    if (EQ (make_fixnum (0),
-	    Fstring_match (XCAR (lds_re_tail), filename, Qnil, Qnil)))
-      {
-	filename = Freplace_match (build_string ("//"), Qt, Qt, filename, Qnil);
-	break;
-      }
 
   Lisp_Object separator = build_string ("-");
   return Fconcat
@@ -5006,7 +4951,7 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump,
     = dynlib_sym (handle,
 		  late_load ? "late_top_level_run" : "top_level_run");
 
-  /* Always set data_imp_relocs pointer in the compilation unit (in can be
+  /* Always set data_imp_relocs pointer in the compilation unit (it can be
      used in 'dump_do_dump_relocation').  */
   comp_u->data_imp_relocs = dynlib_sym (handle, DATA_RELOC_IMPURE_SYM);
 
@@ -5061,7 +5006,7 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump,
 
   if (!loading_dump)
     {
-      /* Note: data_ephemeral_vec is not GC protected except than by
+      /* Note: data_ephemeral_vec is not GC protected except by
 	 this function frame.  After this functions will be
 	 deactivated GC will be free to collect it, but it MUST
 	 survive till 'top_level_run' has finished his job.  We store
@@ -5439,8 +5384,6 @@ natively-compiled one.  */);
   staticpro (&comp.func_blocks_h);
   staticpro (&comp.emitter_dispatcher);
   comp.emitter_dispatcher = Qnil;
-  staticpro (&loadsearch_re_list);
-  loadsearch_re_list = Qnil;
 
   DEFVAR_LISP ("comp-ctxt", Vcomp_ctxt,
 	       doc: /* The compiler context.  */);

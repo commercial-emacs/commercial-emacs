@@ -10685,8 +10685,7 @@ w32_my_exename (void)
   return exename;
 }
 
-/* Emulate Posix 'realpath'.  This is needed in
-   comp-el-to-eln-rel-filename.  */
+/* Emulate Posix 'realpath'.  */
 char *
 realpath (const char *file_name, char *resolved_name)
 {

@@ -499,8 +499,7 @@ define pdump
 	$(AM_V_at)rm -f $(1)
 	LC_ALL=C ../src/$(1:.pdmp=)$(EXEEXT) --batch $(BUILD_DETAILS) \
 	  $(PDUMPER_OVERWRITE) -l ../admin/$(1:emacs.pdmp=pdump) \
-	  --pdump-write=$1 $(if $(BIN_DESTDIR),--bin-dest $(BIN_DESTDIR),) \
-	  $(if $(ELN_DESTDIR),--eln-dest $(ELN_DESTDIR),)$(2)
+	  --pdump-write=$1$(2)
 endef
 
 define byte-compile-loaded

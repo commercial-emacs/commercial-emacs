@@ -47,7 +47,6 @@
 (declare-function comp--init-ctxt "comp.c")
 (declare-function comp--release-ctxt "comp.c")
 (declare-function comp-el-to-eln-filename "comp.c")
-(declare-function comp-el-to-eln-rel-filename "comp.c")
 (declare-function native-elisp-load "comp.c")
 
 (defgroup comp nil
@@ -3433,21 +3432,6 @@ Wtf is late loading."
                 (when (subr-primitive-p (symbol-function f))
                   (message "Compiling trampoline for: %s" f)
                   (comp-trampoline-compile f))))))
-
-;;;###autoload
-(defun comp-lookup-eln (filename)
-  "Given a Lisp source FILENAME return the corresponding .eln file if found.
-Search happens in `native-comp-eln-load-path'."
-  (cl-loop
-   with eln-filename = (comp-el-to-eln-rel-filename filename)
-   for dir in native-comp-eln-load-path
-   for f = (expand-file-name eln-filename
-                             (expand-file-name comp-native-version-dir
-                                               (expand-file-name
-                                                dir
-                                                invocation-directory)))
-   when (file-exists-p f)
-     do (cl-return f)))
 
 ;;;###autoload
 (defun native-compile (function-or-file &optional output)

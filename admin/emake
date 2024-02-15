@@ -111,7 +111,6 @@ GEN.*loaddefs|\
 ^\"configure\" file built.|\
 ^There seems to be no|\
 ^config.status:|\
-ELN_DESTDIR|\
 --bin-dest |\
 ^ *$|\
 ^Makefile built|\

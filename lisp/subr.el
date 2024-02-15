@@ -2988,7 +2988,6 @@ This is to `put' what `defalias' is to `fset'."
 (declare-function subr-native-elisp-p "data.c")
 (declare-function native-comp-unit-file "data.c")
 (declare-function subr-native-comp-unit "data.c")
-(declare-function comp-el-to-eln-rel-filename "comp.c")
 
 (defun locate-eln-file (eln-file)
   "Locate a natively-compiled ELN-FILE by searching its load path.
@@ -3003,20 +3002,15 @@ This function looks in directories named by `native-comp-eln-load-path'."
        (last native-comp-eln-load-path))))
 
 (defun symbol-file (symbol &optional type)
-  "Return the name of the file that defined SYMBOL.
-The value is normally an absolute file name.  It can also be nil,
-if the definition is not associated with any file.  If SYMBOL
-specifies an autoloaded function, the value can be a relative
-file name without extension.
+  "Returns the elisp file that defined SYMBOL.
+The return value is an extension-less relative file name for autoloaded
+functions, and an absolute file name otherwise.
 
-If TYPE is nil, then any kind of definition is acceptable.  If
-TYPE is `defun', `defvar', or `defface', that specifies function
-definition, variable definition, or face definition only.
-Otherwise TYPE is assumed to be a symbol property.
+A non-nil TYPE of `defun', `defvar', or `defface' restricts
+the search accordingly.  TYPE can also specify the symbolic key
+for entries in the `load-history' alist.
 
-This function only works for symbols defined in Lisp files.  For
-symbols that are defined in C files, use `help-C-file-name'
-instead."
+Use `help-C-file-name' for symbols defined in C."
   (declare (important-return-value t))
   (if (and (or (null type) (eq type 'defun))
 	   (symbolp symbol)
@@ -3030,15 +3024,13 @@ instead."
 		      (member symbol elems)
 		    ;; Many other types are represented as (TYPE . NAME).
 		    (or (member (cons type symbol) elems)
-                        (memq symbol (alist-get type
-                                                (alist-get 'define-symbol-props
-                                                           elems)))))
+                        (memq symbol (alist-get type (alist-get 'define-symbol-props
+								elems)))))
 	        ;; We accept all types, so look for variable def
 	        ;; and then for any other kind.
 	        (or (member symbol elems)
-                    (let ((match (rassq symbol elems)))
-		      (and match
-		           (not (eq 'require (car match)))))))
+                    (when-let ((match (rassq symbol elems)))
+		      (not (eq 'require (car match))))))
           (throw 'found file))))))
 
 (declare-function read-library-name "find-func" nil)

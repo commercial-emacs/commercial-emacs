@@ -4269,17 +4269,6 @@ pdumper_remember_lv_ptr_raw_impl (void *ptr, enum Lisp_Type type)
   pdumper_remember_user_data_1 (ptr, -type);
 }
 
-
-#ifdef HAVE_NATIVE_COMP
-/* This records the directory where the Emacs executable lives, to be
-   used for locating the native-lisp directory from which we need to
-   load the preloaded *.eln files.  See pdumper_set_emacs_execdir
-   below.  */
-static char *emacs_execdir;
-static ptrdiff_t execdir_size;
-static ptrdiff_t execdir_len;
-#endif
-
 /* Dump runtime */
 enum dump_memory_protection
 {
@@ -5190,64 +5179,20 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 #ifdef HAVE_NATIVE_COMP
     case RELOC_NATIVE_COMP_UNIT:
       {
-	static enum { UNKNOWN, LOCAL_BUILD, INSTALLED } installation_state;
 	struct Lisp_Native_Comp_Unit *comp_unit =
 	  dump_ptr (dump_base, reloc_offset);
 	comp_unit->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
-	if (STRINGP (comp_unit->file))
-	  error ("trying to load incoherent dumped eln file %s",
-		 SSDATA (comp_unit->file));
-
-	if (!CONSP (comp_unit->file))
-	  error ("incoherent compilation unit for dump was dumped");
-
-	Lisp_Object eln_fname;
-	Lisp_Object fn1 = ENCODE_FILE (XCAR (comp_unit->file));
-	Lisp_Object fn2 = ENCODE_FILE (XCDR (comp_unit->file));
-	ptrdiff_t fn1_len = SBYTES (fn1), fn2_len = SBYTES (fn2);
-
-	if (installation_state == UNKNOWN)
-	  {
-	    eln_fname = make_unibyte_string (NULL, execdir_len + fn1_len);
-	    char *fndata = SSDATA (eln_fname);
-	    memcpy (fndata, emacs_execdir, execdir_len);
-	    memcpy (fndata + execdir_len, SSDATA (fn1), fn1_len);
-	    if (file_access_p (fndata, F_OK))
-	      installation_state = INSTALLED;
-	    else
-	      {
-		eln_fname = make_unibyte_string (NULL, execdir_len + fn2_len);
-		fndata = SSDATA (eln_fname);
-		memcpy (fndata, emacs_execdir, execdir_len);
-		memcpy (fndata + execdir_len, SSDATA (fn2), fn2_len);
-		installation_state = LOCAL_BUILD;
-	      }
-	  }
-	else
-	  {
-	    const ptrdiff_t fn_len =
-	      installation_state == INSTALLED ? fn1_len : fn2_len;
-	    const Lisp_Object file =
-	      installation_state == INSTALLED ? fn1 : fn2;
-	    eln_fname = make_unibyte_string (NULL, execdir_len + fn_len);
-	    char *fndata = SSDATA (eln_fname);
-	    memcpy (fndata, emacs_execdir, execdir_len);
-	    memcpy (fndata + execdir_len, SSDATA (file), fn_len);
-	  }
-
-	comp_unit->file = eln_fname;
-	comp_unit->handle = dynlib_open_for_eln (SSDATA (eln_fname));
+	if (!STRINGP (comp_unit->file))
+	  error ("bad compilation unit was dumped");
+	comp_unit->handle = dynlib_open_for_eln (SSDATA (comp_unit->file));
 	if (!comp_unit->handle)
-	  error ("%s: %s", emacs_execdir, dynlib_error ());
+	  error ("%s: %s", SSDATA (comp_unit->file), dynlib_error ());
 	load_comp_unit (comp_unit, true, false);
 	break;
       }
     case RELOC_NATIVE_SUBR:
       {
-	/* When resurrecting from a dump given non all the original
-	   native compiled subrs may be still around we can't rely on
-	   a 'top_level_run' mechanism, we revive them one-by-one
-	   here.  */
+	/* Revive them one-by-one.  */
 	struct Lisp_Subr *subr = dump_ptr (dump_base, reloc_offset);
 	struct Lisp_Native_Comp_Unit *comp_unit =
 	  XNATIVE_COMP_UNIT (subr->native_comp_u);
@@ -5262,11 +5207,10 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 	subr->function.a0 = func;
 	Lisp_Object lambda_data_idx =
 	  Fgethash (build_string (c_name), comp_unit->lambda_c_name_idx_h, Qnil);
-	if (! NILP (lambda_data_idx))
+	if (!NILP (lambda_data_idx))
 	  {
-	    /* This is an anonymous lambda.
-	       We must fixup d_reloc_imp so the lambda can be referenced
-	       by code.  */
+	    /* This is an anonymous lambda.  We must fixup d_reloc_imp
+	       so the lambda can be referenced by code.  */
 	    Lisp_Object tem;
 	    XSETSUBR (tem, subr);
 	    Lisp_Object *fixup =
@@ -5366,26 +5310,6 @@ dump_do_all_emacs_relocations (const struct dump_header *const header,
     dump_do_emacs_relocation (dump_base, r[i]);
 }
 
-#ifdef HAVE_NATIVE_COMP
-/* Compute and record the directory of the Emacs executable given the
-   file name of that executable.  */
-static void
-pdumper_set_emacs_execdir (char *emacs_executable)
-{
-  char *p = emacs_executable + strlen (emacs_executable);
-
-  while (p > emacs_executable
-	 && !IS_DIRECTORY_SEP (p[-1]))
-    --p;
-  eassert (p > emacs_executable);
-  emacs_execdir = xpalloc (emacs_execdir, &execdir_size,
-			   p - emacs_executable + 1 - execdir_size, -1, 1);
-  memcpy (emacs_execdir, emacs_executable, p - emacs_executable);
-  execdir_len = p - emacs_executable;
-  emacs_execdir[execdir_len] = '\0';
-}
-#endif
-
 enum dump_section
   {
    DS_HOT,
@@ -5402,7 +5326,7 @@ static Lisp_Object *pdumper_hashes = &zero_vector;
    N.B. We run very early in initialization, so we can't use lisp,
    unwinding, xmalloc, and so on.  */
 int
-pdumper_load (char *dump_filename, char *argv0)
+pdumper_load (char *dump_filename)
 {
   intptr_t dump_size;
   struct stat stat;
@@ -5557,12 +5481,6 @@ pdumper_load (char *dump_filename, char *argv0)
      initialization.  */
   for (int i = 0; i < nr_dump_hooks; ++i)
     dump_hooks[i] ();
-
-#ifdef HAVE_NATIVE_COMP
-  pdumper_set_emacs_execdir (argv0);
-#else
-  (void) argv0;
-#endif
 
   dump_do_all_dump_reloc_for_phase (header, dump_base, LATE_RELOCS);
   dump_do_all_dump_reloc_for_phase (header, dump_base, VERY_LATE_RELOCS);

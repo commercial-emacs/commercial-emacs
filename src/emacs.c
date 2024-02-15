@@ -956,7 +956,7 @@ load_pdump (int argc, char **argv, char *emacs_executable)
 		 path_exec, DIRECTORY_SEP, argv0_base, suffix);
     }
 
-  result = pdumper_load (pdump_file, emacs_executable);
+  result = pdumper_load (pdump_file);
   if (buflen)
     xfree (pdump_file);
   return result;
