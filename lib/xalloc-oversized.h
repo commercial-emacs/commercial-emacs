@@ -29,7 +29,8 @@
    is SIZE_MAX - 1.  */
 #define __xalloc_oversized(n, s) \
   ((s) != 0 \
-   && (PTRDIFF_MAX < SIZE_MAX ? PTRDIFF_MAX : SIZE_MAX - 1) / (s) < (n))
+   && ((size_t) (PTRDIFF_MAX < SIZE_MAX ? PTRDIFF_MAX : SIZE_MAX - 1) / (s) \
+       < (n)))
 
 /* Return 1 if and only if an array of N objects, each of size S,
    cannot exist reliably because its total size in bytes would exceed

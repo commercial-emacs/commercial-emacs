@@ -428,7 +428,11 @@ _GL_CXXALIAS_SYS (ctime, char *, (time_t const *__tp));
 _GL_CXXALIASWARN (ctime);
 #  endif
 # elif defined GNULIB_POSIXCHECK
-/* No need to warn about portability, as a more serious warning is below.  */
+#  undef ctime
+#  if HAVE_RAW_DECL_CTIME
+_GL_WARN_ON_USE (ctime, "ctime has portability problems - "
+                 "use gnulib module ctime for portability");
+#  endif
 # endif
 
 /* Convert *TP to a date and time string.  See
