@@ -556,6 +556,17 @@ the updated value."
     (setq startup--original-eln-load-path
           (copy-sequence native-comp-eln-load-path))))
 
+(defun startup--rescale-elt-match-p (font-pattern font-object)
+  "Test whether FONT-OBJECT matches an element of `face-font-rescale-alist'.
+FONT-OBJECT is a font-object that specifies a font to test.
+FONT-PATTERN is the car of an element of `face-font-rescale-alist',
+which can be either a regexp matching a font name or a font-spec."
+  (if (stringp font-pattern)
+      ;; FONT-PATTERN is a regexp, we need the name of FONT-OBJECT to match.
+      (string-match-p font-pattern (font-xlfd-name font-object))
+    ;; FONT-PATTERN is a font-spec.
+    (font-match-p font-pattern font-object)))
+
 (defun normal-top-level ()
   "Emacs calls this function when it first starts up.
 It sets `command-line-processed', processes the command-line,
@@ -778,8 +789,9 @@ It is the default value of the variable `top-level'."
 	  (when (and (display-multi-font-p)
                      (not (eq face-font-rescale-alist
 		              old-face-font-rescale-alist))
-                     (assoc (font-xlfd-name (face-attribute 'default :font))
-                            face-font-rescale-alist #'string-match-p))
+                     (assoc (face-attribute 'default :font)
+                            face-font-rescale-alist
+                            #'startup--rescale-elt-match-p))
 	    (set-face-attribute 'default nil :font (font-spec)))
 
 	  ;; Modify the initial frame based on what .emacs puts into
