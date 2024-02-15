@@ -778,8 +778,9 @@ It is the default value of the variable `top-level'."
 	  (when (and (display-multi-font-p)
                      (not (eq face-font-rescale-alist
 		              old-face-font-rescale-alist))
-                     (assoc (font-xlfd-name (face-attribute 'default :font))
-                            face-font-rescale-alist #'string-match-p))
+                     (assoc (face-attribute 'default :font)
+                            face-font-rescale-alist
+                            #'startup--rescale-elt-match-p))
 	    (set-face-attribute 'default nil :font (font-spec)))
 
 	  ;; Modify the initial frame based on what .emacs puts into
