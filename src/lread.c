@@ -1140,25 +1140,6 @@ close_infile_unwind (void *arg)
   infile = prev_infile;
 }
 
-/* Workaround for native comp horseshit that recovers .elc from
-   .eln.  */
-
-static Lisp_Object
-elc_if_eln (Lisp_Object found)
-{
-  /* Reconstruct the .elc filename.  */
-  Lisp_Object src_name =
-    Fgethash (Ffile_name_nondirectory (found), Vcomp_eln_to_el_h, Qnil);
-
-  if (NILP (src_name))
-    /* Manual eln load.  */
-    return found;
-
-  if (suffix_p (src_name, "el.gz"))
-    src_name = Fsubstring (src_name, make_fixnum (0), make_fixnum (-3));
-  return concat2 (src_name, build_string ("c"));
-}
-
 static void
 loadhist_initialize (Lisp_Object filename)
 {
@@ -1168,49 +1149,32 @@ loadhist_initialize (Lisp_Object filename)
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
        doc: /* Execute a file of Lisp code named FILE.
-First try FILE with '.elc' appended, then try with '.el', then try
-with a system-dependent suffix of dynamic modules (see `load-suffixes'),
-then try FILE unmodified (the exact suffixes in the exact order are
-determined by `load-suffixes').  Environment variable references in
-FILE are replaced with their values by calling `substitute-in-file-name'.
-This function searches the directories in `load-path'.
+Iterates over directories in `load-path' to find FILE.  The variable
+`load-suffixes' specifies the order in which suffixes to FILE are tried
+(usually FILE.{so,dylib}[.gz], then FILE.elc[.gz], then FILE.el[.gz]).
 
-If optional second arg NOERROR is non-nil,
-report no error if FILE doesn't exist.
-Print messages at start and end of loading unless
-optional third arg NOMESSAGE is non-nil (but `force-load-messages'
-overrides that).
-If optional fourth arg NOSUFFIX is non-nil, don't try adding
-suffixes to the specified name FILE.
-If optional fifth arg MUST-SUFFIX is non-nil, insist on
-the suffix `.elc' or `.el' or the module suffix; don't accept just
-FILE unless it ends in one of those suffixes or includes a directory name.
+The empty suffix is tried last.  Under NOSUFFIX, only the empty suffix
+is tried.  Under MUST-SUFFIX, the empty suffix is not tried.
+MUST-SUFFIX is ignored if FILE already ends in one of `load-suffixes' or
+if FILE includes a directory.
 
-If NOSUFFIX is nil, then if a file could not be found, try looking for
-a different representation of the file by adding non-empty suffixes to
-its name, before trying another file.  Emacs uses this feature to find
-compressed versions of files when Auto Compression mode is enabled.
-If NOSUFFIX is non-nil, disable this feature.
+Ordinarily the search ends with the first found variant of FILE.  Under
+`load-prefer-newer' however, the search continues for all variants to
+determine the one most recently modified.
 
-The suffixes that this function tries out, when NOSUFFIX is nil, are
-given by the return value of `get-load-suffixes' and the values listed
-in `load-file-rep-suffixes'.  If MUST-SUFFIX is non-nil, only the
-return value of `get-load-suffixes' is used, i.e. the file name is
-required to have a non-empty suffix.
+Signals an error if a FILE variant cannot be found unless NOERROR.
 
-When searching suffixes, this function normally stops at the first
-one that exists.  If the option `load-prefer-newer' is non-nil,
-however, it tries all suffixes, and uses whichever file is the newest.
+Bookends loading with status messages unless NOMESSAGE (although
+`force-load-messages' overrides).
 
-Loading a file records its definitions, and its `provide' and
-`require' calls, in an element of `load-history' whose
-car is the file name loaded.  See `load-history'.
+During the actual loading of the FILE variant, the variable
+`load-in-progress' is set true, and the variable `load-file-name' is
+assigned the variant's file name.
 
-While the file is in the process of being loaded, the variable
-`load-in-progress' is non-nil and the variable `load-file-name'
-is bound to the file's name.
+Environment variables in FILE are interpolated with
+`substitute-in-file-name'.
 
-Return t if the file exists and loads successfully.  */)
+Return t if on success.  */)
   (Lisp_Object file, Lisp_Object noerror, Lisp_Object nomessage,
    Lisp_Object nosuffix, Lisp_Object must_suffix)
 {
@@ -1246,8 +1210,6 @@ Return t if the file exists and loads successfully.  */)
     }
   else
     file = Fsubstitute_in_file_name (file);
-
-  bool no_native = suffix_p (file, ".elc");
 
   /* Avoid weird lossage with null string as arg,
      since it would try to load a directory as a Lisp file.  */
@@ -1291,8 +1253,7 @@ Return t if the file exists and loads successfully.  */)
 	  if (NILP (must_suffix))
 	    suffixes = CALLN (Fappend, suffixes, Vload_file_rep_suffixes);
 	}
-      fd = openp (Vload_path, file, suffixes, &found, Qnil, load_prefer_newer,
-		  no_native);
+      fd = openp (Vload_path, file, suffixes, &found, Qnil, load_prefer_newer);
     }
 
   if (fd == -1)
@@ -1353,11 +1314,7 @@ Return t if the file exists and loads successfully.  */)
   bool is_module = false;
 #endif
 
-#ifdef HAVE_NATIVE_COMP
-  bool is_native_elisp = suffix_p (found, NATIVE_ELISP_SUFFIX);
-#else
-  bool is_native_elisp = false;
-#endif
+  bool is_native_lisp = suffix_p (found, NATIVE_ELISP_SUFFIX);
 
   /* Check if we're stuck in a recursive load cycle.
 
@@ -1383,7 +1340,12 @@ Return t if the file exists and loads successfully.  */)
      override.  */
   specbind (Qlexical_binding, Qnil);
 
-  hist_file_name = is_native_elisp ? elc_if_eln (found) : found;
+  /* Workaround for native comp horseshit since load-history still
+     keys off .elc, not .eln */
+  hist_file_name = is_native_lisp
+    ? concat2 (Fsubstring (found, make_fixnum (0), make_fixnum (-1)),
+	       build_string ("c"))
+    : found;
   version = -1;
 
   /* Check for the presence of unescaped character literals and warn
@@ -1412,14 +1374,12 @@ Return t if the file exists and loads successfully.  */)
 	      && !load_prefer_newer
 	      && 0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s1, 0))
             {
-	      bool report_newer;
 	      SSET (efound, SBYTES (efound) - 1, 0); /* .elc to .el */
-              report_newer = (0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s2, 0)
-			      && 0 > timespec_cmp (get_stat_mtime (&s1),
-						   get_stat_mtime (&s2)));
-	      SSET (efound, SBYTES (efound) - 1, 'c'); /* back to .elc from .el */
-              if (report_newer)
+              if (0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s2, 0)
+		  && 0 > timespec_cmp (get_stat_mtime (&s1),
+				       get_stat_mtime (&s2)))
 		message_with_string ("Loading %s despite modified .el", found, 1);
+	      SSET (efound, SBYTES (efound) - 1, 'c'); /* back to .elc from .el */
             }
 	}
     }
@@ -1605,104 +1565,52 @@ directories, make sure the PREDICATE function returns `dir-ok' for them.  */)
   (Lisp_Object filename, Lisp_Object path, Lisp_Object suffixes, Lisp_Object predicate)
 {
   Lisp_Object file;
-  int fd = openp (path, filename, suffixes, &file, predicate, false, true);
+  int fd = openp (path, filename, suffixes, &file, predicate, false);
   if (NILP (predicate) && fd >= 0)
     emacs_close (fd);
   return file;
 }
 
-#ifdef HAVE_NATIVE_COMP
-/* Populate *FILENAME and *FD with .eln generated after MTIME. */
-static void
-maybe_swap_for_eln (Lisp_Object *filename, int *fd, struct timespec mtime)
-{
-  Fremhash (*filename, V_comp_no_native_file_h);
-  if (!suffix_p (*filename, ".elc"))
-    return;
-  Lisp_Object el = Fsubstring (*filename, Qnil, make_fixnum (-1));
-  if (!NILP (Ffile_exists_p (el))
-      || !NILP (Ffile_exists_p (concat2 (el, build_string (".gz")))))
-    {
-      Lisp_Object eln_rel = Fcomp_el_to_eln_rel_filename (el);
-      Lisp_Object tail = Vnative_comp_eln_load_path;
-      FOR_EACH_TAIL_SAFE (tail)
-	{
-	  Lisp_Object path = XCAR (tail);
-	  Lisp_Object eln = Fexpand_file_name
-	    (eln_rel, Fexpand_file_name (Vcomp_native_version_dir, path));
-	  int eln_fd = emacs_open (SSDATA (ENCODE_FILE (eln)), O_RDONLY, 0);
-	  if (eln_fd > 0)
-	    {
-	      struct stat eln_st;
-	      if (0 == fstat (eln_fd, &eln_st)
-		  && !S_ISDIR (eln_st.st_mode))
-		{
-		  struct timespec eln_mtime = get_stat_mtime (&eln_st);
-		  if (timespec_cmp (eln_mtime, mtime) >= 0)
-		    {
-		      emacs_close (*fd);
-		      *fd = eln_fd;
-		      *filename = eln;
-		      Fputhash (Ffile_name_nondirectory (eln),
-				el, Vcomp_eln_to_el_h);
-		      break;
-		    }
-		}
-	      emacs_close (eln_fd);
-	    }
-	}
-    }
-}
-#endif
+/* Ridiculousness originating with Blandy then continually made worse.
 
-/* Search for a file whose name is STR, looking in directories
-   in the Lisp list PATH, and trying suffixes from SUFFIX.
-   On success, return a file descriptor (or 1 or -2 as described below).
-   On failure, return -1 and set errno.
+   Ostensibly returns first file descriptor found in PATH for STR or STR
+   catenated with one of SUFFIXES.
 
-   SUFFIXES is a list of strings containing possible suffixes.
-   The empty suffix is automatically added if the list is empty.
+   PREDICATE is a lisp function, t, or a fixnum passed to access().  A
+   non-nil PREDICATE has the important side effect of avoiding opening
+   files -- useful when files are problematic (binary).  A trivial
+   PREDICATE of t is only interested in this side effect.
 
-   PREDICATE t means the files are binary.
-   PREDICATE non-nil and non-t means don't open the files,
-   just look for one that satisfies the predicate.  In this case,
-   return -2 on success.  The predicate can be a lisp function or
-   an integer to pass to `access' (in which case file-name-handlers
-   are ignored).
+   If NEWER, finds all such descriptors and returns the most recently
+   modified.  NEWER is ignored for remote files, and for calls where
+   PREDICATE is neither nil nor t (a historical and arbitrary
+   distinction).
 
-   If STOREPTR is nonzero, it points to a slot where the name of
-   the file actually found should be stored as a Lisp string.
-   nil is stored there on failure.
+   A non-null STOREPTR is populated with the found file name as a Lisp
+   string, or nil if not found.
 
-   If the file we find is remote, return -2
-   but store the found remote file name in *STOREPTR.
+   Return -2 if the file found is remote.
 
-   If NEWER is true, try all SUFFIXes and return the result for the
-   newest file that exists.  Does not apply to remote files,
-   or if a non-nil and non-t PREDICATE is specified.
-
-   if NO_NATIVE is true do not try to load native code.  */
+   Return -2 if PREDICATE is satisfied.
+*/
 
 int
 openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
-       Lisp_Object *storeptr, Lisp_Object predicate, bool newer,
-       bool no_native)
+       Lisp_Object *storeptr, Lisp_Object predicate, bool newer)
 {
   ptrdiff_t fn_size = 100;
   char buf[100];
   char *fn = buf;
   bool absolute;
   ptrdiff_t want_length;
-  Lisp_Object filename;
-  Lisp_Object string, tail, encoded_fn, save_string;
+  Lisp_Object filename, string, tail, encoded_fn, best_string;
   ptrdiff_t max_suffix_len = 0;
   int last_errno = ENOENT;
-  int save_fd = -1;
+  int best_fd = -1;
   USE_SAFE_ALLOCA;
 
-  /* The last-modified time of the newest matching file found.
-     Initialize it to something less than all valid timestamps.  */
-  struct timespec save_mtime = make_timespec (TYPE_MINIMUM (time_t), -1);
+  /* Initial value less than all valid timestamps.  */
+  struct timespec best_mtime = make_timespec (TYPE_MINIMUM (time_t), -1);
 
   CHECK_STRING (str);
 
@@ -1710,11 +1618,10 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
   FOR_EACH_TAIL_SAFE (tail)
     {
       CHECK_STRING_CAR (tail);
-      max_suffix_len = max (max_suffix_len,
-			    SBYTES (XCAR (tail)));
+      max_suffix_len = max (max_suffix_len, SBYTES (XCAR (tail)));
     }
 
-  string = filename = encoded_fn = save_string = Qnil;
+  string = filename = encoded_fn = best_string = Qnil;
 
   if (storeptr)
     *storeptr = Qnil;
@@ -1725,29 +1632,23 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
   if (NILP (path))
     path = just_use_str;
 
-  /* Go through all entries in the path and see whether we find the
-     executable. */
   FOR_EACH_TAIL_SAFE (path)
    {
-    ptrdiff_t baselen, prefixlen;
+     ptrdiff_t baselen, prefixlen;
 
     if (EQ (path, just_use_str))
       filename = str;
     else
       filename = Fexpand_file_name (str, XCAR (path));
-    if (!complete_filename_p (filename))
-      /* If there are non-absolute elts in PATH (eg ".").  */
-      /* Of course, this could conceivably lose if luser sets
-	 default-directory to be something non-absolute...  */
+
+    if (!complete_filename_p (filename)) // not absolute file name
       {
 	filename = Fexpand_file_name (filename, BVAR (current_buffer, directory));
 	if (!complete_filename_p (filename))
-	  /* Give up on this path element!  */
 	  continue;
       }
 
-    /* Calculate maximum length of any filename made from
-       this path element/specified file name and any possible suffix.  */
+    /* Ensure FN big enough.  */
     want_length = max_suffix_len + SBYTES (filename);
     if (fn_size <= want_length)
       {
@@ -1771,20 +1672,39 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 	Lisp_Object suffix = XCAR (tail);
 	ptrdiff_t fnlen, lsuffix = SBYTES (suffix);
 	Lisp_Object handler;
+	int fd = -1;
 
 	/* Make complete filename by appending SUFFIX.  */
 	memcpy (fn + baselen, SDATA (suffix), lsuffix + 1);
 	fnlen = baselen + lsuffix;
 
 	if (!STRING_MULTIBYTE (filename) && !STRING_MULTIBYTE (suffix))
-	  /* Strongly prefer raw unibyte to let loadup decide (loadup
-	     switches between several default-file-name-coding-system).  */
+	  /* Prefer unibyte to let loadup decide (loadup switches
+	     between several default-file-name-coding-system).  */
 	  string = make_unibyte_string (fn, fnlen);
 	else
 	  string = make_string (fn, fnlen);
 	handler = Ffind_file_name_handler (string, Qfile_exists_p);
-	if ((!NILP (handler) || (!NILP (predicate) && !EQ (predicate, Qt)))
-	    && !FIXNATP (predicate))
+	if (FIXNATP (predicate))
+	  {
+	    encoded_fn = ENCODE_FILE (string);
+	    const char *pfn = SSDATA (encoded_fn);
+
+	    if (INT_MAX < XFIXNAT (predicate))
+	      last_errno = EINVAL;
+	    else if (0 == faccessat (AT_FDCWD, pfn, XFIXNAT (predicate), AT_EACCESS))
+	      {
+		if (file_directory_p (encoded_fn))
+		  last_errno = EISDIR;
+		else if (errno == ENOENT || errno == ENOTDIR)
+		  fd = 1;
+		else
+		  last_errno = errno;
+	      }
+	    else if (!(errno == ENOENT || errno == ENOTDIR))
+	      last_errno = errno;
+	  }
+	else if (!NILP (handler) || (!NILP (predicate) && !EQ (predicate, Qt)))
 	  {
 	    bool exists;
 	    if (NILP (predicate) || EQ (predicate, Qt))
@@ -1806,129 +1726,79 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 
 	    if (exists)
 	      {
-		/* We succeeded; return this descriptor and filename.  */
-		if (storeptr)
-		  *storeptr = string;
-		SAFE_FREE ();
-		return -2;
+		best_string = string;
+		best_fd = -2;
+		goto openp_out;
 	      }
+	    eassume (fd == -1 && best_fd == -1);
 	  }
 	else
 	  {
-	    int fd;
-	    const char *pfn;
-	    struct stat st;
-
 	    encoded_fn = ENCODE_FILE (string);
-	    pfn = SSDATA (encoded_fn);
+	    const char *pfn = SSDATA (encoded_fn);
 
-	    /* Check that we can access or open it.  */
-	    if (FIXNATP (predicate))
+	    /*  In some systems (like Windows) finding out if a
+		file exists is cheaper to do than actually opening
+		it.  Only open the file when we are sure that it
+		exists.  */
+#ifdef WINDOWSNT
+	    if (faccessat (AT_FDCWD, pfn, R_OK, AT_EACCESS))
+	      fd = -1;
+	    else
+#endif
+	      fd = emacs_open (pfn, O_RDONLY, 0);
+
+	    if (fd < 0)
 	      {
-		fd = -1;
-		if (INT_MAX < XFIXNAT (predicate))
-		  last_errno = EINVAL;
-		else if (faccessat (AT_FDCWD, pfn, XFIXNAT (predicate),
-				    AT_EACCESS)
-			 == 0)
-		  {
-		    if (file_directory_p (encoded_fn))
-		      last_errno = EISDIR;
-		    else if (errno == ENOENT || errno == ENOTDIR)
-		      fd = 1;
-		    else
-		      last_errno = errno;
-		  }
-		else if (!(errno == ENOENT || errno == ENOTDIR))
+		if (!(errno == ENOENT || errno == ENOTDIR))
 		  last_errno = errno;
 	      }
 	    else
 	      {
-                /*  In some systems (like Windows) finding out if a
-                    file exists is cheaper to do than actually opening
-                    it.  Only open the file when we are sure that it
-                    exists.  */
-#ifdef WINDOWSNT
-                if (faccessat (AT_FDCWD, pfn, R_OK, AT_EACCESS))
-                  fd = -1;
-                else
-#endif
-                  fd = emacs_open (pfn, O_RDONLY, 0);
-
-		if (fd < 0)
+		struct stat st;
+		int err = (fstat (fd, &st) != 0
+			   ? errno
+			   : S_ISDIR (st.st_mode)
+			   ? EISDIR
+			   : 0);
+		if (err)
 		  {
-		    if (!(errno == ENOENT || errno == ENOTDIR))
-		      last_errno = errno;
+		    last_errno = err;
+		    emacs_close (fd);
+		    fd = -1;
 		  }
-		else
-		  {
-		    int err = (fstat (fd, &st) != 0 ? errno
-			       : S_ISDIR (st.st_mode) ? EISDIR : 0);
-		    if (err)
-		      {
-			last_errno = err;
-			emacs_close (fd);
-			fd = -1;
-		      }
-		  }
-	      }
-
-	    if (fd >= 0)
-	      {
-		if (newer && !FIXNATP (predicate))
-		  {
-		    struct timespec mtime = get_stat_mtime (&st);
-
-		    if (timespec_cmp (mtime, save_mtime) <= 0)
-		      emacs_close (fd);
-		    else
-		      {
-			if (0 <= save_fd)
-			  emacs_close (save_fd);
-			save_fd = fd;
-			save_mtime = mtime;
-			save_string = string;
-		      }
-		  }
-		else
-		  {
-#ifdef HAVE_NATIVE_COMP
-		    if (no_native || load_no_native)
-		      Fputhash (string, Qt, V_comp_no_native_file_h);
-		    else
-		      maybe_swap_for_eln (&string, &fd, get_stat_mtime (&st));
-#endif
-		    /* We succeeded; return this descriptor and filename.  */
-		    if (storeptr)
-		      *storeptr = string;
-		    SAFE_FREE ();
-		    return fd;
-		  }
-	      }
-
-	    /* No more suffixes.  Return the newest.  */
-	    if (0 <= save_fd && !CONSP (XCDR (tail)))
-	      {
-#ifdef HAVE_NATIVE_COMP
-		if (no_native || load_no_native)
-		  Fputhash (save_string, Qt, V_comp_no_native_file_h);
-		else
-		  maybe_swap_for_eln (&save_string, &save_fd, save_mtime);
-#endif
-		if (storeptr)
-		  *storeptr = save_string;
-		SAFE_FREE ();
-		return save_fd;
 	      }
 	  }
-      }
-    if (absolute)
-      break;
-   }
 
+	if (fd >= 0)
+	  {
+	    struct timespec mtime = get_stat_mtime (&st);
+	    bool first_found = !newer || FIXNATP (predicate);
+	    if (first_found || timespec_cmp (mtime, best_mtime) > 0)
+	      {
+		if (best_fd >= 0)
+		  emacs_close (best_fd);
+		best_fd = fd;
+		best_mtime = mtime;
+		best_string = string;
+		if (first_found)
+		  goto openp_out;
+	      }
+	    emacs_close (fd);
+	    fd = -1;
+	  }
+      } /* FOR_EACH suffix */
+    if (best_fd >= 0 || absolute)
+      break;
+   } /* FOR_EACH path */
+
+ openp_out:
+  if (!NILP (best_string))
+    if (storeptr)
+      *storeptr = best_string;
   SAFE_FREE ();
   errno = last_errno;
-  return -1;
+  return best_fd;
 }
 
 
@@ -5611,10 +5481,6 @@ If unsuffixed, a nil `load-prefer-newer' loads the first readable file among
 `load-suffixes' or `load-file-rep-suffixes'.  A non-nil `load-prefer-newer'
 loads the most recently modified readable file.  */);
   load_prefer_newer = false;
-
-  DEFVAR_BOOL ("load-no-native", load_no_native,
-               doc: /* Non-nil means not to load a .eln file when a .elc was requested.  */);
-  load_no_native = false;
 
   /* Vsource_directory was initialized in init_lread.  */
 

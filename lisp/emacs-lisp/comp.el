@@ -41,12 +41,11 @@
 (defvar comp-native-version-dir)
 (defvar comp-subr-arities-h)
 (defvar native-comp-eln-load-path)
-(defvar native-comp-enable-subr-trampolines)
+(defvar native-comp-disable-subr-trampolines)
 
 (declare-function comp--compile-ctxt-to-file0 "comp.c")
 (declare-function comp--init-ctxt "comp.c")
 (declare-function comp--release-ctxt "comp.c")
-(declare-function comp-el-to-eln-filename "comp.c")
 (declare-function native-elisp-load "comp.c")
 
 (defgroup comp nil
@@ -127,9 +126,6 @@ Emacs Lisp file:
 
 \;; Local Variables:\n;; no-native-compile: t\n;; End:")
 ;;;###autoload(put 'no-native-compile 'safe-local-variable 'booleanp)
-
-(defvar native-compile-target-directory nil
-  "The parent directory of `comp-native-version-dir'.")
 
 (defvar comp-log-time-report nil
   "If non-nil, log a time report for each pass.")
@@ -820,13 +816,13 @@ clashes."
     (signal 'native-compiler-error-empty-byte (list filename)))
   (unless (comp-ctxt-output comp-ctxt)
     (setf (comp-ctxt-output comp-ctxt)
-          (comp-el-to-eln-filename filename native-compile-target-directory)))
+          (concat (file-name-sans-extension filename) ".eln")))
   (setf (comp-ctxt-speed comp-ctxt) (alist-get 'native-comp-speed
                                                byte-native-qualities)
         (comp-ctxt-debug comp-ctxt) (alist-get 'native-comp-debug
                                                byte-native-qualities)
         (comp-ctxt-compiler-options comp-ctxt) (alist-get 'native-comp-compiler-options
-                                                        byte-native-qualities)
+                                                          byte-native-qualities)
         (comp-ctxt-driver-options comp-ctxt) (alist-get 'native-comp-driver-options
                                                         byte-native-qualities)
         (comp-ctxt-top-level-forms comp-ctxt)
@@ -3250,13 +3246,7 @@ Prepare every function for final compilation and drive the C back-end."
 (defun comp--trampoline-abs-filename (subr-name)
   "Return the absolute filename for a trampoline for SUBR-NAME."
   (cl-loop
-   with dirs = (if (stringp native-comp-enable-subr-trampolines)
-                   (list (expand-file-name native-comp-enable-subr-trampolines
-                                           invocation-directory))
-                 (if native-compile-target-directory
-                     (list (expand-file-name comp-native-version-dir
-                                             native-compile-target-directory))
-                   (comp-eln-load-path-eff)))
+   with dirs = (comp-eln-load-path-eff)
    with rel-filename = (comp-trampoline-filename subr-name)
    for dir in dirs
    for abs-filename = (expand-file-name rel-filename dir)

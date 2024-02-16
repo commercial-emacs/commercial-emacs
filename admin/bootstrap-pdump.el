@@ -414,10 +414,11 @@
 (unless (garbage-collect)
   (setq pure-space-overflow t))
 
-;; Enabling this without pdumper--pure-pool incurs dreaded eager
-;; macroexpansion cycles.
-(when (and (featurep 'native-compile) pdumper--pure-pool)
-  (setq comp-enable-subr-trampolines t))
+;; A bootstrap wrinkle: trampoline compilation without byte-compiled
+;; bytecomp.elc (equivalently, a null pdumper--pure-pool) incurs dreaded
+;; eager macroexpansion cycles.
+(unless pdumper--pure-pool
+  (setq native-comp-disable-subr-trampolines t))
 
 (message "Dumping to %s" (pdumping-output))
 (condition-case nil

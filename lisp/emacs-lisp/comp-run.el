@@ -132,10 +132,9 @@ if `confirm-kill-processes' is non-nil."
 (defvar comp--no-native-compile)
 (defvar comp-deferred-pending-h)
 (defvar comp-installed-trampolines-h)
-(defvar native-comp-enable-subr-trampolines)
+(defvar native-comp-disable-subr-trampolines)
 
 (declare-function comp--install-trampoline "comp.c")
-(declare-function comp-el-to-eln-filename "comp.c")
 (declare-function native-elisp-load "comp.c")
 
 (defun native-compile-async-skip-p (file load selector)
@@ -221,7 +220,7 @@ display a message."
   (cl-assert (null comp-no-spawn))
   (if (or comp-files-queue
           (> (comp-async-runnings) 0))
-      (unless (>= (comp-async-runnings) (comp-effective-async-max-jobs))
+      (when (< (comp-async-runnings) (comp-effective-async-max-jobs))
         (cl-loop
          for (source-file . load) = (pop comp-files-queue)
          while source-file
@@ -229,19 +228,14 @@ display a message."
                        "`comp-files-queue' should be \".el\" files: %s"
                        source-file)
          when (or native-comp-always-compile
-                  load        ; Always compile when the compilation is
-                                        ; commanded for late load.
-                  ;; Skip compilation if `comp-el-to-eln-filename' fails
-                  ;; to find a writable directory.
-                  (with-demoted-errors "Async compilation :%S"
-                    (file-newer-than-file-p
-                     source-file (comp-el-to-eln-filename source-file))))
+                  load        ; always compile when late loading
+                  (file-newer-than-file-p
+                   source-file (concat (file-name-sans-extension source-file) ".eln")))
          do (let* ((expr `((require 'comp)
                            (setq comp-async-compilation t
                                  warning-fill-column most-positive-fixnum)
                            ,(let ((set (list 'setq)))
                               (dolist (var '(comp-file-preloaded-p
-                                             native-compile-target-directory
                                              native-comp-speed
                                              native-comp-debug
                                              native-comp-verbose
@@ -309,11 +303,11 @@ display a message."
                                 source-file)
                                (comp-accept-and-process-async-output process)
                                (ignore-errors (delete-file temp-file))
-                               (let ((eln-file (comp-el-to-eln-filename
-                                                source-file1)))
+                               (let ((eln-file (concat
+                                                (file-name-sans-extension source-file1)
+                                                ".eln")))
                                  (when (and load1
-                                            (zerop (process-exit-status
-                                                    process))
+                                            (zerop (process-exit-status process))
                                             (file-exists-p eln-file))
                                    (native-elisp-load eln-file
                                                       (eq load1 'late))))
@@ -346,12 +340,11 @@ This are essential for the trampoline machinery to work properly.")
 (defun comp-trampoline-search (subr-name)
   "Search a trampoline file for SUBR-NAME.
 Return the trampoline if found or nil otherwise."
-  (cl-loop
-   with rel-filename = (comp-trampoline-filename subr-name)
-   for dir in (comp-eln-load-path-eff)
-   for filename = (expand-file-name rel-filename dir)
-   when (file-exists-p filename)
-     do (cl-return (native-elisp-load filename))))
+  (cl-loop with rel-filename = (comp-trampoline-filename subr-name)
+           for dir in (comp-eln-load-path-eff)
+           for filename = (expand-file-name rel-filename dir)
+           when (file-exists-p filename)
+           do (cl-return (native-elisp-load filename))))
 
 (declare-function comp-trampoline-compile "comp")
 ;;;###autoload
@@ -360,9 +353,9 @@ Return the trampoline if found or nil otherwise."
   (when (memq subr-name comp-warn-primitives)
     (warn "Redefining `%s' might break native compilation of trampolines."
           subr-name))
-  (unless (or (null native-comp-enable-subr-trampolines)
-              (memq subr-name native-comp-never-optimize-functions)
-              (gethash subr-name comp-installed-trampolines-h))
+  (when (and (not native-comp-disable-subr-trampolines)
+             (not (memq subr-name native-comp-never-optimize-functions))
+             (not (gethash subr-name comp-installed-trampolines-h)))
     (cl-assert (subr-primitive-p (symbol-function subr-name)))
     (when-let ((trampoline (or (comp-trampoline-search subr-name)
                                (comp-trampoline-compile subr-name))))
@@ -431,7 +424,7 @@ bytecode definition was not changed in the meantime)."
                              collect i)))
 
         (unless (native-compile-async-skip-p file load selector)
-          (let* ((out-filename (comp-el-to-eln-filename file))
+          (let* ((out-filename (concat (file-name-sans-extension file) ".eln"))
                  (out-dir (file-name-directory out-filename)))
             (unless (file-exists-p out-dir)
               (make-directory out-dir t))

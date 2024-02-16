@@ -525,7 +525,7 @@ DIRS are relative."
 
 (defvar native-comp-eln-load-path)
 (defvar native-comp-jit-compilation)
-(defvar native-comp-enable-subr-trampolines)
+(defvar native-comp-disable-subr-trampolines)
 
 (defvar startup--original-eln-load-path nil
   "Original value of `native-comp-eln-load-path'.")
@@ -993,19 +993,17 @@ If STYLE is nil, display appropriately for the terminal."
           (when standard-display-table
             (aset standard-display-table char nil)))))))
 
-(defun startup--load-user-init-file
-    (filename-function &optional alternate-filename-function load-defaults)
+(defun startup--load-user-init-file (filename-function
+                                     &optional alternate-filename-function
+                                     load-defaults)
   "Load a user init-file.
-FILENAME-FUNCTION is called with no arguments and should return
-the name of the init-file to load.  If this file cannot be
-loaded, and ALTERNATE-FILENAME-FUNCTION is non-nil, then it is
-called with no arguments and should return the name of an
-alternate init-file to load.  If LOAD-DEFAULTS is non-nil, then
-load default.el after the init-file, unless `inhibit-default-init'
-is non-nil.
+FILENAME-FUNCTION with no arguments returns the name of the file to
+load.  An optional ALTERNATE-FILENAME-FUNCTION returns the name of an
+alternate file should FILENAME-FUNCTION fail.  If LOAD-DEFAULTS, then
+load default.el after the init-file, unless `inhibit-default-init'.
 
-This function sets `user-init-file' to the name of the loaded
-init-file, or to a default value if loading is not possible."
+The variable `user-init-file' is set to the name of the loaded
+init-file."
   (let ((debug-on-error-from-init-file nil)
         (debug-on-error-should-be-set nil)
         (debug-on-error-initial
@@ -1029,11 +1027,11 @@ init-file, or to a default value if loading is not possible."
       (condition-case-unless-debug error
           (when init-file-user
             (let ((init-file-name (funcall filename-function)))
-
               ;; If `user-init-file' is t, then `load' will store
               ;; the name of the file that it loads into
               ;; `user-init-file'.
               (setq user-init-file t)
+
 	      (when init-file-name
 		(load (if (equal (file-name-extension init-file-name)
 				 "el")
@@ -1057,30 +1055,13 @@ init-file, or to a default value if loading is not possible."
 
             ;; If we loaded a compiled file, set `user-init-file' to
             ;; the source version if that exists.
-            (if (equal (file-name-extension user-init-file) "elc")
-                (let* ((source (file-name-sans-extension user-init-file))
-                       (alt (concat source ".el")))
-                  (setq source (cond ((file-exists-p alt) alt)
-                                     ((file-exists-p source) source)
-                                     (t nil)))
-                  (when source
-                    (when (file-newer-than-file-p source user-init-file)
-                      (message "Warning: %s is newer than %s"
-                               source user-init-file)
-                      (sit-for 1))
-                    (setq user-init-file source)))
-              ;; Else, perhaps the user init file was compiled
-              (when (and (equal (file-name-extension user-init-file) "eln")
-                         ;; The next test is for builds without native
-                         ;; compilation support or builds with unexec.
-                         (boundp 'comp-eln-to-el-h))
-                (if-let (source (gethash (file-name-nondirectory user-init-file)
-                                         comp-eln-to-el-h))
-                    ;; source exists or the .eln file would not load
-                    (setq user-init-file source)
-                  (message "Warning: unknown source file for init file %S"
-                           user-init-file)
-                  (sit-for 1))))
+            (when (member (file-name-extension user-init-file) '("elc" "eln"))
+              (when-let ((stem (file-name-sans-extension user-init-file))
+                         (el (concat stem ".el"))
+                         (source (cond ((file-exists-p el) el)
+                                       ((file-exists-p stem) stem)
+                                       (t nil))))
+                (setq user-init-file source)))
 
             (when (and load-defaults
                        (not inhibit-default-init))

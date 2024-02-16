@@ -1058,7 +1058,7 @@ compilation is disabled, Emacs might still need to start asynchronous
 native compilation subprocesses to produce @dfn{trampolines}.  To
 control this, use a separate variable, described below.
 
-@defvar native-comp-enable-subr-trampolines
+@defvar native-comp-disable-subr-trampolines
 This variable controls generation of trampolines.  A trampoline is a
 small piece of native code required to allow calling Lisp primitives,
 which were advised or redefined, from Lisp code that was

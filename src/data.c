@@ -889,7 +889,7 @@ signal a `cyclic-function-indirection' error.  */)
 #ifdef HAVE_NATIVE_COMP
   register Lisp_Object function = XSYMBOL (symbol)->u.s.function;
 
-  if (!NILP (Vnative_comp_enable_subr_trampolines)
+  if (NILP (Vnative_comp_disable_subr_trampolines)
       && SUBRP (function)
       && !SUBR_NATIVE_COMPILEDP (function))
     CALLN (Ffuncall, Qcomp_subr_trampoline_install, symbol);

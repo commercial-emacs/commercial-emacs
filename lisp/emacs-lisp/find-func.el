@@ -227,18 +227,13 @@ for completion."
             (setq name rel))))
     (unless (equal name library) name)))
 
-(defvar comp-eln-to-el-h)
-
 (defun find-library-name (library)
   "Return the absolute file name of LIBRARY.
 If LIBRARY ends in the byte-compiled extension .elc or the
 native-compiled extension .eln, find the corresponding source
 ending in .el."
-  (cond
-   ((string-match "\\.el\\(c\\(\\..*\\)?\\)\\'" library)
+  (when (string-match "\\.el\\([cn]\\(\\..*\\)?\\)\\'" library)
     (setq library (replace-match "" t t library)))
-   ((string-match "\\.eln\\'" library)
-    (setq library (gethash (file-name-nondirectory library) comp-eln-to-el-h))))
   (let ((result
          (or
           (locate-file library

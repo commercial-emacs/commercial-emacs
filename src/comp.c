@@ -4168,75 +4168,6 @@ make_directory_wrapper_1 (Lisp_Object ignore)
   return Qt;
 }
 
-DEFUN ("comp-el-to-eln-rel-filename", Fcomp_el_to_eln_rel_filename,
-       Scomp_el_to_eln_rel_filename, 1, 1, 0,
-       doc: /* Append two hashes to FILENAME, tack on .eln extension.  */)
-  (Lisp_Object filename)
-{
-  /* Resolve possible symlinks in FILENAME, so that path_hash below
-     always compares equal. (Bug#44701).  */
-
-  if (suffix_p (filename, ".gz"))
-    filename = Fsubstring (filename, Qnil, make_fixnum (-3));
-
-  /* /absolute/path/filename.el + content
-     -> eln-cache/filename-hash-hash.eln
-
-     To prevent two different versions of filename.el hashing
-     to same eln, included source file content?
-
-     Possible to delete all filename-path_hash-* except the most recent?
-  */
-
-  Lisp_Object separator = build_string ("-");
-  return Fconcat
-    (6, (Lisp_Object []) {
-      Ffile_name_nondirectory (Fsubstring (filename, Qnil, make_fixnum (-3))),
-      separator,
-      comp_hash_string (filename),
-      separator,
-      content_hash,
-      build_string (NATIVE_ELISP_SUFFIX)
-    });
-}
-
-DEFUN ("comp-el-to-eln-filename", Fcomp_el_to_eln_filename,
-       Scomp_el_to_eln_filename, 1, 2, 0,
-       doc: /* Return the absolute .eln corresponding to .el.  */)
-  (Lisp_Object filename, Lisp_Object base_dir)
-{
-  if (NILP (base_dir))
-    {
-      /* Figure out suitable BASE_DIR if unspecified.  */
-      Lisp_Object paths = Vnative_comp_eln_load_path;
-      FOR_EACH_TAIL (paths)
-	{
-	  Lisp_Object path = XCAR (paths);
-	  bool q_extant = !NILP (Ffile_exists_p (path));
-	  bool q_created = !q_extant
-	    && NILP (internal_condition_case_1 (make_directory_wrapper,
-						path, Qt,
-						make_directory_wrapper_1));
-	  bool q_writable = q_extant
-	    && !NILP (Ffile_writable_p (path));
-	  if (q_created || q_writable)
-	    {
-	      base_dir = path;
-	      break;
-	    }
-	}
-    }
-
-  if (NILP (base_dir))
-    error ("Cannot find suitable directory for output in "
-	   "`native-comp-eln-load-path'.");
-
-  if (!file_name_absolute_p (SSDATA (base_dir)))
-    base_dir = Fexpand_file_name (base_dir, Vinvocation_directory);
-
-  return Fexpand_file_name (Fcomp_el_to_eln_rel_filename (filename), base_dir);
-}
-
 DEFUN ("comp--install-trampoline", Fcomp__install_trampoline,
        Scomp__install_trampoline, 2, 2, 0,
        doc: /* Install a TRAMPOLINE for primitive SUBR-NAME.  */)
@@ -4771,13 +4702,12 @@ directory_files_matching (Lisp_Object name, Lisp_Object match)
 void
 eln_load_path_final_clean_up (void)
 {
-  Lisp_Object paths = Vnative_comp_eln_load_path;
+  Lisp_Object paths = Vload_path;
   FOR_EACH_TAIL (paths)
     {
       Lisp_Object files =
 	internal_condition_case_2 (directory_files_matching,
-				   Fexpand_file_name (Vcomp_native_version_dir,
-						      XCAR (paths)),
+				   XCAR (paths),
 				   build_string ("\\.eln\\.old\\'"),
 				   Qt, return_nil);
       FOR_EACH_TAIL (files)
@@ -4819,8 +4749,7 @@ maybe_defer_native_compilation (Lisp_Object function_name,
       || !NILP (Vpdumper__pure_pool)
       || !COMPILEDP (definition)
       || !STRINGP (Vload_true_file_name)
-      || !suffix_p (Vload_true_file_name, ".elc")
-      || !NILP (Fgethash (Vload_true_file_name, V_comp_no_native_file_h, Qnil)))
+      || !suffix_p (Vload_true_file_name, ".elc"))
     return;
 
   Lisp_Object src = concat2 (CALL1I (file-name-sans-extension, Vload_true_file_name),
@@ -5404,31 +5333,17 @@ The hash derives from both the `comp-subr-list' and `comp-abi-hash'.  */);
 For internal use.  */);
   Vcomp_deferred_pending_h = CALLN (Fmake_hash_table, QCtest, Qeq);
 
-  DEFVAR_LISP ("comp-eln-to-el-h", Vcomp_eln_to_el_h,
-	       doc: /* Hash eln-filename to el-filename.  */);
-  Vcomp_eln_to_el_h = CALLN (Fmake_hash_table, QCtest, Qequal);
-
-  DEFVAR_LISP ("native-comp-eln-load-path", Vnative_comp_eln_load_path,
-	       doc: /* List of paths containing `comp-native-version-dir'.
-Paths are relative to `invocation-directory' unless absolute.  */);
-
-  Vnative_comp_eln_load_path = Qnil;
-
-  DEFVAR_LISP ("native-comp-enable-subr-trampolines",
-	       Vnative_comp_enable_subr_trampolines,
-	       doc: /* Generate code for advised or redefined primitives.
-Such "trampoline" functions are generated on the fly at runtime.  A
-string value specifies an alternative directory for storing trampolines
-and overrides `native-comp-eln-load-path'.  */);
+  DEFVAR_LISP ("native-comp-disable-subr-trampolines",
+	       Vnative_comp_disable_subr_trampolines,
+	       doc: /* Disable advised or redefined C primitives.
+Under this condition, native compiled lisp always calls the original C
+primitives, a clearly suboptimal setting.  This variable is set during
+bootstrap when a not-yet-compiled byte compiler would otherwise trigger
+macroexpansion cycles.  */);
 
   DEFVAR_LISP ("comp-installed-trampolines-h", Vcomp_installed_trampolines_h,
 	       doc: /* Hash primitive name to trampoline.  */);
   Vcomp_installed_trampolines_h = CALLN (Fmake_hash_table);
-
-  DEFVAR_LISP ("comp-no-native-file-h", V_comp_no_native_file_h,
-	       doc: /* Elisp files excluded from deferred compilation.
-For internal use.  */);
-  V_comp_no_native_file_h = CALLN (Fmake_hash_table, QCtest, Qequal);
 
   DEFVAR_LISP ("comp-loaded-comp-units-h", Vcomp_loaded_comp_units_h,
 	       doc: /* Hash file name to compilation unit.  */);

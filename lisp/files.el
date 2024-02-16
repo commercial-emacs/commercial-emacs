@@ -1023,8 +1023,6 @@ See `file-symlink-p' to distinguish symlinks."
                              (file-name-nondirectory buffer-file-name))))))
   (load (expand-file-name file) nil nil t))
 
-(defvar comp-eln-to-el-h)
-
 (defun locate-file (filename path &optional suffixes predicate)
   "Return absolute file name of FILENAME in PATH, or nil if not found.
 
