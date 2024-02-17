@@ -1657,20 +1657,26 @@ The door of all subtleties!
   (should (equal (file-name-base "foo") "foo"))
   (should (equal (file-name-base "foo/bar") "bar")))
 
-(defun files-tests--check-shebang (shebang expected-mode)
-  "Assert that mode for SHEBANG derives from EXPECTED-MODE."
-  (let ((actual-mode
-         (ert-with-temp-file script-file
-           :text shebang
-           (find-file script-file)
-           (if (derived-mode-p expected-mode)
-               expected-mode
-             major-mode))))
-    ;; Tuck all the information we need in the `should' form: input
-    ;; shebang, expected mode vs actual.
-    (should
-     (equal (list shebang actual-mode)
-            (list shebang expected-mode)))))
+(defvar sh-shell)
+
+(defun files-tests--check-shebang (shebang expected-mode &optional expected-dialect)
+  "Assert that mode for SHEBANG derives from EXPECTED-MODE.
+
+If EXPECTED-MODE is sh-base-mode, DIALECT says what `sh-shell' should be
+set to."
+  (ert-with-temp-file script-file
+    :text shebang
+    (find-file script-file)
+    (let ((actual-mode (if (derived-mode-p expected-mode)
+                           expected-mode
+                         major-mode)))
+      ;; Tuck all the information we need in the `should' form: input
+      ;; shebang, expected mode vs actual.
+      (should
+       (equal (list shebang actual-mode)
+              (list shebang expected-mode)))
+      (when (eq expected-mode 'sh-base-mode)
+        (should (eq sh-shell expected-dialect))))))
 
 (ert-deftest files-tests-auto-mode-interpreter ()
   "Test that `set-auto-mode' deduces correct modes from shebangs."
@@ -1680,7 +1686,12 @@ The door of all subtleties!
   (files-tests--check-shebang "#!/usr/bin/env python3" 'python-mode)
   (files-tests--check-shebang "#!/usr/bin/env -S awk -v FS=\"\\t\" -v OFS=\"\\t\" -f" 'awk-mode)
   (files-tests--check-shebang "#!/usr/bin/env -S make -f" 'makefile-mode)
-  (files-tests--check-shebang "#!/usr/bin/make -f" 'makefile-mode))
+  (files-tests--check-shebang "#!/usr/bin/env -S-vi bash -eux" 'sh-base-mode 'bash)
+  (files-tests--check-shebang "#!/usr/bin/env -ivS --default-signal=INT bash -eux" 'sh-base-mode 'bash)
+  (files-tests--check-shebang "#!/usr/bin/env -ivS --default-signal bash -eux" 'sh-base-mode 'bash)
+  (files-tests--check-shebang "#!/usr/bin/env -vS -uFOOBAR bash -eux" 'sh-base-mode 'bash)
+  ;; Invocation through env, with modified environment.
+  (files-tests--check-shebang "#!/usr/bin/env -S PYTHONPATH=/...:${PYTHONPATH} python" 'python-base-mode))
 
 (ert-deftest files-test-dir-locals-auto-mode-alist ()
   "Test an `auto-mode-alist' entry in `.dir-locals.el'"
