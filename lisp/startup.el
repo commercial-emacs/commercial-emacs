@@ -523,38 +523,8 @@ DIRS are relative."
       xdg-dir)
      (t emacs-d-dir))))
 
-(defvar native-comp-eln-load-path)
 (defvar native-comp-jit-compilation)
 (defvar native-comp-disable-subr-trampolines)
-
-(defvar startup--original-eln-load-path nil
-  "Original value of `native-comp-eln-load-path'.")
-
-(defun startup-redirect-eln-cache (cache-directory)
-  "Redirect the user's eln-cache directory to CACHE-DIRECTORY.
-CACHE-DIRECTORY must be a single directory, a string.
-This function destructively changes `native-comp-eln-load-path'
-so that its first element is CACHE-DIRECTORY.  If CACHE-DIRECTORY
-is not an absolute file name, it is interpreted relative
-to `user-emacs-directory'.
-For best results, call this function in your early-init file,
-so that the rest of initialization and package loading uses
-the updated value."
-  ;; Remove the original eln-cache.
-  (setq native-comp-eln-load-path (cdr native-comp-eln-load-path))
-  ;; Add the new eln-cache.
-  (push (expand-file-name (file-name-as-directory cache-directory)
-                          user-emacs-directory)
-        native-comp-eln-load-path))
-
-(defun startup--update-eln-cache ()
-  "Update the user eln-cache directory due to user customizations."
-  ;; Don't override user customizations!
-  (when (equal native-comp-eln-load-path
-               startup--original-eln-load-path)
-    (startup-redirect-eln-cache "eln-cache")
-    (setq startup--original-eln-load-path
-          (copy-sequence native-comp-eln-load-path))))
 
 (defun startup--rescale-elt-match-p (font-pattern font-object)
   "Test whether FONT-OBJECT matches an element of `face-font-rescale-alist'.
@@ -584,16 +554,6 @@ It is the default value of the variable `top-level'."
     (setq user-emacs-directory
 	  (startup--xdg-or-homedot startup--xdg-config-home-emacs nil))
 
-    (when (featurep 'native-compile)
-      ;; Form the initial value of `native-comp-eln-load-path'.
-      (let ((path-env (getenv "EMACSNATIVELOADPATH")))
-        (when path-env
-          (dolist (path (split-string path-env path-separator))
-            (unless (string= "" path)
-              (push path native-comp-eln-load-path)))))
-      (push (expand-file-name "eln-cache/" user-emacs-directory)
-            native-comp-eln-load-path))
-
     ;; Look in each dir in load-path for a subdirs.el file.  If we
     ;; find one, load it, which will add the appropriate subdirs of
     ;; that dir into load-path.  This needs to be done before setting
@@ -618,6 +578,12 @@ It is the default value of the variable `top-level'."
         ;; the end, because the subdirs.el files may add elements to the end
         ;; of load-path and we want to take it into account.
         (setq tail (cdr tail))))
+
+    (when (featurep 'native-compile)
+      (setq load-path (nconc (split-string (or (getenv "EMACSNATIVELOADPATH") "")
+                                           path-separator :omit-null)
+                             (list comp-trampoline-dir)
+                             load-path)))
 
     ;; Set the default strings to display in mode line for end-of-line
     ;; formats that aren't native to this platform.  This should be
@@ -676,22 +642,10 @@ It is the default value of the variable `top-level'."
 	;; further down below.
 	(dolist (pathsym '(load-path exec-path))
 	  (let ((path (symbol-value pathsym)))
-	    (if (listp path)
-		(set pathsym (mapcar (lambda (dir)
-				       (decode-coding-string dir coding t))
-				     path)))))
-        (when (featurep 'native-compile)
-          (let ((npath (symbol-value 'native-comp-eln-load-path)))
-            (set 'native-comp-eln-load-path
-                 (mapcar (lambda (dir)
-                           ;; Call expand-file-name to remove all the
-                           ;; pesky ".." from the directyory names in
-                           ;; native-comp-eln-load-path.
-                           (expand-file-name
-                            (decode-coding-string dir coding t)))
-                         npath)))
-          (setq startup--original-eln-load-path
-                (copy-sequence native-comp-eln-load-path)))
+	    (when (listp path)
+	      (set pathsym (mapcar (lambda (dir)
+				     (decode-coding-string dir coding t))
+				   path)))))
 	(dolist (filesym '(data-directory doc-directory exec-directory
 					  installation-directory
 					  invocation-directory invocation-name
@@ -711,17 +665,15 @@ It is the default value of the variable `top-level'."
     (put 'user-full-name 'standard-value
 	 (list (default-value 'user-full-name)))
     ;; If the PWD environment variable isn't accurate, delete it.
-    (let ((pwd (getenv "PWD")))
-      (and pwd
-	   (or (and default-directory
-		    (ignore-errors
-		      (equal (file-attributes
-			      (file-name-as-directory pwd))
-			     (file-attributes
-			      (file-name-as-directory default-directory)))))
-	       (setq process-environment
-		     (delete (concat "PWD=" pwd)
-			     process-environment)))))
+    (when-let ((pwd (getenv "PWD")))
+      (when (or (not default-directory)
+	        (not (ignore-errors
+		       (equal (file-attributes
+			       (file-name-as-directory pwd))
+			      (file-attributes
+			       (file-name-as-directory default-directory))))))
+	(setq process-environment
+	      (delete (concat "PWD=" pwd) process-environment))))
     ;; Now, that other directories were searched, and any charsets we
     ;; need for encoding them are already loaded, we are ready to
     ;; decode charset-map-path.
@@ -1319,7 +1271,7 @@ please check its value")
 	  (setq xdg-dir (concat "~" init-file-user "/.config/emacs/"))
 	  (startup--xdg-or-homedot xdg-dir init-file-user)))
 
-  ;; Load the early init file, if found.
+  ;; Load the early init file, if found.  Fuq this.
   (startup--load-user-init-file
    (lambda ()
      (expand-file-name
@@ -1330,12 +1282,6 @@ please check its value")
       "early-init.el"
       startup-init-directory)))
   (setq early-init-file user-init-file)
-
-  ;; Amend `native-comp-eln-load-path', since the early-init file may
-  ;; have altered `user-emacs-directory' and/or changed the eln-cache
-  ;; directory.
-  (when (featurep 'native-compile)
-    (startup--update-eln-cache))
 
   ;; If any package directory exists, initialize the package system.
   (and user-init-file
@@ -1470,12 +1416,6 @@ please check its value")
         "init.el"
         startup-init-directory))
      t)
-
-    ;; Amend `native-comp-eln-load-path' again, since the early-init
-    ;; file may have altered `user-emacs-directory' and/or changed the
-    ;; eln-cache directory.
-    (when (featurep 'native-compile)
-      (startup--update-eln-cache))
 
     (when (and deactivate-mark transient-mark-mode)
       (with-current-buffer (window-buffer)

@@ -240,7 +240,6 @@ display a message."
                                              native-comp-debug
                                              native-comp-verbose
                                              comp-libgccjit-reproducer
-                                             native-comp-eln-load-path
                                              native-comp-compiler-options
                                              native-comp-driver-options
                                              load-path
@@ -340,11 +339,10 @@ This are essential for the trampoline machinery to work properly.")
 (defun comp-trampoline-search (subr-name)
   "Search a trampoline file for SUBR-NAME.
 Return the trampoline if found or nil otherwise."
-  (cl-loop with rel-filename = (comp-trampoline-filename subr-name)
-           for dir in (comp-eln-load-path-eff)
-           for filename = (expand-file-name rel-filename dir)
-           when (file-exists-p filename)
-           do (cl-return (native-elisp-load filename))))
+  (let ((filename (expand-file-name (comp-trampoline-filename subr-name)
+                                    comp-trampoline-dir)))
+    (when (file-readable-p filename)
+      (native-elisp-load filename))))
 
 (declare-function comp-trampoline-compile "comp")
 ;;;###autoload

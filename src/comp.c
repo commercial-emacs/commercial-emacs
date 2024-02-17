@@ -4472,7 +4472,7 @@ add_compiler_options (void)
 DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
        Scomp__compile_ctxt_to_file0,
        1, 1, 0,
-       doc: /* Compile the current context as native code to file FILENAME.  */)
+       doc: /* Compile the current context as native code to FILENAME.  */)
   (Lisp_Object filename)
 {
   load_gccjit_if_necessary (true);
@@ -4536,8 +4536,11 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
 
   gcc_jit_context_set_int_option (comp.ctxt,
 				  GCC_JIT_INT_OPTION_OPTIMIZATION_LEVEL,
-				  comp.speed < 0 ? 0
-				  : (comp.speed > 3 ? 3 : comp.speed));
+				  comp.speed < 0
+				  ? 0
+				  : comp.speed > 3
+				  ? 3
+				  : comp.speed);
 
   /* On MacOS set a unique dylib ID.  */
 #if defined (LIBGCCJIT_HAVE_gcc_jit_context_add_driver_option)	\
@@ -4571,8 +4574,7 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
     XHASH_TABLE (CALL1I (comp-ctxt-funcs-h, Vcomp_ctxt));
   DOHASH_SAFE (func_h, i)
     declare_function (HASH_VALUE (func_h, i));
-  /* Compile all functions. Can't be done before because the
-     relocation structs has to be already defined.  */
+  /* Compile all functions now that relocation structs are defined.  */
   DOHASH_SAFE (func_h, i)
     compile_function (HASH_VALUE (func_h, i));
 
@@ -4609,7 +4611,7 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
 				   GCC_JIT_OUTPUT_KIND_DYNAMIC_LIBRARY,
 				   SSDATA (encoded_tmp_file));
 
-  const char *err =  gcc_jit_context_get_first_error (comp.ctxt);
+  const char *err = gcc_jit_context_get_first_error (comp.ctxt);
   if (err)
     xsignal3 (Qnative_ice,
 	      build_string ("failed to compile"),
@@ -4617,7 +4619,7 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
 	      build_string (err));
 
   CALL1I (comp-clean-up-stale-eln, filename);
-  CALL2I (comp-delete-or-replace-file, filename, tmp_file);
+  CALL2I (comp-delete-or-replace-file, tmp_file, filenamea);
 
   return filename;
 }
@@ -5323,10 +5325,6 @@ natively-compiled one.  */);
   DEFVAR_LISP ("comp-abi-hash", Vcomp_abi_hash,
 	       doc: /* String signing the .eln files ABI.  */);
   Vcomp_abi_hash = Qnil;
-  DEFVAR_LISP ("comp-native-version-dir", Vcomp_native_version_dir,
-	       doc: /* Directory named after compatibility has.
-The hash derives from both the `comp-subr-list' and `comp-abi-hash'.  */);
-  Vcomp_native_version_dir = Qnil;
 
   DEFVAR_LISP ("comp-deferred-pending-h", Vcomp_deferred_pending_h,
 	       doc: /* Hash symbol-name to function-value.
@@ -5339,7 +5337,7 @@ For internal use.  */);
 Under this condition, native compiled lisp always calls the original C
 primitives, a clearly suboptimal setting.  This variable is set during
 bootstrap when a not-yet-compiled byte compiler would otherwise trigger
-macroexpansion cycles.  */);
+a cycle when `macroexpand' gets advised.  */);
 
   DEFVAR_LISP ("comp-installed-trampolines-h", Vcomp_installed_trampolines_h,
 	       doc: /* Hash primitive name to trampoline.  */);

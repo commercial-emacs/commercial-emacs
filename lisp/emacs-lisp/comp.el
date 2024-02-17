@@ -38,9 +38,7 @@
 (require 'comp-cstr)
 
 ;; These variables and functions are defined in comp.c
-(defvar comp-native-version-dir)
 (defvar comp-subr-arities-h)
-(defvar native-comp-eln-load-path)
 (defvar native-comp-disable-subr-trampolines)
 
 (declare-function comp--compile-ctxt-to-file0 "comp.c")
@@ -126,6 +124,15 @@ Emacs Lisp file:
 
 \;; Local Variables:\n;; no-native-compile: t\n;; End:")
 ;;;###autoload(put 'no-native-compile 'safe-local-variable 'booleanp)
+
+(defvar comp-trampoline-dir (cond ((and init-file-user user-init-file) ;live
+                                   (expand-file-name "trampolines" user-emacs-directory))
+                                  (installation-directory ;within repo
+                                   (expand-file-name "lisp/trampolines" installation-directory))
+                                  (t ;batch or test mode
+                                   (expand-file-name (make-temp-name "trampolines-")
+                                                     temporary-file-directory)))
+  "User directory from which to save and load trampolines.")
 
 (defvar comp-log-time-report nil
   "If non-nil, log a time report for each pass.")
@@ -257,12 +264,10 @@ Useful to hook into pass checkers.")
 (define-error 'native-compiler-error-empty-byte
   "empty byte compiler output"
   'native-compiler-error)
-
 
 (defvar comp-no-spawn nil
   "Non-nil don't spawn native compilation processes.")
 
-
 (cl-defstruct (comp-vec (:copier nil))
   "A re-sizable vector like object."
   (data (make-hash-table :test #'eql) :type hash-table
@@ -306,8 +311,6 @@ Returns ELT."
   (puthash (1- (comp-vec-beg vec)) elt (comp-vec-data vec))
   (cl-decf (comp-vec-beg vec))
   elt)
-
-
 
 (eval-when-compile
   (defconst comp-op-stack-info
@@ -526,8 +529,6 @@ In use by the back-end."
     (cons (comp-cstr-cons-p mvar))
     (fixnum (comp-cstr-fixnum-p mvar))))
 
-
-
 (defun comp--equality-fun-p (function)
   "Equality functions predicate for FUNCTION."
   (when (memq function '(eq eql equal)) t))
@@ -593,7 +594,6 @@ Assume allocation class `d-default' as default."
   (puthash obj t (comp-data-container-idx (comp--alloc-class-to-container
                                            comp-curr-allocation-class))))
 
-
 ;;; Log routines.
 
 (defun comp--prettyformat-mvar (mvar)
@@ -637,8 +637,6 @@ VERBOSITY is a number between 0 and 3."
                          2))
           edges)))
 
-
-
 (defmacro comp--loop-insn-in-block (basic-block &rest body)
   "Loop over all insns in BASIC-BLOCK executing BODY.
 Inside BODY, `insn' and `insn-cell'can be used to read or set the
@@ -650,13 +648,13 @@ current instruction or its cell."
        (while insn-cell
          ,@body
          (setf insn-cell (cdr insn-cell))))))
-
-;;; spill-lap pass specific code.
 
 (defun comp--lex-byte-func-p (f)
   "Return t if F is a lexically-scoped byte compiled function."
   (and (byte-code-function-p f)
        (fixnump (aref f 0))))
+
+;;; spill-lap pass specific code.
 
 (defun comp--spill-decl-spec (function-name spec)
   "Return the declared specifier SPEC for FUNCTION-NAME."
@@ -854,9 +852,6 @@ If INPUT is a string, it is the filename to be compiled."
          (res (comp--spill-lap-function input)))
     (comp-cstr-ctxt-update-type-slots comp-ctxt)
     res))
-
-
-;;; Limplification pass specific code.
 
 (cl-defstruct (comp-limplify (:copier nil))
   "Support structure used during function limplification."
@@ -1728,7 +1723,6 @@ into the C code forwarding the compilation unit."
   (when (comp-ctxt-with-late-load comp-ctxt)
     (comp--add-func-to-ctxt (comp--limplify-top-level t))))
 
-
 ;;; add-cstrs pass specific code.
 
 ;; This pass is responsible for adding constraints, these are
@@ -2132,7 +2126,6 @@ blocks."
                  (comp--log-func comp-func 3))))
            (comp-ctxt-funcs-h comp-ctxt)))
 
-
 ;;; pure-func pass specific code.
 
 ;; Simple IPA pass to infer function purity of functions not
@@ -2187,7 +2180,6 @@ blocks."
               count (comp-func-pure f))))
    finally (comp-log (format "ipa-pure iterated %d times" n))))
 
-
 ;;; SSA pass specific code.
 ;; After limplification no edges are present between basic blocks and an
 ;; implicit phi is present for every slot at the beginning of every basic block.
@@ -2518,7 +2510,6 @@ Return t when one or more block was removed, nil otherwise."
                  (setf (comp-func-ssa-status f) t))))
            (comp-ctxt-funcs-h comp-ctxt)))
 
-
 ;;; propagate pass specific code.
 ;; A very basic propagation pass follows.
 ;; This propagates values and types plus ref property in the control flow graph.
@@ -2751,7 +2742,6 @@ Return t if something was changed."
                  (comp--log-func comp-func 3))))
            (comp-ctxt-funcs-h comp-ctxt)))
 
-
 ;;; Call optimizer pass specific code.
 ;; This pass is responsible for the following optimizations:
 ;; - Call to subrs that are in defined in the C source and are passing through
@@ -2858,7 +2848,6 @@ FUNCTION can be a function-name or byte compiled function."
                  (comp--call-optim-func))))
            (comp-ctxt-funcs-h comp-ctxt)))
 
-
 ;;; Dead code elimination pass specific code.
 ;; This simple pass try to eliminate insns became useful after propagation.
 ;; Even if gcc would take care of this is good to perform this here
@@ -2927,7 +2916,6 @@ Return the list of m-var ids nuked."
                 (comp--log-func comp-func 3))))
            (comp-ctxt-funcs-h comp-ctxt)))
 
-
 ;;; Tail Call Optimization pass specific code.
 
 (defun comp--form-tco-call-seq (args)
@@ -2967,7 +2955,6 @@ Return the list of m-var ids nuked."
                  (comp--log-func comp-func 3))))
            (comp-ctxt-funcs-h comp-ctxt)))
 
-
 ;;; Type hint removal pass specific code.
 
 ;; This must run after all SSA prop not to have the type hint
@@ -2991,9 +2978,6 @@ These are substituted with a normal `set' op."
                  (comp--remove-type-hints-func)
                  (comp--log-func comp-func 3))))
            (comp-ctxt-funcs-h comp-ctxt)))
-
-
-;;; Function types pass specific code.
 
 (defun comp--compute-function-type (_ func)
   "Compute type specifier for `comp-func' FUNC.
@@ -3024,9 +3008,6 @@ Set it into the `type' slot."
 (defun comp--compute-function-types (_)
   "Compute and store the type specifier for all functions."
   (maphash #'comp--compute-function-type (comp-ctxt-funcs-h comp-ctxt)))
-
-
-;;; Final pass specific code.
 
 (defun comp--args-to-lambda-list (args)
   "Return a lambda list for ARGS."
@@ -3175,7 +3156,6 @@ Prepare every function for final compilation and drive the C back-end."
                      (setf native-comp-verbose ,native-comp-verbose
                            comp-libgccjit-reproducer ,comp-libgccjit-reproducer
                            comp-ctxt ,comp-ctxt
-                           native-comp-eln-load-path ',native-comp-eln-load-path
                            native-comp-compiler-options
                            ',native-comp-compiler-options
                            native-comp-driver-options
@@ -3208,7 +3188,6 @@ Prepare every function for final compilation and drive the C back-end."
 		(signal 'native-compiler-error (list (buffer-string))))
             (comp-log-to-buffer (buffer-string))))))))
 
-
 ;;; Compiler type hints.
 ;; Public entry points to be used by user code to give comp
 ;; suggestions about types.  These are used to implement CL style
@@ -3225,7 +3204,6 @@ Prepare every function for final compilation and drive the C back-end."
   (declare (gv-setter (lambda (val) `(setf ,x ,val))))
   x)
 
-
 ;; Primitive function advice machinery
 
 (defun comp--make-lambda-list-from-subr (subr)
@@ -3243,29 +3221,10 @@ Prepare every function for final compilation and drive the C back-end."
       (push (gensym "arg") lambda-list))
     (reverse lambda-list)))
 
-(defun comp--trampoline-abs-filename (subr-name)
-  "Return the absolute filename for a trampoline for SUBR-NAME."
-  (cl-loop
-   with dirs = (comp-eln-load-path-eff)
-   with rel-filename = (comp-trampoline-filename subr-name)
-   for dir in dirs
-   for abs-filename = (expand-file-name rel-filename dir)
-   unless (file-exists-p dir)
-     do (ignore-errors
-          (make-directory dir t)
-          (cl-return abs-filename))
-   when (file-writable-p abs-filename)
-     do (cl-return abs-filename)
-   ;; Default to some temporary directory if no better option was
-   ;; found.
-   finally (cl-return
-            (make-temp-file (file-name-sans-extension rel-filename) nil ".eln"
-                            nil))))
-
 ;; Called from comp-run.el
 ;;;###autoload
 (defun comp-trampoline-compile (subr-name)
-  "Synthesize compile and return a trampoline for SUBR-NAME."
+  "Synthesize, compile, and return a trampoline for SUBR-NAME."
   (let* ((lambda-list (comp--make-lambda-list-from-subr
                        (symbol-function subr-name)))
          ;; The synthesized trampoline must expose the exact same ABI of
@@ -3278,19 +3237,19 @@ Prepare every function for final compilation and drive the C back-end."
                         for arg in lambda-list
                         unless (memq arg '(&optional &rest))
                         collect arg)))))
-         ;; Use speed 1 for compilation speed and not to optimize away
-         ;; funcall calls!
-         (byte-optimize nil)
-         (native-comp-speed 1)
+         (byte-optimize nil)   ;don't optimize away funcalls
+         (native-comp-speed 1) ;conservative
          (lexical-binding t))
-    (comp--native-compile form nil (comp--trampoline-abs-filename subr-name))))
+    (make-directory comp-trampoline-dir t)
+    (comp--native-compile form nil (expand-file-name
+                                    (comp-trampoline-filename subr-name)
+                                    comp-trampoline-dir))))
 
-
 ;; Some entry point support code.
 
 ;;;###autoload
 (defun comp-clean-up-stale-eln (file)
-  "Remove all FILE*.eln* files found in `native-comp-eln-load-path'.
+  "Remove all FILE*.eln* files found in `load-path'.
 The files to be removed are those produced from the original source
 filename (including FILE)."
   (when (string-match (rx "-" (group-n 1 (1+ hex)) "-" (1+ hex) ".eln" eos)
@@ -3299,7 +3258,7 @@ filename (including FILE)."
      with filename-hash = (match-string 1 file)
      with regexp = (rx-to-string
                     `(seq "-" ,filename-hash "-" (1+ hex) ".eln" eos))
-     for dir in (comp-eln-load-path-eff)
+     for dir in load-path
      do (cl-loop
          for f in (when (file-exists-p dir)
 		    (directory-files dir t regexp t))
@@ -3327,11 +3286,11 @@ When NEWFILE is nil just delete OLDFILE."
                                       nil ".eln.old" nil)
                                      t))
                       (when newfile
-                        (rename-file newfile oldfile nil)))
+                        (rename-file oldfile newfile nil)))
                                         ;exit while
                   (file-already-exists t))))
         (t (if newfile
-               (rename-file newfile oldfile t)
+               (rename-file oldfile newfile t)
              (delete-file oldfile)))))
 
 (defun comp--native-compile (function-or-file &optional with-late-load output)
@@ -3409,15 +3368,11 @@ Wtf is late loading."
                    (ignore-errors (delete-file (comp-ctxt-output comp-ctxt))))
                   (t (delete-file (comp-ctxt-output comp-ctxt))))))))))
 
-
 ;;; Compiler entry points.
 
 (defun comp-compile-all-trampolines ()
   "Pre-compile AOT all trampolines."
-  (let ((comp-running-batch-compilation t)
-        ;; We want to target only the 'native-lisp' directory.
-        (native-compile-target-directory
-         (car (last native-comp-eln-load-path))))
+  (let ((comp-running-batch-compilation t))
     (mapatoms (lambda (f)
                 (when (subr-primitive-p (symbol-function f))
                   (message "Compiling trampoline for: %s" f)
@@ -3456,36 +3411,6 @@ of file names not excluded by `native-comp-bootstrap-deny-list'."
              (set-file-times eln-file)))
        (kill-buffer temp-buffer))
      target-file)))
-
-(defun native-compile-prune-cache ()
-  "Remove .eln files that aren't applicable to the current Emacs invocation."
-  (interactive)
-  (unless (featurep 'native-compile)
-    (user-error "This Emacs isn't built with native-compile support"))
-  ;; The last item in native-comp-eln-load-path is assumed to be a system
-  ;; directory, so don't try to delete anything there (bug#59658).
-  (dolist (dir (butlast native-comp-eln-load-path))
-    ;; If a directory is non absolute it is assumed to be relative to
-    ;; `invocation-directory'.
-    (setq dir (expand-file-name dir invocation-directory))
-    (when (file-exists-p dir)
-      (dolist (subdir (seq-filter
-                       (lambda (f) (not (string-match (rx "/." (? ".") eos) f)))
-                       (directory-files dir t)))
-        (when (and (file-directory-p subdir)
-                   (file-writable-p subdir)
-                   (not (equal (file-name-nondirectory
-                                (directory-file-name subdir))
-                               comp-native-version-dir)))
-          (message "Deleting `%s'..." subdir)
-          ;; We're being overly cautious here -- there shouldn't be
-          ;; anything but .eln files in these directories.
-          (dolist (eln (directory-files subdir t "\\.eln\\(\\.tmp\\)?\\'"))
-            (when (file-writable-p eln)
-              (delete-file eln)))
-          (when (directory-empty-p subdir)
-            (delete-directory subdir))))))
-  (message "Cache cleared"))
 
 (provide 'comp)
 

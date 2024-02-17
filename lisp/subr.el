@@ -2983,23 +2983,14 @@ This is to `put' what `defalias' is to `fset'."
         (setcdr ps (cons symbol (cdr ps))))))
   (put symbol prop val))
 
-(defvar comp-native-version-dir)
-(defvar native-comp-eln-load-path)
 (declare-function subr-native-elisp-p "data.c")
 (declare-function native-comp-unit-file "data.c")
 (declare-function subr-native-comp-unit "data.c")
 
 (defun locate-eln-file (eln-file)
-  "Locate a natively-compiled ELN-FILE by searching its load path.
-This function looks in directories named by `native-comp-eln-load-path'."
+  "Locate native compilation file."
   (declare (important-return-value t))
-  (or (locate-file-internal (concat comp-native-version-dir "/" eln-file)
-		   native-comp-eln-load-path)
-      (locate-file-internal
-       ;; Preloaded *.eln files live in the preloaded/ subdirectory of
-       ;; the last entry in `native-comp-eln-load-path'.
-       (concat comp-native-version-dir "/preloaded/" eln-file)
-       (last native-comp-eln-load-path))))
+  (locate-file-internal eln-file load-path))
 
 (defun symbol-file (symbol &optional type)
   "Returns the elisp file that defined SYMBOL.

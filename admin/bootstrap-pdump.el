@@ -417,8 +417,7 @@
 ;; A bootstrap wrinkle: trampoline compilation without byte-compiled
 ;; bytecomp.elc (equivalently, a null pdumper--pure-pool) incurs dreaded
 ;; eager macroexpansion cycles.
-(unless pdumper--pure-pool
-  (setq native-comp-disable-subr-trampolines t))
+(setq native-comp-disable-subr-trampolines (not pdumper--pure-pool))
 
 (message "Dumping to %s" (pdumping-output))
 (condition-case nil
@@ -453,7 +452,7 @@
                               t))))
     (error (ignore-errors (delete-file output-path)))))
 
-(kill-emacs)
+(kill-emacs) ;crude
 
 ;; Local Variables:
 ;; no-byte-compile: t

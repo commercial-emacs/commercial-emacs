@@ -25,22 +25,10 @@ top_builddir = @top_builddir@
 VPATH = $(srcdir)
 EXEEXT = @EXEEXT@
 
-# Empty for all systems except MinGW, where xargs needs an explicit
-# limitation.
+# MinGW xargs needs an explicit limitation.
 XARGS_LIMIT = @XARGS_LIMIT@
 
 HAVE_NATIVE_COMP = @HAVE_NATIVE_COMP@
-NATIVE_COMPILATION_AOT = @NATIVE_COMPILATION_AOT@
-ifeq ($(HAVE_NATIVE_COMP),yes)
-# Environment variable to enable Ahead-Of-Time compilation.
-ifndef NATIVE_FULL_AOT
-NATIVE_SKIP_NONDUMP = 1
-endif
-# Configured for Ahead-Of-Time compilation.
-ifeq ($(NATIVE_COMPILATION_AOT),yes)
-NATIVE_SKIP_NONDUMP = ""
-endif
-endif
 
 -include ${top_builddir}/src/verbose.mk
 
@@ -244,16 +232,15 @@ ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
 	    --eval "(native-compile \"./$<\" \"./$@\")"
 endif
 
+# this was obviously the wrong way of doing this
 define compile-rest
-$(filter-out $(BYTE_COMPILER_EL:.el=.elc) $(COMPILE_FIRST:.el=.elc),$(shell for el in `echo "${SUBDIRS_REL} " | \
-            sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.el |g'`; \
-    do \
-      test -f $$el || continue; \
-      test ! -f $${el}c && \
-        GREP_OPTIONS= grep '^;.*[^a-zA-Z]no-byte-compile: *t' $$el > /dev/null && \
-        continue; \
-      echo "$${el}c"; \
-    done | xargs $(XARGS_LIMIT) echo))
+$(filter-out $(BYTE_COMPILER_EL:.el=el$(1)) $(COMPILE_FIRST:.el=el$(1)), $(shell \
+  els=`echo "${SUBDIRS_REL} " | sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.el |g'`; \
+  for el in $$els; do \
+    test -f $$el || continue; \
+    GREP_OPTIONS= grep '^;.*[^a-zA-Z]$(2): *t' $$el >/dev/null && continue; \
+    echo "$${el}$(1)"; \
+  done | xargs $(XARGS_LIMIT) echo))
 endef
 
 .PHONY: compile-compiler
@@ -261,7 +248,11 @@ compile-compiler: $(BYTE_COMPILER_EL:.el=.elc)
 
 .SECONDEXPANSION:
 .PHONY: compile
-compile: compile-clean compile-compiler $(COMPILE_FIRST:.el=.elc) $$(compile-rest)
+compile: compile-clean compile-compiler \
+  $(COMPILE_FIRST:.el=.elc) $$(call compile-rest,c,no-byte-compile)
+ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
+compile: $$(call compile-rest,n,no-\(byte\|native\)-compile)
+endif
 
 ifeq ($(HAVE_NATIVE_COMP),yes)
 .PHONY: compile-native
@@ -289,24 +280,9 @@ compile-always:
 	@$(MAKE) compile
 
 ifeq ($(HAVE_NATIVE_COMP),yes)
-.PHONY: trampolines compile-eln-aot
+.PHONY: trampolines
 trampolines: compile
-	$(emacs) -l comp -f comp-compile-all-trampolines
-compile-eln-aot:
-	# this was obviously the wrong way to do this
-	@(els=`echo "${SUBDIRS_REL} " | sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.el |g'`; \
-	for el in $$els; do                          \
-	  test -f $$el || continue; 		     \
-	  test -f $${el}c || continue; 		     \
-	  GREP_OPTIONS= grep '^;.*[^a-zA-Z]no-byte-compile: *t' $$el > /dev/null && \
-	      continue; 			     \
-	  GREP_OPTIONS= grep '^;.*[^a-zA-Z]no-native-compile: *t' $$el > /dev/null && \
-	      continue; 			     \
-	  echo "$${el}n";                            \
-	done | xargs $(XARGS_LIMIT) echo) |	     \
-	while read chunk; do			     \
-	  $(MAKE) "$$chunk";                         \
-	done
+	$(emacs) $(BYTE_COMPILE_FLAGS) -l comp -f comp-compile-all-trampolines
 endif
 
 .PHONY: backup-compiled-files compile-after-backup

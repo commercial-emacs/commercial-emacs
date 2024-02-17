@@ -29,10 +29,6 @@
 
 (eval-when-compile (require 'cl-lib))
 
-;; These variables and functions are defined in comp.c
-(defvar comp-native-version-dir)
-(defvar native-comp-eln-load-path)
-
 (defgroup comp-common nil
   "Emacs Lisp native compiler common code."
   :group 'lisp)
@@ -516,15 +512,6 @@ To be used by all entry points."
 (defun comp-trampoline-filename (subr-name)
   "Given SUBR-NAME return the filename containing the trampoline."
   (concat (comp-c-func-name subr-name "subr--trampoline-" t) ".eln"))
-
-(defun comp-eln-load-path-eff ()
-  "Return a list of effective eln load directories.
-Account for `native-comp-eln-load-path' and `comp-native-version-dir'."
-  (mapcar (lambda (dir)
-            (expand-file-name comp-native-version-dir
-                              (file-name-as-directory
-                               (expand-file-name dir invocation-directory))))
-          native-comp-eln-load-path))
 
 ;;;###autoload
 (defun comp-function-type-spec (function)

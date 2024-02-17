@@ -140,7 +140,6 @@ src/gl-stamp
 core
 core.*[0-9]
 gmon.out
-native-lisp/
 oo/
 oo-spd/
 src/*.map
@@ -220,6 +219,7 @@ lisp/international/eucjp-ms.el
 lisp/international/uni-*.el
 lisp/international/idna-mapping.el
 lisp/language/pinyin.el
+lisp/trampolines
 
 # Documentation.
 *.aux

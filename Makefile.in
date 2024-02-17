@@ -397,11 +397,6 @@ lisp: src
 lib lib-src lisp nt: Makefile
 	$(MAKE) -C $@ all
 
-trampolines: src lisp
-ifeq ($(HAVE_NATIVE_COMP),yes)
-	$(MAKE) -C lisp trampolines
-endif
-
 src: Makefile
 	$(MAKE) -C $@ all
 
