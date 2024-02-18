@@ -1118,6 +1118,12 @@ Similarly to buffer restoration by Desktop, 'recentf-mode' checking
 of the accessibility of remote files can now time out if
 'remote-file-name-access-timeout' is set to a positive number.
 
+** Smerge mode
+
+*** New interactive function 'smerge-resolve-all-in-file-to'.
+Allows to resolve all conflicts inside a file in preference of 'upper'
+or 'base' or 'lower'.
+
 ** Notifications
 
 +++
