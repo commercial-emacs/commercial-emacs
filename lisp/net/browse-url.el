@@ -724,13 +724,16 @@ for use in `interactive'."
 ;; Browse current buffer
 
 ;;;###autoload
-(defun browse-url-of-file (&optional file)
+(defun browse-url-of-file (&optional file secondary)
   "Use a web browser to display FILE.
 Display the current buffer's file if FILE is nil or if called
 interactively.  Turn the filename into a URL with function
 `browse-url-file-url'.  Pass the URL to a browser using the
-`browse-url' function then run `browse-url-of-file-hook'."
-  (interactive)
+`browse-url' function then run `browse-url-of-file-hook'.
+
+With a prefix argument, or when SECONDARY is non-nil, use
+`browse-url-secondary-browser-function' instead."
+  (interactive (list nil current-prefix-arg))
   (or file
       (setq file (buffer-file-name))
       (error "Current buffer has no file"))
@@ -744,7 +747,10 @@ interactively.  Turn the filename into a URL with function
              (not browse-url-temp-file-name))
     (setq browse-url-temp-file-name (file-local-copy file)
           file browse-url-temp-file-name))
-  (browse-url (browse-url-file-url file))
+  (let ((url (browse-url-file-url file)))
+    (if secondary
+      (funcall browse-url-secondary-browser-function url)
+    (browse-url url)))
   (run-hooks 'browse-url-of-file-hook))
 
 (defun browse-url--file-name-coding-system ()
@@ -785,14 +791,17 @@ Use variable `browse-url-filename-alist' to map filenames to URLs."
   file)
 
 ;;;###autoload
-(defun browse-url-of-buffer (&optional buffer)
+(defun browse-url-of-buffer (&optional buffer secondary)
   "Use a web browser to display BUFFER.
 See `browse-url' for details.
 
 Display the current buffer if BUFFER is nil.  Display only the
 currently visible part of BUFFER (from a temporary file) if buffer is
-narrowed."
-  (interactive)
+narrowed.
+
+With a prefix argument, or when SECONDARY is non-nil, use
+`browse-url-secondary-browser-function' instead."
+  (interactive (list nil current-prefix-arg))
   (save-excursion
     (and buffer (set-buffer buffer))
     (let ((file-name
@@ -812,7 +821,7 @@ narrowed."
 		  nil ".html"))))
 	(setq file-name browse-url-temp-file-name)
 	(write-region (point-min) (point-max) file-name nil 'no-message))
-      (browse-url-of-file file-name))))
+      (browse-url-of-file file-name secondary))))
 
 (defun browse-url-delete-temp-file (&optional temp-file-name)
   "Delete `browse-url-temp-file-name' from the file system.
