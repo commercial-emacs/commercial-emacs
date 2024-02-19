@@ -312,7 +312,10 @@ parameter, and should return the (possibly) transformed URL."
 
 (defvar eww-data nil)
 (defvar eww-history nil)
-(defvar eww-history-position 0)
+(defvar eww-history-position 0
+  "The 1-indexed position in `eww-history'.
+If zero, EWW is at the newest page, which isn't yet present in
+`eww-history'.")
 (defvar eww-prompt-history nil)
 
 (defvar eww-local-regex "localhost"
@@ -1129,9 +1132,9 @@ the like."
           ["Reload" eww-reload t]
           ["Follow URL in new buffer" eww-open-in-new-buffer]
           ["Back to previous page" eww-back-url
-           :active (not (zerop (length eww-history)))]
+           :active (< eww-history-position (length eww-history))]
           ["Forward to next page" eww-forward-url
-           :active (not (zerop eww-history-position))]
+           :active (> eww-history-position 1)]
           ["Browse with external browser" eww-browse-with-external-browser t]
           ["Download" eww-download t]
           ["View page source" eww-view-source]
@@ -1155,9 +1158,9 @@ the like."
     (easy-menu-define nil easy-menu nil
       '("Eww"
         ["Back to previous page" eww-back-url
-	 :visible (not (zerop (length eww-history)))]
+	 :active (< eww-history-position (length eww-history))]
 	["Forward to next page" eww-forward-url
-	 :visible (not (zerop eww-history-position))]
+	 :active (> eww-history-position 1)]
 	["Reload" eww-reload t]))
     (dolist (item (reverse (lookup-key easy-menu [menu-bar eww])))
       (when (consp item)
@@ -1280,16 +1283,20 @@ instead of `browse-url-new-window-flag'."
   (interactive nil eww-mode)
   (when (>= eww-history-position (length eww-history))
     (user-error "No previous page"))
-  (eww-save-history)
-  (setq eww-history-position (+ eww-history-position 2))
+  (if (eww-save-history)
+      ;; We were at the latest page (which was just added to the
+      ;; history), so go back two entries.
+      (setq eww-history-position 2)
+    (setq eww-history-position (1+ eww-history-position)))
   (eww-restore-history (elt eww-history (1- eww-history-position))))
 
 (defun eww-forward-url ()
   "Go to the next displayed page."
   (interactive nil eww-mode)
-  (when (zerop eww-history-position)
+  (when (<= eww-history-position 1)
     (user-error "No next page"))
   (eww-save-history)
+  (setq eww-history-position (1- eww-history-position))
   (eww-restore-history (elt eww-history (1- eww-history-position))))
 
 (defun eww-restore-history (elem)
@@ -2289,11 +2296,21 @@ If ERROR-OUT, signal user-error if there are no bookmarks."
 ;;; History code
 
 (defun eww-save-history ()
+  "Save the current page's data to the history.
+If the current page is a historial one loaded from
+`eww-history' (e.g. by calling `eww-back-url'), this will update the
+page's entry in `eww-history' and return nil.  Otherwise, add a new
+entry to `eww-history' and return t."
   (plist-put eww-data :point (point))
   (plist-put eww-data :text (buffer-string))
-  (let ((history-delete-duplicates nil))
-    (add-to-history 'eww-history eww-data eww-history-limit t))
-  (setq eww-data (list :title "")))
+  (prog1
+      (if (zerop eww-history-position)
+          (let ((history-delete-duplicates nil))
+            (add-to-history 'eww-history eww-data eww-history-limit t)
+            t)
+        (setf (elt eww-history (1- eww-history-position)) eww-data)
+        nil)
+    (setq eww-data (list :title ""))))
 
 (defvar eww-current-buffer)
 

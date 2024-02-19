@@ -856,6 +856,13 @@ When invoked with the prefix argument ('C-u'),
 This is useful for continuing reading the URL in the current buffer
 when the new URL is fetched.
 
+---
+*** History navigation in EWW now works like other browsers.
+Previously, when navigating back and forward through page history in
+EWW, new history entries could get added to the history list.  Now, when
+navigating through history, EWW preserves the history list and only
+displays the relevant history entry.
+
 ** go-ts-mode
 
 +++
