@@ -65,6 +65,11 @@
 (set-buffer "*scratch*")
 (setq buffer-undo-list t)
 
+;; A bootstrap wrinkle: trampoline compilation without byte-compiled
+;; bytecomp.elc (equivalently, a null pdumper--pure-pool) incurs dreaded
+;; eager macroexpansion cycles.
+(setq native-comp-disable-subr-trampolines (null pdumper--pure-pool))
+
 (load "emacs-lisp/debug-early")
 (load "emacs-lisp/byte-run")
 (load "emacs-lisp/backquote")
@@ -413,11 +418,6 @@
 
 (unless (garbage-collect)
   (setq pure-space-overflow t))
-
-;; A bootstrap wrinkle: trampoline compilation without byte-compiled
-;; bytecomp.elc (equivalently, a null pdumper--pure-pool) incurs dreaded
-;; eager macroexpansion cycles.
-(setq native-comp-disable-subr-trampolines (not pdumper--pure-pool))
 
 (message "Dumping to %s" (pdumping-output))
 (condition-case nil

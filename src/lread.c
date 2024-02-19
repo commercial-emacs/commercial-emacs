@@ -1717,6 +1717,7 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 			  && (errno == ENOENT || errno == ENOTDIR))
 		   {
 		     best_fd = 1; // just something not zero
+		     best_string = string;
 		     goto openp_out;
 		   }
 	       }

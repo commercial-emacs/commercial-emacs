@@ -488,14 +488,9 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
   record_unwind_protect_ptr (call_process_kill, callproc_fd);
 
   /* Search for program; barf if not found.  */
-  {
-    int ok;
-
-    ok = openp (Vexec_path, args[0], Vexec_suffixes, &path,
-		make_fixnum (X_OK), false);
-    if (ok < 0)
-      report_file_error ("Searching for program", args[0]);
-  }
+  if (0 > openp (Vexec_path, args[0], Vexec_suffixes, &path,
+		 make_fixnum (X_OK), false))
+    report_file_error ("Searching for program", args[0]);
 
   /* Remove "/:" from PATH.  */
   path = remove_slash_colon (path);

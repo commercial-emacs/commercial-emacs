@@ -486,6 +486,7 @@ endif
 	$(MAKE) -C ../lisp update-subdirs
 
 bootstrap-emacs$(EXEEXT): ../lisp/subdirs.el | emacs$(EXEEXT)
+	@# symlink preferred but for mingw
 	cp -f $(firstword $|) $@
 
 ../lisp/international/charprop.el: | bootstrap-emacs.pdmp
