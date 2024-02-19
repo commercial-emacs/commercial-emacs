@@ -740,43 +740,6 @@ comp_hash_string (Lisp_Object string)
   return Fsubstring (digest, Qnil, make_fixnum (HASH_LENGTH));
 }
 
-static Lisp_Object
-comp_hash_source_file (Lisp_Object filename)
-{
-  /* Can't use Finsert_file_contents + Fbuffer_hash as this is called
-     by Fcomp_el_to_eln_filename too early during bootstrap.  */
-  bool is_gz = suffix_p (filename, ".gz");
-#ifndef HAVE_ZLIB
-  if (is_gz)
-    xsignal2 (Qfile_notify_error,
-	      build_string ("Cannot natively compile compressed *.el files without zlib support"),
-	      filename);
-#endif
-  Lisp_Object encoded_filename = ENCODE_FILE (filename);
-  FILE *f = emacs_fopen (SSDATA (encoded_filename), is_gz ? "rb" : "r");
-
-  if (!f)
-    report_file_error ("Opening source file", filename);
-
-  Lisp_Object digest = make_unibyte_string (NULL, MD5_DIGEST_SIZE * 2);
-
-#ifdef HAVE_ZLIB
-  int res = is_gz
-    ? md5_gz_stream (f, SSDATA (digest))
-    : md5_stream (f, SSDATA (digest));
-#else
-  int res = md5_stream (f, SSDATA (digest));
-#endif
-  fclose (f);
-
-  if (res)
-    xsignal2 (Qfile_notify_error, build_string ("hashing failed"), filename);
-
-  hexbuf_digest (SSDATA (digest), SSDATA (digest), MD5_DIGEST_SIZE);
-
-  return Fsubstring (digest, Qnil, make_fixnum (HASH_LENGTH));
-}
-
 DEFUN ("comp--subr-signature", Fcomp__subr_signature,
        Scomp__subr_signature, 1, 1, 0,
        doc: /* Support function to hash_native_abi.
@@ -803,8 +766,6 @@ hash_native_abi (void)
 	       Fmapconcat (intern_c_string ("comp--subr-signature"),
 			   Vcomp_subr_list, build_string (""))));
 
-  Lisp_Object version = Vemacs_version;
-
 #ifdef NS_SELF_CONTAINED
   /* MacOS self contained app bundles do not like having dots in the
      directory names under the Contents/Frameworks directory, so
@@ -828,9 +789,6 @@ hash_native_abi (void)
       *to++ = c;
     }
 #endif
-
-  Vcomp_native_version_dir =
-    concat3 (version, build_string ("-"), Vcomp_abi_hash);
 }
 
 static void
@@ -4155,19 +4113,6 @@ compile_function (Lisp_Object func)
 /* Entry points exposed to lisp.  */
 /**********************************/
 
-static Lisp_Object
-make_directory_wrapper (Lisp_Object directory)
-{
-  CALL2I (make-directory, directory, Qt);
-  return Qnil;
-}
-
-static Lisp_Object
-make_directory_wrapper_1 (Lisp_Object ignore)
-{
-  return Qt;
-}
-
 DEFUN ("comp--install-trampoline", Fcomp__install_trampoline,
        Scomp__install_trampoline, 2, 2, 0,
        doc: /* Install a TRAMPOLINE for primitive SUBR-NAME.  */)
@@ -4619,7 +4564,7 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
 	      build_string (err));
 
   CALL1I (comp-clean-up-stale-eln, filename);
-  CALL2I (comp-delete-or-replace-file, tmp_file, filenamea);
+  CALL2I (comp-delete-or-replace-file, tmp_file, filename);
 
   return filename;
 }
@@ -5294,8 +5239,6 @@ natively-compiled one.  */);
   DEFSYM (Qnative__compile_async, "native--compile-async");
 
   defsubr (&Scomp__subr_signature);
-  defsubr (&Scomp_el_to_eln_rel_filename);
-  defsubr (&Scomp_el_to_eln_filename);
   defsubr (&Scomp_native_driver_options_effective_p);
   defsubr (&Scomp_native_compiler_options_effective_p);
   defsubr (&Scomp__install_trampoline);

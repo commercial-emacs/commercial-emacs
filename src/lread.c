@@ -1383,7 +1383,7 @@ Return t if on success.  */)
             }
 	}
     }
-  else if (!is_module && !is_native_elisp)
+  else if (!is_module && !is_native_lisp)
     {
       if (!NILP (Vload_source_file_function)) /* too hard to write in C? */
 	{
@@ -1410,7 +1410,7 @@ Return t if on success.  */)
       stream = NULL;
       errno = EINVAL;
     }
-  else if (!is_module && !is_native_elisp)
+  else if (!is_module && !is_native_lisp)
     {
 #ifdef WINDOWSNT
       emacs_close (fd);
@@ -1426,7 +1426,7 @@ Return t if on success.  */)
      might be accessed by the unbind_to call below.  */
   struct infile input;
 
-  if (is_module || is_native_elisp)
+  if (is_module || is_native_lisp)
     {
       /* `module-load' uses the file name, so we can close the stream
          now.  */
@@ -1451,7 +1451,7 @@ Return t if on success.  */)
     {
       if (is_module)
         message_with_string ("Loading %s (module)...", file, 1);
-      else if (is_native_elisp)
+      else if (is_native_lisp)
         message_with_string ("Loading %s (native compiled elisp)...", file, 1);
       else if (!compiled)
 	message_with_string ("Loading %s.el (source)...", file, 1);
@@ -1475,7 +1475,7 @@ Return t if on success.  */)
       emacs_abort ();
 #endif
     }
-  else if (is_native_elisp)
+  else if (is_native_lisp)
     {
 #ifdef HAVE_NATIVE_COMP
       loadhist_initialize (hist_file_name);
@@ -1521,7 +1521,7 @@ Return t if on success.  */)
     {
       if (is_module)
         message_with_string ("Loading %s (module)...done", file, 1);
-      else if (is_native_elisp)
+      else if (is_native_lisp)
 	message_with_string ("Loading %s (native compiled elisp)...done", file, 1);
       else if (!compiled)
 	message_with_string ("Loading %s (source)...done", file, 1);
@@ -1632,164 +1632,163 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
   if (NILP (path))
     path = just_use_str;
 
+  if (FIXNATP (predicate) && XFIXNAT (predicate) > INT_MAX)
+    {
+      last_errno = EINVAL;
+      goto openp_out;
+    }
+
   FOR_EACH_TAIL_SAFE (path)
    {
      ptrdiff_t baselen, prefixlen;
 
-    if (EQ (path, just_use_str))
-      filename = str;
-    else
-      filename = Fexpand_file_name (str, XCAR (path));
+     if (EQ (path, just_use_str))
+       filename = str;
+     else
+       filename = Fexpand_file_name (str, XCAR (path));
 
-    if (!complete_filename_p (filename)) // not absolute file name
-      {
-	filename = Fexpand_file_name (filename, BVAR (current_buffer, directory));
-	if (!complete_filename_p (filename))
-	  continue;
-      }
+     if (!complete_filename_p (filename)) // complete === absolute
+       {
+	 filename = Fexpand_file_name (filename, BVAR (current_buffer, directory));
+	 if (!complete_filename_p (filename))
+	   continue;
+       }
 
-    /* Ensure FN big enough.  */
-    want_length = max_suffix_len + SBYTES (filename);
-    if (fn_size <= want_length)
-      {
-	fn_size = 100 + want_length;
-	fn = SAFE_ALLOCA (fn_size);
-      }
+     /* Ensure FN big enough.  */
+     want_length = max_suffix_len + SBYTES (filename);
+     if (fn_size <= want_length)
+       {
+	 fn_size = 100 + want_length;
+	 fn = SAFE_ALLOCA (fn_size);
+       }
 
-    /* Copy FILENAME's data to FN but remove starting /: if any.  */
-    prefixlen = ((SCHARS (filename) > 2
-		  && SREF (filename, 0) == '/'
-		  && SREF (filename, 1) == ':')
-		 ? 2 : 0);
-    baselen = SBYTES (filename) - prefixlen;
-    memcpy (fn, SDATA (filename) + prefixlen, baselen);
+     /* Copy FILENAME's data to FN but remove starting /: if any.  */
+     prefixlen = ((SCHARS (filename) > 2
+		   && SREF (filename, 0) == '/'
+		   && SREF (filename, 1) == ':')
+		  ? 2 : 0);
+     baselen = SBYTES (filename) - prefixlen;
+     memcpy (fn, SDATA (filename) + prefixlen, baselen);
 
-    /* Loop over suffixes.  */
-    AUTO_LIST1 (empty_string_only, empty_unibyte_string);
-    tail = NILP (suffixes) ? empty_string_only : suffixes;
-    FOR_EACH_TAIL_SAFE (tail)
-      {
-	Lisp_Object suffix = XCAR (tail);
-	ptrdiff_t fnlen, lsuffix = SBYTES (suffix);
-	Lisp_Object handler;
-	int fd = -1;
+     /* Loop over suffixes.  */
+     AUTO_LIST1 (empty_string_only, empty_unibyte_string);
+     tail = NILP (suffixes) ? empty_string_only : suffixes;
 
-	/* Make complete filename by appending SUFFIX.  */
-	memcpy (fn + baselen, SDATA (suffix), lsuffix + 1);
-	fnlen = baselen + lsuffix;
+     FOR_EACH_TAIL_SAFE (tail)
+       {
+	 Lisp_Object suffix = XCAR (tail);
+	 ptrdiff_t fnlen, lsuffix = SBYTES (suffix);
+	 Lisp_Object handler;
+	 int fd = -1;
 
-	if (!STRING_MULTIBYTE (filename) && !STRING_MULTIBYTE (suffix))
-	  /* Prefer unibyte to let loadup decide (loadup switches
-	     between several default-file-name-coding-system).  */
-	  string = make_unibyte_string (fn, fnlen);
-	else
-	  string = make_string (fn, fnlen);
-	handler = Ffind_file_name_handler (string, Qfile_exists_p);
-	if (FIXNATP (predicate))
-	  {
-	    encoded_fn = ENCODE_FILE (string);
-	    const char *pfn = SSDATA (encoded_fn);
+	 /* Make complete filename by appending SUFFIX.  */
+	 memcpy (fn + baselen, SDATA (suffix), lsuffix + 1);
+	 fnlen = baselen + lsuffix;
 
-	    if (INT_MAX < XFIXNAT (predicate))
-	      last_errno = EINVAL;
-	    else if (0 == faccessat (AT_FDCWD, pfn, XFIXNAT (predicate), AT_EACCESS))
-	      {
-		if (file_directory_p (encoded_fn))
-		  last_errno = EISDIR;
-		else if (errno == ENOENT || errno == ENOTDIR)
-		  fd = 1;
-		else
-		  last_errno = errno;
-	      }
-	    else if (!(errno == ENOENT || errno == ENOTDIR))
-	      last_errno = errno;
-	  }
-	else if (!NILP (handler) || (!NILP (predicate) && !EQ (predicate, Qt)))
-	  {
-	    bool exists;
-	    if (NILP (predicate) || EQ (predicate, Qt))
-	      exists = !NILP (Ffile_readable_p (string));
-	    else
-	      {
-		Lisp_Object tmp = call1 (predicate, string);
-		if (NILP (tmp))
-		  exists = false;
-		else if (EQ (tmp, Qdir_ok)
-			 || NILP (Ffile_directory_p (string)))
-		  exists = true;
-		else
-		  {
-		    exists = false;
-		    last_errno = EISDIR;
-		  }
-	      }
+	 if (!STRING_MULTIBYTE (filename) && !STRING_MULTIBYTE (suffix))
+	   /* Prefer unibyte to let loadup decide (loadup switches
+	      between several default-file-name-coding-system).  */
+	   string = make_unibyte_string (fn, fnlen);
+	 else
+	   string = make_string (fn, fnlen);
+	 handler = Ffind_file_name_handler (string, Qfile_exists_p);
 
-	    if (exists)
-	      {
-		best_string = string;
-		best_fd = -2;
-		goto openp_out;
-	      }
-	    eassume (fd == -1 && best_fd == -1);
-	  }
-	else
-	  {
-	    encoded_fn = ENCODE_FILE (string);
-	    const char *pfn = SSDATA (encoded_fn);
+	 if (FIXNATP (predicate)
+	     || (NILP (handler) && (NILP (predicate) || EQ (predicate, Qt))))
+	   {
+	     // In this case, no arbitrary lisp needs executing.
+	     encoded_fn = ENCODE_FILE (string);
+	     const char *pfn = SSDATA (encoded_fn);
 
-	    /*  In some systems (like Windows) finding out if a
-		file exists is cheaper to do than actually opening
-		it.  Only open the file when we are sure that it
-		exists.  */
-#ifdef WINDOWSNT
-	    if (faccessat (AT_FDCWD, pfn, R_OK, AT_EACCESS))
-	      fd = -1;
-	    else
-#endif
-	      fd = emacs_open (pfn, O_RDONLY, 0);
+	     bool q_good = FIXNATP (predicate)
+	       ? 0 == faccessat (AT_FDCWD, pfn, XFIXNAT (predicate), AT_EACCESS)
+	       : (fd = emacs_open (pfn, O_RDONLY, 0), fd >= 0);
 
-	    if (fd < 0)
-	      {
-		if (!(errno == ENOENT || errno == ENOTDIR))
-		  last_errno = errno;
-	      }
-	    else
-	      {
-		struct stat st;
-		int err = (fstat (fd, &st) != 0
-			   ? errno
-			   : S_ISDIR (st.st_mode)
-			   ? EISDIR
-			   : 0);
-		if (err)
-		  {
-		    last_errno = err;
-		    emacs_close (fd);
-		    fd = -1;
-		  }
-	      }
-	  }
+	     if (q_good)
+	       {
+		 if (file_directory_p (encoded_fn))
+		   {
+		     last_errno = EISDIR;
+		     if (fd >= 0)
+		       emacs_close (fd);
+		     fd = -1;
+		   }
+		 else if (FIXNATP (predicate)
+			  && (errno == ENOENT || errno == ENOTDIR))
+		   {
+		     best_fd = 1; // just something not zero
+		     goto openp_out;
+		   }
+	       }
+	     else if (errno != ENOENT && errno != ENOTDIR)
+	       {
+		 eassume (fd < 0);
+		 last_errno = errno;
+	       }
 
-	if (fd >= 0)
-	  {
-	    struct timespec mtime = get_stat_mtime (&st);
-	    bool first_found = !newer || FIXNATP (predicate);
-	    if (first_found || timespec_cmp (mtime, best_mtime) > 0)
-	      {
-		if (best_fd >= 0)
-		  emacs_close (best_fd);
-		best_fd = fd;
-		best_mtime = mtime;
-		best_string = string;
-		if (first_found)
-		  goto openp_out;
-	      }
-	    emacs_close (fd);
-	    fd = -1;
-	  }
-      } /* FOR_EACH suffix */
-    if (best_fd >= 0 || absolute)
-      break;
+	     if (fd >= 0)
+	       {
+		 bool update_best = true;
+		 struct timespec mtime;
+
+		 if (newer)
+		   {
+		     struct stat st;
+		     fstat (fd, &st);
+		     mtime = get_stat_mtime (&st);
+		     update_best = timespec_cmp (mtime, best_mtime) > 0;
+		   }
+		 if (update_best)
+		   {
+		     if (best_fd >= 0)
+		       emacs_close (best_fd);
+		     best_fd = fd;
+		     best_string = string;
+		     if (newer)
+		       best_mtime = mtime;
+		     else
+		       goto openp_out;
+		   }
+		 else
+		   {
+		     emacs_close (fd);
+		     fd = -1;
+		   }
+	       }
+	   }
+	 else
+	   {
+	     // Assert arbitrary lisp needs executing
+	     eassert (!NILP (handler) || (!NILP (predicate) && !EQ (predicate, Qt)));
+	     bool exists;
+	     if (NILP (predicate) || EQ (predicate, Qt))
+	       exists = !NILP (Ffile_readable_p (string));
+	     else
+	       {
+		 Lisp_Object tmp = call1 (predicate, string);
+		 if (NILP (tmp))
+		   exists = false;
+		 else if (EQ (tmp, Qdir_ok)
+			  || NILP (Ffile_directory_p (string)))
+		   exists = true;
+		 else
+		   {
+		     exists = false;
+		     last_errno = EISDIR;
+		   }
+	       }
+
+	     if (exists)
+	       {
+		 best_string = string;
+		 best_fd = -2;
+		 goto openp_out;
+	       }
+	     eassume (fd == -1 && best_fd == -1);
+	   }
+       } /* FOR_EACH suffix */
+     if (best_fd >= 0 || absolute)
+       break;
    } /* FOR_EACH path */
 
  openp_out:
