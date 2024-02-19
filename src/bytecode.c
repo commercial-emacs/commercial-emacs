@@ -1713,13 +1713,12 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
             struct Lisp_Hash_Table *h = XHASH_TABLE (jmp_table);
 	    /* Do a linear search if there are few cases and the test is `eq'.
 	       (The table is assumed to be sized exactly; all entries are
-	       consecutive at the beginning.)
-	       FIXME: 5 is arbitrarily chosen.  */
-            if (h->count <= 5 && !h->test->cmpfn && !symbols_with_pos_enabled)
+	       consecutive at the beginning.)  */
+            if (h->count <= 5 && !h->test->cmpfn)
               {
 		eassume (h->count >= 2);
 		for (ptrdiff_t i = h->count - 1; i >= 0; i--)
-		  if (BASE_EQ (v1, HASH_KEY (h, i)))
+		  if (EQ (v1, HASH_KEY (h, i)))
 		    {
 		      op = XFIXNUM (HASH_VALUE (h, i));
 		      goto op_branch;

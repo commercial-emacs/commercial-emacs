@@ -2254,7 +2254,6 @@ XHASH_TABLE (Lisp_Object a)
 INLINE Lisp_Object
 make_lisp_hash_table (struct Lisp_Hash_Table *h)
 {
-  eassert (PSEUDOVECTOR_TYPEP (&h->header, PVEC_HASH_TABLE));
   return make_lisp_ptr (h, Lisp_Vectorlike);
 }
 
