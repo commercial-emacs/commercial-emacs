@@ -2483,16 +2483,7 @@ installed), maybe you need to \\[package-refresh-contents]")
 
 (defvar package-vc-repository-store)
 (defun package--delete-directory (dir)
-  "Delete PKG-DESC directory DIR recursively.
-Clean-up the corresponding .eln files if Emacs is native
-compiled."
-  (when (featurep 'native-compile)
-    (cl-loop
-     for file in (directory-files-recursively
-                  dir
-                  ;; Exclude lockfiles
-                  (rx bos (or (and "." (not "#")) (not ".")) (* nonl) ".el" eos))
-     do (comp-clean-up-stale-eln (concat (file-name-sans-extension file) ".eln"))))
+  "Delete PKG-DESC directory DIR recursively."
   (if (file-symlink-p (directory-file-name dir))
       (delete-file (directory-file-name dir))
     (delete-directory dir t)))

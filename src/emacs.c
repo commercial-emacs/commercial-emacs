@@ -2760,10 +2760,6 @@ killed.  */
       unlink (SSDATA (listfile));
     }
 
-#if defined HAVE_NATIVE_COMP && defined WINDOWSNT
-  eln_load_path_final_clean_up ();
-#endif
-
   if (!NILP (restart))
     {
       turn_on_atimers (false);

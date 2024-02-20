@@ -520,10 +520,6 @@ load_gccjit_if_necessary (bool mandatory)
 #define CALL2I(fun, arg1, arg2)				\
   CALLN (Ffuncall, intern_c_string (STR (fun)), arg1, arg2)
 
-/* Like call4 but stringify and intern.  */
-#define CALL4I(fun, arg1, arg2, arg3, arg4)				\
-  CALLN (Ffuncall, intern_c_string (STR (fun)), arg1, arg2, arg3, arg4)
-
 #define DECL_BLOCK(name, func)				\
   gcc_jit_block *(name) =				\
     gcc_jit_function_new_block (func, STR (name))
@@ -4425,13 +4421,11 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
   load_gccjit_if_necessary (true);
 
   CHECK_STRING (filename);
-  Lisp_Object base_name = Fsubstring (filename, Qnil, make_fixnum (-4));
-  Lisp_Object ebase_name = ENCODE_FILE (base_name);
+  Lisp_Object base_name = CALL1I (file-name-sans-extension, filename);
 
   comp.func_relocs_local = NULL;
 
 #ifdef WINDOWSNT
-  ebase_name = ansi_encode_filename (ebase_name);
   /* Tell libgccjit the actual file name of the loaded DLL, otherwise
      it will use 'libgccjit.so', which is not useful.  */
   Lisp_Object libgccjit_loaded_from = Fget (Qgccjit, QCloaded_from);
@@ -4454,8 +4448,7 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
   else	/* this should never happen */
     gcc_jit_context_set_str_option (comp.ctxt, GCC_JIT_STR_OPTION_PROGNAME,
 				    "libgccjit-0.dll");
-#endif
-
+#endif /* WINDOWSNT */
   comp.speed = XFIXNUM (CALL1I (comp-ctxt-speed, Vcomp_ctxt));
   eassert (comp.speed < INT_MAX);
   comp.debug = XFIXNUM (CALL1I (comp-ctxt-debug, Vcomp_ctxt));
@@ -4540,33 +4533,22 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
 
   if (comp.debug > 1)
       gcc_jit_context_dump_to_file (comp.ctxt,
-				    format_string ("%s.c", SSDATA (ebase_name)),
+				    format_string ("%s.c", SSDATA (base_name)),
 				    1);
   if (!NILP (Fsymbol_value (Qcomp_libgccjit_reproducer)))
     gcc_jit_context_dump_reproducer_to_file (
       comp.ctxt,
-      format_string ("%s_libgccjit_repro.c", SSDATA (ebase_name)));
+      format_string ("%s_libgccjit_repro.c", SSDATA (base_name)));
 
-  Lisp_Object tmp_file =
-    CALL4I (make-temp-file, base_name, Qnil, build_string (".eln.tmp"), Qnil);
-
-  Lisp_Object encoded_tmp_file = ENCODE_FILE (tmp_file);
-#ifdef WINDOWSNT
-  encoded_tmp_file = ansi_encode_filename (encoded_tmp_file);
-#endif
   gcc_jit_context_compile_to_file (comp.ctxt,
 				   GCC_JIT_OUTPUT_KIND_DYNAMIC_LIBRARY,
-				   SSDATA (encoded_tmp_file));
-
+				   SSDATA (concat2 (base_name, build_string (".eln"))));
   const char *err = gcc_jit_context_get_first_error (comp.ctxt);
   if (err)
     xsignal3 (Qnative_ice,
 	      build_string ("failed to compile"),
 	      filename,
 	      build_string (err));
-
-  CALL1I (comp-clean-up-stale-eln, filename);
-  CALL2I (comp-delete-or-replace-file, tmp_file, filename);
 
   return filename;
 }
@@ -4628,42 +4610,8 @@ helper_save_restriction (void)
 static bool
 helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code)
 {
-  /* return PSEUDOVECTOR_TYPEP (XUNTAG (a, Lisp_Vectorlike, */
-  /* 				     union vectorlike_header), */
-  /* 			     code); */
   return PSEUDOVECTORP (a, code);
 }
-
-#ifdef WINDOWSNT
-static Lisp_Object
-return_nil (Lisp_Object arg)
-{
-  return Qnil;
-}
-
-static Lisp_Object
-directory_files_matching (Lisp_Object name, Lisp_Object match)
-{
-  return Fdirectory_files (name, Qt, match, Qnil, Qnil);
-}
-
-/* Reap what `comp-delete-or-replace-file' sowed.  Insane.  */
-void
-eln_load_path_final_clean_up (void)
-{
-  Lisp_Object paths = Vload_path;
-  FOR_EACH_TAIL (paths)
-    {
-      Lisp_Object files =
-	internal_condition_case_2 (directory_files_matching,
-				   XCAR (paths),
-				   build_string ("\\.eln\\.old\\'"),
-				   Qt, return_nil);
-      FOR_EACH_TAIL (files)
-	internal_delete_file (XCAR (files));
-    }
-}
-#endif /* ifdef WINDOWSNT */
 
 /* This function puts the compilation unit in the
   `Vcomp_loaded_comp_units_h` hashmap.  */

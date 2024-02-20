@@ -84,10 +84,6 @@ extern void syms_of_comp (void);
 extern void maybe_defer_native_compilation (Lisp_Object function_name,
 					    Lisp_Object definition);
 
-#ifdef WINDOWSNT
-extern void eln_load_path_final_clean_up (void);
-#endif
-
 #else /* #ifdef HAVE_NATIVE_COMP */
 
 static inline void

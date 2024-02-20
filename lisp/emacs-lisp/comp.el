@@ -2074,35 +2074,34 @@ TARGET-BB-SYM is the symbol name of the target block."
          (setf lambda-list (cdr lambda-list)))))))
 
 (defun comp--add-call-cstr ()
-  "Add args assumptions for each function of which the type specifier is known."
+  "Add args assumptions for functions."
   (cl-loop
    for bb being each hash-value of (comp-func-blocks comp-func)
-   do
-   (comp--loop-insn-in-block bb
-     (when-let ((match
-                 (pcase insn
-                   (`(set ,lhs (,(pred comp--call-op-p) ,f . ,args))
-                    (when-let ((cstr-f (gethash f comp-known-func-cstr-h)))
-                      (cl-values f cstr-f lhs args)))
-                   (`(,(pred comp--call-op-p) ,f . ,args)
-                    (when-let ((cstr-f (gethash f comp-known-func-cstr-h)))
-                      (cl-values f cstr-f nil args))))))
-       (cl-multiple-value-bind (f cstr-f lhs args) match
-         (cl-loop
-          with gen = (comp--lambda-list-gen (comp-cstr-f-args cstr-f))
-          for arg in args
-          for cstr = (funcall gen)
-          for target = (comp--cond-cstrs-target-mvar arg insn bb)
-          unless (comp-cstr-p cstr)
-            do (signal 'native-ice
-                       (list "Incoherent type specifier for function" f))
-          when (and target
-                    ;; No need to add call constraints if this is t
-                    ;; (bug#45812 bug#45705 bug#45751).
-                    (not (equal comp-cstr-t cstr))
-                    (or (null lhs)
-                        (not (eql (comp-mvar-slot lhs)
-                                  (comp-mvar-slot target)))))
+   do (comp--loop-insn-in-block
+       bb
+       (when-let ((match
+                   (pcase insn
+                     (`(set ,lhs (,(pred comp--call-op-p) ,f . ,args))
+                      (when-let ((cstr-f (gethash f comp-known-func-cstr-h)))
+                        (cl-values f cstr-f lhs args)))
+                     (`(,(pred comp--call-op-p) ,f . ,args)
+                      (when-let ((cstr-f (gethash f comp-known-func-cstr-h)))
+                        (cl-values f cstr-f nil args))))))
+         (cl-multiple-value-bind (f cstr-f lhs args) match
+           (cl-loop
+            with gen = (comp--lambda-list-gen (comp-cstr-f-args cstr-f))
+            for arg in args
+            for cstr = (funcall gen)
+            for target = (comp--cond-cstrs-target-mvar arg insn bb)
+            unless (comp-cstr-p cstr)
+            do (signal 'native-ice (list "Incoherent type specifier for function" f))
+            when (and target
+                      ;; No need to add call constraints if t
+                      ;; (bug#45812 bug#45705 bug#45751).
+                      (not (equal cstr comp-cstr-t))
+                      (or (null lhs)
+                          (not (eql (comp-mvar-slot lhs)
+                                    (comp-mvar-slot target)))))
             do (comp--emit-call-cstr target insn-cell cstr)))))))
 
 (defun comp--add-cstrs (_)
@@ -3244,54 +3243,6 @@ Prepare every function for final compilation and drive the C back-end."
     (comp--native-compile form nil (expand-file-name
                                     (comp-trampoline-filename subr-name)
                                     comp-trampoline-dir))))
-
-;; Some entry point support code.
-
-;;;###autoload
-(defun comp-clean-up-stale-eln (file)
-  "Remove all FILE*.eln* files found in `load-path'.
-The files to be removed are those produced from the original source
-filename (including FILE)."
-  (when (string-match (rx "-" (group-n 1 (1+ hex)) "-" (1+ hex) ".eln" eos)
-                      file)
-    (cl-loop
-     with filename-hash = (match-string 1 file)
-     with regexp = (rx-to-string
-                    `(seq "-" ,filename-hash "-" (1+ hex) ".eln" eos))
-     for dir in load-path
-     do (cl-loop
-         for f in (when (file-exists-p dir)
-		    (directory-files dir t regexp t))
-         ;; We may not be able to delete the file if we have no write
-         ;; permission.
-         do (ignore-error file-error
-              (comp-delete-or-replace-file f))))))
-
-;; In use by comp.c.
-(defun comp-delete-or-replace-file (oldfile &optional newfile)
-  "Replace OLDFILE with NEWFILE.
-When NEWFILE is nil just delete OLDFILE."
-  (cond ((eq 'windows-nt system-type)
-         ;; Windows won't allow deletion of .eln if currently
-         ;; loaded by a process.  Brutal workaround: rename to
-         ;; .eln.old and wait for eln_load_path_final_clean_up().
-         (ignore-errors (delete-file oldfile))
-         (while (condition-case nil
-                                        ;sustain while
-                    (prog1 nil
-                      (when (file-exists-p oldfile)
-                        (rename-file oldfile
-                                     (make-temp-file-internal
-                                      (file-name-sans-extension oldfile)
-                                      nil ".eln.old" nil)
-                                     t))
-                      (when newfile
-                        (rename-file oldfile newfile nil)))
-                                        ;exit while
-                  (file-already-exists t))))
-        (t (if newfile
-               (rename-file oldfile newfile t)
-             (delete-file oldfile)))))
 
 (defun comp--native-compile (function-or-file &optional with-late-load output)
   "Compile FUNCTION-OR-FILE into native code.

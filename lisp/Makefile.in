@@ -68,6 +68,13 @@ BYTE_COMPILER_EL = \
 	emacs-lisp/cconv.el    \
 	emacs-lisp/byte-opt.el \
 	emacs-lisp/bytecomp.el
+ifeq ($(HAVE_NATIVE_COMP),yes)
+BYTE_COMPILER_EL += \
+	emacs-lisp/comp.el \
+	emacs-lisp/comp-cstr.el \
+	emacs-lisp/comp-common.el \
+	emacs-lisp/comp-run.el
+endif
 
 # Prevent any settings in the user environment causing problems.
 unexport EMACSDATA EMACSDOC EMACSLOADPATH EMACSPATH
