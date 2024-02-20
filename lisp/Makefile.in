@@ -96,9 +96,6 @@ COMPILE_FIRST = ./emacs-lisp/loaddefs-gen.el ./emacs-lisp/radix-tree.el \
   ./org/ox.el ./org/ox-texinfo.el ./org/org-macro.el ./org/org-element.el \
   ./org/oc.el ./org/ol.el ./emacs-lisp/cl-lib.el
 all: compile ./cus-load.el ./finder-inf.el ./leim/ja-dic/ja-dic.elc ../doc/misc/org.texi ../doc/misc/modus-themes.texi
-ifeq ($(HAVE_NATIVE_COMP),yes)
-all: compile-native
-endif
 
 PHONY_EXTRAS =
 .PHONY: all custom-deps finder-data update-subdirs $(PHONY_EXTRAS)
@@ -153,8 +150,8 @@ cldefs .PHONY: ./emacs-lisp/cldefs.el
 ./emacs-lisp/cldefs.el: ./emacs-lisp/cldefs.el.in
 	$(AM_V_GEN)$(emacs) -l pp -l "cldefs.el.in" \
 	    --eval "(with-temp-file (expand-file-name (unmsys--file-name \"$@\")) \
-	              (insert \";; Automatically generated from cldefs.el.in.  \" \
-	                \"DO NOT EDIT.\n\" \
+	              (insert \";; Automatically generated from cldefs.el.in. \" \
+	                \"DO NOT EDIT  -*- lexical-binding: t -*-\n\" \
                         \"(defconst cldefs-cl-lib-functions\n\" \
 	                \"(quote \" \
 	                (pp-to-string cldefs--cl-lib-functions) \
@@ -228,15 +225,9 @@ ifeq ($(HAVE_NATIVE_COMP),yes)
 	    --eval "(native-compile \"./$<\" \"./$@\")"
 endif
 
-# this was obviously the wrong way of doing this
 define compile-rest
 $(filter-out $(BYTE_COMPILER_EL:.el=el$(1)) $(COMPILE_FIRST:.el=el$(1)), $(shell \
-  els=`echo "${SUBDIRS_REL} " | sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.el |g'`; \
-  for el in $$els; do \
-    test -f $$el || continue; \
-    GREP_OPTIONS= grep '^;.*[^a-zA-Z]$(2): *t' $$el >/dev/null && continue; \
-    echo "$${el}$(1)"; \
-  done | xargs $(XARGS_LIMIT) echo))
+  find -type f -name '*.el' -exec echo {}$(1) \;))
 endef
 
 .PHONY: compile-compiler
@@ -245,14 +236,9 @@ compile-compiler: $(BYTE_COMPILER_EL:.el=.elc)
 .SECONDEXPANSION:
 .PHONY: compile
 compile: compile-clean compile-compiler \
-  $(COMPILE_FIRST:.el=.elc) $$(call compile-rest,c,no-byte-compile)
+  $(COMPILE_FIRST:.el=.elc) $$(call compile-rest,c)
 ifeq ($(HAVE_NATIVE_COMP),yes)
-compile: $$(call compile-rest,n,no-\(byte\|native\)-compile)
-endif
-
-ifeq ($(HAVE_NATIVE_COMP),yes)
-.PHONY: compile-native
-compile-native: $(compile-rest:.elc=.eln)
+compile: $$(call compile-rest,n)
 endif
 
 .PHONY: compile-clean

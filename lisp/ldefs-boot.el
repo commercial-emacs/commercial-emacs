@@ -1933,7 +1933,7 @@ other modes.  See `override-global-mode'.
 (fn &rest ARGS)" nil t)
 (autoload 'describe-personal-keybindings "bind-key" "\
 Display all the personal keybindings defined by `bind-key'." t)
-(register-definition-prefixes "bind-key" '("bind-key" "override-global-m" "personal-keybindings"))
+(register-definition-prefixes "bind-key" '("bind-key" "override-global-m"))
 
 
 ;;; Generated autoloads from emacs-lisp/bindat.el
@@ -4660,51 +4660,28 @@ clashes.
 
 (fn NAME PREFIX &optional FIRST)")
 (autoload 'comp-trampoline-compile "comp" "\
-Synthesize compile and return a trampoline for SUBR-NAME.
+Synthesize, compile, and return a trampoline for SUBR-NAME.
 
 (fn SUBR-NAME)")
 (autoload 'comp-clean-up-stale-eln "comp" "\
-Remove all FILE*.eln* files found in `native-comp-eln-load-path'.
+Remove all FILE*.eln* files found in `load-path'.
 The files to be removed are those produced from the original source
 filename (including FILE).
 
 (fn FILE)")
-(autoload 'comp-lookup-eln "comp" "\
-Given a Lisp source FILENAME return the corresponding .eln file if found.
-Search happens in `native-comp-eln-load-path'.
-
-(fn FILENAME)")
 (autoload 'native-compile "comp" "\
-Compile FUNCTION-OR-FILE into native code.
-This is the synchronous entry-point for the Emacs Lisp native
-compiler.  FUNCTION-OR-FILE is a function symbol, a form, or the
-filename of an Emacs Lisp source file.  If OUTPUT is non-nil, use
-it as the filename for the compiled object.  If FUNCTION-OR-FILE
-is a filename, if the compilation was successful return the
-filename of the compiled object.  If FUNCTION-OR-FILE is a
-function symbol or a form, if the compilation was successful
-return the compiled function.
+Synchronous entry into native compilation.
+FUNCTION-OR-FILE is a function symbol, form, or file name.  OUTPUT is the
+optional file name for the compiled object.  Returns FUNCTION-OR-FILE if
+a file name, else the compiled object.
 
 (fn FUNCTION-OR-FILE &optional OUTPUT)")
 (autoload 'batch-native-compile "comp" "\
-Perform batch native compilation of remaining command-line arguments.
+Compile remaining command-line arguments.
+Equivalent of `batch-byte-compile' for native compilation.  Returns list
+of file names not excluded by `native-comp-bootstrap-deny-list'.
 
-Native compilation equivalent of `batch-byte-compile'.
-Use this from the command line, with `-batch'; it won't work
-in an interactive Emacs session.
-Optional argument FOR-TARBALL non-nil means the file being compiled
-as part of building the source tarball, in which case the .eln file
-will be placed under the native-lisp/ directory (actually, in the
-last directory in `native-comp-eln-load-path').
-
-(fn &optional FOR-TARBALL)")
-(autoload 'batch-byte+native-compile "comp" "\
-Like `batch-native-compile', but used for bootstrap.
-Generate .elc files in addition to the .eln files.
-Force the produced .eln to be outputted in the eln system
-directory (the last entry in `native-comp-eln-load-path') unless
-`native-compile-target-directory' is non-nil.  If the environment
-variable \"NATIVE_DISABLED\" is set, only byte compile.")
+(fn &optional UNUSED)")
 (register-definition-prefixes "comp" '("comp-" "native-comp" "no-native-compile"))
 
 
@@ -4820,6 +4797,16 @@ on third call it again advances points to the next difference and so on.
 
 (fn IGNORE-WHITESPACE)" t)
 (register-definition-prefixes "compare-w" '("compare-"))
+
+
+;;; Generated autoloads from emacs-lisp/compat.el
+
+ (push (list 'compat
+            emacs-major-version
+            emacs-minor-version
+            9999)
+      package--builtin-versions)
+(register-definition-prefixes "compat" '("compat-"))
 
 
 ;;; Generated autoloads from image/compface.el
@@ -5818,6 +5805,11 @@ Customize GROUP, which must be a customization group, in another window.
 Customize SYMBOL, which must be a user option.
 
 (fn SYMBOL)" t)
+(autoload 'customize-toggle-option "cus-edit" "\
+Toggle the value of boolean option SYMBOL for this session.
+
+(fn SYMBOL)" t)
+(defalias 'toggle-option #'customize-toggle-option)
 (defalias 'customize-variable-other-window 'customize-option-other-window)
 (autoload 'customize-option-other-window "cus-edit" "\
 Customize SYMBOL, which must be a user option.
@@ -6637,10 +6629,19 @@ or call the function `desktop-save-mode'.")
 (autoload 'desktop-save-mode "desktop" "\
 Toggle desktop saving (Desktop Save mode).
 
-When Desktop Save mode is enabled, the state of Emacs is saved from
-one session to another.  In particular, Emacs will save the desktop when
-it exits (this may prompt you; see the option `desktop-save').  The next
-time Emacs starts, if this mode is active it will restore the desktop.
+When Desktop Save mode is enabled, the state of Emacs is saved from one
+session to another.  The saved Emacs \"desktop configuration\" includes the
+buffers, their file names, major modes, buffer positions, window and frame
+configuration, and some important global variables.
+
+To enable this feature for future sessions, customize `desktop-save-mode'
+to t, or add this line in your init file:
+
+    (desktop-save-mode 1)
+
+When this mode is enabled, Emacs will save the desktop when it exits
+(this may prompt you, see the option `desktop-save').  The next time
+Emacs starts, if this mode is active it will restore the desktop.
 
 To manually save the desktop at any time, use the command \\[desktop-save].
 To load it, use \\[desktop-read].
@@ -8438,7 +8439,7 @@ An extant spec symbol is a symbol that is not a function and has a
 `edebug-form-spec' property.
 
 (fn SPEC)")
-(defalias 'edebug-defun 'edebug-eval-top-level-form)
+(defalias 'edebug-defun #'edebug-eval-top-level-form)
 (autoload 'edebug-eval-top-level-form "edebug" "\
 Evaluate the top level form point is in, stepping through with Edebug.
 This is like `eval-defun' except that it steps the code for Edebug
@@ -12375,8 +12376,6 @@ evaluate `flymake-mode'.
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
 
-\\{flymake-mode-map}
-
 (fn &optional ARG)" t)
 (autoload 'flymake-mode-on "flymake" "\
 Turn Flymake mode on.")
@@ -15478,7 +15477,7 @@ The mode's hook is called both when the mode is enabled and when it is
 disabled.
 
 (fn &optional ARG)" t)
-(register-definition-prefixes "hideif" '("backward-ifdef" "down-ifdef" "forward-ifdef" "hide-ifdef" "hif-" "intern-safe" "next-ifdef" "previous-ifdef" "show-ifdef" "up-ifdef"))
+(register-definition-prefixes "hideif" '("backward-ifdef" "down-ifdef" "forward-ifdef" "hide-ifdef" "hif-" "next-ifdef" "previous-ifdef" "show-ifdef" "up-ifdef"))
 
 
 ;;; Generated autoloads from progmodes/hideshow.el
@@ -16863,21 +16862,25 @@ BUFFER nil or omitted means use the current buffer.
 
 (fn START END &optional BUFFER)")
 (autoload 'find-image "image" "\
-Find an image, choosing one of a list of image specifications.
+Find an image that satisfies one of a list of image specifications.
 
 SPECS is a list of image specifications.
 
-Each image specification in SPECS is a property list.  The contents of
-a specification are image type dependent.  All specifications must at
-least contain either the property `:file FILE' or `:data DATA',
-where FILE is the file to load the image from, and DATA is a string
-containing the actual image data.  If the property `:type TYPE' is
-omitted or nil, try to determine the image type from its first few
+Each image specification in SPECS is a property list.  The
+contents of a specification are image type dependent; see the
+info node `(elisp)Image Descriptors' for details.  All specifications
+must at least contain either the property `:file FILE' or `:data DATA',
+where FILE is the file from which to load the image, and DATA is a
+string containing the actual image data.  If the property `:type TYPE'
+is omitted or nil, try to determine the image type from its first few
 bytes of image data.  If that doesn't work, and the property `:file
-FILE' provide a file name, use its file extension as image type.
-If `:type TYPE' is provided, it must match the actual type
-determined for FILE or DATA by `create-image'.  Return nil if no
-specification is satisfied.
+FILE' provide a file name, use its file extension as idication of the
+image type. If `:type TYPE' is provided, it must match the actual type
+determined for FILE or DATA by `create-image'.
+
+The function returns the image specification for the first specification
+in the list whose TYPE is supported and FILE, if specified, exists.  It
+returns nil if no specification in the list can be satisfied.
 
 If CACHE is non-nil, results are cached and returned on subsequent calls.
 
@@ -23368,6 +23371,8 @@ FUN in `pred' and `app' can take one of the forms:
      call it with one argument
   (F ARG1 .. ARGn)
      call F with ARG1..ARGn and EXPVAL as n+1'th argument
+  (F ARG1 .. _ .. ARGn)
+     call F, passing EXPVAL at the _ position.
 
 FUN, BOOLEXP, and subsequent PAT can refer to variables
 bound earlier in the pattern by a SYMBOL pattern.
@@ -24746,8 +24751,6 @@ requires quoting, e.g. `\\[quoted-insert]<space>'.
 (fn REGEXP)" t)
 (autoload 'project-or-external-find-regexp "project" "\
 Find all matches for REGEXP in the project roots or external roots.
-With \\[universal-argument] prefix, you can specify the file name
-pattern to search for.
 
 (fn REGEXP)" t)
 (autoload 'project-find-file "project" "\
@@ -25792,8 +25795,6 @@ evaluate `rectangle-mark-mode'.
 
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
-
-\\{rectangle-mark-mode-map}
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "rect" '("apply-on-rectangle" "clear-rectangle-line" "delete-" "extract-rectangle-" "killed-rectangle" "ope" "rectangle-" "spaces-string" "string-rectangle-"))
@@ -27164,7 +27165,8 @@ For more details, see Info node `(elisp) Extending Rx'.
 
 (fn NAME [(ARGS...)] RX)" nil t)
 (function-put 'rx-define 'lisp-indent-function 'defun)
-(eval-and-compile (defun rx--pcase-macroexpander (&rest regexps) "A pattern that matches strings against `rx' REGEXPS in sexp form.
+(autoload 'rx--pcase-macroexpander "rx" "\
+A pattern that matches strings against `rx' REGEXPS in sexp form.
 REGEXPS are interpreted as in `rx'.  The pattern matches any
 string that is a match for REGEXPS, as if by `string-match'.
 
@@ -27178,7 +27180,9 @@ following constructs:
   (backref REF)    matches whatever the submatch REF matched.
                    REF can be a number, as usual, or a name
                    introduced by a previous (let REF ...)
-                   construct." (rx--pcase-expand regexps)))
+                   construct.
+
+(fn &rest REGEXPS)")
 (define-symbol-prop 'rx--pcase-macroexpander 'edebug-form-spec 'nil)
 (define-symbol-prop 'rx 'pcase-macroexpander #'rx--pcase-macroexpander)
 (autoload 'rx--pcase-expand "rx" "\
@@ -31744,21 +31748,16 @@ List all timers in a buffer.
 ;;; Generated autoloads from international/titdic-cnv.el
 
 (autoload 'titdic-convert "titdic-cnv" "\
-Convert a TIT dictionary of FILENAME into a Quail package.
-Optional argument DIRNAME if specified is the directory name under which
-the generated Quail package is saved.
 
-(fn FILENAME &optional DIRNAME)" t)
+
+(fn FILENAME &optional DIRNAME)")
+(make-obsolete 'titdic-convert 'tit-dic-convert "30.1")
 (autoload 'batch-titdic-convert "titdic-cnv" "\
-Run `titdic-convert' on the files remaining on the command line.
-Use this from the command line, with `-batch';
-it won't work in an interactive Emacs.
-For example, invoke \"emacs -batch -f batch-titdic-convert XXX.tit\" to
- generate Quail package file \"xxx.el\" from TIT dictionary file \"XXX.tit\".
-To get complete usage, invoke \"emacs -batch -f batch-titdic-convert -h\".
+
 
 (fn &optional FORCE)")
-(register-definition-prefixes "titdic-cnv" '("batch-miscdic-convert" "ctlau-" "miscdic-convert" "pinyin-convert" "py-converter" "quail-" "quick-" "tit-" "tsang-" "ziranma-converter"))
+(make-obsolete 'batch-titdic-convert 'batch-tit-dic-convert "30.1")
+(register-definition-prefixes "titdic-cnv" '("batch-tit-" "tit-"))
 
 
 ;;; Generated autoloads from tmm.el
@@ -32955,10 +32954,7 @@ URL can be a URL string, or a URL record of the type returned by
 
 ;;; Generated autoloads from url/url-mailto.el
 
-(autoload 'url-mail "url-mailto" "\
-
-
-(fn &rest ARGS)" t)
+(defalias 'url-mail #'message-mail)
 (autoload 'url-mailto "url-mailto" "\
 Handle the mailto: URL syntax.
 

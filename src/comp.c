@@ -2105,6 +2105,7 @@ emit_exception_stack_pop (void)
 {
   /* C: exception_stack_pop (thr);  */
   gcc_jit_block *bb_orig = comp.block;
+  gcc_jit_function *f_orig = comp.func;
   gcc_jit_lvalue *exception_stack_top =
     gcc_jit_rvalue_dereference_field
     (gcc_jit_lvalue_as_rvalue (gcc_jit_rvalue_dereference
@@ -2172,6 +2173,7 @@ emit_exception_stack_pop (void)
 				 NULL,
 				 gcc_jit_lvalue_as_rvalue (exception_stack_top));
   comp.block = bb_orig;
+  comp.func = f_orig;
 }
 
 static void

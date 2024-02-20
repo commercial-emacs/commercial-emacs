@@ -13,5 +13,5 @@
                       (cdr define)))
                   defines)))
      (mapcar #'cdr load-history)))
-  "Since cl-lib has yet to join loadup.el, we must flag user code which
-does not first require it before using its functions.  (Bug#30635)")
+  "Flag user code which uses cl functions without first requiring
+cl-lib.  (Bug#30635)")
