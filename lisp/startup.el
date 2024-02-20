@@ -580,6 +580,7 @@ It is the default value of the variable `top-level'."
         (setq tail (cdr tail))))
 
     (when (featurep 'native-compile)
+      (require 'comp)
       (setq load-path (nconc (split-string (or (getenv "EMACSNATIVELOADPATH") "")
                                            path-separator :omit-null)
                              (list comp-trampoline-dir)

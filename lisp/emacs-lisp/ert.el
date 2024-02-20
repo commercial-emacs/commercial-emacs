@@ -1547,7 +1547,7 @@ the tests)."
         attempt-orderly-shutdown-on-fatal-signal)
     (unwind-protect
         (setq stats (ert-run-tests-batch selector))
-      (if (stats)
+      (if stats
           (kill-emacs (if (zerop (ert-stats-completed-unexpected stats)) 0 1))
         (message "Error running tests")
         (backtrace)

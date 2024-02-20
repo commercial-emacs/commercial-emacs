@@ -65,10 +65,8 @@
 (set-buffer "*scratch*")
 (setq buffer-undo-list t)
 
-;; A bootstrap wrinkle: trampoline compilation without byte-compiled
-;; bytecomp.elc (equivalently, a null pdumper--pure-pool) incurs dreaded
-;; eager macroexpansion cycles.
-(setq native-comp-disable-subr-trampolines (null pdumper--pure-pool))
+;; Bootstrap remains a game of "disable shit until it works."
+(setq native-comp-disable-subr-trampolines t)
 
 (load "emacs-lisp/debug-early")
 (load "emacs-lisp/byte-run")
@@ -348,6 +346,12 @@
   (unless (equal lp load-path)
     ;; We reset load-path after dumping.
     (message "Warning: load-path change from site-init has no effect")))
+
+(when (featurep 'native-compile)
+  ;; Trampoline compilation without byte-compiled bytecomp.elc
+  ;; (equivalently, a null pdumper--pure-pool) incurs dreaded eager
+  ;; macroexpansion cycles (more bootstrap fake-it-til-you-make-it).
+  (setq native-comp-disable-subr-trampolines (null pdumper--pure-pool)))
 
 (setq current-load-list nil)
 ;; Avoid storing references to build directory in the binary.

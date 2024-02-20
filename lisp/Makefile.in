@@ -68,10 +68,6 @@ BYTE_COMPILER_EL = \
 	emacs-lisp/cconv.el    \
 	emacs-lisp/byte-opt.el \
 	emacs-lisp/bytecomp.el
-ifeq ($(HAVE_NATIVE_COMP),yes)
-BYTE_COMPILER_EL += emacs-lisp/comp.el
-BYTE_COMPILER_EL += emacs-lisp/comp-cstr.el
-endif
 
 # Prevent any settings in the user environment causing problems.
 unexport EMACSDATA EMACSDOC EMACSLOADPATH EMACSPATH
@@ -100,7 +96,7 @@ COMPILE_FIRST = ./emacs-lisp/loaddefs-gen.el ./emacs-lisp/radix-tree.el \
   ./org/ox.el ./org/ox-texinfo.el ./org/org-macro.el ./org/org-element.el \
   ./org/oc.el ./org/ol.el ./emacs-lisp/cl-lib.el
 all: compile ./cus-load.el ./finder-inf.el ./leim/ja-dic/ja-dic.elc ../doc/misc/org.texi ../doc/misc/modus-themes.texi
-ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
+ifeq ($(HAVE_NATIVE_COMP),yes)
 all: compile-native
 endif
 
@@ -226,9 +222,9 @@ $(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
 %.elc: %.el $(BYTE_COMPILER_EL:.el=.elc)
 	$(call byte-compile)
 
-ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
+ifeq ($(HAVE_NATIVE_COMP),yes)
 %.eln: %.el $(BYTE_COMPILER_EL:.el=.elc)
-	$(AM_V_ELN)$(emacs) $(BYTE_COMPILE_FLAGS) -l comp \
+	$(AM_V_ELN)$(emacs) $(BYTE_COMPILE_FLAGS) \
 	    --eval "(native-compile \"./$<\" \"./$@\")"
 endif
 
@@ -250,7 +246,7 @@ compile-compiler: $(BYTE_COMPILER_EL:.el=.elc)
 .PHONY: compile
 compile: compile-clean compile-compiler \
   $(COMPILE_FIRST:.el=.elc) $$(call compile-rest,c,no-byte-compile)
-ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
+ifeq ($(HAVE_NATIVE_COMP),yes)
 compile: $$(call compile-rest,n,no-\(byte\|native\)-compile)
 endif
 
@@ -282,7 +278,7 @@ compile-always:
 ifeq ($(HAVE_NATIVE_COMP),yes)
 .PHONY: trampolines
 trampolines: compile
-	$(emacs) $(BYTE_COMPILE_FLAGS) -l comp -f comp-compile-all-trampolines
+	$(emacs) $(BYTE_COMPILE_FLAGS) -f comp-compile-all-trampolines
 endif
 
 .PHONY: backup-compiled-files compile-after-backup

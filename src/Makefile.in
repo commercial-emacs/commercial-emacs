@@ -507,16 +507,16 @@ define byte-compile-loaded
 	../src/$(@:.pdmp=)$(EXEEXT) --batch --no-site-file --no-site-lisp \
 	   --eval "(dolist (el (mapcar (function car) load-history)) \
 	             (when (equal \"el\" (file-name-extension el)) \
-	               (byte-compile-file el)))"
+	               (princ (format \"%sc \" el))))"
 endef
 
 bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT)
 emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.elc ../lisp/international/charprop.el
 bootstrap-emacs.pdmp emacs.pdmp:
-	# this run figures out packages loaded
+	# pdmp all interpreted elisp
 	$(call pdump,$@, 2>/dev/null)
-	$(call byte-compile-loaded)
-	# this run ensures only compiled packages loaded
+	$(MAKE) -C ../lisp `$(call byte-compile-loaded)` EMACS=../src/$(@:.pdmp=)$(EXEEXT)
+	# pdmp all byte-compiled
 	$(call pdump,$@)
 install-emacs.pdmp: emacs.pdmp
 	$(AM_V_at)rm -f install-emacs$(EXEEXT)

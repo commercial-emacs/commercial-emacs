@@ -2492,11 +2492,10 @@ compiled."
                   dir
                   ;; Exclude lockfiles
                   (rx bos (or (and "." (not "#")) (not ".")) (* nonl) ".el" eos))
-     do (comp-clean-up-stale-eln (concat (file-name-sans-extension file) ".eln")))))
-(if (file-symlink-p (directory-file-name dir))
-    (delete-file (directory-file-name dir))
-  (delete-directory dir t))
-
+     do (comp-clean-up-stale-eln (concat (file-name-sans-extension file) ".eln"))))
+  (if (file-symlink-p (directory-file-name dir))
+      (delete-file (directory-file-name dir))
+    (delete-directory dir t)))
 
 (defun package-delete (pkg-desc &optional force nosave)
   "Delete package PKG-DESC.
