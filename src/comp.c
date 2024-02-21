@@ -688,6 +688,8 @@ static void helper_unwind_protect (Lisp_Object);
 static Lisp_Object helper_unbind_n (Lisp_Object);
 static void helper_save_restriction (void);
 static bool helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object, enum pvec_type);
+static Lisp_Object
+helper_sanitizer_assert (Lisp_Object, Lisp_Object);
 
 /* Note: helper_link_table must match the list created by
    `declare_runtime_imported_funcs'.  */
@@ -700,6 +702,7 @@ static void *helper_link_table[] =
     record_unwind_protect_excursion,
     helper_unbind_n,
     helper_save_restriction,
+    helper_sanitizer_assert,
     record_unwind_current_buffer,
     set_internal,
     helper_unwind_protect,
@@ -2761,6 +2764,10 @@ declare_runtime_imported_funcs (void)
 
   ADD_IMPORTED (helper_save_restriction, comp.void_type, 0, NULL);
 
+  args[0] = comp.lisp_obj_type;
+  args[1] = comp.lisp_obj_type;
+  ADD_IMPORTED (helper_sanitizer_assert, comp.lisp_obj_type, 2, args);
+
   ADD_IMPORTED (record_unwind_current_buffer, comp.void_type, 0, NULL);
 
   args[0] = args[1] = args[2] = comp.lisp_obj_type;
@@ -4535,6 +4542,21 @@ helper_PSEUDOVECTOR_TYPEP_XUNTAG (Lisp_Object a, enum pvec_type code)
   return PSEUDOVECTORP (a, code);
 }
 
+static Lisp_Object
+helper_sanitizer_assert (Lisp_Object val, Lisp_Object type)
+{
+  if (!comp_sanitizer_active
+      || !NILP ((CALL2I (cl-typep, val, type))))
+    return Qnil;
+
+  AUTO_STRING (format, "Comp sanitizer FAIL for %s with type %s");
+  CALLN (Fmessage, format, val, type);
+  CALL0I (backtrace);
+  xsignal2 (Qcomp_sanitizer_error, val, type);
+
+  return Qnil;
+}
+
 /* This function puts the compilation unit in the
   `Vcomp_loaded_comp_units_h` hashmap.  */
 static void
@@ -5105,11 +5127,10 @@ For internal use.  */);
   Vcomp_subr_arities_h = CALLN (Fmake_hash_table, QCtest, Qequal);
 
   DEFVAR_BOOL ("comp-sanitizer-active", comp_sanitizer_active,
-    doc: /* If non-nil, enable runtime execution of native-compiler sanitizer.
-For this to be effective, Lisp code must be compiled
-with `comp-sanitizer-emit' non-nil.
-This is intended to be used only for development and
-verification of the native compiler.  */);
+    doc: /* When non-nil enable sanitizer runtime execution.
+To be effective Lisp Code must have been compiled with
+`comp-sanitizer-emit' non-nil.
+In use for native compiler development and verification only.  */);
   comp_sanitizer_active = false;
 
   Fprovide (intern_c_string ("native-compile"), Qnil);

@@ -2944,6 +2944,52 @@ These are substituted with a normal `set' op."
                  (comp--log-func comp-func 3))))
            (comp-ctxt-funcs-h comp-ctxt)))
 
+;;; Sanitizer pass specific code.
+
+;; This pass aims to verify compile time value type predictions during
+;; execution.
+;; The sanitizer pass injects a call to 'helper_sanitizer_assert' before
+;; each conditional branch. 'helper_sanitizer_assert' will verify that
+;; the variable tested by the conditional branch is of the predicted
+;; value type and signal an error otherwise.
+
+(defvar comp-sanitizer-emit nil
+  "Gates the sanitizer pass.
+In use for native compiler development and verification only.")
+
+(defun comp--sanitizer (_)
+  (when comp-sanitizer-emit
+    (cl-loop
+     for f being each hash-value of (comp-ctxt-funcs-h comp-ctxt)
+     for comp-func = f
+     unless (comp-func-has-non-local comp-func)
+     do
+     (cl-loop
+      for b being each hash-value of (comp-func-blocks f)
+      do
+      (cl-loop
+       named in-the-basic-block
+       for insns-seq on (comp-block-insns b)
+       do (pcase insns-seq
+            (`((cond-jump ,(and (pred comp-mvar-p) mvar-tested)
+                          ,(pred comp-mvar-p) ,_bb1 ,_bb2))
+             (let ((type (comp-cstr-to-type-spec mvar-tested))
+                   (insn (car insns-seq)))
+               ;; No need to check if type is t.
+               (unless (eq type t)
+                 (comp--add-const-to-relocs type)
+                 (setcar
+                  insns-seq
+                  (comp--call 'helper_sanitizer_assert
+                              mvar-tested
+                              (make--comp-mvar :constant type)))
+                 (setcdr insns-seq (list insn)))
+               ;; (setf (comp-func-ssa-status comp-func) 'dirty)
+               (cl-return-from in-the-basic-block))))))
+     do (comp--log-func comp-func 3))))
+
+;;; Function types pass specific code.
+
 (defun comp--compute-function-type (_ func)
   "Compute type specifier for `comp-func' FUNC.
 Set it into the `type' slot."
