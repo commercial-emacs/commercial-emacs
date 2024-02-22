@@ -1701,7 +1701,7 @@ into the C code forwarding the compilation unit."
   "Compute LIMPLE IR for forms in `comp-ctxt'."
   (maphash (lambda (_ f) (comp--limplify-function f))
            (comp-ctxt-funcs-h comp-ctxt))
-  (comp--add-func-to-ctxt (comp--limplify-top-level nil)))
+  (comp--add-func-to-ctxt (comp--limplify-top-level)))
 
 ;;; add-cstrs pass specific code.
 

@@ -221,9 +221,9 @@ define byte-compile
 	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile $<
 endef
 
-$(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
-	$(call byte-compile)
 %.elc: %.el $(BYTE_COMPILER_EL:.el=.elc)
+	$(call byte-compile)
+$(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
 	$(call byte-compile)
 
 ifeq ($(HAVE_NATIVE_COMP),yes)
@@ -234,7 +234,7 @@ endif
 
 define compile-rest
 $(filter-out $(BYTE_COMPILER_EL:.el=el$(1)) $(COMPILE_FIRST:.el=el$(1)), $(shell \
-  find -type f -name '*.el' -exec echo {}$(1) \;))
+  find -type f -name '*.el' -printf "%pc "))
 endef
 
 .PHONY: compile-compiler
@@ -307,10 +307,14 @@ compile-one-process: compile-compiler
 	$(emacs) $(BYTE_COMPILE_FLAGS) \
 	    --eval "(batch-byte-recompile-directory 0)" .
 
-.PHONY: bootstrap-clean distclean maintainer-clean
+.PHONY: bootstrap-clean distclean maintainer-clean pdmpclean bootstrap-pdmpclean
 
-bootstrap-clean:
+pdmpclean:
+
+bootstrap-pdmpclean:
 	find . -name '*.elc' $(FIND_DELETE)
+
+bootstrap-clean: bootstrap-pdmp
 	rm -f $(AUTOGENEL)
 
 distclean:

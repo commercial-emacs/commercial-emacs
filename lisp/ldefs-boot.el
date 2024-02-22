@@ -4659,16 +4659,14 @@ available name ignoring compilation context and potential name
 clashes.
 
 (fn NAME PREFIX &optional FIRST)")
+(autoload 'comp-trampoline-search "comp" "\
+Return trampoline file for SUBR-NAME.
+
+(fn SUBR-NAME)")
 (autoload 'comp-trampoline-compile "comp" "\
 Synthesize, compile, and return a trampoline for SUBR-NAME.
 
 (fn SUBR-NAME)")
-(autoload 'comp-clean-up-stale-eln "comp" "\
-Remove all FILE*.eln* files found in `load-path'.
-The files to be removed are those produced from the original source
-filename (including FILE).
-
-(fn FILE)")
 (autoload 'native-compile "comp" "\
 Synchronous entry into native compilation.
 FUNCTION-OR-FILE is a function symbol, form, or file name.  OUTPUT is the
@@ -4711,57 +4709,7 @@ inferred from the code itself by the native compiler; if it is
 Make SUBR-NAME effectively advice-able when called from native code.
 
 (fn SUBR-NAME)")
-(autoload 'native--compile-async "comp-run" "\
-Compile FILES asynchronously.
-FILES is one filename or a list of filenames or directories.
-
-If optional argument RECURSIVELY is non-nil, recurse into
-subdirectories of given directories.
-
-If optional argument LOAD is non-nil, request to load the file
-after compiling.
-
-The optional argument SELECTOR has the following valid values:
-
-nil -- Select all files.
-a string -- A regular expression selecting files with matching names.
-a function -- A function selecting files with matching names.
-
-The variable `native-comp-async-jobs-number' specifies the number
-of (commands) to run simultaneously.
-
-LOAD can also be the symbol `late'.  This is used internally if
-the byte code has already been loaded when this function is
-called.  It means that we request the special kind of load
-necessary in that situation, called \"late\" loading.
-
-During a \"late\" load, instead of executing all top-level forms
-of the original files, only function definitions are
-loaded (paying attention to have these effective only if the
-bytecode definition was not changed in the meantime).
-
-(fn FILES &optional RECURSIVELY LOAD SELECTOR)")
-(autoload 'native-compile-async "comp-run" "\
-Compile FILES asynchronously.
-FILES is one file or a list of filenames or directories.
-
-If optional argument RECURSIVELY is non-nil, recurse into
-subdirectories of given directories.
-
-If optional argument LOAD is non-nil, request to load the file
-after compiling.
-
-The optional argument SELECTOR has the following valid values:
-
-nil -- Select all files.
-a string -- A regular expression selecting files with matching names.
-a function -- A function selecting files with matching names.
-
-The variable `native-comp-async-jobs-number' specifies the number
-of (commands) to run simultaneously.
-
-(fn FILES &optional RECURSIVELY LOAD SELECTOR)")
-(register-definition-prefixes "comp-run" '("comp-" "native-comp"))
+(register-definition-prefixes "comp-run" '("comp-warn-primitives"))
 
 
 ;;; Generated autoloads from vc/compare-w.el
@@ -12375,6 +12323,8 @@ evaluate `flymake-mode'.
 
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
+
+\\{flymake-mode-map}
 
 (fn &optional ARG)" t)
 (autoload 'flymake-mode-on "flymake" "\
@@ -25795,6 +25745,8 @@ evaluate `rectangle-mark-mode'.
 
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
+
+\\{rectangle-mark-mode-map}
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "rect" '("apply-on-rectangle" "clear-rectangle-line" "delete-" "extract-rectangle-" "killed-rectangle" "ope" "rectangle-" "spaces-string" "string-rectangle-"))

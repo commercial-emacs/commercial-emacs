@@ -507,20 +507,19 @@ define byte-compile-loaded
 	../src/$(@:.pdmp=)$(EXEEXT) --batch --no-site-file --no-site-lisp \
 	   --eval "(dolist (el (mapcar (function car) load-history)) \
 	             (when (equal \"el\" (file-name-extension el)) \
-	               (let ((prefix (file-name-as-directory \"$(abs_top_srcdir)\"))) \
-	                 (when (string-prefix-p prefix el) \
-	                   (setq el (substring el (length prefix))))) \
-	               (princ (format \"%sc \" el))))"
+	               (princ (format \"%sc \" \
+	                        (file-relative-name el \"$(abs_top_srcdir)/lisp\")))))"
 endef
+
+.PRECIOUS: bootstrap-emacs.pdmp
 
 bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT)
 emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.elc ../lisp/international/charprop.el
 bootstrap-emacs.pdmp emacs.pdmp:
-	# pdmp all interpreted elisp
-	$(call pdump,$@, 2>/dev/null)
-	$(MAKE) -C ../lisp `$(call byte-compile-loaded)` EMACS=../src/$(@:.pdmp=)$(EXEEXT)
-	# pdmp all byte-compiled
-	$(call pdump,$@)
+	$(MAKE) -C ../lisp $(@:emacs.pdmp=)pdmpclean
+	$(call pdump,$@, 2>/dev/null) # pdmp all interpreted elisp
+	$(MAKE) -s -C ../lisp `$(call byte-compile-loaded)` EMACS=../src/$(@:.pdmp=)$(EXEEXT)
+	$(call pdump,$@) # pdmp all byte-compiled
 install-emacs.pdmp: emacs.pdmp
 	$(AM_V_at)rm -f install-emacs$(EXEEXT)
 	$(AM_V_at)cp -f emacs$(EXEEXT) install-emacs$(EXEEXT)
