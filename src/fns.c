@@ -5007,6 +5007,8 @@ hash_string (char const *ptr, ptrdiff_t len)
       /* String is shorter than an EMACS_UINT.  Use smaller loads.  */
       eassume (p <= end && end - p < sizeof (EMACS_UINT));
       EMACS_UINT tail = 0;
+      verify (sizeof tail <= 8);
+#if EMACS_INT_MAX > INT32_MAX
       if (end - p >= 4)
 	{
 	  uint32_t c;
@@ -5014,6 +5016,7 @@ hash_string (char const *ptr, ptrdiff_t len)
 	  tail = (tail << (8 * sizeof c)) + c;
 	  p += sizeof c;
 	}
+#endif
       if (end - p >= 2)
 	{
 	  uint16_t c;
