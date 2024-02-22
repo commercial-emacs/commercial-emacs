@@ -155,7 +155,7 @@ Used to modify the compiler environment."
      (function ((or integer marker) (or integer marker) &optional t) integer))
     (current-buffer (function () buffer))
     (current-global-map (function () cons))
-    (current-indentation (function () integer))
+    (current-indentation (function (&optional integer) integer))
     (current-local-map (function () (or cons null)))
     (current-minor-mode-maps (function () (or cons null)))
     (current-time (function () cons))

@@ -639,7 +639,7 @@ VERBOSITY is a number between 0 and 3."
 
 (defmacro comp--loop-insn-in-block (basic-block &rest body)
   "Loop over all insns in BASIC-BLOCK executing BODY.
-Inside BODY, `insn' and `insn-cell'can be used to read or set the
+Inside BODY, `insn' and `insn-cell' can be used to read or set the
 current instruction or its cell."
   (declare (debug (form body))
            (indent defun))
@@ -2089,12 +2089,11 @@ TARGET-BB-SYM is the symbol name of the target block."
                         (cl-values f cstr-f nil args))))))
          (cl-multiple-value-bind (f cstr-f lhs args) match
            (cl-loop
-            with gen = (comp--lambda-list-gen (comp-cstr-f-args cstr-f))
-            for arg in args
-            for cstr = (funcall gen)
-            for target = (comp--cond-cstrs-target-mvar arg insn bb)
-            unless (comp-cstr-p cstr)
+            with cstr = (funcall (comp--lambda-list-gen (comp-cstr-f-args cstr-f)))
+            when (and args (not (comp-cstr-p cstr)))
             do (signal 'native-ice (list "Incoherent type specifier for function" f))
+            for arg in args
+            for target = (comp--cond-cstrs-target-mvar arg insn bb)
             when (and target
                       ;; No need to add call constraints if t
                       ;; (bug#45812 bug#45705 bug#45751).
@@ -2797,10 +2796,10 @@ FUNCTION can be a function-name or byte compiled function."
                                   (comp-nargs-p comp-func-callee))
                                 'callref
                               'call))
-                 (args (if (eq call-type 'callref)
-                           args
-                         (fill-args args maxarg))))
-            `(,call-type ,callee ,@args)))
+                 (args2 (if (eq call-type 'callref)
+                            args
+                          (fill-args args maxarg))))
+            `(,call-type ,callee ,@args2)))
          ;; Intra compilation unit procedure call optimization.
          ;; Attention speed 3 triggers this for non self calls too!!
          ((and comp-func-callee
