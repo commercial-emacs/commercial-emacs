@@ -404,18 +404,6 @@ a sane initial value."
   :version "25.1"
   :type '(repeat symbol))
 
-(defcustom package-native-compile nil
-  "Non-nil means to natively compile packages as part of their installation.
-This controls ahead-of-time compilation of packages when they are
-installed.  If this option is nil, packages will be natively
-compiled when they are loaded for the first time.
-
-This option does not have any effect if Emacs was not built with
-native compilation support."
-  :type '(boolean)
-  :risky t
-  :version "28.1")
-
 (defcustom package-menu-async t
   "If non-nil, package-menu will use async operations when possible.
 Currently, only the refreshing of archive contents supports
@@ -1030,8 +1018,6 @@ untar into a directory named DIR; otherwise, signal an error."
         ;; E.g. for multi-package installs, we should first install all packages
         ;; and then compile them.
         (package--compile new-desc)
-        (when package-native-compile
-          (package--native-compile-async new-desc))
         ;; After compilation, load again any files loaded by
         ;; `activate-1', so that we use the byte-compiled definitions.
         (package--reload-previously-loaded new-desc)))
@@ -1134,14 +1120,6 @@ This assumes that `pkg-desc' has already been activated with
         (warning-minimum-level :error)
         (load-path load-path))
     (byte-recompile-directory (package-desc-dir pkg-desc) 0 t)))
-
-(defun package--native-compile-async (pkg-desc)
-  "Native compile installed package PKG-DESC asynchronously.
-This assumes that `pkg-desc' has already been activated with
-`package-activate-1'."
-  (when (native-comp-available-p)
-    (let ((warning-minimum-level :error))
-      (native-compile-async (package-desc-dir pkg-desc) t))))
 
 ;;;; Inferring package from current buffer
 (defun package-read-from-string (str)

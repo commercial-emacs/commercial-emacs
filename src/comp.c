@@ -4623,48 +4623,6 @@ register_native_comp_unit (Lisp_Object comp_u)
 }
 
 
-/***********************************/
-/* Deferred compilation mechanism. */
-/***********************************/
-
-/* Queue an asynchronous compilation for the source file defining
-   FUNCTION_NAME and perform a late load.
-
-   NOTE: ideally would be nice to move its call simply into Fload but
-   we need DEFINITION to guard against function redefinition while
-   async compilation happen.  */
-
-void
-maybe_defer_native_compilation (Lisp_Object function_name,
-				Lisp_Object definition)
-{
-  if (! load_gccjit_if_necessary (false))
-    return;
-
-  if (!native_comp_jit_compilation
-      || noninteractive
-      || !NILP (Vpdumper__pure_pool)
-      || !COMPILEDP (definition)
-      || !STRINGP (Vload_true_file_name)
-      || !suffix_p (Vload_true_file_name, ".elc"))
-    return;
-
-  Lisp_Object src = concat2 (CALL1I (file-name-sans-extension, Vload_true_file_name),
-			     build_pure_c_string (".el"));
-  if (NILP (Ffile_exists_p (src)))
-    {
-      src = concat2 (src, build_pure_c_string (".gz"));
-      if (NILP (Ffile_exists_p (src)))
-	return;
-    }
-
-  Fputhash (function_name, definition, Vcomp_deferred_pending_h);
-
-  pending_funcalls = Fcons (list (Qnative__compile_async, src, Qnil, Qlate),
-			    pending_funcalls);
-}
-
-
 /**************************************/
 /* Functions used to load eln files.  */
 /**************************************/
@@ -5005,21 +4963,6 @@ This gets called by top_level_run during the load phase.  */)
   return tem;
 }
 
-DEFUN ("comp--late-register-subr", Fcomp__late_register_subr,
-       Scomp__late_register_subr, 7, 7, 0,
-       doc: /* Register exported subr.
-This gets called by late_top_level_run during the load phase.  */)
-  (Lisp_Object name, Lisp_Object c_name, Lisp_Object minarg,
-   Lisp_Object maxarg, Lisp_Object type, Lisp_Object rest,
-   Lisp_Object comp_u)
-{
-  if (!NILP (Fequal (Fsymbol_function (name),
-		     Fgethash (name, Vcomp_deferred_pending_h, Qnil))))
-    Fcomp__register_subr (name, c_name, minarg, maxarg, type, rest, comp_u);
-  Fremhash (name, Vcomp_deferred_pending_h);
-  return Qnil;
-}
-
 DEFUN ("native-elisp-load", Fnative_elisp_load, Snative_elisp_load, 1, 2, 0,
        doc: /* Load FILENAME.
 Set LATE-LOAD for deferred compilation.  */)
@@ -5072,13 +5015,6 @@ void
 syms_of_comp (void)
 {
 #ifdef HAVE_NATIVE_COMP
-  DEFVAR_BOOL ("native-comp-jit-compilation", native_comp_jit_compilation,
-    doc: /* If non-nil, compile loaded .elc files asynchronously.
-
-After compilation, each function definition is updated to use the
-natively-compiled one.  */);
-  native_comp_jit_compilation = true;
-
   DEFSYM (Qnative_comp_speed, "native-comp-speed");
   DEFSYM (Qnative_comp_debug, "native-comp-debug");
   DEFSYM (Qnative_comp_driver_options, "native-comp-driver-options");
@@ -5218,11 +5154,6 @@ natively-compiled one.  */);
   DEFVAR_LISP ("comp-abi-hash", Vcomp_abi_hash,
 	       doc: /* String signing the .eln files ABI.  */);
   Vcomp_abi_hash = Qnil;
-
-  DEFVAR_LISP ("comp-deferred-pending-h", Vcomp_deferred_pending_h,
-	       doc: /* Hash symbol-name to function-value.
-For internal use.  */);
-  Vcomp_deferred_pending_h = CALLN (Fmake_hash_table, QCtest, Qeq);
 
   DEFVAR_LISP ("native-comp-disable-subr-trampolines",
 	       Vnative_comp_disable_subr_trampolines,

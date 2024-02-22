@@ -398,10 +398,7 @@
   ;; retrieve it even in case of redefinition.
   (mapatoms (lambda (f)
               (when (subr-primitive-p (symbol-function f))
-                (puthash f (func-arity f) comp-subr-arities-h))))
-  ;; Set up the mechanism to allow inhibiting native-comp via
-  ;; file-local variables.
-  (defvar comp--no-native-compile (make-hash-table :test #'equal)))
+                (puthash f (func-arity f) comp-subr-arities-h)))))
 
 (when pdumper--pure-pool
   (let ((strings 0)

@@ -989,8 +989,6 @@ The return value is undefined.  */)
 
   defalias (symbol, definition);
 
-  maybe_defer_native_compilation (symbol, definition);
-
   if (!NILP (docstring))
     Fput (symbol, Qfunction_documentation, docstring);
   /* We used to return `definition', but now that `defun' and `defmacro' expand

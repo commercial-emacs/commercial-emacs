@@ -57,13 +57,6 @@ those primitives unnecessary in case of function redefinition/advice."
   :type '(repeat symbol)
   :version "30.1")
 
-(defcustom native-comp-async-env-modifier-form nil
-  "Form evaluated before compilation by each asynchronous compilation subprocess.
-Used to modify the compiler environment."
-  :type 'sexp
-  :risky t
-  :version "28.1")
-
 (defconst comp-known-type-specifiers
   `(
     ;; Functions we can trust not to be redefined, or, if redefined,
@@ -523,18 +516,14 @@ If the symbol is `inferred', the type specifier is automatically
 inferred from the code itself by the native compiler; if it is
 `know', the type specifier comes from `comp-known-type-specifiers'."
   (let ((kind 'know)
-        type-spec )
-    (when-let ((res (assoc function comp-known-type-specifiers)))
-      (setf type-spec (cadr res)))
-    (let ((f (and (symbolp function)
-                  (symbol-function function))))
-      (when (and f
-                 (null type-spec)
-                 (subr-native-elisp-p f))
-        (setf kind 'inferred
-              type-spec (subr-type f))))
+        (type-spec (when-let ((res (assoc function comp-known-type-specifiers)))
+                     (cadr res)))
+        (f (and (symbolp function) (symbol-function function))))
+    (when (and f (null type-spec) (subr-native-elisp-p f))
+      (setf kind 'inferred
+            type-spec (subr-type f)))
     (when type-spec
-        (cons type-spec kind))))
+      (cons type-spec kind))))
 
 (provide 'comp-common)
 

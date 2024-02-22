@@ -588,8 +588,6 @@ documentation and marking the package as installed."
         ;; E.g. for multi-package installs, we should first install all packages
         ;; and then compile them.
         (package--compile new-desc)
-        (when package-native-compile
-          (package--native-compile-async new-desc))
         ;; After compilation, load again any files loaded by
         ;; `activate-1', so that we use the byte-compiled definitions.
         (package--reload-previously-loaded new-desc)))

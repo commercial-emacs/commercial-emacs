@@ -81,15 +81,7 @@ extern Lisp_Object native_function_doc (Lisp_Object function);
 
 extern void syms_of_comp (void);
 
-extern void maybe_defer_native_compilation (Lisp_Object function_name,
-					    Lisp_Object definition);
-
 #else /* #ifdef HAVE_NATIVE_COMP */
-
-static inline void
-maybe_defer_native_compilation (Lisp_Object function_name,
-				Lisp_Object definition)
-{}
 
 static inline
 void unload_comp_unit (struct Lisp_Native_Comp_Unit *cu)

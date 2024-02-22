@@ -265,9 +265,6 @@ Useful to hook into pass checkers.")
   "empty byte compiler output"
   'native-compiler-error)
 
-(defvar comp-no-spawn nil
-  "Non-nil don't spawn native compilation processes.")
-
 (cl-defstruct (comp-vec (:copier nil))
   "A re-sizable vector like object."
   (data (make-hash-table :test #'eql) :type hash-table
@@ -364,9 +361,7 @@ Needed to replace immediate byte-compiled lambdas with the compiled reference.")
             :documentation "Relocated data that cannot be moved into pure space.
 This is typically for top-level forms other than defun.")
   (d-ephemeral (make-comp-data-container) :type comp-data-container
-               :documentation "Relocated data not necessary after load.")
-  (with-late-load nil :type boolean
-                  :documentation "When non-nil support late load."))
+               :documentation "Relocated data not necessary after load."))
 
 (cl-defstruct comp-args-base
   (min nil :type integer
@@ -1514,11 +1509,10 @@ and the annotation emission."
           ;; symbols.
           (make--comp-mvar :constant (comp-func-d-lambda-list function)))))
 
-(cl-defgeneric comp--emit-for-top-level (form for-late-load)
+(cl-defgeneric comp--emit-for-top-level (form)
   "Emit the Limple code for top level FORM.")
 
-(cl-defmethod comp--emit-for-top-level ((form byte-to-native-func-def)
-                                       for-late-load)
+(cl-defmethod comp--emit-for-top-level ((form byte-to-native-func-def))
   (let* ((name (byte-to-native-func-def-name form))
          (c-name (byte-to-native-func-def-c-name form))
          (f (gethash c-name (comp-ctxt-funcs-h comp-ctxt)))
@@ -1526,38 +1520,34 @@ and the annotation emission."
     (cl-assert (and name f))
     (comp--emit
      `(set ,(make--comp-mvar :slot 1)
-           ,(comp--call (if for-late-load
-                           'comp--late-register-subr
-                         'comp--register-subr)
-                       (make--comp-mvar :constant name)
-                       (make--comp-mvar :constant c-name)
-                       (car args)
-                       (cdr args)
-                       (setf (comp-func-type f)
-                             (make--comp-mvar :constant nil))
-                       (make--comp-mvar
-                        :constant
-                        (list
-                         (let* ((h (comp-ctxt-function-docs comp-ctxt))
-                                (i (hash-table-count h)))
-                           (puthash i (comp-func-doc f) h)
-                           i)
-                         (comp-func-int-spec f)
-                         (comp-func-command-modes f)))
-                       ;; This is the compilation unit it-self passed as
-                       ;; parameter.
-                       (make--comp-mvar :slot 0))))))
+           ,(comp--call 'comp--register-subr
+                        (make--comp-mvar :constant name)
+                        (make--comp-mvar :constant c-name)
+                        (car args)
+                        (cdr args)
+                        (setf (comp-func-type f)
+                              (make--comp-mvar :constant nil))
+                        (make--comp-mvar
+                         :constant
+                         (list
+                          (let* ((h (comp-ctxt-function-docs comp-ctxt))
+                                 (i (hash-table-count h)))
+                            (puthash i (comp-func-doc f) h)
+                            i)
+                          (comp-func-int-spec f)
+                          (comp-func-command-modes f)))
+                        ;; This is the compilation unit it-self passed as
+                        ;; parameter.
+                        (make--comp-mvar :slot 0))))))
 
-(cl-defmethod comp--emit-for-top-level ((form byte-to-native-top-level)
-                                       for-late-load)
-  (unless for-late-load
-    (comp--emit
-     (comp--call 'eval
-                (let ((comp-curr-allocation-class 'd-impure))
-                  (make--comp-mvar :constant
+(cl-defmethod comp--emit-for-top-level ((form byte-to-native-top-level))
+  (comp--emit
+   (comp--call 'eval
+               (let ((comp-curr-allocation-class 'd-impure))
+                 (make--comp-mvar :constant
                                   (byte-to-native-top-level-form form)))
-                (make--comp-mvar :constant
-                                (byte-to-native-top-level-lexical form))))))
+               (make--comp-mvar :constant
+                                (byte-to-native-top-level-lexical form)))))
 
 (defun comp--emit-lambda-for-top-level (func)
   "Emit the creation of subrs for lambda FUNC.
@@ -1592,10 +1582,8 @@ These are stored in the reloc data array."
                 ;; parameter.
                 (make--comp-mvar :slot 0)))))
 
-(defun comp--limplify-top-level (for-late-load)
+(defun comp--limplify-top-level ()
   "Create a Limple function to modify the global environment at load.
-When FOR-LATE-LOAD is non-nil, the emitted function modifies only
-function definition.
 
 Synthesize a function called `top_level_run' that gets one single
 parameter (the compilation unit itself).  To define native
@@ -1605,12 +1593,8 @@ into the C code forwarding the compilation unit."
   ;; reasons to be executed ever again.  Therefore all objects can be
   ;; just ephemeral.
   (let* ((comp-curr-allocation-class 'd-ephemeral)
-         (func (make-comp-func-l :name (if for-late-load
-                                           'late-top-level-run
-                                         'top-level-run)
-                                 :c-name (if for-late-load
-                                             "late_top_level_run"
-                                           "top_level_run")
+         (func (make-comp-func-l :name 'top-level-run
+                                 :c-name "top_level_run"
                                  :args (make-comp-args :min 1 :max 1)
                                  ;; Frame is 2 wide: Slot 0 is the
                                  ;; compilation unit being loaded
@@ -1624,15 +1608,13 @@ into the C code forwarding the compilation unit."
                      :curr-block (make--comp-block-lap -1 0 'top-level)
                      :frame (comp--new-frame 1 0))))
     (comp--make-curr-block 'entry (comp--sp))
-    (comp--emit-annotation (if for-late-load
-                              "Late top level"
-                            "Top level"))
+    (comp--emit-annotation "Top level")
     ;; Assign the compilation unit incoming as parameter to the slot frame 0.
     (comp--emit `(set-par-to-local ,(comp--slot-n 0) 0))
     (maphash (lambda (_ func)
                (comp--emit-lambda-for-top-level func))
              (comp-ctxt-byte-func-to-func-h comp-ctxt))
-    (mapc (lambda (x) (comp--emit-for-top-level x for-late-load))
+    (mapc (lambda (x) (comp--emit-for-top-level x))
           (comp-ctxt-top-level-forms comp-ctxt))
     (comp--emit `(return ,(make--comp-mvar :slot 1)))
     (comp--limplify-finalize-function func)))
@@ -1719,9 +1701,7 @@ into the C code forwarding the compilation unit."
   "Compute LIMPLE IR for forms in `comp-ctxt'."
   (maphash (lambda (_ f) (comp--limplify-function f))
            (comp-ctxt-funcs-h comp-ctxt))
-  (comp--add-func-to-ctxt (comp--limplify-top-level nil))
-  (when (comp-ctxt-with-late-load comp-ctxt)
-    (comp--add-func-to-ctxt (comp--limplify-top-level t))))
+  (comp--add-func-to-ctxt (comp--limplify-top-level nil)))
 
 ;;; add-cstrs pass specific code.
 
@@ -3126,65 +3106,10 @@ Prepare every function for final compilation and drive the C back-end."
       (comp--compile-ctxt-to-file (comp-ctxt-output comp-ctxt))
     (comp--release-ctxt)))
 
-(defvar comp-async-compilation nil
-  "Non-nil while executing an asynchronous native compilation.")
-
-(defvar comp-running-batch-compilation nil
-  "Non-nil when compilation is driven by any `batch-*-compile' function.")
-
 (defun comp--final (_)
   "Final pass driving the C back-end for code emission."
   (unless comp-dry-run
-    ;; Always run the C side of the compilation as a sub-process
-    ;; unless during bootstrap or async compilation (bug#45056).  GCC
-    ;; leaks memory but also interfere with the ability of Emacs to
-    ;; detect when a sub-process completes (TODO understand why).
-    (if (or comp-running-batch-compilation comp-async-compilation)
-	(comp--final1)
-      ;; Call comp--final1 in a child process.
-      (let* ((output (comp-ctxt-output comp-ctxt))
-             (print-escape-newlines t)
-             (print-length nil)
-             (print-level nil)
-             (print-quoted t)
-             (print-gensym t)
-             (print-circle t)
-             (print-escape-multibyte t)
-             (expr `((require 'comp)
-                     (setf native-comp-verbose ,native-comp-verbose
-                           comp-libgccjit-reproducer ,comp-libgccjit-reproducer
-                           comp-ctxt ,comp-ctxt
-                           native-comp-compiler-options
-                           ',native-comp-compiler-options
-                           native-comp-driver-options
-                           ',native-comp-driver-options
-                           byte-compile-warnings ',byte-compile-warnings
-                           load-path ',load-path)
-                     ,native-comp-async-env-modifier-form
-                     (message "Compiling %s..." ',output)
-                     (comp--final1)))
-             (temp-file (make-temp-file
-			 (concat "emacs-int-comp-"
-				 (file-name-base output) "-")
-			 nil ".el"))
-             (default-directory invocation-directory))
-	(with-temp-file temp-file
-          (insert ";; -*-coding: utf-8-emacs-unix; -*-\n")
-          (mapc (lambda (e)
-                  (insert (prin1-to-string e)))
-                expr))
-	(with-temp-buffer
-          (unwind-protect
-              (if (zerop
-                   (call-process (expand-file-name invocation-name
-                                                   invocation-directory)
-				 nil t t "-no-comp-spawn" "-Q" "--batch" "-l"
-                                 temp-file))
-                  (progn
-                    (delete-file temp-file)
-                    output)
-		(signal 'native-compiler-error (list (buffer-string))))
-            (comp-log-to-buffer (buffer-string))))))))
+    (comp--final1)))
 
 ;;; Compiler type hints.
 ;; Public entry points to be used by user code to give comp
@@ -3239,94 +3164,77 @@ Prepare every function for final compilation and drive the C back-end."
          (native-comp-speed 1) ;conservative
          (lexical-binding t))
     (make-directory comp-trampoline-dir t)
-    (comp--native-compile form nil (expand-file-name
-                                    (comp-trampoline-filename subr-name)
-                                    comp-trampoline-dir))))
+    (comp--native-compile form (expand-file-name
+                                (comp-trampoline-filename subr-name)
+                                comp-trampoline-dir))))
 
-(defun comp--native-compile (function-or-file &optional with-late-load output)
-  "Compile FUNCTION-OR-FILE into native code.
-Wtf is late loading."
+(defun comp--native-compile (function-or-file &optional output)
+  "Compile FUNCTION-OR-FILE into native code."
   (comp-ensure-native-compiler)
-  (unless (or (functionp function-or-file)
-              (stringp function-or-file))
+  (when (and (not (functionp function-or-file))
+             (not (stringp function-or-file)))
     (signal 'native-compiler-error
             (list "Not a function symbol or file" function-or-file)))
-  (when (or (null comp-no-spawn) comp-async-compilation)
-    (catch 'no-native-compile
-      (let* ((data function-or-file)
-             (comp-native-compiling t)
-             (byte-native-qualities nil)
-             (byte-compile-error-on-warn t)
-             (comp-ctxt (make-comp-ctxt :output output
-                                        :with-late-load with-late-load)))
-        (comp-log "\n\n" 1)
-        (unwind-protect
-            (progn
-              (condition-case-unless-debug err
-                  (cl-loop
-                   with report = nil
-                   for t0 = (current-time)
-                   for pass in comp-passes
-                   unless (memq pass comp-disabled-passes)
-                   do
-                   (comp-log (format "\n(%s) Running pass %s:\n"
-                                     function-or-file pass)
-                             2)
-                   (setf data (funcall pass data))
-                   (push (cons pass (float-time (time-since t0))) report)
-                   (cl-loop for f in (alist-get pass comp-post-pass-hooks)
-                            do (funcall f data))
-                   finally
-                   (when comp-log-time-report
-                     (comp-log (format "Done compiling %s" data) 0)
-                     (cl-loop for (pass . time) in (reverse report)
-                              do (comp-log (format "Pass %s took: %fs."
-                                                   pass time)
-                                           0))))
-                (native-compiler-skip)
-                (t
-                 (let ((err-val (cdr err)))
-                   ;; If we are doing an async native compilation print the
-                   ;; error in the correct format so is parsable and abort.
-                   (if (and comp-async-compilation
-                            (not (eq (car err) 'native-compiler-error)))
-                       (progn
-                         (message "%s: Error %s"
-                                  function-or-file
-                                  (error-message-string err))
-                         (kill-emacs -1))
-                     ;; Otherwise re-signal it adding the compilation input.
-                     ;; FIXME: We can't just insert arbitrary info in the
-                     ;; error-data part of an error: the handler may expect
-                     ;; specific data at specific positions!
-	             (signal (car err) (if (consp err-val)
-			                   (cons function-or-file err-val)
-			                 ;; FIXME: `err-val' is supposed to be
-			                 ;; a list, so it can only be nil here!
-			                 (list function-or-file err-val)))))))
-              (if (stringp function-or-file)
-                  data
-                ;; So we return the compiled function.
-                (native-elisp-load data)))
-          (when (and (not (stringp function-or-file))
-                     (not output)
-                     comp-ctxt
-                     (comp-ctxt-output comp-ctxt)
-                     (file-exists-p (comp-ctxt-output comp-ctxt)))
-            (cond ((eq 'windows-nt system-type)
-                   ;; We may still be using the temporary .eln file.
-                   (ignore-errors (delete-file (comp-ctxt-output comp-ctxt))))
-                  (t (delete-file (comp-ctxt-output comp-ctxt))))))))))
+  (catch 'no-native-compile
+    (let* ((data function-or-file)
+           (comp-native-compiling t)
+           (byte-native-qualities nil)
+           (byte-compile-error-on-warn t)
+           (comp-ctxt (make-comp-ctxt :output output)))
+      (comp-log "\n\n" 1)
+      (unwind-protect
+          (progn
+            (condition-case-unless-debug err
+                (cl-loop
+                 with report
+                 for t0 = (current-time)
+                 for pass in comp-passes
+                 unless (memq pass comp-disabled-passes)
+                 do (comp-log (format "\n(%s) Running pass %s:\n"
+                                      function-or-file
+                                      pass)
+                              2)
+                 (setf data (funcall pass data))
+                 (push (cons pass (float-time (time-since t0))) report)
+                 (cl-loop for f in (alist-get pass comp-post-pass-hooks)
+                          do (funcall f data))
+                 finally
+                 (when comp-log-time-report
+                   (comp-log (format "Done compiling %s" data) 0)
+                   (cl-loop for (pass . time) in (reverse report)
+                            do (comp-log (format "Pass %s took: %fs."
+                                                 pass time)
+                                         0))))
+              (native-compiler-skip)
+              (t
+               (let ((err-val (cdr err)))
+                 (signal (car err) (if (consp err-val)
+			               (cons function-or-file err-val)
+			             ;; FIXME: `err-val' is supposed to be
+			             ;; a list, so it can only be nil here!
+			             (list function-or-file err-val))))))
+            (if (stringp function-or-file)
+                data
+              ;; So we return the compiled function.
+              (native-elisp-load data)))
+        (when (and (not (stringp function-or-file))
+                   (not output)
+                   comp-ctxt
+                   (comp-ctxt-output comp-ctxt)
+                   (file-exists-p (comp-ctxt-output comp-ctxt)))
+          (cond ((eq 'windows-nt system-type)
+                 ;; We may still be using the temporary .eln file.
+                 (ignore-errors (delete-file (comp-ctxt-output comp-ctxt))))
+                (t (delete-file (comp-ctxt-output comp-ctxt)))))))))
 
 ;;; Compiler entry points.
 
 (defun comp-compile-all-trampolines ()
   "Pre-compile AOT all trampolines."
-  (let ((comp-running-batch-compilation t))
-    (mapatoms (lambda (f)
-                (when (subr-primitive-p (symbol-function f))
-                  (message "Compiling trampoline for: %s" f)
-                  (comp-trampoline-compile f))))))
+  (mapatoms (lambda (f)
+              (when (subr-primitive-p (symbol-function f))
+                (message "Compiling trampoline for: %s" f)
+                (comp-trampoline-compile f)))))
 
 ;;;###autoload
 (defun native-compile (function-or-file &optional output)
@@ -3334,7 +3242,7 @@ Wtf is late loading."
 FUNCTION-OR-FILE is a function symbol, form, or file name.  OUTPUT is the
 optional file name for the compiled object.  Returns FUNCTION-OR-FILE if
 a file name, else the compiled object."
-  (comp--native-compile function-or-file nil output))
+  (comp--native-compile function-or-file output))
 
 ;;;###autoload
 (defun batch-native-compile (&optional _unused)
@@ -3342,8 +3250,7 @@ a file name, else the compiled object."
 Equivalent of `batch-byte-compile' for native compilation.  Returns list
 of file names not excluded by `native-comp-bootstrap-deny-list'."
   (comp-ensure-native-compiler)
-  (cl-loop with comp-running-batch-compilation = t
-           for file in command-line-args-left
+  (cl-loop for file in command-line-args-left
            unless (cl-some (lambda (re) (string-match-p re file))
                            native-comp-bootstrap-deny-list)
            collect (comp--native-compile file)))
