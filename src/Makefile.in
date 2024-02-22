@@ -511,8 +511,6 @@ define byte-compile-loaded
 	                        (file-relative-name el \"$(abs_top_srcdir)/lisp\")))))"
 endef
 
-.PRECIOUS: bootstrap-emacs.pdmp
-
 bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT)
 emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.elc ../lisp/international/charprop.el
 bootstrap-emacs.pdmp emacs.pdmp:
