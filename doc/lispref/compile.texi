@@ -880,7 +880,6 @@ more than one file, this function will normally start several
 compilation subprocesses in parallel, under the control of
 @code{native-comp-async-jobs-number} (@pxref{Native-Compilation
 Variables}).
-@end defun
 
 @deffn Command emacs-lisp-native-compile
 This command compiles the file visited by the current buffer into

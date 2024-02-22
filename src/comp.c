@@ -5134,7 +5134,6 @@ syms_of_comp (void)
   defsubr (&Scomp_libgccjit_version);
   defsubr (&Scomp__register_lambda);
   defsubr (&Scomp__register_subr);
-  defsubr (&Scomp__late_register_subr);
   defsubr (&Snative_elisp_load);
 
   staticpro (&comp.exported_funcs_h);

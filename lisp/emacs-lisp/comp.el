@@ -3144,7 +3144,14 @@ Prepare every function for final compilation and drive the C back-end."
       (push (gensym "arg") lambda-list))
     (reverse lambda-list)))
 
-;; Called from comp-run.el
+;;;###autoload
+(defun comp-trampoline-search (subr-name)
+  "Return trampoline file for SUBR-NAME."
+  (let ((filename (expand-file-name (comp-trampoline-filename subr-name)
+                                    comp-trampoline-dir)))
+    (when (file-readable-p filename)
+      (native-elisp-load filename))))
+
 ;;;###autoload
 (defun comp-trampoline-compile (subr-name)
   "Synthesize, compile, and return a trampoline for SUBR-NAME."

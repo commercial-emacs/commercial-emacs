@@ -24,7 +24,7 @@ SHELL = @SHELL@
 # We use $(srcdir) explicitly in dependencies so as not to depend on VPATH.
 srcdir = @srcdir@
 top_builddir = @top_builddir@
-# MinGW CPPFLAGS may use this.
+# MinGW CPPFLAGS uses this and fails enigmatically without it.
 abs_top_srcdir=@abs_top_srcdir@
 VPATH = $(srcdir)
 CC = @CC@
@@ -507,6 +507,9 @@ define byte-compile-loaded
 	../src/$(@:.pdmp=)$(EXEEXT) --batch --no-site-file --no-site-lisp \
 	   --eval "(dolist (el (mapcar (function car) load-history)) \
 	             (when (equal \"el\" (file-name-extension el)) \
+	               (let ((prefix (file-name-as-directory \"$(abs_top_srcdir)\"))) \
+	                 (when (string-prefix-p prefix el) \
+	                   (setq el (substring el (length prefix))))) \
 	               (princ (format \"%sc \" el))))"
 endef
 
