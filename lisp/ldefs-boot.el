@@ -14923,6 +14923,9 @@ whose documentation describes the minor mode.
 If called from Lisp with a non-nil BUFFER argument, display
 documentation for the major and minor modes of that buffer.
 
+When `describe-mode-outline' is non-nil, Outline minor mode
+is enabled in the Help buffer.
+
 (fn &optional BUFFER)" t)
 (autoload 'describe-widget "help-fns" "\
 Display a buffer with information about a widget.
@@ -28049,6 +28052,10 @@ Make the shell buffer the current buffer, and return it.
 
 ;;; Generated autoloads from emacs-lisp/shortdoc.el
 
+(autoload 'shortdoc--check "shortdoc" "\
+
+
+(fn GROUP FUNCTIONS)")
 (defvar shortdoc--groups nil)
 (defmacro define-short-documentation-group (group &rest functions) "\
 Add GROUP to the list of defined documentation groups.
@@ -28112,7 +28119,7 @@ execution of the documented form depends on some conditions.
 
 A FUNC form can have any number of `:no-eval' (or `:no-value'),
 `:no-eval*', `:result', `:result-string', `:eg-result' and
-`:eg-result-string' properties." (declare (indent defun)) `(progn (setq shortdoc--groups (delq (assq ',group shortdoc--groups) shortdoc--groups)) (push (cons ',group ',functions) shortdoc--groups)))
+`:eg-result-string' properties." (declare (indent defun)) (shortdoc--check group functions) `(progn (setq shortdoc--groups (delq (assq ',group shortdoc--groups) shortdoc--groups)) (push (cons ',group ',functions) shortdoc--groups)))
 (autoload 'shortdoc-display-group "shortdoc" "\
 Pop to a buffer with short documentation summary for functions in GROUP.
 If FUNCTION is non-nil, place point on the entry for FUNCTION (if any).

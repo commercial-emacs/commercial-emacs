@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         gearing: [standard]
@@ -27,8 +27,6 @@ jobs:
             gearing: alt-x
           - os: ubuntu-latest
             gearing: multithread
-          - os: ubuntu-latest
-            gearing: native-comp
     steps:
     - run: |
         git config --global core.autocrlf false
