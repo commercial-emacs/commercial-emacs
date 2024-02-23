@@ -62,6 +62,8 @@ DEF_DLL_FN (SQLITE_API int, sqlite3_bind_int64,
 DEF_DLL_FN (SQLITE_API int, sqlite3_bind_double, (sqlite3_stmt*, int, double));
 DEF_DLL_FN (SQLITE_API int, sqlite3_bind_null, (sqlite3_stmt*, int));
 DEF_DLL_FN (SQLITE_API int, sqlite3_bind_int, (sqlite3_stmt*, int, int));
+DEF_DLL_FN (SQLITE_API int, sqlite3_bind_parameter_index,
+	    (sqlite3_stmt*, const char*));
 DEF_DLL_FN (SQLITE_API int, sqlite3_extended_errcode, (sqlite3*));
 DEF_DLL_FN (SQLITE_API const char*, sqlite3_errmsg, (sqlite3*));
 #if SQLITE_VERSION_NUMBER >= 3007015
@@ -107,6 +109,7 @@ DEF_DLL_FN (SQLITE_API int, sqlite3_db_config, (sqlite3*, int, ...));
 # undef sqlite3_bind_double
 # undef sqlite3_bind_null
 # undef sqlite3_bind_int
+# undef sqlite3_bind_parameter_index
 # undef sqlite3_extended_errcode
 # undef sqlite3_errmsg
 # if SQLITE_VERSION_NUMBER >= 3007015
@@ -136,6 +139,7 @@ DEF_DLL_FN (SQLITE_API int, sqlite3_db_config, (sqlite3*, int, ...));
 # define sqlite3_bind_double fn_sqlite3_bind_double
 # define sqlite3_bind_null fn_sqlite3_bind_null
 # define sqlite3_bind_int fn_sqlite3_bind_int
+# define sqlite3_bind_parameter_index fn_sqlite3_bind_parameter_index
 # define sqlite3_extended_errcode fn_sqlite3_extended_errcode
 # define sqlite3_errmsg fn_sqlite3_errmsg
 # if SQLITE_VERSION_NUMBER >= 3007015
@@ -168,6 +172,7 @@ load_dll_functions (HMODULE library)
   LOAD_DLL_FN (library, sqlite3_bind_double);
   LOAD_DLL_FN (library, sqlite3_bind_null);
   LOAD_DLL_FN (library, sqlite3_bind_int);
+  LOAD_DLL_FN (library, sqlite3_bind_parameter_index);
   LOAD_DLL_FN (library, sqlite3_extended_errcode);
   LOAD_DLL_FN (library, sqlite3_errmsg);
 #if SQLITE_VERSION_NUMBER >= 3007015
@@ -332,6 +337,7 @@ bind_values (sqlite3 *db, sqlite3_stmt *stmt, Lisp_Object values)
 {
   sqlite3_reset (stmt);
   int len;
+  int kw_dex = 0;
   if (VECTORP (values))
     len = ASIZE (values);
   else
@@ -340,6 +346,7 @@ bind_values (sqlite3 *db, sqlite3_stmt *stmt, Lisp_Object values)
   for (int i = 0; i < len; ++i)
     {
       int ret = SQLITE_MISMATCH;
+      int j = (kw_dex ? kw_dex : i + 1);
       Lisp_Object value;
       if (VECTORP (values))
 	value = AREF (values, i);
@@ -375,33 +382,37 @@ bind_values (sqlite3 *db, sqlite3_stmt *stmt, Lisp_Object values)
 	    {
 	      if (SBYTES (value) != SCHARS (value))
 		xsignal1 (Qsqlite_error, build_string ("BLOB values must be unibyte"));
-	    ret = sqlite3_bind_blob (stmt, i + 1,
+	      ret = sqlite3_bind_blob (stmt, j,
 				       SSDATA (value), SBYTES (value),
 				       NULL);
 	    }
 	    else
-	      ret = sqlite3_bind_text (stmt, i + 1,
+	      ret = sqlite3_bind_text (stmt, j,
 				       SSDATA (encoded), SBYTES (encoded),
 				       NULL);
 	}
       else if (EQ (type, Qinteger))
 	{
 	  if (BIGNUMP (value))
-	    ret = sqlite3_bind_int64 (stmt, i + 1, bignum_to_intmax (value));
+	    ret = sqlite3_bind_int64 (stmt, j, bignum_to_intmax (value));
 	  else
-	    ret = sqlite3_bind_int64 (stmt, i + 1, XFIXNUM (value));
+	    ret = sqlite3_bind_int64 (stmt, j, XFIXNUM (value));
 	}
       else if (EQ (type, Qfloat))
-	ret = sqlite3_bind_double (stmt, i + 1, XFLOAT_DATA (value));
+	ret = sqlite3_bind_double (stmt, j, XFLOAT_DATA (value));
       else if (NILP (value))
-	ret = sqlite3_bind_null (stmt, i + 1);
+	ret = sqlite3_bind_null (stmt, j);
       else if (EQ (value, Qt))
-	ret = sqlite3_bind_int (stmt, i + 1, 1);
+	ret = sqlite3_bind_int (stmt, j, 1);
       else if (EQ (value, Qfalse))
-	ret = sqlite3_bind_int (stmt, i + 1, 0);
+	ret = sqlite3_bind_int (stmt, j, 0);
+      else if (!NILP (Fkeywordp (value))
+	       && (kw_dex = sqlite3_bind_parameter_index
+		   (stmt, SSDATA (encode_string (SYMBOL_NAME (value))))))
+	continue;
       else
 	return "invalid argument";
-
+      kw_dex = 0;
       if (ret != SQLITE_OK)
 	return sqlite3_errmsg (db);
     }

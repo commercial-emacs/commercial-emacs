@@ -5366,7 +5366,12 @@ For instance:
 
 This has exactly the same effect as the previous example, but is more
 efficient and safer (because it doesn't involve any string parsing or
-interpolation).
+interpolation).  In addition to positional substitutions, you can also
+use keyword-based replacements, for example:
+
+@lisp
+(sqlite-execute db "insert into foo values (:a, :b)" '(:a "bar" :b 2))
+@end lisp
 
 @code{sqlite-execute} usually returns the number of affected rows.
 For instance, an @samp{insert} statement will typically return
@@ -5407,6 +5412,8 @@ or a vector of values that will be bound before executing the select:
 
 @lisp
 (sqlite-select db "select * from foo where key = ?" [2])
+  @result{} (("bar" 2))
+(sqlite-select db "select * from foo where key = :a" [:a 2])
   @result{} (("bar" 2))
 @end lisp
 
