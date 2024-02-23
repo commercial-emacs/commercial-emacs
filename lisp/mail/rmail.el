@@ -4093,8 +4093,7 @@ typically for purposes of moderating a list."
 	    (save-excursion
 	      (if (featurep 'mailabbrev)
 		  (let ((end (point-marker))
-			(local-abbrev-table mail-abbrevs)
-			(old-syntax-table (syntax-table)))
+			(local-abbrev-table mail-abbrevs))
 		    (if (and (not (obarrayp mail-abbrevs))
 			     (file-exists-p mail-personal-alias-file))
 			(build-mail-abbrevs))
