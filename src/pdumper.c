@@ -2771,15 +2771,15 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
 #ifdef HAVE_NATIVE_COMP
   bool native_comp = ! NILP (subr->native_comp_u);
 #else
-  bool non_primitive = false;
+  bool native_comp = false;
 #endif
-  if (non_primitive)
+  if (native_comp)
     out.function.a0 = NULL;
   else
     dump_field_emacs_ptr (ctx, &out, subr, &subr->function.a0);
   DUMP_FIELD_COPY (&out, subr, min_args);
   DUMP_FIELD_COPY (&out, subr, max_args);
-  if (non_primitive)
+  if (native_comp)
     {
       dump_field_fixup_later (ctx, &out, subr, &subr->symbol_name);
       dump_remember_cold_op (ctx,
@@ -2804,7 +2804,7 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
   dump_field_lv (ctx, &out, subr, &subr->type, WEIGHT_NORMAL);
 #endif
   dump_off subr_off = dump_object_finish (ctx, &out, sizeof (out));
-  if (non_primitive && ctx->flags.dump_object_contents)
+  if (native_comp && ctx->flags.dump_object_contents)
     /* We'll do the final addr relocation during VERY_LATE_RELOCS time
        after the compilation units has been loaded. */
     dump_push (&ctx->dump_relocs[VERY_LATE_RELOCS],
