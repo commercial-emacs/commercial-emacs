@@ -5007,6 +5007,8 @@ hash_string (char const *ptr, ptrdiff_t len)
       /* String is shorter than an EMACS_UINT.  Use smaller loads.  */
       eassume (p <= end && end - p < sizeof (EMACS_UINT));
       EMACS_UINT tail = 0;
+      verify (sizeof tail <= 8);
+#if EMACS_INT_MAX > INT32_MAX
       if (end - p >= 4)
 	{
 	  uint32_t c;
@@ -5014,6 +5016,7 @@ hash_string (char const *ptr, ptrdiff_t len)
 	  tail = (tail << (8 * sizeof c)) + c;
 	  p += sizeof c;
 	}
+#endif
       if (end - p >= 2)
 	{
 	  uint16_t c;
@@ -5111,7 +5114,7 @@ sxhash_bignum (Lisp_Object bignum)
 {
   mpz_t const *n = xbignum_val (bignum);
   size_t i, nlimbs = mpz_size (*n);
-  EMACS_UINT hash = 0;
+  EMACS_UINT hash = mpz_sgn(*n) < 0;
 
   for (i = 0; i < nlimbs; ++i)
     hash = sxhash_combine (hash, mpz_getlimbn (*n, i));
