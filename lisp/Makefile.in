@@ -242,22 +242,10 @@ compile-compiler: $(BYTE_COMPILER_EL:.el=.elc)
 
 .SECONDEXPANSION:
 .PHONY: compile
-compile: compile-clean compile-compiler \
-  $(COMPILE_FIRST:.el=.elc) $$(call compile-rest,c)
+compile: compile-compiler $(COMPILE_FIRST:.el=.elc) $$(call compile-rest,c)
 ifeq ($(HAVE_NATIVE_COMP),yes)
 compile: $$(call compile-rest,n)
 endif
-
-.PHONY: compile-clean
-# Erase left-over .elc files that do not have a corresponding .el file.
-compile-clean:
-	@elcs=`echo "${SUBDIRS_REL} " | sed -e 's|/\./|/|g' -e 's|/\. | |g' -e 's| |/*.elc |g'`; \
-	for el in `echo $$elcs | sed -e 's/\.elc/\.el/g'`; do \
-	  if test -f "$$el" || test ! -f "$${el}c"; then :; else \
-	    echo rm "$${el}c"; \
-	    rm "$${el}c"; \
-	  fi; \
-	done
 
 ./leim/leim-list.el: ./international/titdic-cnv.elc
 	$(MAKE) -C ../leim all EMACS="$(EMACS)"
@@ -314,7 +302,7 @@ pdmpclean:
 bootstrap-pdmpclean:
 	find . -name '*.elc' $(FIND_DELETE)
 
-bootstrap-clean: bootstrap-pdmp
+bootstrap-clean: bootstrap-pdmpclean
 	rm -f $(AUTOGENEL)
 
 distclean:
