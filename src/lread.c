@@ -4540,8 +4540,6 @@ static Lisp_Object initial_obarray;
 
 static size_t oblookup_last_bucket_number;
 
-static Lisp_Object make_obarray (unsigned bits);
-
 /* Slow path obarray check: return the obarray to use or signal an error.  */
 Lisp_Object
 check_obarray_slow (Lisp_Object obarray)
@@ -4553,7 +4551,7 @@ check_obarray_slow (Lisp_Object obarray)
       Lisp_Object obj = AREF (obarray, 0);
       if (OBARRAYP (obj))
 	return obj;
-      if (BASE_EQ (obj, make_fixnum (0)))
+      if (EQ (obj, make_fixnum (0)))
 	{
 	  /* Put an actual obarray object in the first slot.
 	     The rest of the vector remains unused.  */
@@ -4563,7 +4561,7 @@ check_obarray_slow (Lisp_Object obarray)
 	}
     }
   /* Reset Vobarray to the standard obarray for nicer error handling. */
-  if (BASE_EQ (Vobarray, obarray)) Vobarray = initial_obarray;
+  if (EQ (Vobarray, obarray)) Vobarray = initial_obarray;
 
   wrong_type_argument (Qobarrayp, obarray);
 }
@@ -4785,7 +4783,7 @@ usage: (unintern NAME OBARRAY)  */)
 
   struct Lisp_Symbol *prev = XSYMBOL (*loc);
   if (sym == prev)
-    *loc = sym->u.s.next ? make_lisp_symbol (sym->u.s.next) : make_fixnum (0);
+    *loc = sym->u.s.next ? make_lisp_ptr (sym->u.s.next, Lisp_Symbol) : make_fixnum (0);
   else
     while (1)
       {
@@ -4838,7 +4836,7 @@ oblookup (Lisp_Object obarray, register const char *ptr, ptrdiff_t size, ptrdiff
 	    return sym;
 	  if (s->u.s.next == NULL)
 	    break;
-	  sym = make_lisp_symbol(s->u.s.next);
+	  sym = make_lisp_ptr (s->u.s.next, Lisp_Symbol);
 	}
     }
   return make_fixnum (idx);
@@ -4913,7 +4911,7 @@ allocate_obarray (void)
   return ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Obarray, PVEC_OBARRAY);
 }
 
-static Lisp_Object
+Lisp_Object
 make_obarray (unsigned bits)
 {
   struct Lisp_Obarray *o = allocate_obarray ();
@@ -4965,7 +4963,7 @@ grow_obarray (struct Lisp_Obarray *o)
 	      Lisp_Object *loc = o->buckets + idx;
 	      struct Lisp_Symbol *next = s->u.s.next;
 	      s->u.s.next = SYMBOLP (*loc) ? XSYMBOL (*loc) : NULL;
-	      *loc = make_lisp_symbol (s);
+	      *loc = make_lisp_ptr (s, Lisp_Symbol);
 	      if (next == NULL)
 		break;
 	      s = next;
@@ -5068,7 +5066,7 @@ DEFUN ("internal--obarray-buckets",
     {
       Lisp_Object bucket = Qnil;
       Lisp_Object sym = XOBARRAY (obarray)->buckets[i];
-      if (SYMBOL_P (sym))
+      if (SYMBOLP (sym))
 	while (1)
 	  {
 	    bucket = Fcons (sym, bucket);

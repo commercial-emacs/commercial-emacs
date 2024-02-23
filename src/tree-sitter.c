@@ -1437,7 +1437,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 
       Lisp_Object capture_name_to_tsnode =
 	make_hash_table (&hashtest_eq, 10, Weak_None, false);
-      Lisp_Object obarray = initialize_vector (10, make_fixnum (0));
+      Lisp_Object obarray = make_obarray (3);
       const Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
       ptrdiff_t line_target =
 	count_lines (CHAR_TO_BYTE (enclosing_beg), CHAR_TO_BYTE (XFIXNUM (calc_beg)));

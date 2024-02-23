@@ -4999,7 +4999,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		    {
 		      struct Lisp_Obarray *o = (struct Lisp_Obarray *)ptr;
 		      set_vector_marked (ptr);
-		      mark_stack_push_values (o->buckets, obarray_size (o));
+		      mark_stack_push_n (o->buckets, obarray_size (o));
 		    }
 		    break;
 		  case PVEC_CHAR_TABLE:

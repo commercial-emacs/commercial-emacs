@@ -162,8 +162,6 @@ verify (BITS_WORD_MAX >> (BITS_PER_BITS_WORD - 1) == 1);
    pre-C99 libraries such as glibc 2.0 (1997) and Solaris 8 (2000).  */
 #define pD "t"
 
-#define OBARRAY_SIZE 15121
-
 /* Convenience macro for rarely-used functions that do not return.  */
 #define AVOID _Noreturn ATTRIBUTE_COLD void
 
@@ -2117,7 +2115,6 @@ CHECK_OBARRAY (Lisp_Object x)
 INLINE Lisp_Object
 make_lisp_obarray (struct Lisp_Obarray *o)
 {
-  eassert (PSEUDOVECTOR_TYPEP (&o->header, PVEC_OBARRAY));
   return make_lisp_ptr (o, Lisp_Vectorlike);
 }
 
@@ -2162,9 +2159,9 @@ obarray_iter_at_end (obarray_iter_t *it)
   while (++it->idx < size)
     {
       Lisp_Object obj = it->o->buckets[it->idx];
-      if (!BASE_EQ (obj, make_fixnum (0)))
+      if (!EQ (obj, make_fixnum (0)))
 	{
-	  it->symbol = XBARE_SYMBOL (obj);
+	  it->symbol = XSYMBOL (obj);
 	  return false;
 	}
     }
@@ -2182,7 +2179,7 @@ obarray_iter_step (obarray_iter_t *it)
 INLINE Lisp_Object
 obarray_iter_symbol (obarray_iter_t *it)
 {
-  return make_lisp_symbol (it->symbol);
+  return make_lisp_ptr (it->symbol, Lisp_Symbol);
 }
 
 /* Iterate IT over the symbols of the obarray OA.
@@ -4142,6 +4139,7 @@ build_string (const char *str)
   return make_string (str, strlen (str));
 }
 
+extern Lisp_Object make_obarray (unsigned);
 extern Lisp_Object pure_cons (Lisp_Object, Lisp_Object);
 extern Lisp_Object initialize_vector (ptrdiff_t, Lisp_Object);
 extern struct Lisp_String *(*static_string_allocator) (void);

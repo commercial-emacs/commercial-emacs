@@ -1702,8 +1702,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	  print_string (BVAR (XMARKER (obj)->buffer, name), printcharfun);
 	}
       printchar ('>', printcharfun);
-      return;
-
+      break;
     case PVEC_OVERLAY:
       print_c_string ("#<overlay ", printcharfun);
       if (!OVERLAY_BUFFER (obj))
@@ -1718,8 +1717,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 			printcharfun);
 	}
       printchar ('>', printcharfun);
-      return;
-
+      break;
     case PVEC_USER_PTR:
       {
 	print_c_string ("#<user-ptr ", printcharfun);
@@ -1729,15 +1727,13 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	strout (buf, i, i, printcharfun);
 	printchar ('>', printcharfun);
       }
-      return;
-
+      break;
     case PVEC_FINALIZER:
       print_c_string ("#<finalizer", printcharfun);
       if (NILP (XFINALIZER (obj)->function))
 	print_c_string (" used", printcharfun);
       printchar ('>', printcharfun);
-      return;
-
+      break;
     case PVEC_MISC_PTR:
       {
 	/* This shouldn't happen in normal usage, but let's
@@ -1745,8 +1741,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	int i = sprintf (buf, "#<ptr %p>", xmint_pointer (obj));
 	strout (buf, i, i, printcharfun);
       }
-      return;
-
+      break;
     case PVEC_PROCESS:
       if (escapeflag)
 	{
@@ -1756,14 +1751,12 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	}
       else
 	print_string (XPROCESS (obj)->name, printcharfun);
-      return;
-
+      break;
     case PVEC_SUBR:
       print_c_string ("#<subr ", printcharfun);
       print_c_string (XSUBR (obj)->symbol_name, printcharfun);
       printchar ('>', printcharfun);
-      return;
-
+      break;
     case PVEC_XWIDGET:
 #ifdef HAVE_XWIDGETS
       {
@@ -1786,12 +1779,10 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
       }
 #endif
       break;
-
     case PVEC_XWIDGET_VIEW:
       print_c_string ("#<xwidget view", printcharfun);
       printchar ('>', printcharfun);
-      return;
-
+      break;
     case PVEC_WINDOW:
       {
 	int len = sprintf (buf, "#<window %"pI"d",
@@ -1805,8 +1796,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	  }
 	printchar ('>', printcharfun);
       }
-      return;
-
+      break;
     case PVEC_TERMINAL:
       {
 	struct terminal *t = XTERMINAL (obj);
@@ -1819,8 +1809,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	  }
 	printchar ('>', printcharfun);
       }
-      return;
-
+      break;
     case PVEC_BUFFER:
       if (!BUFFER_LIVE_P (XBUFFER (obj)))
 	print_c_string ("#<killed buffer>", printcharfun);
@@ -1832,12 +1821,10 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	}
       else
 	print_string (BVAR (XBUFFER (obj), name), printcharfun);
-      return;
-
+      break;
     case PVEC_WINDOW_CONFIGURATION:
       print_c_string ("#<window-configuration>", printcharfun);
-      return;
-
+      break;
     case PVEC_FRAME:
       {
 	void *ptr = XFRAME (obj);
@@ -1860,8 +1847,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	int len = sprintf (buf, " %p>", ptr);
 	strout (buf, len, len, printcharfun);
       }
-      return;
-
+      break;
     case PVEC_FONT:
       {
 	if (!FONT_OBJECT_P (obj))
@@ -1888,8 +1874,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	  }
 	printchar ('>', printcharfun);
       }
-      return;
-
+      break;
     case PVEC_THREAD:
       print_c_string ("#<thread ", printcharfun);
       if (STRINGP (XTHREAD (obj)->name))
@@ -1914,8 +1899,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	  strout (buf, len, len, printcharfun);
 	}
       printchar ('>', printcharfun);
-      return;
-
+      break;
     case PVEC_CONDVAR:
       print_c_string ("#<condvar ", printcharfun);
       if (STRINGP (XCONDVAR (obj)->name))
@@ -1927,8 +1911,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	  strout (buf, len, len, printcharfun);
 	}
       printchar ('>', printcharfun);
-      return;
-
+      break;
     case PVEC_MODULE_FUNCTION:
 #ifdef HAVE_MODULES
       {
@@ -1955,11 +1938,9 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	  }
 
 	printchar ('>', printcharfun);
-	return;
       }
 #endif
       break;
-
     case PVEC_NATIVE_COMP_UNIT:
 #ifdef HAVE_NATIVE_COMP
       {
@@ -1969,11 +1950,11 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	printchar (' ', printcharfun);
 	print_object (cu->optimize_qualities, printcharfun, escapeflag);
 	printchar ('>', printcharfun);
-	return;
       }
 #endif
-#ifdef HAVE_TREE_SITTER
+      break;
     case PVEC_TREE_SITTER:
+#ifdef HAVE_TREE_SITTER
       {
 	int len;
 	print_c_string ("#<tree-sitter for ", printcharfun);
@@ -1983,8 +1964,30 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	strout (buf, len, len, printcharfun);
 	printchar ('>', printcharfun);
       }
-      return;
-
+#endif
+      break;
+    case PVEC_TREE_SITTER_NODE:
+#ifdef HAVE_TREE_SITTER
+      {
+	int len;
+	print_c_string ("#<tree-sitter-node for ", printcharfun);
+	len = sprintf (buf, "%p", XTREE_SITTER_NODE (obj));
+	strout (buf, len, len, printcharfun);
+	printchar ('>', printcharfun);
+      }
+#endif
+      break;
+    case PVEC_TREE_SITTER_CURSOR:
+#ifdef HAVE_TREE_SITTER
+      {
+	int len;
+	print_c_string ("#<tree-sitter-cursor for ", printcharfun);
+	len = sprintf (buf, "%p", XTREE_SITTER_CURSOR (obj));
+	strout (buf, len, len, printcharfun);
+	printchar ('>', printcharfun);
+      }
+#endif
+      break;
     case PVEC_OBARRAY:
       {
 	struct Lisp_Obarray *o = XOBARRAY (obj);
@@ -1992,9 +1995,8 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	   a limit)?  */
 	int i = sprintf (buf, "#<obarray n=%u>", o->count);
 	strout (buf, i, i, printcharfun);
-	return;
       }
-
+      break;
     /* Types handled earlier.  */
     case PVEC_NORMAL_VECTOR:
     case PVEC_RECORD:
@@ -2008,25 +2010,6 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
     case PVEC_FREE:
     case PVEC_OTHER:
       break;
-    case PVEC_TREE_SITTER_NODE:
-      {
-	int len;
-	print_c_string ("#<tree-sitter-node for ", printcharfun);
-	len = sprintf (buf, "%p", XTREE_SITTER_NODE (obj));
-	strout (buf, len, len, printcharfun);
-	printchar ('>', printcharfun);
-      }
-      break;
-    case PVEC_TREE_SITTER_CURSOR:
-      {
-	int len;
-	print_c_string ("#<tree-sitter-cursor for ", printcharfun);
-	len = sprintf (buf, "%p", XTREE_SITTER_CURSOR (obj));
-	strout (buf, len, len, printcharfun);
-	printchar ('>', printcharfun);
-      }
-      break;
-#endif
 #ifdef HAVE_SQLITE3
     case PVEC_SQLITE:
       {
@@ -2043,8 +2026,8 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
         strout (buf, i, i, printcharfun);
         printchar ('>', printcharfun);
       }
-      break;
 #endif
+      break;
     default:
       emacs_abort ();
       break;
@@ -2575,21 +2558,17 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	      }
 	    goto next_obj;
 	  }
-
 	case PVEC_BIGNUM:
 	  print_bignum (obj, printcharfun);
 	  break;
-
 	case PVEC_BOOL_VECTOR:
 	  print_bool_vector (obj, printcharfun);
 	  break;
-
 	default:
 	  print_vectorlike_unreadable (obj, printcharfun, escapeflag, buf);
 	  break;
 	}
 	break;
-
     default:
       emacs_abort ();
     }

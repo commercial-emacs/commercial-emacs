@@ -1747,10 +1747,7 @@ It is too wide if it has any lines longer than the largest of
                                     docs start))
             (let* ((ofs (match-beginning 0))
                    (c (aref docs ofs)))
-              ;; FIXME: it should be possible to use the exact source position
-              ;; of the control char in most cases, and it would be helpful
-              (byte-compile-warn-x
-               name
+              (byte-compile-warn
                "%sdocstring contains control char #x%02x (position %d)"
                (funcall prefix) c ofs)
               (setq start (1+ ofs))))))
