@@ -234,7 +234,10 @@ endif
 
 define compile-rest
 $(filter-out $(BYTE_COMPILER_EL:.el=el$(1)) $(COMPILE_FIRST:.el=el$(1)), $(shell \
-  find -type f -name '*.el' -printf "%pc "))
+  read -a arr <<<`find . -type f -name '*.el' -exec echo {} +` ; \
+  arr=( "$${arr[@]/%/$(1)}" ); \
+  echo "$${arr[*]}"; \
+))
 endef
 
 .PHONY: compile-compiler

@@ -503,12 +503,9 @@ define pdump
 	  --pdump-write=$1$(2)
 endef
 
-define byte-compile-loaded
-	../src/$(@:.pdmp=)$(EXEEXT) --batch --no-site-file --no-site-lisp \
-	   --eval "(dolist (el (mapcar (function car) load-history)) \
-	             (when (equal \"el\" (file-name-extension el)) \
-	               (princ (format \"%sc \" \
-	                        (file-relative-name el \"$(abs_top_srcdir)/lisp\")))))"
+define relative-lisp-files
+	../src/$(@:.pdmp=)$(EXEEXT) --batch -l ../admin/relative-lisp-files \
+	   -f relative-lisp-files
 endef
 
 bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT)
@@ -516,7 +513,7 @@ emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.elc ../lisp/international/charprop.e
 bootstrap-emacs.pdmp emacs.pdmp:
 	$(MAKE) -C ../lisp $(@:emacs.pdmp=)pdmpclean
 	$(call pdump,$@, 2>/dev/null) # pdmp all interpreted elisp
-	$(MAKE) -s -C ../lisp `$(call byte-compile-loaded)` EMACS=../src/$(@:.pdmp=)$(EXEEXT)
+	$(MAKE) -s -C ../lisp `$(call relative-lisp-files)` EMACS=../src/$(@:.pdmp=)$(EXEEXT)
 	$(call pdump,$@) # pdmp all byte-compiled
 install-emacs.pdmp: emacs.pdmp
 	$(AM_V_at)rm -f install-emacs$(EXEEXT)
