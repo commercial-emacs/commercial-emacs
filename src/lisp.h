@@ -913,7 +913,6 @@ enum pvec_type
   PVEC_BOOL_VECTOR,
   PVEC_BUFFER,
   PVEC_HASH_TABLE,
-  PVEC_OBARRAY,
   PVEC_TERMINAL,
   PVEC_WINDOW_CONFIGURATION,
   PVEC_SUBR,
@@ -2373,28 +2372,6 @@ SXHASH_REDUCE (EMACS_UINT x)
 {
   return (x ^ x >> (EMACS_INT_WIDTH - FIXNUM_BITS)) & INTMASK;
 }
-
-/* Reduce an EMACS_UINT hash value to hash_hash_t.  */
-INLINE hash_hash_t
-reduce_emacs_uint_to_hash_hash (EMACS_UINT x)
-{
-  verify (sizeof x <= 2 * sizeof (hash_hash_t));
-  return (sizeof x == sizeof (hash_hash_t)
-	  ? x
-	  : x ^ (x >> (8 * (sizeof x - sizeof (hash_hash_t)))));
-}
-
-/* Reduce HASH to a value BITS wide.  */
-INLINE ptrdiff_t
-knuth_hash (hash_hash_t hash, unsigned bits)
-{
-  /* Knuth multiplicative hashing, tailored for 32-bit indices
-     (avoiding a 64-bit multiply).  */
-  uint32_t alpha = 2654435769;	/* 2**32/phi */
-  /* Note the cast to uint64_t, to make it work for bits=0.  */
-  return (uint64_t)((uint32_t)hash * alpha) >> (32 - bits);
-}
-
 
 struct Lisp_Marker
 {

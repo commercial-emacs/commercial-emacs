@@ -1612,15 +1612,13 @@ or from one of the possible completions.  */)
   ptrdiff_t bestmatchsize = 0;
   /* These are in bytes, too.  */
   ptrdiff_t compare, matchsize;
-  if (VECTORP (collection))
-    collection = check_obarray (collection);
   enum { function_table, list_table, obarray_table, hash_table}
     type = (HASH_TABLE_P (collection) ? hash_table
-	    : OBARRAYP (collection) ? obarray_table
+	    : VECTORP (collection) ? obarray_table
 	    : ((NILP (collection)
 		|| (CONSP (collection) && !FUNCTIONP (collection)))
 	       ? list_table : function_table));
-  ptrdiff_t idx = 0;
+  ptrdiff_t idx = 0, obsize = 0;
   int matchcount = 0;
   Lisp_Object bucket, zero, end, tem;
 
@@ -1633,9 +1631,12 @@ or from one of the possible completions.  */)
 
   /* If COLLECTION is not a list, set TAIL just for gc pro.  */
   tail = collection;
-  obarray_iter_t obit;
   if (type == obarray_table)
-    obit = make_obarray_iter (XOBARRAY (collection));
+    {
+      collection = check_obarray (collection);
+      obsize = ASIZE (collection);
+      bucket = AREF (collection, idx);
+    }
 
   while (1)
     {
@@ -1654,10 +1655,24 @@ or from one of the possible completions.  */)
 	}
       else if (type == obarray_table)
 	{
-	  if (obarray_iter_at_end (&obit))
+	  if (!EQ (bucket, zero))
+	    {
+	      if (!SYMBOLP (bucket))
+		error ("Bad data in guts of obarray");
+	      elt = bucket;
+	      eltstring = elt;
+	      if (XSYMBOL (bucket)->u.s.next)
+		XSETSYMBOL (bucket, XSYMBOL (bucket)->u.s.next);
+	      else
+		XSETFASTINT (bucket, 0);
+	    }
+	  else if (++idx >= obsize)
 	    break;
-	  elt = eltstring = obarray_iter_symbol (&obit);
-	  obarray_iter_step (&obit);
+	  else
+	    {
+	      bucket = AREF (collection, idx);
+	      continue;
+	    }
 	}
       else /* if (type == hash_table) */
 	{
@@ -1840,12 +1855,10 @@ with a space are ignored unless STRING itself starts with a space.  */)
 {
   Lisp_Object tail, elt, eltstring;
   Lisp_Object allmatches;
-  if (VECTORP (collection))
-    collection = check_obarray (collection);
   int type = HASH_TABLE_P (collection) ? 3
-    : OBARRAYP (collection) ? 2
+    : VECTORP (collection) ? 2
     : NILP (collection) || (CONSP (collection) && !FUNCTIONP (collection));
-  ptrdiff_t idx = 0;
+  ptrdiff_t idx = 0, obsize = 0;
   Lisp_Object bucket, tem, zero;
 
   CHECK_STRING (string);
@@ -1856,9 +1869,12 @@ with a space are ignored unless STRING itself starts with a space.  */)
 
   /* If COLLECTION is not a list, set TAIL just for gc pro.  */
   tail = collection;
-  obarray_iter_t obit;
   if (type == 2)
-    obit = make_obarray_iter (XOBARRAY (collection));
+    {
+      collection = check_obarray (collection);
+      obsize = ASIZE (collection);
+      bucket = AREF (collection, idx);
+    }
 
   while (1)
     {
@@ -1877,10 +1893,24 @@ with a space are ignored unless STRING itself starts with a space.  */)
 	}
       else if (type == 2)
 	{
-	  if (obarray_iter_at_end (&obit))
+	  if (!EQ (bucket, zero))
+	    {
+	      if (!SYMBOLP (bucket))
+		error ("Bad data in guts of obarray");
+	      elt = bucket;
+	      eltstring = elt;
+	      if (XSYMBOL (bucket)->u.s.next)
+		XSETSYMBOL (bucket, XSYMBOL (bucket)->u.s.next);
+	      else
+		XSETFASTINT (bucket, 0);
+	    }
+	  else if (++idx >= obsize)
 	    break;
-	  elt = eltstring = obarray_iter_symbol (&obit);
-	  obarray_iter_step (&obit);
+	  else
+	    {
+	      bucket = AREF (collection, idx);
+	      continue;
+	    }
 	}
       else /* if (type == 3) */
 	{
@@ -2026,7 +2056,7 @@ If COLLECTION is a function, it is called with three arguments:
 the values STRING, PREDICATE and `lambda'.  */)
   (Lisp_Object string, Lisp_Object collection, Lisp_Object predicate)
 {
-  Lisp_Object tem = Qnil, arg = Qnil;
+  Lisp_Object tail, tem = Qnil, arg = Qnil;
 
   CHECK_STRING (string);
 
@@ -2036,9 +2066,8 @@ the values STRING, PREDICATE and `lambda'.  */)
       if (NILP (tem))
 	return Qnil;
     }
-  else if (OBARRAYP (collection) || VECTORP (collection))
+  else if (VECTORP (collection))
     {
-      collection = check_obarray (collection);
       /* Bypass intern-soft as that loses for nil.  */
       tem = oblookup (collection,
 		      SSDATA (string),
@@ -2067,7 +2096,7 @@ the values STRING, PREDICATE and `lambda'.  */)
 	    }
 	}
 
-      if (!BARE_SYMBOL_P (tem))
+      if (!SYMBOLP (tem))
 	return Qnil;
     }
   else if (HASH_TABLE_P (collection))

@@ -935,7 +935,7 @@ is sensitive to blank lines."
 (defun vc-clear-context ()
   "Clear all cached file properties."
   (interactive)
-  (obarray-clear vc-file-prop-obarray))
+  (fillarray vc-file-prop-obarray 0))
 
 (defmacro with-vc-properties (files form settings)
   "Execute FORM, then maybe set per-file properties for FILES.

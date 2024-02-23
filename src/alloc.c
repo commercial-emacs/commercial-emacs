@@ -136,8 +136,8 @@ PER_THREAD_STATIC struct
   size_t total_hash_table_bytes;
 } gcstat;
 
-/* Total size of ancillary arrays of all allocated hash-table and obarray
-   objects, both dead and alive.  This number is always kept up-to-date.  */
+/* Total size of ancillary arrays of all allocated hash-table objects,
+   both dead and alive.  This number is always kept up-to-date.  */
 static ptrdiff_t hash_table_allocated_bytes = 0;
 
 enum _GL_ATTRIBUTE_PACKED sdata_type
@@ -3678,8 +3678,7 @@ valid_lisp_object_p (Lisp_Object obj)
   return 0;
 }
 
-/* Like xmalloc, but makes allocation count toward the total consing
-   and hash table or obarray usage.
+/* Like xmalloc, but makes allocation count toward the total consing.
    Return NULL for a zero-sized allocation.  */
 void *
 hash_table_alloc_bytes (ptrdiff_t nbytes)

@@ -34,7 +34,7 @@
   (let ((num 0))
     (mapcar (lambda (str) (cons str (cl-incf num))) list)))
 (defun minibuf-tests--strings-to-obarray (list)
-  (let ((ob (obarray-make 7)))
+  (let ((ob (make-vector 7 0)))
     (mapc (lambda (str) (intern str ob)) list)
     ob))
 (defun minibuf-tests--strings-to-string-hashtable (list)
