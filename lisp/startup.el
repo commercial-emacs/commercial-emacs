@@ -32,6 +32,8 @@
 
 (setq top-level '(normal-top-level))
 
+(defvar comp-trampoline-dir)
+
 (defvar command-line-processed nil
   "Non-nil once command line has been processed.")
 
