@@ -27,6 +27,8 @@
 
 ;;; Code:
 
+(defconst relative-lisp-phony-files '("ldefs-boot.el"))
+
 (defsubst relative-lisp-files-as-list ()
   (delq
    nil
@@ -37,14 +39,23 @@
              (fn (directory-file-name (file-name-directory ofn))))
         (when (equal "el" (file-name-extension ofn))
           (catch 'done
-            (prog1 nil
-              (while (not (equal (file-name-directory "/") fn))
-                (if (equal "lisp" (file-name-nondirectory fn))
-                    (throw 'done result)
-	          (setq result (concat (file-name-as-directory
-			                (file-name-nondirectory fn))
-			               result)))
-                (setq fn (directory-file-name (file-name-directory fn)))))))))
+            (prog1 nil ;if `while' doesn't yield something better
+              (let ((wtf 0))
+                (while (not (equal (file-name-directory "/") fn))
+                  (if (equal "lisp" (file-name-nondirectory fn))
+                      (progn
+                        (when (member result relative-lisp-phony-files)
+                          (setq result nil))
+                        (throw 'done result))
+	            (setq result (concat (file-name-as-directory
+			                  (file-name-nondirectory fn))
+			                 result)))
+                  (setq fn (directory-file-name (file-name-directory fn)))
+                  (setq wtf (1+ wtf))
+                  (when (> wtf 10)
+                    (princ (format "wtf %s %s" fn (file-name-directory "/"))
+                           #'external-debugging-output)
+                    (throw 'done nil)))))))))
     load-history)))
 
 (defun relative-lisp-files ()
