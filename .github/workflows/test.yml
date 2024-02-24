@@ -27,6 +27,8 @@ jobs:
             gearing: alt-x
           - os: ubuntu-latest
             gearing: multithread
+          - os: ubuntu-latest
+            gearing: native-comp
     steps:
     - run: |
         git config --global core.autocrlf false
