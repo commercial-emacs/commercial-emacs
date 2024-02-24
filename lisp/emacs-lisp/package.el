@@ -1126,11 +1126,9 @@ This assumes that `pkg-desc' has already been activated with
   "Read a Lisp expression from STR.
 Signal an error if the entire string was not used."
   (pcase-let ((`(,expr . ,offset) (read-from-string str)))
-    (condition-case ()
-        ;; The call to `ignore' suppresses a compiler warning.
-        (progn (ignore (read-from-string str offset))
-               (error "Can't read whole string"))
-      (end-of-file expr))))
+    (if (zerop (length (string-trim (substring str offset))))
+        expr
+      (error "Could not use whole string %"))))
 
 (declare-function lm-header "lisp-mnt" (header))
 (declare-function lm-package-requires "lisp-mnt" (&optional file))

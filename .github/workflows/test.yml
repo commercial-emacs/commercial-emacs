@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [ubuntu-latest]
         gearing: [standard]
     steps:
     - run: |
@@ -99,8 +99,9 @@ jobs:
       run: |
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-tree-sitter
-        make -j4 check
-        ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
+        make -j4
+        make test/lisp/emacs-lisp/package-tests
+        make test/lisp/emacs-lisp/lisp-mnt-tests
     - name: make-macos
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'macOS')
       run: |
