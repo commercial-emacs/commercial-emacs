@@ -1615,7 +1615,8 @@ If `eval-expression-debug-on-error' is non-nil, which is the default,
 this command arranges for all errors to enter the debugger."
   (interactive "P")
   (values--store-value
-   (handler-bind ((error (if #'eval-expression--debug #'ignore)))
+   (handler-bind ((error (if eval-expression-debug-on-error
+                             #'eval-expression--debug #'ignore)))
      (elisp--eval-last-sexp eval-last-sexp-arg-internal))))
 
 (defun elisp--eval-defun-1 (form)
@@ -1754,7 +1755,8 @@ which see."
 	 (defvar edebug-all-defs)
 	 (eval-defun (not edebug-all-defs)))
 	(t
-	 (handler-bind ((error (if #'eval-expression--debug #'ignore)))
+	 (handler-bind ((error (if eval-expression-debug-on-error
+	                           #'eval-expression--debug #'ignore)))
 	   (elisp--eval-defun)))))
 
 ;;; ElDoc Support
