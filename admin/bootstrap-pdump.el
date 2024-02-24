@@ -133,12 +133,9 @@
 
 (load "jka-cmpr-hook")
 (load "epa-hook")
-;; Any Emacs Lisp source file (*.el) loaded here after can contain
-;; multilingual text.
+;; hereafter can load multilingual text.
 (load "international/mule-cmds")
 (load "case-table")
-;; This file doesn't exist when building a development version of Emacs
-;; from the repository.  It is generated just after temacs is built.
 (load "international/charprop.el" t)
 (load "international/characters")
 (load "international/cp51932")

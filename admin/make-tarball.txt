@@ -23,7 +23,7 @@ Steps to take before starting on the first pretest in any release sequence:
     (We currently don't bother with this.)
 
 4.  Check that all new Lisp libraries belong to sensible packages.
-    Run "make -C lisp finder-data" and check the diff of the generated
+    Run "make -C lisp finder-inf.el" and check the diff of the generated
     file against the previously released Emacs version to see what has
     changed.
 

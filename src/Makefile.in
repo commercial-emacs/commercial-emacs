@@ -481,11 +481,7 @@ Emacs.pdmp: emacs.pdmp
 	$(AM_V_GEN)cp -f $< $@
 endif
 
-../lisp/subdirs.el:
-	$(MAKE) -C ../lisp bootstrap-clean
-	$(MAKE) -C ../lisp update-subdirs
-
-bootstrap-emacs$(EXEEXT): ../lisp/subdirs.el | emacs$(EXEEXT)
+bootstrap-emacs$(EXEEXT): | emacs$(EXEEXT)
 	@# symlink preferred but for mingw
 	cp -f $(firstword $|) $@
 
@@ -508,13 +504,21 @@ define relative-lisp-files
 	   -f relative-lisp-files
 endef
 
-bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT)
-emacs.pdmp: emacs$(EXEEXT) ../lisp/loaddefs.elc ../lisp/international/charprop.el
-bootstrap-emacs.pdmp emacs.pdmp:
-	$(MAKE) -C ../lisp $(@:emacs.pdmp=)pdmpclean
+../lisp/subdirs.el:
+	$(MAKE) -C ../lisp subdirs.el EMACS=../src/$<
+
+bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT) ../lisp/subdirs.el
+	$(MAKE) -C ../lisp bootstrap-clean EMACS=../src/$<
 	$(call pdump,$@, 2>/dev/null) # pdmp all interpreted elisp
-	$(MAKE) -s -C ../lisp `$(call relative-lisp-files)` EMACS=../src/$(@:.pdmp=)$(EXEEXT)
+	$(MAKE) -s -C ../lisp `$(call relative-lisp-files)` EMACS=../src/$<
 	$(call pdump,$@) # pdmp all byte-compiled
+
+emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el ../lisp/loaddefs.elc \
+  ../lisp/international/charprop.el
+	$(call pdump,$@, 2>/dev/null) # pdmp some interpreted elisp
+	$(MAKE) -s -C ../lisp `$(call relative-lisp-files)`
+	$(call pdump,$@) # pdmp all byte-compiled
+
 install-emacs.pdmp: emacs.pdmp
 	$(AM_V_at)rm -f install-emacs$(EXEEXT)
 	$(AM_V_at)cp -f emacs$(EXEEXT) install-emacs$(EXEEXT)
@@ -684,7 +688,7 @@ TAGS: ${ETAGS} $(ctagsfiles1) $(ctagsfiles2)
 tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS $(lib)/TAGS
 
 ../lisp/emacs-lisp/cldefs.el: | emacs.pdmp
-	$(MAKE) -C ../lisp cldefs
+	$(MAKE) -C ../lisp emacs-lisp/cldefs.el
 
 ### Flymake support (for C only)
 check-syntax:

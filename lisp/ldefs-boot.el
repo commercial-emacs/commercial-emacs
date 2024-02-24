@@ -4918,8 +4918,6 @@ evaluate `compilation-shell-minor-mode'.
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
 
-\\{compilation-shell-minor-mode-map}
-
 (fn &optional ARG)" t)
 (autoload 'compilation-minor-mode "compile" "\
 Toggle Compilation minor mode.
@@ -4941,8 +4939,6 @@ evaluate `compilation-minor-mode'.
 
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
-
-\\{compilation-minor-mode-map}
 
 (fn &optional ARG)" t)
 (autoload 'compilation-next-error-function "compile" "\
@@ -9745,8 +9741,9 @@ PORT, NICK, and PASSWORD, along with USER and FULL-NAME when
 given a prefix argument.  Non-interactively, expect the rarely
 needed ID parameter, when non-nil, to be a symbol or a string for
 naming the server buffer and identifying the connection
-unequivocally.  (See Info node `(erc) Connecting' for details
-about all mentioned parameters.)
+unequivocally.  Once connected, return the server buffer.  (See
+Info node `(erc) Connecting' for details about all mentioned
+parameters.)
 
 Together with `erc-tls', this command serves as the main entry
 point for ERC, the powerful, modular, and extensible IRC client.
@@ -12323,8 +12320,6 @@ evaluate `flymake-mode'.
 
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
-
-\\{flymake-mode-map}
 
 (fn &optional ARG)" t)
 (autoload 'flymake-mode-on "flymake" "\
@@ -23364,8 +23359,8 @@ As with `pcase-let', BINDINGS are of the form (PATTERN EXP), but the
 EXP in each binding in BINDINGS can use the results of the destructuring
 bindings that precede it in BINDINGS' order.
 
-Each EXP should match (i.e. be of compatible structure) to its
-respective PATTERN; a mismatch may signal an error or may go
+Each EXP should match its respective PATTERN (i.e. be of structure
+compatible to PATTERN); a mismatch may signal an error or may go
 undetected, binding variables to arbitrary values, such as nil.
 
 (fn BINDINGS &rest BODY)" nil t)
@@ -23378,8 +23373,8 @@ All EXPs are evaluated first, and then used to perform destructuring
 bindings by matching each EXP against its respective PATTERN.  Then
 BODY is evaluated with those bindings in effect.
 
-Each EXP should match (i.e. be of compatible structure) to its
-respective PATTERN; a mismatch may signal an error or may go
+Each EXP should match its respective PATTERN (i.e. be of structure
+compatible to PATTERN); a mismatch may signal an error or may go
 undetected, binding variables to arbitrary values, such as nil.
 
 (fn BINDINGS &rest BODY)" nil t)
@@ -25748,8 +25743,6 @@ evaluate `rectangle-mark-mode'.
 
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
-
-\\{rectangle-mark-mode-map}
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "rect" '("apply-on-rectangle" "clear-rectangle-line" "delete-" "extract-rectangle-" "killed-rectangle" "ope" "rectangle-" "spaces-string" "string-rectangle-"))

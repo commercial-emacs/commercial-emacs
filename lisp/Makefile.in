@@ -34,30 +34,14 @@ HAVE_NATIVE_COMP = @HAVE_NATIVE_COMP@
 
 FIND_DELETE = @FIND_DELETE@
 
-# You can specify a different executable on the make command line,
-# e.g. "make EMACS=../src/emacs ...".
-
-# We never change directory before running Emacs, so a relative file
-# name is fine, and makes life easier.  If we need to change
-# directory, we can use emacs --chdir.
 EMACS = ../src/emacs${EXEEXT}
-
-# Command line flags for Emacs.
 
 EMACSOPT = -Q -batch
 
-# Extra flags to pass to the byte compiler
 BYTE_COMPILE_EXTRA_FLAGS =
-# For example to not display the undefined function warnings you can use this:
-# BYTE_COMPILE_EXTRA_FLAGS = --eval '(setq byte-compile-warnings (quote (not unresolved)))'
-# The example above is just for developers, it should not be used by default.
 
-# All generated autoload files.
+# loaddefs is a confusing historical name for autoloads
 loaddefs = $(shell find ${srcdir} -name '*loaddefs.el' ! -name '.*')
-# Elisp files auto-generated.
-AUTOGENEL = ${loaddefs} ${srcdir}/cus-load.el ${srcdir}/finder-inf.el \
-  ${srcdir}/subdirs.el ${srcdir}/eshell/esh-groups.el ${srcdir}/emacs-lisp/cldefs.el \
-  ${srcdir}/leim/leim-list.el
 
 BYTE_COMPILE_FLAGS = \
   --eval "(custom-set-variables (quote (byte-compile-warnings (quote all))))" \
@@ -77,7 +61,7 @@ BYTE_COMPILER_EL += \
 endif
 
 # Prevent any settings in the user environment causing problems.
-unexport EMACSDATA EMACSDOC EMACSLOADPATH EMACSPATH
+unexport EMACSDATA EMACSDOC EMACSLOADPATH EMACSPATH EMACSNATIVELOADPATH
 
 # The actual Emacs command run in the targets below.
 emacs = '$(EMACS)' $(EMACSOPT)
@@ -102,46 +86,7 @@ COMPILE_FIRST = ./emacs-lisp/loaddefs-gen.el ./emacs-lisp/radix-tree.el \
   ./international/ja-dic-cnv.el \
   ./org/ox.el ./org/ox-texinfo.el ./org/org-macro.el ./org/org-element.el \
   ./org/oc.el ./org/ol.el ./emacs-lisp/cl-lib.el
-all: compile ./cus-load.el ./finder-inf.el ./leim/ja-dic/ja-dic.elc ../doc/misc/org.texi ../doc/misc/modus-themes.texi
-
-PHONY_EXTRAS =
-.PHONY: all custom-deps finder-data update-subdirs $(PHONY_EXTRAS)
-
-# custom-deps and finder-data both used to scan _all_ the *.el files.
-# This could lead to problems in parallel builds if automatically
-# generated *.el files (eg loaddefs etc) were being changed at the same time.
-# One solution was to add autoloads as a prerequisite:
-# https://lists.gnu.org/r/emacs-pretest-bug/2007-01/msg00469.html
-# https://lists.gnu.org/r/bug-gnu-emacs/2007-12/msg00171.html
-# However, this meant that running these targets modified loaddefs.el,
-# every time (due to time-stamping).  Calling these rules from
-# bootstrap-after would modify loaddefs after src/emacs, resulting
-# in make install remaking src/emacs for no real reason:
-# https://lists.gnu.org/r/emacs-devel/2008-02/msg00311.html
-# Nowadays these commands don't scan automatically generated files,
-# since they will never contain any useful information
-# (see finder-no-scan-regexp and custom-dependencies-no-scan-regexp).
-custom-deps:
-	$(AM_V_at)$(MAKE) PHONY_EXTRAS=./cus-load.el ./cus-load.el
-./cus-load.el:
-	$(AM_V_GEN)$(emacs) -l cus-dep \
-	  --eval '(setq generated-custom-dependencies-file (unmsys--file-name "$(srcdir)/cus-load.el"))' \
-	  -f custom-make-dependencies ${SUBDIRS_ALMOST}
-
-finder-data:
-	$(AM_V_at)$(MAKE) PHONY_EXTRAS=./finder-inf.el \
-	  ./finder-inf.el
-./finder-inf.el:
-	$(AM_V_GEN)$(emacs) -l finder \
-	  --eval '(setq generated-finder-keywords-file (unmsys--file-name "$(srcdir)/finder-inf.el"))' \
-	  -f finder-compile-keywords-make-dist ${SUBDIRS_FINDER}
-
-# This is the OKURO-NASI compilation trigger.
-./leim/ja-dic/ja-dic.el: ./leim/leim-list.el
-	$(AM_V_at)$(MAKE) -C ../leim generate-ja-dic EMACS="$(EMACS)"
-
-../doc/misc/org.texi ../doc/misc/modus-themes.texi:
-	$(AM_V_at)$(MAKE) -C ../doc/misc $@
+all: compile ./cus-load.el ./finder-inf.el
 
 .PHONY: autoloads
 autoloads: ./loaddefs.el
@@ -153,7 +98,6 @@ autoloads: ./loaddefs.el
             -l ./emacs-lisp/loaddefs-gen \
 	    -f loaddefs-generate--emacs-batch ${SUBDIRS_ALMOST}
 
-cldefs .PHONY: ./emacs-lisp/cldefs.el
 ./emacs-lisp/cldefs.el: ./emacs-lisp/cldefs.el.in
 	$(AM_V_GEN)$(emacs) -l pp -l "cldefs.el.in" \
 	    --eval "(with-temp-file (expand-file-name (unmsys--file-name \"$@\")) \
@@ -173,28 +117,23 @@ cldefs .PHONY: ./emacs-lisp/cldefs.el
 	                \";;; cldefs.el ends here\n\" \
 	                ))"
 
-# ldefs-boot.el is merely the last working loaddefs.el that was manually
-# checked in.  It acts as a stopgap for the bootstrap pdump until
-# loaddefs.el can be generated.
-.PHONY: ldefs-boot
-ldefs-boot: ./loaddefs.el
-	sed '/^;; Local Variables:/a ;; no-byte-compile: t' < $< > $@.el
-
 # Overwrought load-path augmentation dates back to 1994.
 ./subdirs.el:
-	$(AM_V_GEN)$(MAKE) update-subdirs
-update-subdirs:
-	$(AM_V_at)for file in ${SUBDIRS_SUBDIRS}; do \
+	$(AM_V_GEN)for file in ${SUBDIRS_SUBDIRS}; do \
 	   $(srcdir)/../build-aux/update-subdirs $$file; \
 	done;
 
-.PHONY: updates repo-update update-authors
+./cus-load.el:
+	$(AM_V_GEN)$(emacs) -l cus-dep \
+	  --eval '(setq generated-custom-dependencies-file (unmsys--file-name "$(srcdir)/cus-load.el"))' \
+	  -f custom-make-dependencies ${SUBDIRS_ALMOST}
 
-# Some modes of make-dist use this.
-updates: update-subdirs finder-data custom-deps
+./finder-inf.el:
+	$(AM_V_GEN)$(emacs) -l finder \
+	  --eval '(setq generated-finder-keywords-file (unmsys--file-name "$(srcdir)/finder-inf.el"))' \
+	  -f finder-compile-keywords-make-dist ${SUBDIRS_FINDER}
 
-repo-update: compile finder-data custom-deps
-
+.PHONY: update-authors
 update-authors:
 	$(emacs) -L "$(top_srcdir)/admin" -l authors \
 	  -f batch-update-authors "$(top_srcdir)/etc/AUTHORS" "$(top_srcdir)"
@@ -209,10 +148,6 @@ ETAGS = ../lib-src/etags${EXEEXT}
 ${ETAGS}:
 	${MAKE} -C ../lib-src $(notdir $@)
 
-## The use of xargs is to stop the command line getting too long
-## on MS Windows, when the MSYS Bash passes it to a MinGW compiled
-## etags.  But maybe this is not even necessary any more now
-## that this uses relative filenames.
 TAGS: ${ETAGS} ${tagsfiles}
 	$(AM_V_GEN)rm -f $@
 	$(AM_V_at)touch $@
@@ -235,7 +170,7 @@ endif
 
 define compile-rest
 $(filter-out $(BYTE_COMPILER_EL:.el=el$(1)) $(COMPILE_FIRST:.el=el$(1)), $(shell \
-  read -a arr <<<`find . -type f -name '*.el' -exec echo {} +` ; \
+  read -a arr <<<`find . -type f -name '*.el' -exec grep -L '^;.*[^a-zA-Z]no-byte-compile: *t' {} + | xargs $(XARGS_LIMIT) echo`; \
   arr=( "$${arr[@]/%/$(1)}" ); \
   echo "$${arr[*]}"; \
 ))
@@ -254,127 +189,26 @@ endif
 ./leim/leim-list.el: ./international/titdic-cnv.elc
 	$(MAKE) -C ../leim all EMACS="$(EMACS)"
 
-# Force world rebuild.
-.PHONY: compile-always
-compile-always:
-	find . -name '*.elc' $(FIND_DELETE)
-	@$(MAKE) compile
-
 ifeq ($(HAVE_NATIVE_COMP),yes)
 .PHONY: trampolines
 trampolines: compile
 	$(emacs) $(BYTE_COMPILE_FLAGS) -f comp-compile-all-trampolines
 endif
 
-.PHONY: backup-compiled-files compile-after-backup
+.PHONY: bootstrap-clean
+bootstrap-clean:
+	find . \( -name '*.elc' -o -name '*.eln' \) $(FIND_DELETE)
 
-# Backup compiled Lisp files in elc.tar.gz.  If that file already
-# exists, make a backup of it.
+# ldefs-boot.el is merely the last working loaddefs.el that was manually
+# checked in.  It acts as a stopgap for the bootstrap pdump until
+# loaddefs.el can be generated.
+./ldefs-boot.el: ./loaddefs.el
+	sed '/^;; Local Variables:/a ;; no-byte-compile: t' < $< > $@
 
-backup-compiled-files:
-	-mv ./elc.tar.gz ./elc.tar.gz~
-	-tar czf ./elc.tar.gz ./*.elc ./*/*.elc ./*/*/*.elc ./*/*/*/*.elc
-
-# Compile Lisp files, but save old compiled files first.
-
-compile-after-backup: backup-compiled-files compile-always
-
-# This does the same job as the "compile" rule, but in a different way.
-# Rather than spawning a separate Emacs instance to compile each file,
-# it uses the same Emacs instance to compile everything.
-# This is faster on a single core, since it avoids the overhead of
-# starting Emacs many times (it was 33% faster on a test with a
-# random 10% of the .el files needing recompilation).
-# Unlike compile, this is not parallelizable; so if you have more than
-# one core and use make -j#, compile will be (much) faster.
-# This rule also produces less accurate compilation warnings.
-# The environment of later files is affected by definitions in
-# earlier ones, so it does not produce some warnings that it should.
-# It can also produces spurious warnings about "invalid byte code" if
-# files that use byte-compile-dynamic are updated.
-# There is no reason to use this rule unless you only have a single
-# core and CPU time is an issue.
-.PHONY: compile-one-process
-compile-one-process: compile-compiler
-	$(emacs) $(BYTE_COMPILE_FLAGS) \
-	    --eval "(batch-byte-recompile-directory 0)" .
-
-.PHONY: bootstrap-clean distclean maintainer-clean pdmpclean bootstrap-pdmpclean
-
-pdmpclean:
-
-bootstrap-pdmpclean:
-	find . -name '*.elc' $(FIND_DELETE)
-
-bootstrap-clean: bootstrap-pdmpclean
-	rm -f $(AUTOGENEL)
-
-distclean:
-	-rm -f ./Makefile ./loaddefs.el ./emacs-lisp/cldefs.el
-
-maintainer-clean: distclean bootstrap-clean
-	rm -f TAGS
+# Pain-in-the-ass OKURO-NASI trigger.
+./leim/ja-dic/ja-dic.el: ./leim/leim-list.el
+	$(AM_V_at)$(MAKE) -C ../leim generate-ja-dic EMACS="$(EMACS)"
 
 .PHONY: check-declare
-
 check-declare:
 	$(emacs) -l check-declare --eval '(check-declare-directory ".")'
-
-## This finds a lot of duplicates between foo.el and obsolete/foo.el.
-check-defun-dups:
-	sed -n -e '/^(defun /s/\(.\)(.*/\1/p' \
-	  `find . -name '*.el' ! -name '.*' -print | \
-	  grep -Ev '(loaddefs|ldefs-boot)\.el|obsolete'` | sort | uniq -d
-
-# Dependencies
-
-## None of the following matters for bootstrap, which is the only way
-## to ensure a correct compilation of all lisp files.
-## Manually specifying dependencies of a handful of lisp files, (and
-## ones that don't change very often at that) seems pretty pointless
-## to me.
-
-# https://debbugs.gnu.org/1004
-# CC Mode uses a compile time macro system which causes a compile time
-# dependency in cc-*.elc files on the macros in other cc-*.el and the
-# version string in cc-defs.el.
-./progmodes/cc-align.elc\
- ./progmodes/cc-cmds.elc ./progmodes/cc-compat.elc\
- ./progmodes/cc-engine.elc ./progmodes/cc-fonts.elc\
- ./progmodes/cc-langs.elc ./progmodes/cc-menus.elc\
- ./progmodes/cc-mode.elc ./progmodes/cc-styles.elc\
- ./progmodes/cc-vars.elc: \
-   ./progmodes/cc-bytecomp.elc ./progmodes/cc-defs.elc
-
-./progmodes/cc-align.elc ./progmodes/cc-cmds.elc: \
-   ./progmodes/cc-vars.elc ./progmodes/cc-engine.elc
-
-./progmodes/cc-compat.elc: \
-   ./progmodes/cc-vars.elc ./progmodes/cc-styles.elc \
-   ./progmodes/cc-engine.elc
-
-./progmodes/cc-defs.elc: ./progmodes/cc-bytecomp.elc
-
-./progmodes/cc-engine.elc: ./progmodes/cc-langs.elc \
-   ./progmodes/cc-vars.elc
-
-./progmodes/cc-fonts.elc: ./progmodes/cc-langs.elc \
-   ./progmodes/cc-vars.elc ./progmodes/cc-engine.elc
-
-./progmodes/cc-langs.elc: ./progmodes/cc-vars.elc
-
-./progmodes/cc-mode.elc: ./progmodes/cc-langs.elc \
-   ./progmodes/cc-vars.elc ./progmodes/cc-engine.elc \
-   ./progmodes/cc-styles.elc ./progmodes/cc-cmds.elc \
-   ./progmodes/cc-align.elc ./progmodes/cc-menus.elc
-
-./progmodes/cc-styles.elc: ./progmodes/cc-vars.elc \
-   ./progmodes/cc-align.elc
-
-# https://debbugs.gnu.org/43037
-# js.elc (like all modes using CC Mode's compile time macros) needs to
-# be compiled under the same version of CC Mode it will run with.
-./progmodes/js.elc: ./progmodes/cc-defs.elc \
-   ./progmodes/cc-engine.elc ./progmodes/cc-mode.elc
-
-# Makefile ends here.

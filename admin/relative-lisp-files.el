@@ -27,6 +27,9 @@
 
 ;;; Code:
 
+(defconst relative-lisp-files-explicit '("ldefs-boot.el")
+  "Elisp we don't want `make -C lisp` making without explicit consent.")
+
 (defsubst relative-lisp-files-as-list ()
   (delq
    nil
@@ -38,10 +41,13 @@
              base-name)
         (when (equal "el" (file-name-extension ofn))
           (catch 'done
-            (prog1 nil ;if `while' doesn't yield something better
+            (prog1 nil ;if `while' doesn't `throw' something better
               (while (not (zerop (length (setq base-name (file-name-nondirectory fn)))))
                 (if (equal "lisp" base-name)
-                    (throw 'done result)
+                    (progn
+                      (when (member result relative-lisp-files-explicit)
+                        (setq result nil))
+                      (throw 'done result))
 	          (setq result (concat (file-name-as-directory
 			                (file-name-nondirectory fn))
 			               result)))
