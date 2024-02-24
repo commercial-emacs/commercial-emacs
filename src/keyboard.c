@@ -525,9 +525,14 @@ echo_dash (void)
 		    concat2 (KVAR (current_kboard, echo_string), dash));
 
   if (echo_keystrokes_help)
-    kset_echo_string (current_kboard,
-		      calln (Qhelp__append_keystrokes_help,
-			     KVAR (current_kboard, echo_string)));
+    {
+      Lisp_Object help;
+
+      help = build_string (" (\\`C-h' or \\`<f1>' for help)");
+      kset_echo_string (current_kboard,
+			concat2 (KVAR (current_kboard, echo_string),
+				 calln (Qsubstitute_command_keys, help)));
+    }
 
   echo_now ();
 }
@@ -11787,8 +11792,6 @@ syms_of_keyboard (void)
   DEFSYM (Qhelp_form_show, "help-form-show");
 
   DEFSYM (Qhelp_key_binding, "help-key-binding");
-
-  DEFSYM (Qhelp__append_keystrokes_help, "help--append-keystrokes-help");
 
   DEFSYM (Qecho_keystrokes, "echo-keystrokes");
 
