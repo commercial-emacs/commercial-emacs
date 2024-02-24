@@ -2638,7 +2638,7 @@ DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
   if (symbol_free_list)
     {
       ASAN_UNPOISON_SYMBOL (symbol_free_list);
-      val = make_lisp_symbol (symbol_free_list);
+      XSETSYMBOL (val, symbol_free_list);
       symbol_free_list = symbol_free_list->u.s.next;
     }
   else

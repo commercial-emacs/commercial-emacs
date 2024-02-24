@@ -1285,7 +1285,7 @@ If OBJECT is not a symbol, just return it.  */)
       struct Lisp_Symbol *sym = XSYMBOL (object);
       while (sym->u.s.type == SYMBOL_VARALIAS)
 	sym = SYMBOL_ALIAS (sym);
-      object = make_lisp_symbol (sym);
+      XSETSYMBOL (object, sym);
     }
   return object;
 }
