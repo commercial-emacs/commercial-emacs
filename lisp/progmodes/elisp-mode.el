@@ -307,7 +307,7 @@ Comments in the form will be lost."
 INTERACTIVE non-nil means ask the user for confirmation; this
 happens in interactive invocations."
   (interactive "p")
-  (if (and (local-variable-p 'lexical-binding) lexical-binding)
+  (if lexical-binding
       (when interactive
         (message "lexical-binding already enabled!")
         (ding))
@@ -368,12 +368,6 @@ be used instead.
   (add-hook 'context-menu-functions #'elisp-context-menu 10 t))
 
 ;; Font-locking support.
-
-(defun elisp--font-lock-shorthand (_limit)
-  ;; Add faces on shorthands between point and LIMIT.
-  ;; ...
-  ;; Return nil to tell font-lock, that there's nothing left to do.
-  nil)
 
 (defun elisp--font-lock-flush-elisp-buffers (&optional file)
   ;; We're only ever called from after-load-functions, load-in-progress can
@@ -1573,6 +1567,9 @@ character)."
 			       (buffer-substring-no-properties beg end))
 	))))
 
+
+(defvar elisp--eval-last-sexp-fake-value (make-symbol "t"))
+
 (defun eval-sexp-add-defvars (exp &optional pos)
   "Prepend EXP with all the `defvar's that precede it in the buffer.
 POS specifies the starting position where EXP was found and defaults to point."
@@ -1614,9 +1611,16 @@ integer value is also printed as a character of that codepoint.
 If `eval-expression-debug-on-error' is non-nil, which is the default,
 this command arranges for all errors to enter the debugger."
   (interactive "P")
-  (values--store-value
-   (handler-bind ((error (if #'eval-expression--debug #'ignore)))
-     (elisp--eval-last-sexp eval-last-sexp-arg-internal))))
+  (if (null eval-expression-debug-on-error)
+      (values--store-value
+       (elisp--eval-last-sexp eval-last-sexp-arg-internal))
+    (let ((value
+	   (let ((debug-on-error elisp--eval-last-sexp-fake-value))
+	     (cons (elisp--eval-last-sexp eval-last-sexp-arg-internal)
+		   debug-on-error))))
+      (unless (eq (cdr value) elisp--eval-last-sexp-fake-value)
+	(setq debug-on-error (cdr value)))
+      (car value))))
 
 (defun elisp--eval-defun-1 (form)
   "Treat some expressions in FORM specially.
@@ -1675,7 +1679,8 @@ Return the result of evaluation."
   ;; FIXME: the print-length/level bindings should only be applied while
   ;; printing, not while evaluating.
   (defvar elisp--eval-defun-result)
-  (let ((edebugging edebug-all-defs)
+  (let ((debug-on-error eval-expression-debug-on-error)
+        (edebugging edebug-all-defs)
         elisp--eval-defun-result)
     (save-excursion
       ;; Arrange for eval-region to "read" the (possibly) altered form.
@@ -1754,8 +1759,15 @@ which see."
 	 (defvar edebug-all-defs)
 	 (eval-defun (not edebug-all-defs)))
 	(t
-	 (handler-bind ((error (if #'eval-expression--debug #'ignore)))
-	   (elisp--eval-defun)))))
+	 (if (null eval-expression-debug-on-error)
+	     (elisp--eval-defun)
+	   (let (new-value value)
+	     (let ((debug-on-error elisp--eval-last-sexp-fake-value))
+	       (setq value (elisp--eval-defun))
+	       (setq new-value debug-on-error))
+	     (unless (eq elisp--eval-last-sexp-fake-value new-value)
+	       (setq debug-on-error new-value))
+	     value)))))
 
 ;;; ElDoc Support
 
