@@ -20,8 +20,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         gearing: [standard]
+        include:
+          - os: ubuntu-latest
+            gearing: alt-x
+          - os: ubuntu-latest
+            gearing: multithread
     steps:
     - run: |
         git config --global core.autocrlf false
@@ -99,9 +104,8 @@ jobs:
       run: |
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-tree-sitter
-        make -j4
-        make test/lisp/emacs-lisp/package-tests
-        make test/lisp/emacs-lisp/lisp-mnt-tests
+        make -j4 check
+        ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
     - name: make-macos
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'macOS')
       run: |

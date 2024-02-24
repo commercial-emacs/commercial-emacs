@@ -1128,7 +1128,7 @@ Signal an error if the entire string was not used."
   (pcase-let ((`(,expr . ,offset) (read-from-string str)))
     (if (zerop (length (string-trim (substring str offset))))
         expr
-      (error "Could not use whole string %"))))
+      (error "Could not use whole string"))))
 
 (declare-function lm-header "lisp-mnt" (header))
 (declare-function lm-package-requires "lisp-mnt" (&optional file))
