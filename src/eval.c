@@ -1803,7 +1803,7 @@ signal_quit_p (Lisp_Object signal)
   Lisp_Object list;
 
   return EQ (signal, Qquit)
-    || (!NILP (Fsymbolp (signal))
+    || (SYMBOLP (signal)
 	&& CONSP (list = Fget (signal, Qerror_conditions))
 	&& !NILP (Fmemq (Qquit, list)));
 }
