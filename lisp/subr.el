@@ -2565,6 +2565,8 @@ Affects only hooks run in the current buffer."
           (list binding binding))
          ((null (cdr binding))
           (list (make-symbol "s") (car binding)))
+         ((eq '_ (car binding))
+          (list (make-symbol "s") (cadr binding)))
          (t binding)))
   (when (> (length binding) 2)
     (signal 'error
@@ -2605,7 +2607,7 @@ This is like `when-let' but doesn't handle a VARLIST of the form
 (defmacro and-let* (varlist &rest body)
   "Bind variables according to VARLIST and conditionally evaluate BODY.
 Like `when-let*', except if BODY is empty and all the bindings
-are non-nil, then the result is non-nil."
+are non-nil, then the result is the value of the last binding."
   (declare (indent 1) (debug if-let*))
   (let (res)
     (if varlist
@@ -2618,7 +2620,8 @@ are non-nil, then the result is non-nil."
   "Bind variables according to SPEC and evaluate THEN or ELSE.
 Evaluate each binding in turn, as in `let*', stopping if a
 binding value is nil.  If all are non-nil return the value of
-THEN, otherwise the last form in ELSE.
+THEN, otherwise the value of the last form in ELSE, or nil if
+there are none.
 
 Each element of SPEC is a list (SYMBOL VALUEFORM) that binds
 SYMBOL to the value of VALUEFORM.  An element can additionally be
