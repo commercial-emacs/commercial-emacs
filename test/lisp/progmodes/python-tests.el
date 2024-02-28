@@ -60,27 +60,21 @@ BODY is code to be executed within the temp buffer.  Point is
 always located at the beginning of buffer.  Native completion is
 turned off.  Shell buffer will be killed on exit."
   (declare (indent 1) (debug t))
-  (let ((dir (make-symbol "dir")))
-    `(with-temp-buffer
-       (let ((python-indent-guess-indent-offset nil)
-             (python-shell-completion-native-enable nil))
-         (python-mode)
-         (unwind-protect
-             ;; Prevent test failures when Jedi is used as a completion
-             ;; backend, either directly or indirectly (e.g., via
-             ;; IPython).  Jedi needs to store cache, but the
-             ;; "/nonexistent" HOME directory is not writable.
-             (ert-with-temp-directory ,dir
-               (with-environment-variables (("XDG_CACHE_HOME" ,dir))
-                 (run-python nil t)
-                 (insert ,contents)
-                 (goto-char (point-min))
-                 (python-tests-shell-wait-for-prompt)
-                 ,@body))
-           (when (python-shell-get-buffer)
-             (python-shell-with-shell-buffer
-               (let (kill-buffer-hook kill-buffer-query-functions)
-                 (kill-buffer)))))))))
+  `(with-temp-buffer
+     (let ((python-indent-guess-indent-offset nil)
+           (python-shell-completion-native-enable nil))
+       (python-mode)
+       (unwind-protect
+           (progn
+             (run-python nil t)
+             (insert ,contents)
+             (goto-char (point-min))
+             (python-tests-shell-wait-for-prompt)
+             ,@body)
+         (when (python-shell-get-buffer)
+           (python-shell-with-shell-buffer
+             (let (kill-buffer-hook kill-buffer-query-functions)
+               (kill-buffer))))))))
 
 (defmacro python-tests-with-temp-file (contents &rest body)
   "Create a `python-mode' enabled file with CONTENTS.
