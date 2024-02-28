@@ -1983,7 +1983,7 @@ entries for git.gnus.org:
 
 
 (defun auth-source--decode-octal-string (string)
-  "Convert octal STRING to utf-8 string.  E.g: \"a\134b\" to \"a\b\"."
+  "Convert octal STRING to utf-8 string.  E.g.: \"a\\134b\" to \"a\\b\"."
   (let ((list (string-to-list string))
         (size (length string)))
     (decode-coding-string
