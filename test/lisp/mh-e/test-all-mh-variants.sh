@@ -86,7 +86,6 @@ for path in "${mh_sys_path[@]}"; do
     TEST_MH_PATH=$path TEST_MH_DEBUG=$debug \
     LD_LIBRARY_PATH=/usr/local/lib HOME=/nonexistent \
     "${emacs[@]}" -l ert \
-        --eval "(setq load-prefer-newer t)" \
         --eval "(load \"$PWD/test/lisp/mh-e/mh-utils-tests\" nil t)" \
         --eval "(ert-run-tests-batch-and-exit '(or ${ert_test_list[*]}))" \
         && ((++tests_passed))

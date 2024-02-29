@@ -766,9 +766,7 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
     }
 
   /* Search bitmap-file-path for the file, if appropriate.  */
-  if (openp (Vx_bitmap_file_path, file, Qnil, &found,
-	     make_fixnum (R_OK), false)
-      < 0)
+  if (0 > openp (Vx_bitmap_file_path, file, Qnil, &found, make_fixnum (R_OK)))
     return -1;
 
   filename = SSDATA (found);
@@ -815,9 +813,8 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
     }
 
   /* Search bitmap-file-path for the file, if appropriate.  */
-  if (openp (Vx_bitmap_file_path, file, Qnil, &found,
-	     make_fixnum (R_OK), false)
-      < 0)
+  if (0 > openp (Vx_bitmap_file_path, file, Qnil, &found,
+		 make_fixnum (R_OK)))
     return -1;
 
   if (!STRINGP (image_find_image_fd (file, &fd))
@@ -3778,7 +3775,7 @@ image_find_image_fd (Lisp_Object file, int *pfd)
 
   /* Try to find FILE in data-directory/images, then x-bitmap-file-path.  */
   fd = openp (search_path, file, Qnil, &file_found,
-	      pfd ? Qt : make_fixnum (R_OK), false);
+	      pfd ? Qt : make_fixnum (R_OK));
   if (fd == -2)
     {
       /* The file exists locally, but has a file name handler.

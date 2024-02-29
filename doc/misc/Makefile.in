@@ -237,7 +237,7 @@ abs_top_builddir = @abs_top_builddir@
 unexport EMACSDATA EMACSDOC EMACSLOADPATH EMACSPATH
 
 EMACS = ${abs_top_builddir}/src/emacs
-emacs = "${EMACS}" -batch --no-site-file --no-site-lisp --eval '(setq load-prefer-newer t)'
+emacs = "${EMACS}" -batch --no-site-file --no-site-lisp
 
 # Generated .texi files go in srcdir so they can be included in the
 # release tarfile along with the others.

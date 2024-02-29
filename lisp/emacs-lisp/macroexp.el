@@ -777,58 +777,28 @@ test of free variables in the following ways:
      `(load ,(file-name-nondirectory name)))))
 
 (defvar macroexp--pending-eager-loads nil
-  "Stack of files currently undergoing eager macro-expansion.")
-
-(defvar macroexp--debug-eager nil)
+  "Detect cycles in `load' eager macroexpand.")
 
 (defun internal-macroexpand-for-load (form full-p)
-  ;; Called from the eager-macroexpansion in readevalloop.
+  "Called from readevalloop_eager_expand_eval."
   (cond
-   ;; Don't repeat the same warning for every top-level element.
-   ((eq 'skip (car macroexp--pending-eager-loads)) form)
-   ;; If we detect a cycle, skip macro-expansion for now, and output a warning
-   ;; with a trimmed backtrace.
    ((and load-file-name (member load-file-name macroexp--pending-eager-loads))
     (let* ((bt (delq nil
                      (mapcar #'macroexp--trim-backtrace-frame
                              (macroexp--backtrace))))
            (elem `(load ,(file-name-nondirectory load-file-name)))
            (tail (member elem (cdr (member elem bt)))))
-      (if tail (setcdr tail (list '…)))
-      (if (eq (car-safe (car bt)) 'macroexpand-all) (setq bt (cdr bt)))
-      (if macroexp--debug-eager
-          (debug 'eager-macroexp-cycle)
-        (message "Warning: Eager macro-expansion skipped due to cycle:\n  %s"
-                 (mapconcat #'prin1-to-string (nreverse bt) " => ")))
-      (push 'skip macroexp--pending-eager-loads)
-      form))
+      (when tail (setcdr tail (list '…)))
+      (when (eq (car-safe (car bt)) 'macroexpand-all)
+        (setq bt (cdr bt)))
+      (prog1 form
+        (debug 'eager-macroexp-cycle))))
    (t
-    (condition-case err
-        (let ((macroexp--pending-eager-loads
-               (cons load-file-name macroexp--pending-eager-loads)))
-          (if full-p
-              (macroexpand--all-top-level form)
-            (macroexpand form)))
-      ((debug error)
-       ;; Hopefully this shouldn't happen thanks to the cycle detection,
-       ;; but in case it does happen, let's catch the error and give the
-       ;; code a chance to macro-expand later.
-       (message "Eager macro-expansion failure: %S" err)
-       form)))))
-
-;; ¡¡¡ Big Ugly Hack !!!
-;; src/bootstrap-emacs is mostly used to compile .el files, so it needs
-;; macroexp, bytecomp, cconv, and byte-opt to be fast.  Generally this is done
-;; by compiling those files first, but this only makes a difference if those
-;; files are not preloaded.  But macroexp.el is preloaded so we reload it if
-;; the current version is interpreted and there's a compiled version available.
-(eval-when-compile
-  (add-hook 'emacs-startup-hook
-            (lambda ()
-              (and (not (compiled-function-p
-                         (symbol-function 'macroexpand-all)))
-                   (locate-library "macroexp.elc")
-                   (load "macroexp.elc")))))
+    (let ((macroexp--pending-eager-loads
+           (cons load-file-name macroexp--pending-eager-loads)))
+      (if full-p
+          (macroexpand--all-top-level form)
+        (macroexpand form))))))
 
 (provide 'macroexp)
 

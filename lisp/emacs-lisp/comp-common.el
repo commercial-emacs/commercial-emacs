@@ -504,7 +504,7 @@ To be used by all entry points."
 
 (defun comp-trampoline-filename (subr-name)
   "Given SUBR-NAME return the filename containing the trampoline."
-  (concat (comp-c-func-name subr-name "subr--trampoline-" t) ".eln"))
+  (concat (comp-c-func-name subr-name) ".eln"))
 
 ;;;###autoload
 (defun comp-function-type-spec (function)

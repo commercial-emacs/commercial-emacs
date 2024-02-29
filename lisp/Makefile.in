@@ -43,22 +43,28 @@ BYTE_COMPILE_EXTRA_FLAGS =
 # loaddefs is a confusing historical name for autoloads
 loaddefs = $(shell find ${srcdir} -name '*loaddefs.el' ! -name '.*')
 
+ifeq ($(HAVE_NATIVE_COMP),yes)
+TARGET_EXT = eln
+TARGET_REGEX = byte\|native
+else
+TARGET_EXT = elc
+TARGET_REGEX = byte
+endif
+
 BYTE_COMPILE_FLAGS = \
   --eval "(custom-set-variables (quote (byte-compile-warnings (quote all))))" \
   $(BYTE_COMPILE_EXTRA_FLAGS)
+
+ifeq ($(HAVE_NATIVE_COMP),yes)
+BYTE_COMPILE_FLAGS += \
+  -l comp --eval "(setq native-comp-disable-subr-trampolines t)"
+endif
 
 BYTE_COMPILER_EL = \
 	emacs-lisp/macroexp.el \
 	emacs-lisp/cconv.el    \
 	emacs-lisp/byte-opt.el \
 	emacs-lisp/bytecomp.el
-ifeq ($(HAVE_NATIVE_COMP),yes)
-BYTE_COMPILER_EL += \
-	emacs-lisp/comp.el \
-	emacs-lisp/comp-cstr.el \
-	emacs-lisp/comp-common.el \
-	emacs-lisp/comp-run.el
-endif
 
 # Prevent any settings in the user environment causing problems.
 unexport EMACSDATA EMACSDOC EMACSLOADPATH EMACSPATH EMACSNATIVELOADPATH
@@ -86,7 +92,15 @@ COMPILE_FIRST = ./emacs-lisp/loaddefs-gen.el ./emacs-lisp/radix-tree.el \
   ./international/ja-dic-cnv.el \
   ./org/ox.el ./org/ox-texinfo.el ./org/org-macro.el ./org/org-element.el \
   ./org/oc.el ./org/ol.el ./emacs-lisp/cl-lib.el
-all: compile ./cus-load.el ./finder-inf.el
+
+.DEFAULT_GOAL = all
+
+.PHONY: none
+none:
+	@true
+
+.PHONY: all
+all: compile ./cus-load.el ./finder-inf.el ./emacs-lisp/cldefs.el
 
 .PHONY: autoloads
 autoloads: ./loaddefs.el
@@ -157,36 +171,37 @@ define byte-compile
 	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile $<
 endef
 
+define native-compile
+	$(AM_V_ELN)$(emacs) $(BYTE_COMPILE_FLAGS) \
+	    --eval "(native-compile \"./$<\" \"./$@\")"
+endef
+
 %.elc: %.el $(BYTE_COMPILER_EL:.el=.elc)
 	$(call byte-compile)
 $(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
 	$(call byte-compile)
 
-ifeq ($(HAVE_NATIVE_COMP),yes)
-%.eln: %.el $(BYTE_COMPILER_EL:.el=.elc)
-	$(AM_V_ELN)$(emacs) $(BYTE_COMPILE_FLAGS) \
-	    --eval "(native-compile \"./$<\" \"./$@\")"
-endif
+%.eln: %.el $(BYTE_COMPILER_EL:.el=.eln)
+	$(call native-compile)
+$(BYTE_COMPILER_EL:.el=.eln): %.eln : %.el $(top_srcdir)/src/lread.c
+	$(call native-compile)
 
+# grep is the wrong way of doing this (hack-local-variables better).
 define compile-rest
-$(filter-out $(BYTE_COMPILER_EL:.el=el$(1)) $(COMPILE_FIRST:.el=el$(1)), $(shell \
-  read -a arr <<<`find . -type f -name '*.el' -exec grep -L '^;.*[^a-zA-Z]no-byte-compile: *t' {} + | xargs $(XARGS_LIMIT) echo`; \
-  arr=( "$${arr[@]/%/$(1)}" ); \
+$(filter-out $(BYTE_COMPILER_EL:.el=.$(TARGET_EXT)) $(COMPILE_FIRST:.el=.$(TARGET_EXT)), $(shell \
+  read -a arr <<<`find . -type f -name '*.el' -exec grep -L '^;.*[^a-zA-Z]no-\($(TARGET_REGEX)\)-compile: *t' {} + | sort | xargs $(XARGS_LIMIT) echo`; \
+  arr=( "$${arr[@]/%.el/.$(TARGET_EXT)}" ); \
   echo "$${arr[*]}"; \
 ))
 endef
 
-.PHONY: compile-compiler
-compile-compiler: $(BYTE_COMPILER_EL:.el=.elc)
-
 .SECONDEXPANSION:
 .PHONY: compile
-compile: compile-compiler $(COMPILE_FIRST:.el=.elc) $$(call compile-rest,c)
-ifeq ($(HAVE_NATIVE_COMP),yes)
-compile: $$(call compile-rest,n)
-endif
+compile: $(BYTE_COMPILER_EL:.el=.$(TARGET_EXT)) \
+  $(COMPILE_FIRST:.el=.$(TARGET_EXT)) \
+  $$(call compile-rest)
 
-./leim/leim-list.el: ./international/titdic-cnv.elc
+./leim/leim-list.el: ./international/titdic-cnv.$(TARGET_EXT)
 	$(MAKE) -C ../leim all EMACS="$(EMACS)"
 
 ifeq ($(HAVE_NATIVE_COMP),yes)
@@ -203,7 +218,7 @@ bootstrap-clean:
 # checked in.  It acts as a stopgap for the bootstrap pdump until
 # loaddefs.el can be generated.
 ./ldefs-boot.el: ./loaddefs.el
-	sed '/^;; Local Variables:/a ;; no-byte-compile: t' < $< > $@
+	@sed '/^;; Local Variables:/a ;; no-byte-compile: t' < $< > $@
 
 # Pain-in-the-ass OKURO-NASI trigger.
 ./leim/ja-dic/ja-dic.el: ./leim/leim-list.el

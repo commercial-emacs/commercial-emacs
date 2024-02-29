@@ -1033,43 +1033,33 @@ lisp_file_lexically_bound_p (Lisp_Object readcharfun)
     }
 }
 
-/* Value is a version number of byte compiled code if the file
-   associated with file descriptor FD is a compiled Lisp file that's
-   safe to load.  Only files compiled with Emacs can be loaded.  */
+/* Return version byte from .elc header, else zero.  */
 
 static int
-safe_to_load_version (Lisp_Object file, int fd)
+elc_version (Lisp_Object file, int fd)
 {
   struct stat st;
   char buf[512];
-  int nbytes, i;
-  int version = 1;
-
-  /* If the file is not regular, then we cannot safely seek it.
-     Assume that it is not safe to load as a compiled file.  */
-  if (fstat (fd, &st) == 0 && !S_ISREG (st.st_mode))
-    return 0;
-
-  /* Read the first few bytes from the file, and look for a line
-     specifying the byte compiler version used.  */
-  nbytes = emacs_read_quit (fd, buf, sizeof buf);
-  if (nbytes > 0)
+  int version = 0;
+  if (fstat (fd, &st) == 0 && S_ISREG (st.st_mode))
     {
-      /* Skip to the next newline, skipping over the initial `ELC'
-	 with NUL bytes following it, but note the version.  */
-      for (i = 0; i < nbytes && buf[i] != '\n'; ++i)
-	if (i == 4)
-	  version = buf[i];
-
-      if (i >= nbytes
-	  || fast_c_string_match_ignore_case (Vbytecomp_version_regexp,
-					      buf + i, nbytes - i) < 0)
-	version = 0;
+      for (int i = 0, nbytes = emacs_read_quit (fd, buf, sizeof buf);
+	   i < nbytes;
+	   ++i)
+	{
+	  if (i >= 4 && buf[i] == '\n')
+	    {
+	      /* Only trust version if regexp found after newline.  */
+	      if (++i <= nbytes - 1
+		  && 0 <= fast_c_string_match_ignore_case (Vbytecomp_version_regexp,
+							   buf + i, nbytes - i))
+		version = buf[4]; /* version byte after initial `;ELC` */
+	      break;
+	    }
+	}
+      if (lseek (fd, 0, SEEK_SET) < 0)
+	report_file_error ("Rewinding file pointer", file);
     }
-
-  if (lseek (fd, 0, SEEK_SET) < 0)
-    report_file_error ("Seeking to start of file", file);
-
   return version;
 }
 
@@ -1158,10 +1148,6 @@ is tried.  Under MUST-SUFFIX, the empty suffix is not tried.
 MUST-SUFFIX is ignored if FILE already ends in one of `load-suffixes' or
 if FILE includes a directory.
 
-Ordinarily the search ends with the first found variant of FILE.  Under
-`load-prefer-newer' however, the search continues for all variants to
-determine the one most recently modified.
-
 Signals an error if a FILE variant cannot be found unless NOERROR.
 
 Bookends loading with status messages unless NOMESSAGE (although
@@ -1179,15 +1165,15 @@ Return t if on success.  */)
    Lisp_Object nosuffix, Lisp_Object must_suffix)
 {
   FILE *stream UNINIT;
-  int fd;
+  int fd = -1;
   specpdl_ref fd_index UNINIT;
   specpdl_ref count = SPECPDL_INDEX ();
-  Lisp_Object found, efound, hist_file_name;
+  Lisp_Object found, hist_file_name;
   /* True means we are loading a compiled file.  */
-  bool compiled = 0;
+  bool compiled = false;
   Lisp_Object handler;
   const char *fmode = "r" FOPEN_TEXT;
-  int version;
+  int version = 0;
 
   CHECK_STRING (file);
 
@@ -1253,7 +1239,7 @@ Return t if on success.  */)
 	  if (NILP (must_suffix))
 	    suffixes = CALLN (Fappend, suffixes, Vload_file_rep_suffixes);
 	}
-      fd = openp (Vload_path, file, suffixes, &found, Qnil, load_prefer_newer);
+      fd = openp (Vload_path, file, suffixes, &found, Qnil);
     }
 
   if (fd == -1)
@@ -1297,7 +1283,7 @@ Return t if on success.  */)
 #endif
     }
 
-  if (0 <= fd)
+  if (fd >= 0)
     {
       fd_index = SPECPDL_INDEX ();
       record_unwind_protect_int (close_file_unwind, fd);
@@ -1346,41 +1332,31 @@ Return t if on success.  */)
     ? concat2 (Fsubstring (found, make_fixnum (0), make_fixnum (-1)),
 	       build_string ("c"))
     : found;
-  version = -1;
 
-  /* Check for the presence of unescaped character literals and warn
-     about them. */
+  /* Warn about unescaped character literals.  */
   specbind (Qlread_unescaped_character_literals, Qnil);
   record_unwind_protect (load_warn_unescaped_character_literals, file);
 
-  bool is_elc = suffix_p (found, ".elc");
-  if (is_elc
-      /* version = 1 means the file is empty, in which case we can
-	 treat it as not byte-compiled.  */
-      || (fd >= 0 && (version = safe_to_load_version (file, fd)) > 1))
+  version = elc_version (found, fd);
+  if (version)
     {
       if (fd != -2) /* not a handler-lacking remote */
 	{
-	  struct stat s1, s2;
-	  if (version < 0 && !(version = safe_to_load_version (file, fd)))
-	    error ("File `%s' was not compiled in Emacs", SDATA (found));
-
-	  compiled = 1;
-
-	  efound = ENCODE_FILE (found);
+	  compiled = true;
 	  fmode = "r" FOPEN_BINARY;
-
-          if (is_elc
-	      && !load_prefer_newer
-	      && 0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s1, 0))
-            {
-	      SSET (efound, SBYTES (efound) - 1, 0); /* .elc to .el */
-              if (0 == emacs_fstatat (AT_FDCWD, SSDATA (efound), &s2, 0)
-		  && 0 > timespec_cmp (get_stat_mtime (&s1),
-				       get_stat_mtime (&s2)))
-		message_with_string ("Loading %s despite modified .el", found, 1);
-	      SSET (efound, SBYTES (efound) - 1, 'c'); /* back to .elc from .el */
-            }
+	  {
+	    struct stat s1, s2;
+	    const char *elc = SSDATA (ENCODE_FILE (found));
+	    USE_SAFE_ALLOCA;
+	    char *el = SAFE_ALLOCA (strlen (elc));
+	    memcpy (el, elc, strlen (elc) - 1);
+	    el[strlen (elc) - 1] = '\0';
+	    if (0 == emacs_fstatat (AT_FDCWD, elc, &s1, 0)
+		&& 0 == emacs_fstatat (AT_FDCWD, el, &s2, 0)
+		&& 0 > timespec_cmp (get_stat_mtime (&s1), get_stat_mtime (&s2)))
+	      message_with_string ("Loading %s despite modified .el", found, 1);
+	    SAFE_FREE ();
+	  }
 	}
     }
   else if (!is_module && !is_native_lisp)
@@ -1415,8 +1391,7 @@ Return t if on success.  */)
 #ifdef WINDOWSNT
       emacs_close (fd);
       clear_unwind_protect (fd_index);
-      efound = ENCODE_FILE (found);
-      stream = emacs_fopen (SSDATA (efound), fmode);
+      stream = emacs_fopen (SSDATA (ENCODE_FILE (found)), fmode);
 #else
       stream = fdopen (fd, fmode);
 #endif
@@ -1447,17 +1422,22 @@ Return t if on success.  */)
       unread_char = -1;
     }
 
-  if (NILP (nomessage) || force_load_messages)
-    {
-      if (is_module)
-        message_with_string ("Loading %s (module)...", file, 1);
-      else if (is_native_lisp)
-        message_with_string ("Loading %s (native compiled elisp)...", file, 1);
-      else if (!compiled)
-	message_with_string ("Loading %s.el (source)...", file, 1);
-      else /* The typical case; compiled file newer than source file.  */
-	message_with_string ("Loading %s...", file, 1);
-    }
+#define MESSAGE_LOADING(done)						\
+  do {									\
+    if (NILP (nomessage) || force_load_messages)			\
+      {									\
+	if (is_module)							\
+	  message_with_string ("Loading %s (module)..." done, file, 1); \
+	else if (is_native_lisp)					\
+	  message_with_string ("Loading %s (native)..." done, file, 1); \
+	else if (!compiled)						\
+	  message_with_string ("Loading %s.el (source)..." done, file, 1); \
+	else								\
+	  message_with_string ("Loading %s..." done, file, 1);		\
+      }									\
+  } while (0);
+
+  MESSAGE_LOADING ("");
 
   specbind (Qload_file_name, hist_file_name);
   specbind (Qload_true_file_name, found);
@@ -1491,18 +1471,11 @@ Return t if on success.  */)
     {
       if (lisp_file_lexically_bound_p (Qget_file_char))
 	set_internal (Qlexical_binding, Qt, Qnil, SET_INTERNAL_SET);
-
-      if (!version || version >= 22)
+      if (version && version < 22)
+	report_file_error ("Version too old", file);
+      else
         readevalloop (Qget_file_char, &input, hist_file_name,
                       0, Qnil, Qnil, Qnil, Qnil);
-      else
-        {
-          /* We can't handle a file which was compiled with
-             byte-compile-dynamic by older version of Emacs.  */
-          specbind (Qload_force_doc_strings, Qt);
-          readevalloop (Qget_emacs_mule_file_char, &input, hist_file_name,
-                        0, Qnil, Qnil, Qnil, Qnil);
-        }
     }
   unbind_to (count, Qnil);
 
@@ -1517,17 +1490,10 @@ Return t if on success.  */)
       saved_strings[i].size = 0;
     }
 
-  if (!noninteractive && (NILP (nomessage) || force_load_messages))
-    {
-      if (is_module)
-        message_with_string ("Loading %s (module)...done", file, 1);
-      else if (is_native_lisp)
-	message_with_string ("Loading %s (native compiled elisp)...done", file, 1);
-      else if (!compiled)
-	message_with_string ("Loading %s (source)...done", file, 1);
-      else /* The typical case; compiled file newer than source file.  */
-	message_with_string ("Loading %s...done", file, 1);
-    }
+  if (!noninteractive)
+    MESSAGE_LOADING ("done");
+
+#undef MESSAGE_LOADING
 
   return Qt;
 }
@@ -1565,7 +1531,7 @@ directories, make sure the PREDICATE function returns `dir-ok' for them.  */)
   (Lisp_Object filename, Lisp_Object path, Lisp_Object suffixes, Lisp_Object predicate)
 {
   Lisp_Object file;
-  int fd = openp (path, filename, suffixes, &file, predicate, false);
+  int fd = openp (path, filename, suffixes, &file, predicate);
   if (NILP (predicate) && fd >= 0)
     emacs_close (fd);
   return file;
@@ -1581,11 +1547,6 @@ directories, make sure the PREDICATE function returns `dir-ok' for them.  */)
    files -- useful when files are problematic (binary).  A trivial
    PREDICATE of t is only interested in this side effect.
 
-   If NEWER, finds all such descriptors and returns the most recently
-   modified.  NEWER is ignored for remote files, and for calls where
-   PREDICATE is neither nil nor t (a historical and arbitrary
-   distinction).
-
    A non-null STOREPTR is populated with the found file name as a Lisp
    string, or nil if not found.
 
@@ -1596,7 +1557,7 @@ directories, make sure the PREDICATE function returns `dir-ok' for them.  */)
 
 int
 openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
-       Lisp_Object *storeptr, Lisp_Object predicate, bool newer)
+       Lisp_Object *storeptr, Lisp_Object predicate)
 {
   ptrdiff_t fn_size = 100;
   char buf[100];
@@ -1608,9 +1569,6 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
   int last_errno = ENOENT;
   int best_fd = -1;
   USE_SAFE_ALLOCA;
-
-  /* Initial value less than all valid timestamps.  */
-  struct timespec best_mtime = make_timespec (TYPE_MINIMUM (time_t), -1);
 
   CHECK_STRING (str);
 
@@ -1729,53 +1687,30 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 
 	     if (fd >= 0)
 	       {
-		 bool update_best = true;
-		 struct timespec mtime;
-
-		 if (newer)
-		   {
-		     struct stat st;
-		     fstat (fd, &st);
-		     mtime = get_stat_mtime (&st);
-		     update_best = timespec_cmp (mtime, best_mtime) > 0;
-		   }
-		 if (update_best)
-		   {
-		     if (best_fd >= 0)
-		       emacs_close (best_fd);
-		     best_fd = fd;
-		     best_string = string;
-		     if (newer)
-		       best_mtime = mtime;
-		     else
-		       goto openp_out;
-		   }
-		 else
-		   {
-		     emacs_close (fd);
-		     fd = -1;
-		   }
+		 if (best_fd >= 0)
+		   emacs_close (best_fd);
+		 best_fd = fd;
+		 best_string = string;
+		 goto openp_out;
 	       }
 	   }
 	 else
 	   {
 	     // Assert arbitrary lisp needs executing
 	     eassert (!NILP (handler) || (!NILP (predicate) && !EQ (predicate, Qt)));
-	     bool exists;
+	     bool exists = false;
 	     if (NILP (predicate) || EQ (predicate, Qt))
 	       exists = !NILP (Ffile_readable_p (string));
 	     else
 	       {
-		 Lisp_Object tmp = call1 (predicate, string);
-		 if (NILP (tmp))
-		   exists = false;
-		 else if (EQ (tmp, Qdir_ok)
-			  || NILP (Ffile_directory_p (string)))
-		   exists = true;
-		 else
+		 Lisp_Object val = call1 (predicate, string);
+		 if (!NILP (val))
 		   {
-		     exists = false;
-		     last_errno = EISDIR;
+		     if (EQ (val, Qdir_ok)
+			 || NILP (Ffile_directory_p (string)))
+		       exists = true;
+		     else
+		       last_errno = EISDIR;
 		   }
 	       }
 
@@ -2085,7 +2020,7 @@ readevalloop (Lisp_Object readcharfun,
       if (!NILP (macroexpand))
         val = readevalloop_eager_expand_eval (val, macroexpand);
       else
-        val = eval_form (val);
+	val = eval_form (val);
 
       if (printflag)
 	{
@@ -5473,14 +5408,6 @@ For internal use only.  */);
   Vlread_unescaped_character_literals = Qnil;
   DEFSYM (Qlread_unescaped_character_literals,
           "lread--unescaped-character-literals");
-
-  DEFVAR_BOOL ("load-prefer-newer", load_prefer_newer,
-               doc: /* Load the newer of .el and .elc.
-The `load' function loads an explicitly suffixed library file name.
-If unsuffixed, a nil `load-prefer-newer' loads the first readable file among
-`load-suffixes' or `load-file-rep-suffixes'.  A non-nil `load-prefer-newer'
-loads the most recently modified readable file.  */);
-  load_prefer_newer = false;
 
   /* Vsource_directory was initialized in init_lread.  */
 

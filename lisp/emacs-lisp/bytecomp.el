@@ -153,7 +153,6 @@ It should take one argument, the name of an Emacs Lisp source
 file name, and return the name of the compiled file.
 \(Note that the assumption that the source and compiled files
 are found in the same directory is hard-coded in various places in Emacs.)"
-  ;; Eg load-prefer-newer, documentation lookup IIRC.
   :type '(choice (const nil) function)
   :version "23.2")
 
@@ -1961,7 +1960,7 @@ also be compiled."
   "Non-nil to prevent byte-compiling of Emacs Lisp code.
 This is normally set in local file variables at the end of the elisp file:
 
-\;; Local Variables:\n;; no-byte-compile: t\n;; End:") ;Backslash for Makefile.
+;; Local Variables:\n;; no-byte-compile: t\n;; End:")
 ;;;###autoload(put 'no-byte-compile 'safe-local-variable 'booleanp)
 
 (defun byte-recompile-file (filename &optional force arg load)

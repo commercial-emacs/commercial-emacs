@@ -122,7 +122,7 @@ Note that when `no-byte-compile' is set to non-nil it overrides the value of
 This is normally set in local file variables at the end of the
 Emacs Lisp file:
 
-\;; Local Variables:\n;; no-native-compile: t\n;; End:")
+;; Local Variables:\n;; no-native-compile: t\n;; End:")
 ;;;###autoload(put 'no-native-compile 'safe-local-variable 'booleanp)
 
 (defvar comp-trampoline-dir (cond ((and init-file-user user-init-file) ;live
@@ -175,7 +175,6 @@ For internal use by the test suite only.")
 Each function in FUNCTIONS is run after PASS.
 Useful to hook into pass checkers.")
 
-;; FIXME this probably should not be here but... good for now.
 (defconst comp-known-func-cstr-h
   (cl-loop
    with comp-ctxt = (make-comp-cstr-ctxt)
@@ -663,39 +662,19 @@ current instruction or its cell."
 
 ;; Autoloaded as might be used by `disassemble-internal'.
 ;;;###autoload
-(defun comp-c-func-name (name prefix &optional first)
-  "Given NAME, return a name suitable for the native code.
-Add PREFIX in front of it.  If FIRST is not nil, pick the first
-available name ignoring compilation context and potential name
-clashes."
-  ;; Unfortunately not all symbol names are valid as C function names...
-  ;; Nassi's algorithm here:
-  (let* ((orig-name (if (symbolp name) (symbol-name name) name))
-         (crypted (cl-loop with str = (make-string (* 2 (length orig-name)) 0)
-	                   for j from 0 by 2
-	                   for i across orig-name
-	                   for byte = (format "%x" i)
-	                   do (aset str j (aref byte 0))
-			      (aset str (1+ j) (if (length> byte 1)
-						   (aref byte 1)
-						 ?\_))
-	                   finally return str))
-         (human-readable (string-replace
-                          "-" "_" orig-name))
-         (human-readable (replace-regexp-in-string
-                          (rx (not (any "0-9a-z_"))) "" human-readable)))
-    (if (null first)
-        ;; Prevent C namespace conflicts.
-        (cl-loop
-         with h = (comp-ctxt-funcs-h comp-ctxt)
-         for i from 0
-         for c-sym = (concat prefix crypted "_" human-readable "_"
-                             (number-to-string i))
-         unless (gethash c-sym h)
-         return c-sym)
-      ;; When called out of a compilation context (ex disassembling)
-      ;; pick the first one.
-      (concat prefix crypted "_" human-readable "_0"))))
+(defun comp-c-func-name (sym)
+  "Return string suitable for gcc_jit_context_new_function.
+A null SYM indicates anonymous lambda."
+  (if (null sym)
+      (make-temp-name "lambda_")
+    (mapconcat (lambda (c) (cond ((string-match-p (rx (any "0-9")) c)
+                                  (char-to-string (+ ?A (string-to-number c))))
+                                 ((string-match-p (rx (any "A-Za-z_")) c)
+                                  c)
+                                 (t
+                                  "_")))
+               (mapcar #'char-to-string (symbol-name sym))
+               "")))
 
 (defun comp--decrypt-arg-list (x function-name)
   "Decrypt argument list X for FUNCTION-NAME."
@@ -730,12 +709,11 @@ clashes."
   "Byte-compile FUNCTION-NAME, spilling data from the byte compiler."
   (unless (comp-ctxt-output comp-ctxt)
     (setf (comp-ctxt-output comp-ctxt)
-          (make-temp-file (comp-c-func-name function-name "freefn-")
-                          nil ".eln")))
-  (let* ((f (symbol-function function-name))
-         (byte-code (byte-compile function-name))
-         (c-name (comp-c-func-name function-name "F")))
-      (when (byte-code-function-p f)
+          (make-temp-file (comp-c-func-name function-name) nil ".eln")))
+  (let ((f (symbol-function function-name))
+        (byte-code (byte-compile function-name))
+        (c-name (comp-c-func-name function-name)))
+    (when (byte-code-function-p f)
         (signal 'native-compiler-error
                 '("can't native compile an already byte-compiled function")))
         (setf (comp-ctxt-top-level-forms comp-ctxt)
@@ -753,12 +731,12 @@ clashes."
     (setf (comp-ctxt-output comp-ctxt)
           (make-temp-file "comp-lambda-" nil ".eln")))
   (let* ((byte-code (byte-compile form))
-         (c-name (comp-c-func-name "anonymous-lambda" "F")))
-      (setf (comp-ctxt-top-level-forms comp-ctxt)
-            (list (make-byte-to-native-func-def :name '--anonymous-lambda
-                                                :c-name c-name
-                                                :byte-func byte-code)))
-      (maphash #'comp--intern-func-in-ctxt byte-to-native-lambdas-h)))
+         (c-name (comp-c-func-name nil)))
+    (setf (comp-ctxt-top-level-forms comp-ctxt)
+          (list (make-byte-to-native-func-def :name 'anonymous-lambda
+                                              :c-name c-name
+                                              :byte-func byte-code)))
+    (maphash #'comp--intern-func-in-ctxt byte-to-native-lambdas-h)))
 
 (defun comp--intern-func-in-ctxt (_ obj)
   "Given OBJ of type `byte-to-native-lambda', create a function in `comp-ctxt'."
@@ -772,11 +750,11 @@ clashes."
                         return form))
            (name (when top-l-form
                    (byte-to-native-func-def-name top-l-form)))
-           (c-name (comp-c-func-name (or name "anonymous-lambda") "F"))
+           (c-name (comp-c-func-name name))
            (func (if (comp--lex-byte-func-p byte-func)
                      (make-comp-func-l
                       :args (comp--decrypt-arg-list (aref byte-func 0)
-                                                   name))
+                                                    (or name 'anonymous-lambda)))
                    (make-comp-func-d :lambda-list (aref byte-func 0)))))
       (setf (comp-func-name func) name
             (comp-func-byte-func func) byte-func
@@ -2127,8 +2105,7 @@ blocks."
                    for f being each hash-key of h
                    collect (if (stringp f)
                                (comp-func-name
-                                (gethash f
-                                         (comp-ctxt-funcs-h comp-ctxt)))
+                                (gethash f (comp-ctxt-funcs-h comp-ctxt)))
                              f))))
 
 (defun comp--pure-infer-func (f)
@@ -3100,16 +3077,13 @@ Prepare every function for final compilation and drive the C back-end."
         (make-directory dir t)))
     (comp--compile-ctxt-to-file0 name)))
 
-(defun comp--final1 ()
-  (comp--init-ctxt)
-  (unwind-protect
-      (comp--compile-ctxt-to-file (comp-ctxt-output comp-ctxt))
-    (comp--release-ctxt)))
-
 (defun comp--final (_)
   "Final pass driving the C back-end for code emission."
   (unless comp-dry-run
-    (comp--final1)))
+    (comp--init-ctxt)
+    (unwind-protect
+        (comp--compile-ctxt-to-file (comp-ctxt-output comp-ctxt))
+      (comp--release-ctxt))))
 
 ;;; Compiler type hints.
 ;; Public entry points to be used by user code to give comp
@@ -3144,7 +3118,6 @@ Prepare every function for final compilation and drive the C back-end."
       (push (gensym "arg") lambda-list))
     (reverse lambda-list)))
 
-;;;###autoload
 (defun comp-trampoline-search (subr-name)
   "Return trampoline file for SUBR-NAME."
   (let ((filename (expand-file-name (comp-trampoline-filename subr-name)
@@ -3152,7 +3125,6 @@ Prepare every function for final compilation and drive the C back-end."
     (when (file-readable-p filename)
       (native-elisp-load filename))))
 
-;;;###autoload
 (defun comp-trampoline-compile (subr-name)
   "Synthesize, compile, and return a trampoline for SUBR-NAME."
   (let* ((lambda-list (comp--make-lambda-list-from-subr
@@ -3181,14 +3153,13 @@ Prepare every function for final compilation and drive the C back-end."
   (when (and (not (functionp function-or-file))
              (not (stringp function-or-file)))
     (signal 'native-compiler-error
-            (list "Not a function symbol or file" function-or-file)))
+            (list "Neither function symbol nor file" function-or-file)))
   (catch 'no-native-compile
     (let* ((data function-or-file)
            (comp-native-compiling t)
            (byte-native-qualities nil)
            (byte-compile-error-on-warn t)
            (comp-ctxt (make-comp-ctxt :output output)))
-      (comp-log "\n\n" 1)
       (unwind-protect
           (progn
             (condition-case-unless-debug err

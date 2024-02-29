@@ -99,8 +99,7 @@ redefine OBJECT if it is a symbol."
               (goto-char (point-min))
               (re-search-forward (concat "^.*<_?"
                                          (regexp-quote
-                                          (comp-c-func-name
-                                           (subr-name obj) "F" t))
+                                          (comp-c-func-name (subr-name obj)))
                                          ">:"))
               (beginning-of-line)
               (delete-region (point-min) (point))

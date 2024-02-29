@@ -1585,6 +1585,8 @@ See also the function `condition-case'.  */
        attributes: noreturn)
   (Lisp_Object error_symbol, Lisp_Object data)
 {
+  /* if (EQ (error_symbol, Qnative_ice)) */
+  /*   fprintf (stderr, "wtf\n"); */
   signal_or_quit (error_symbol, data);
   eassume (false);
 }

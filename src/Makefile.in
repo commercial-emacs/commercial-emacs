@@ -468,8 +468,14 @@ otherobj= $(TERMCAP_OBJ) $(PRE_ALLOC_OBJ) $(GMALLOC_OBJ) $(RALLOC_OBJ) \
 FIRSTFILE_OBJ=@FIRSTFILE_OBJ@
 ALLOBJS = $(FIRSTFILE_OBJ) $(VMLIMIT_OBJ) $(obj) $(otherobj)
 
+ifeq ($(HAVE_NATIVE_COMP),yes)
+TARGET_EXT = eln
+else
+TARGET_EXT = elc
+endif
+
 .PHONY: all
-all: emacs.pdmp ../lisp/emacs-lisp/cldefs.el
+all: emacs.pdmp
 
 ifeq ($(HAVE_BE_APP),yes)
 all: Emacs Emacs.pdmp
@@ -500,8 +506,9 @@ define pdump
 endef
 
 define relative-lisp-files
-	../src/$(@:.pdmp=)$(EXEEXT) --batch -l ../admin/relative-lisp-files \
-	   -f relative-lisp-files
+	[ -s "../src/$(1).pdmp" ] && \
+	   ../src/$(1) --batch -l ../admin/relative-lisp-files \
+	   --eval "(relative-lisp-files $(2))"
 endef
 
 ../lisp/subdirs.el:
@@ -509,15 +516,18 @@ endef
 
 bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT) ../lisp/subdirs.el
 	$(MAKE) -C ../lisp bootstrap-clean EMACS=../src/$<
-	$(call pdump,$@, 2>/dev/null) # pdmp all interpreted elisp
-	$(MAKE) -s -C ../lisp `$(call relative-lisp-files)` EMACS=../src/$<
+	$(call pdump,$@) # pdmp all interpreted elisp
+	$(MAKE) -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\")` EMACS=../src/$<
 	$(call pdump,$@) # pdmp all byte-compiled
 
+.SECONDEXPANSION:
 emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el ../lisp/loaddefs.elc \
-  ../lisp/international/charprop.el
+  ../lisp/international/charprop.el \
+  $(patsubst %,../lisp/%.el,$(shell $(call relative-lisp-files,bootstrap-emacs$(EXEEXT),nil)))
 	$(call pdump,$@, 2>/dev/null) # pdmp some interpreted elisp
-	$(MAKE) -s -C ../lisp `$(call relative-lisp-files)`
-	$(call pdump,$@) # pdmp all byte-compiled
+	@# if relative-lisp-files empty, .DEFAULT_GOAL=none
+	$(MAKE) .DEFAULT_GOAL=none -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\")`
+	$(call pdump,$@) # pdmp all native- and byte-compiled
 
 install-emacs.pdmp: emacs.pdmp
 	$(AM_V_at)rm -f install-emacs$(EXEEXT)
@@ -574,8 +584,7 @@ emacs$(EXEEXT): $(LIBXMENU) $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(EMACSRES) \
   ../admin/charsets/charsets.stamp \
   ../lisp/international/charscript.el \
   ../lisp/international/emoji-zwj.el \
-  $(libsrc)/make-fingerprint$(EXEEXT) $(etc)/DOC \
-  $(shell 2>/dev/null git rev-parse --git-path index)
+  $(libsrc)/make-fingerprint$(EXEEXT) $(etc)/DOC
 ifeq ($(HAVE_BE_APP),yes)
 	$(AM_V_CXXLD)$(CXX) -o $@.tmp \
 	  $(ALL_CFLAGS) $(EMACS_LDFLAGS) $(LDFLAGS) \
@@ -686,9 +695,6 @@ TAGS: ${ETAGS} $(ctagsfiles1) $(ctagsfiles2)
 
 .PHONY: tags
 tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS $(lib)/TAGS
-
-../lisp/emacs-lisp/cldefs.el: | emacs.pdmp
-	$(MAKE) -C ../lisp emacs-lisp/cldefs.el
 
 ### Flymake support (for C only)
 check-syntax:

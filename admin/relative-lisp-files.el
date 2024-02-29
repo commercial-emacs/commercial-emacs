@@ -1,4 +1,4 @@
-;;; relative-lisp-files.el --- print loaded files relative to lisp directory  -*- lexical-binding: t; -*-
+;;; relative-lisp-files.el --- print `make -C lisp` targets to stdout  -*- lexical-binding: t; -*-
 ;; Copyright (C) 1985-1986, 1992, 1994, 2001-2024 Free Software
 ;; Foundation, Inc.
 
@@ -27,37 +27,67 @@
 
 ;;; Code:
 
-(defconst relative-lisp-files-explicit '("ldefs-boot.el")
+(defconst relative-lisp-files-explicit '("ldefs-boot")
   "Elisp we don't want `make -C lisp` making without explicit consent.")
 
-(defsubst relative-lisp-files-as-list ()
-  (delq
-   nil
-   (mapcar
-    (lambda (entry)
-      (let* ((ofn (car entry))
-             (result (file-name-nondirectory ofn))
-             (fn (directory-file-name (file-name-directory ofn)))
-             base-name)
-        (when (equal "el" (file-name-extension ofn))
-          (catch 'done
-            (prog1 nil ;if `while' doesn't `throw' something better
-              (while (not (zerop (length (setq base-name (file-name-nondirectory fn)))))
-                (if (equal "lisp" base-name)
-                    (progn
-                      (when (member result relative-lisp-files-explicit)
-                        (setq result nil))
-                      (throw 'done result))
-	          (setq result (concat (file-name-as-directory
-			                (file-name-nondirectory fn))
-			               result)))
-                (setq fn (directory-file-name (file-name-directory fn)))))))))
-    load-history)))
+(defun relative-lisp-files-as-list (target-extension)
+  "Return loaded files not yet compiled to TARGET-EXTENSION.
+In the interest of producing `make` targets, append TARGET-EXTENSION to
+return values.  A TARGET-EXTENSION of nil intends returning the full
+complement of loaded files, whether compiled or not.
 
-(defun relative-lisp-files ()
+For both 'elc' and 'eln' TARGET-EXTENSION, omit files excluded by the
+no-byte-compile file-local directive.  For the latter, append the 'elc'
+extension in lieu of 'eln' to files containing the no-native-compile
+directive."
+  (seq-keep
+   (lambda (entry)
+     (let* ((fn (car entry))
+            (path (directory-file-name (file-name-directory fn)))
+            (adjusted-extension target-extension)
+            result no-byte-compile-p no-native-compile-p path-leaf)
+       (with-temp-buffer
+         (insert-file-contents (file-name-with-extension
+                                (file-name-sans-extension fn) "el"))
+         (hack-local-variables '(no-byte-compile no-native-compile))
+         (setq no-byte-compile-p no-byte-compile
+               no-native-compile-p no-native-compile))
+       (setq result (if adjusted-extension
+                        (file-name-with-extension
+                         (file-name-sans-extension (file-name-nondirectory fn))
+                         (if (and (equal adjusted-extension "eln")
+                                  (not no-byte-compile-p)
+                                  no-native-compile-p)
+                             (setq adjusted-extension "elc")
+                           adjusted-extension))
+                      (file-name-sans-extension (file-name-nondirectory fn))))
+       (when (or (null adjusted-extension)
+                 (and (not (equal adjusted-extension (file-name-extension fn)))
+                      (cond ((equal adjusted-extension "elc")
+                             (not no-byte-compile-p))
+                            ((equal adjusted-extension "eln")
+                             (and (not no-byte-compile-p)
+                                  (not no-native-compile-p)))
+                            (t t))))
+         (catch 'done
+           (prog1 nil ;if `while' doesn't `throw' something better
+             (while (not (zerop (length (setq path-leaf (file-name-nondirectory path)))))
+               (if (equal "lisp" path-leaf)
+                   (progn
+                     (when (member result relative-lisp-files-explicit)
+                       (setq result nil))
+                     (throw 'done result))
+	         (setq result (concat (file-name-as-directory
+			               (file-name-nondirectory path))
+			              result)))
+               (setq path (directory-file-name (file-name-directory path)))))))))
+   load-history))
+
+(defun relative-lisp-files (target-extension)
   "Would use `file-relative-name' but bugs out knowingly under mingw."
-  (princ (mapconcat (lambda (f) (concat f "c"))
-                    (relative-lisp-files-as-list) " ")))
+  (princ (mapconcat #'identity
+                    (sort (relative-lisp-files-as-list target-extension) #'string<)
+                    " ")))
 
 ;; Local Variables:
 ;; no-byte-compile: t

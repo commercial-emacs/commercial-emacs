@@ -41,7 +41,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "sysstdio.h"
 #include "zlib.h"
 
-
+
 /********************************/
 /* Dynamic loading of libgccjit */
 /********************************/
@@ -472,7 +472,7 @@ load_gccjit_if_necessary (bool mandatory)
 #endif
 }
 
-
+
 /* Increase this number to force a new Vcomp_abi_hash to be generated.  */
 #define ABI_VERSION "5"
 
@@ -681,7 +681,7 @@ typedef struct {
   gcc_jit_rvalue *idx;
 } imm_reloc_t;
 
-
+
 /*
    Helper functions called by the run-time.
 */
@@ -708,7 +708,7 @@ static void *helper_link_table[] =
     maybe_garbage_collect,
     maybe_quit };
 
-
+
 static char * ATTRIBUTE_FORMAT_PRINTF (1, 2)
 format_string (const char *format, ...)
 {
@@ -960,8 +960,7 @@ declare_imported_func (Lisp_Object subr_sym, gcc_jit_type *ret_type,
 
   /* String containing the function ptr name.  */
   Lisp_Object f_ptr_name =
-    CALLN (Ffuncall, intern_c_string ("comp-c-func-name"),
-	   subr_sym, make_string ("R", 1));
+    CALLN (Ffuncall, intern_c_string ("comp-c-func-name"), subr_sym);
 
   gcc_jit_type *f_ptr_type =
     gcc_jit_type_get_const (
@@ -1829,7 +1828,7 @@ emit_PURE_P (gcc_jit_rvalue *ptr)
 					   PURESIZE));
 }
 
-
+
 /*************************************/
 /* Code emitted by LIMPLE statemes.  */
 /*************************************/
@@ -2436,7 +2435,7 @@ emit_limple_insn (Lisp_Object insn)
     }
 }
 
-
+
 /**************/
 /* Inliners.  */
 /**************/
@@ -2859,40 +2858,36 @@ static void
 emit_ctxt_code (void)
 {
   /* Emit optimize qualities.  */
-  Lisp_Object opt_qly[] =
-    { Fcons (Qnative_comp_speed, make_fixnum (comp.speed)),
-      Fcons (Qnative_comp_debug, make_fixnum (comp.debug)),
-      Fcons (Qgccjit,
-	     Fcomp_libgccjit_version ()) };
+  Lisp_Object opt_qly[] = {
+    Fcons (Qnative_comp_speed, make_fixnum (comp.speed)),
+    Fcons (Qnative_comp_debug, make_fixnum (comp.debug)),
+    Fcons (Qgccjit, Fcomp_libgccjit_version ())
+  };
+
   emit_static_object (TEXT_OPTIM_QLY_SYM, Flist (ARRAYELTS (opt_qly), opt_qly));
 
-  emit_static_object (TEXT_FDOC_SYM,
-		      CALL1I (comp-ctxt-function-docs, Vcomp_ctxt));
+  emit_static_object (TEXT_FDOC_SYM, CALL1I (comp-ctxt-function-docs, Vcomp_ctxt));
 
-  comp.current_thread_ref =
-    gcc_jit_lvalue_as_rvalue (
-      gcc_jit_context_new_global (
-	comp.ctxt,
-	NULL,
-	GCC_JIT_GLOBAL_EXPORTED,
-	gcc_jit_type_get_pointer (comp.thread_state_ptr_type),
-	CURRENT_THREAD_RELOC_SYM));
+  comp.current_thread_ref = gcc_jit_lvalue_as_rvalue
+    (gcc_jit_context_new_global
+     (comp.ctxt,
+      NULL,
+      GCC_JIT_GLOBAL_EXPORTED,
+      gcc_jit_type_get_pointer (comp.thread_state_ptr_type),
+      CURRENT_THREAD_RELOC_SYM));
 
-  comp.pure_ptr =
-    gcc_jit_lvalue_as_rvalue (
-      gcc_jit_context_new_global (
-	comp.ctxt,
-	NULL,
-	GCC_JIT_GLOBAL_EXPORTED,
-        comp.void_ptr_type,
-	PURE_RELOC_SYM));
+  comp.pure_ptr = gcc_jit_lvalue_as_rvalue
+    (gcc_jit_context_new_global (comp.ctxt,
+				 NULL,
+				 GCC_JIT_GLOBAL_EXPORTED,
+				 comp.void_ptr_type,
+				 PURE_RELOC_SYM));
 
-  gcc_jit_context_new_global (
-	comp.ctxt,
-	NULL,
-	GCC_JIT_GLOBAL_EXPORTED,
-	comp.lisp_obj_type,
-	COMP_UNIT_SYM);
+  gcc_jit_context_new_global (comp.ctxt,
+			      NULL,
+			      GCC_JIT_GLOBAL_EXPORTED,
+			      comp.lisp_obj_type,
+			      COMP_UNIT_SYM);
 
   declare_imported_data ();
 
@@ -2922,26 +2917,24 @@ emit_ctxt_code (void)
 						   subr->max_args, NULL);
     }
 
-  gcc_jit_struct *f_reloc_struct =
-    gcc_jit_context_new_struct_type (comp.ctxt,
-				     NULL,
-				     "freloc_link_table",
-				     n_frelocs, fields);
-  comp.func_relocs_ptr_type =
-    gcc_jit_type_get_pointer (
-      gcc_jit_struct_as_type (f_reloc_struct));
+  gcc_jit_struct *f_reloc_struct = gcc_jit_context_new_struct_type
+    (comp.ctxt,
+     NULL,
+     "freloc_link_table",
+     n_frelocs, fields);
 
-  comp.func_relocs =
-    gcc_jit_context_new_global (comp.ctxt,
-				NULL,
-				GCC_JIT_GLOBAL_EXPORTED,
-				comp.func_relocs_ptr_type,
-				FUNC_LINK_TABLE_SYM);
+  comp.func_relocs_ptr_type = gcc_jit_type_get_pointer
+    (gcc_jit_struct_as_type (f_reloc_struct));
 
+  comp.func_relocs = gcc_jit_context_new_global
+    (comp.ctxt,
+     NULL,
+     GCC_JIT_GLOBAL_EXPORTED,
+     comp.func_relocs_ptr_type,
+     FUNC_LINK_TABLE_SYM);
   xfree (fields);
 }
 
-
 /****************************************************************/
 /* Inline function definition and lisp data structure follows.  */
 /****************************************************************/
@@ -3962,22 +3955,22 @@ declare_lex_function (Lisp_Object func)
     }
   else
     {
-      gcc_jit_param *params[] =
-	{ gcc_jit_context_new_param (comp.ctxt,
-				     NULL,
-				     comp.ptrdiff_type,
-				     "nargs"),
-	  gcc_jit_context_new_param (comp.ctxt,
-				     NULL,
-				     comp.lisp_obj_ptr_type,
-				     "args") };
-      res =
-	gcc_jit_context_new_function (comp.ctxt,
-				      NULL,
-				      GCC_JIT_FUNCTION_EXPORTED,
-				      comp.lisp_obj_type,
-				      SSDATA (c_name),
-				      ARRAYELTS (params), params, 0);
+      gcc_jit_param *params[] = {
+	gcc_jit_context_new_param (comp.ctxt,
+				   NULL,
+				   comp.ptrdiff_type,
+				   "nargs"),
+	gcc_jit_context_new_param (comp.ctxt,
+				   NULL,
+				   comp.lisp_obj_ptr_type,
+				   "args")
+      };
+      res = gcc_jit_context_new_function (comp.ctxt,
+					  NULL,
+					  GCC_JIT_FUNCTION_EXPORTED,
+					  comp.lisp_obj_type,
+					  SSDATA (c_name),
+					  ARRAYELTS (params), params, 0);
     }
   SAFE_FREE ();
   return res;
@@ -4079,7 +4072,6 @@ compile_function (Lisp_Object func)
 				comp.func_relocs_local,
 				gcc_jit_lvalue_as_rvalue (comp.func_relocs));
 
-
   DOHASH_SAFE (ht, i)
     {
       Lisp_Object block_name = HASH_KEY (ht, i);
@@ -4097,6 +4089,7 @@ compile_function (Lisp_Object func)
 	  insns = XCDR (insns);
 	}
     }
+
   const char *err =  gcc_jit_context_get_first_error (comp.ctxt);
   if (err)
     xsignal3 (Qnative_ice,
@@ -4106,7 +4099,7 @@ compile_function (Lisp_Object func)
   SAFE_FREE ();
 }
 
-
+
 /**********************************/
 /* Entry points exposed to lisp.  */
 /**********************************/
@@ -4121,11 +4114,9 @@ DEFUN ("comp--install-trampoline", Fcomp__install_trampoline,
   Lisp_Object orig_subr = Fsymbol_function (subr_name);
   CHECK_SUBR (orig_subr);
 
-  /* FIXME: add a post dump load trampoline machinery to remove this
-     check.  */
+  // don't need to use tramps while native compiling
   if (will_dump_p ())
-    signal_error ("Trying to advice unexpected primitive before dumping",
-		  subr_name);
+    signal_error ("Trying to advice during pdump", subr_name);
 
   Lisp_Object subr_l = Vcomp_subr_list;
   ptrdiff_t i = ARRAYELTS (helper_link_table);
@@ -4138,11 +4129,10 @@ DEFUN ("comp--install-trampoline", Fcomp__install_trampoline,
 	  Fputhash (subr_name, trampoline, Vcomp_installed_trampolines_h);
 	  return Qt;
 	}
-      i++;
+      ++i;
     }
-    signal_error ("Trying to install trampoline for non existent subr",
-		  subr_name);
-    return Qnil;
+  signal_error ("Trying to advice unknown subr", subr_name);
+  return Qnil;
 }
 
 DEFUN ("comp--init-ctxt", Fcomp__init_ctxt, Scomp__init_ctxt,
@@ -4486,8 +4476,7 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
 #if defined (LIBGCCJIT_HAVE_gcc_jit_context_add_driver_option)	\
   && defined (DARWIN_OS)
   gcc_jit_context_add_driver_option (comp.ctxt, "-install_name");
-  gcc_jit_context_add_driver_option (
-         comp.ctxt, SSDATA (Ffile_name_nondirectory (filename)));
+  gcc_jit_context_add_driver_option (comp.ctxt, SSDATA (Ffile_name_nondirectory (filename)));
 #endif
 
   comp.d_default_idx =
@@ -4577,7 +4566,7 @@ unknown (before GCC version 10).  */)
 }
 #pragma GCC diagnostic pop
 
-
+
 /******************************************************************************/
 /* Helper functions called from the run-time.				      */
 /* Note: this are all potentially definable directly to gcc and are here just */
@@ -4622,7 +4611,7 @@ register_native_comp_unit (Lisp_Object comp_u)
     XNATIVE_COMP_UNIT (comp_u)->file, comp_u, Vcomp_loaded_comp_units_h);
 }
 
-
+
 /**************************************/
 /* Functions used to load eln files.  */
 /**************************************/
@@ -5010,7 +4999,6 @@ DEFUN ("native-comp-available-p", Fnative_comp_available_p,
 #endif
 }
 
-
 void
 syms_of_comp (void)
 {

@@ -4653,12 +4653,9 @@ REGEXP-GROUP is the regular expression group in REGEXP to use.
 
 (put 'no-native-compile 'safe-local-variable 'booleanp)
 (autoload 'comp-c-func-name "comp" "\
-Given NAME, return a name suitable for the native code.
-Add PREFIX in front of it.  If FIRST is not nil, pick the first
-available name ignoring compilation context and potential name
-clashes.
+Return string suitable for gcc_jit_context_new_function.
 
-(fn NAME PREFIX &optional FIRST)")
+(fn SYM)")
 (autoload 'comp-trampoline-search "comp" "\
 Return trampoline file for SUBR-NAME.
 
@@ -4918,6 +4915,8 @@ evaluate `compilation-shell-minor-mode'.
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
 
+\\{compilation-shell-minor-mode-map}
+
 (fn &optional ARG)" t)
 (autoload 'compilation-minor-mode "compile" "\
 Toggle Compilation minor mode.
@@ -4939,6 +4938,8 @@ evaluate `compilation-minor-mode'.
 
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
+
+\\{compilation-minor-mode-map}
 
 (fn &optional ARG)" t)
 (autoload 'compilation-next-error-function "compile" "\

@@ -115,7 +115,7 @@
 ;; Two poorly named files defining autoloaded functions.
 (if pdumper--pure-pool
     (load "loaddefs")
-  (load "ldefs-boot.el"))
+  (load "ldefs-boot"))
 
 (let ((new (make-hash-table :test #'equal)))
   ;; Now that loaddefs has populated definition-prefixes, purify its contents.
@@ -345,7 +345,7 @@
     (message "Warning: load-path change from site-init has no effect")))
 
 (when (featurep 'native-compile)
-  ;; Trampoline compilation without byte-compiled bytecomp.elc
+  ;; Trampoline compilation without byte-compiled comp.elc
   ;; (equivalently, a null pdumper--pure-pool) incurs dreaded eager
   ;; macroexpansion cycles (more bootstrap fake-it-til-you-make-it).
   (setq native-comp-disable-subr-trampolines (null pdumper--pure-pool)))

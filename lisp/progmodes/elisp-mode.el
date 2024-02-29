@@ -2187,7 +2187,6 @@ current buffer state and calls REPORT-FN when done."
         :command `(,(expand-file-name invocation-name invocation-directory)
                    "-Q"
                    "--batch"
-                   ;; "--eval" "(setq load-prefer-newer t)" ; for testing
                    ,@(mapcan (lambda (path) (list "-L" path))
                              elisp-flymake-byte-compile-load-path)
                    "-f" "elisp-flymake--batch-compile-for-flymake"
