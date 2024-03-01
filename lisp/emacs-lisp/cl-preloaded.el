@@ -87,22 +87,6 @@ Each element has the form (TYPE . SUPERTYPES) where TYPE is one of
 the symbols returned by `type-of', and SUPERTYPES is the list of its
 supertypes from the most specific to least specific.")
 
-(defun cl--supertypes-for-typeof-types (type)
-  (cl-loop with agenda = (list type)
-           while agenda
-           for element = (car agenda)
-           unless (or (eq element t) ;; no t in `cl--typeof-types'.
-                      (memq element res))
-             append (list element) into res
-           do (cl-loop for c in (gethash element cl--direct-supertypes-of-type)
-                       do (setq agenda (append agenda (list c))))
-           do (setq agenda (cdr agenda))
-           finally (cl-return res)))
-
-(maphash (lambda (type _)
-           (push (cl--supertypes-for-typeof-types type) cl--typeof-types))
-         cl--direct-supertypes-of-type)
-
 (defconst cl--all-builtin-types
   (delete-dups (copy-sequence (apply #'append cl--typeof-types))))
 
