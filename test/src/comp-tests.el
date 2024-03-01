@@ -1028,7 +1028,7 @@ Return a list of results."
          (if (= x y)
              x
            'foo))
-       '(or (member foo) number-or-marker))
+       '(or (member foo) number-or-marker integer-or-marker))
 
       ;; 14
       ((defun comp-tests-ret-type-spec-f (x)
@@ -1168,7 +1168,7 @@ Return a list of results."
       ((defun comp-tests-ret-type-spec-f (x)
 	 (when (> x 1.0)
 	   x))
-       '(or null number-or-marker))
+       '(or null number-or-marker integer-or-marker))
 
       ;; 36
       ((defun comp-tests-ret-type-spec-f (x y)
