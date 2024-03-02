@@ -989,7 +989,8 @@ If NO-DECODE is non-nil, don't decode STRING."
     (".jpe"   . "image/jpeg")
     (".jpeg"  . "image/jpeg")
     (".webp"  . "image/webp")
-    (".org"   . "text/x-org"))
+    ;; May be overridden by application/vnd.lotus-organizer in /etc/mime.types.
+    (".org"   . "text/org"))
   "An alist of file extensions and corresponding MIME content-types.
 This exists for you to customize the information in Lisp.  It is
 merged with values from mailcap files by `mailcap-parse-mimetypes'.")
