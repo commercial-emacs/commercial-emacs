@@ -445,16 +445,12 @@ Returns the list of articles removed."
    (file-name-as-directory
     (expand-file-name
      (nnheader-translate-file-chars
-      (if (gnus-use-long-file-name 'not-cache)
-	  group
-	(let ((group (nnheader-replace-duplicate-chars-in-string
-		      (nnheader-replace-chars-in-string group ?/ ?_)
-		      ?. ?_)))
-	  ;; Translate the first colon into a slash.
-	  (when (string-match ":" group)
-		  (setq group (concat (substring group 0 (match-beginning 0))
-				      "/" (substring group (match-end 0)))))
-	  (nnheader-replace-chars-in-string group ?. ?/)))
+      (let ((group (nnheader-replace-duplicate-chars-in-string
+		    (nnheader-replace-chars-in-string group ?/ ?_)
+		    ?. ?_)))
+	(if (not nnmail-use-long-file-names)
+            (nnheader-replace-chars-in-string group ?. ?/)
+	  group))
       t)
      gnus-cache-directory))))
 
