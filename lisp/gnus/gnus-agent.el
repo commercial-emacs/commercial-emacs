@@ -2919,8 +2919,9 @@ The following commands are available:
    ;; Functions are just returned as is.
    ((or (symbolp predicate)
 	(functionp predicate))
-    `(,(or (cdr (assq predicate gnus-category-predicate-alist))
-	   predicate)))
+    (let ((fun (or (cdr (assq predicate gnus-category-predicate-alist))
+	           predicate)))
+      (if (symbolp fun) `(,fun) `(funcall ',fun))))
    ;; More complex predicate.
    ((consp predicate)
     `(,(cond
