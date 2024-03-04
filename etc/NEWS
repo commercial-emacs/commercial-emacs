@@ -1451,6 +1451,34 @@ The first is like Emacs-29's 'major-mode-remap-alist' but to be set by
 packages (instead of users).  The second looks up those two variables.
 
 +++
+** Pcase's functions (in 'pred' and 'app') can specify the argument position.
+For example, instead of '(pred (< 5))' you can write '(pred (> _ 5))'.
+
++++
+** 'define-advice' now sets the new advice's 'name' property to NAME.
+Named advices defined with 'define-advice' can now be removed with
+'(advice-remove SYMBOL NAME)' in addition to '(advice-remove SYMBOL
+SYMBOL@NAME)'.
+
++++
+** New function 'require-with-check' to detect new versions shadowing.
+This is like 'require', but it checks whether the argument 'feature'
+is already loaded, in which case it either signals an error or
+forcibly reloads the file that defines the feature.
+
++++
+** New variable 'lisp-eval-depth-reserve'.
+It puts a limit to the amount by which Emacs can temporarily increase
+'max-lisp-eval-depth' when handling signals.
+
++++
+** New special form 'handler-bind'.
+It provides a functionality similar to 'condition-case' except it runs
+the handler code without unwinding the stack, such that we can record
+the backtrace and other dynamic state at the point of the error.  See
+the Info node "(elisp) Handling Errors".
+
++++
 ** New 'pop-up-frames' action alist entry for 'display-buffer'.
 This has the same effect as the variable of the same name and takes
 precedence over the variable when present.
