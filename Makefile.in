@@ -649,6 +649,7 @@ install-info: info
 	      done; \
 	     (cd "$${thisdir}"; \
 	      ${INSTALL_INFO} --info-dir="$(DESTDIR)${infodir}" "$(DESTDIR)${infodir}/$$elt"); \
+	      cp type_hierarchy* $(DESTDIR)${infodir}/; \ # Used by elisp.info.
 	   done; \
 	fi
 
@@ -791,6 +792,7 @@ uninstall: uninstall-$(NTDIR) uninstall-doc uninstall-gsettings-schemas
 	        ext=.gz; else ext=; fi; \
 	     rm -f $$elt$$ext $$elt-[1-9]$$ext $$elt-[1-9][0-9]$$ext; \
 	   done; \
+	   rm -f type_hierarchy.jpg type_hierarchy.txt; \
 	 fi)
 	(if [ -n "${GZIP_PROG}" ]; then \
 	    ext=.gz; else ext=; fi; \
