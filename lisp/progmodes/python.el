@@ -274,9 +274,9 @@
 (autoload 'help-function-arglist "help-fns")
 
 ;;;###autoload
-(add-to-list 'auto-mode-alist (cons (purecopy-maybe "\\.py[iw]?\\'") 'python-mode))
+(add-to-list 'auto-mode-alist (cons (purify-if-dumping "\\.py[iw]?\\'") 'python-mode))
 ;;;###autoload
-(add-to-list 'interpreter-mode-alist (cons (purecopy-maybe "python[0-9.]*") 'python-mode))
+(add-to-list 'interpreter-mode-alist (cons (purify-if-dumping "python[0-9.]*") 'python-mode))
 
 (defgroup python nil
   "Python Language's flying circus support for Emacs."

@@ -638,7 +638,7 @@ Some context functions add menu items below the separator."
   menu)
 
 (defvar context-menu-entry
-  `(menu-item ,(purecopy-maybe "Context Menu") ,(make-sparse-keymap)
+  `(menu-item ,(purify-if-dumping "Context Menu") ,(make-sparse-keymap)
               :filter ,(lambda (_) (context-menu-map)))
   "Menu item that creates the context menu and can be bound to a mouse key.")
 
@@ -2650,7 +2650,7 @@ a large number if you prefer a mixed multitude.  The default is 4."
   :version "20.3")
 
 (defvar mouse-buffer-menu-mode-groups
-  (mapcar (lambda (arg) (cons  (purecopy-maybe (car arg)) (purecopy-maybe (cdr arg))))
+  (mapcar (lambda (arg) (cons  (purify-if-dumping (car arg)) (purify-if-dumping (cdr arg))))
   '(("Info\\|Help\\|Apropos\\|Man" . "Help")
     ("\\bVM\\b\\|\\bMH\\b\\|Message\\b\\|Mail\\|Group\\|Score\\|Summary\\|Article"
      . "Mail/News")
@@ -2827,11 +2827,11 @@ and selects that window."
 
 (defvar x-fixed-font-alist
   (list
-   (purecopy-maybe "Font Menu")
+   (purify-if-dumping "Font Menu")
    (cons
-    (purecopy-maybe "Misc")
+    (purify-if-dumping "Misc")
     (mapcar
-     (lambda (arg) (cons  (purecopy-maybe (car arg)) (purecopy-maybe (cdr arg))))
+     (lambda (arg) (cons  (purify-if-dumping (car arg)) (purify-if-dumping (cdr arg))))
      ;; For these, we specify the pixel height and width.
     '(("fixed" "fixed")
      ("6x10" "-misc-fixed-medium-r-normal--10-*-*-*-c-60-iso8859-1" "6x10")
@@ -2873,9 +2873,9 @@ and selects that window."
      )))
 
    (cons
-    (purecopy-maybe "Courier")
+    (purify-if-dumping "Courier")
     (mapcar
-     (lambda (arg) (cons  (purecopy-maybe (car arg)) (purecopy-maybe (cdr arg))))
+     (lambda (arg) (cons  (purify-if-dumping (car arg)) (purify-if-dumping (cdr arg))))
      ;; For these, we specify the point height.
      '(("8" "-adobe-courier-medium-r-normal--*-80-*-*-m-*-iso8859-1")
      ("10" "-adobe-courier-medium-r-normal--*-100-*-*-m-*-iso8859-1")
@@ -3627,7 +3627,7 @@ is copied instead of being cut."
     (global-set-key [S-down-mouse-1] #'mouse-appearance-menu))
 ;; C-down-mouse-2 is bound in facemenu.el.
 (global-set-key [C-down-mouse-3]
-  `(menu-item ,(purecopy-maybe "Menu Bar") ignore
+  `(menu-item ,(purify-if-dumping "Menu Bar") ignore
     :filter ,(lambda (_)
                (if (zerop (or (frame-parameter nil 'menu-bar-lines) 0))
                    (mouse-menu-bar-map)

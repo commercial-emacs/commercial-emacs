@@ -220,7 +220,7 @@ No problems result if this variable is not bound.
        (with-no-warnings (defvar ,map (make-sparse-keymap)))
        (unless (get ',map 'variable-documentation)
 	 (put ',map 'variable-documentation
-	      (purecopy-maybe ,(format "Keymap for `%s'." child))))
+	      (purify-if-dumping ,(format "Keymap for `%s'." child))))
        ,(if declare-syntax
 	    `(progn
                (defvar ,syntax)
@@ -229,7 +229,7 @@ No problems result if this variable is not bound.
 		 (defvar ,syntax (make-syntax-table)))
 	       (unless (get ',syntax 'variable-documentation)
 		 (put ',syntax 'variable-documentation
-		      (purecopy-maybe ,(format "Syntax table for `%s'." child))))))
+		      (purify-if-dumping ,(format "Syntax table for `%s'." child))))))
        ,(if declare-abbrev
 	    `(progn
                (defvar ,abbrev)
@@ -239,7 +239,7 @@ No problems result if this variable is not bound.
 		   (progn (define-abbrev-table ',abbrev nil) ,abbrev)))
 	       (unless (get ',abbrev 'variable-documentation)
 		 (put ',abbrev 'variable-documentation
-		      (purecopy-maybe ,(format "Abbrev table for `%s'." child))))))
+		      (purify-if-dumping ,(format "Abbrev table for `%s'." child))))))
        (if (fboundp 'derived-mode-set-parent) ;; Emacs≥30.1
            (derived-mode-set-parent ',child ',parent)
          (put ',child 'derived-mode-parent ',parent))

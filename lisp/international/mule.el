@@ -265,7 +265,7 @@ attribute."
 	  (aset emacs-mule-charset-table emacs-mule-id name)))
 
     (dolist (slot attrs)
-      (setcdr slot (purecopy-maybe (plist-get props (car slot)))))
+      (setcdr slot (purify-if-dumping (plist-get props (car slot)))))
 
     ;; Make sure that the value of :code-space is a vector of 8
     ;; elements.
@@ -278,7 +278,7 @@ attribute."
 
     ;; Add :name and :docstring properties to PROPS.
     (setq props
-	  (cons :name (cons name (cons :docstring (cons (purecopy-maybe docstring) props)))))
+	  (cons :name (cons name (cons :docstring (cons (purify-if-dumping docstring) props)))))
     (or (plist-get props :short-name)
 	(plist-put props :short-name (symbol-name name)))
     (or (plist-get props :long-name)
@@ -288,7 +288,7 @@ attribute."
     (setq props
 	  (mapcar (lambda (elt)
 		    (if (stringp elt)
-			(purecopy-maybe elt)
+			(purify-if-dumping elt)
 		      elt))
 		  props))
     (setcdr (assq :plist attrs) props)
@@ -431,7 +431,7 @@ It can be retrieved with `(get-charset-property CHARSET PROPNAME)'."
   (set-charset-plist charset
 		     (plist-put (charset-plist charset) propname
 				(if (stringp value)
-				    (purecopy-maybe value)
+				    (purify-if-dumping value)
 				  value))))
 
 (defun charset-description (charset)
@@ -973,7 +973,7 @@ non-ASCII files.  This attribute is meaningful only when
 
     ;; Add :name and :docstring properties to PROPS.
     (setq props
-	  (cons :name (cons name (cons :docstring (cons (purecopy-maybe docstring)
+	  (cons :name (cons name (cons :docstring (cons (purify-if-dumping docstring)
 							props)))))
     (setcdr (assq :plist common-attrs) props)
     (apply #'define-coding-system-internal
@@ -1557,7 +1557,7 @@ Each element must be one of the names listed in the variable
 `ctext-non-standard-encodings-alist' (which see).")
 
 (defvar ctext-non-standard-encodings-regexp
-  (purecopy-maybe
+  (purify-if-dumping
   (string-to-multibyte
    (concat
     ;; For non-standard encodings.
@@ -1735,7 +1735,7 @@ in-place."
 (defcustom auto-coding-alist
   ;; .exe and .EXE are added to support archive-mode looking at DOS
   ;; self-extracting exe archives.
-  (mapcar (lambda (arg) (cons (purecopy-maybe (car arg)) (cdr arg)))
+  (mapcar (lambda (arg) (cons (purify-if-dumping (car arg)) (cdr arg)))
 	  '(("\\.\\(\
 arc\\|zip\\|lzh\\|lha\\|zoo\\|[jew]ar\\|xpi\\|rar\\|7z\\|squashfs\\|\
 ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\|7Z\\|SQUASHFS\\)\\'"
@@ -1760,7 +1760,7 @@ and the contents of `file-coding-system-alist'."
 		       (symbol :tag "Coding system"))))
 
 (defcustom auto-coding-regexp-alist
-  (mapcar (lambda (arg) (cons (purecopy-maybe (car arg)) (cdr arg)))
+  (mapcar (lambda (arg) (cons (purify-if-dumping (car arg)) (cdr arg)))
   '(("\\`BABYL OPTIONS:[ \t]*-\\*-[ \t]*rmail[ \t]*-\\*-" . no-conversion)
     ("\\`\xFE\xFF" . utf-16be-with-signature)
     ("\\`\xFF\xFE" . utf-16le-with-signature)

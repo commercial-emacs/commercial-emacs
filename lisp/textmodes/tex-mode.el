@@ -64,7 +64,7 @@
   :group 'tex-run)
 
 ;;;###autoload
-(defcustom tex-directory (purecopy-maybe ".")
+(defcustom tex-directory (purify-if-dumping ".")
   "Directory in which temporary files are written.
 You can make this `/tmp' if your TEXINPUTS has no relative directories in it
 and you don't try to apply \\[tex-region] or \\[tex-buffer] when there are
@@ -98,7 +98,7 @@ if the variable is non-nil."
   :group 'tex-file)
 
 ;;;###autoload
-(defcustom tex-run-command (purecopy-maybe "tex")
+(defcustom tex-run-command (purify-if-dumping "tex")
   "Command used to run TeX subjob.
 TeX Mode sets `tex-command' to this string.
 See the documentation of that variable."
@@ -106,7 +106,7 @@ See the documentation of that variable."
   :group 'tex-run)
 
 ;;;###autoload
-(defcustom latex-run-command (purecopy-maybe "latex")
+(defcustom latex-run-command (purify-if-dumping "latex")
   "Command used to run LaTeX subjob.
 LaTeX Mode sets `tex-command' to this string.
 See the documentation of that variable."
@@ -114,7 +114,7 @@ See the documentation of that variable."
   :group 'tex-run)
 
 ;;;###autoload
-(defcustom slitex-run-command (purecopy-maybe "slitex")
+(defcustom slitex-run-command (purify-if-dumping "slitex")
   "Command used to run SliTeX subjob.
 SliTeX Mode sets `tex-command' to this string.
 See the documentation of that variable."
@@ -122,7 +122,7 @@ See the documentation of that variable."
   :group 'tex-run)
 
 ;;;###autoload
-(defcustom tex-start-options (purecopy-maybe "")
+(defcustom tex-start-options (purify-if-dumping "")
   "TeX options to use when starting TeX.
 These immediately precede the commands in `tex-start-commands'
 and the input file name, with no separating space and are not shell-quoted.
@@ -132,7 +132,7 @@ If nil, TeX runs with no options.  See the documentation of `tex-command'."
   :version "22.1")
 
 ;;;###autoload
-(defcustom tex-start-commands (purecopy-maybe "\\nonstopmode\\input")
+(defcustom tex-start-commands (purify-if-dumping "\\nonstopmode\\input")
   "TeX commands to use when starting TeX.
 They are shell-quoted and precede the input file name, with a separating space.
 If nil, no commands are used.  See the documentation of `tex-command'."
@@ -163,7 +163,7 @@ Combined with `latex-standard-block-names' for minibuffer completion."
   :group 'tex-run)
 
 ;;;###autoload
-(defcustom tex-bibtex-command (purecopy-maybe "bibtex")
+(defcustom tex-bibtex-command (purify-if-dumping "bibtex")
   "Command used by `tex-bibtex-file' to gather bibliographic data.
 If this string contains an asterisk (`*'), that is replaced by the file name;
 otherwise, the file name, preceded by blank, is added at the end."
@@ -171,7 +171,7 @@ otherwise, the file name, preceded by blank, is added at the end."
   :group 'tex-run)
 
 ;;;###autoload
-(defcustom tex-dvi-print-command (purecopy-maybe "lpr -d")
+(defcustom tex-dvi-print-command (purify-if-dumping "lpr -d")
   "Command used by \\[tex-print] to print a .dvi file.
 If this string contains an asterisk (`*'), that is replaced by the file name;
 otherwise, the file name, preceded by blank, is added at the end."
@@ -179,7 +179,7 @@ otherwise, the file name, preceded by blank, is added at the end."
   :group 'tex-view)
 
 ;;;###autoload
-(defcustom tex-alt-dvi-print-command (purecopy-maybe "lpr -d")
+(defcustom tex-alt-dvi-print-command (purify-if-dumping "lpr -d")
   "Command used by \\[tex-print] with a prefix arg to print a .dvi file.
 If this string contains an asterisk (`*'), that is replaced by the file name;
 otherwise, the file name, preceded by blank, is added at the end.
@@ -200,9 +200,9 @@ use."
 ;;;###autoload
 (defcustom tex-dvi-view-command
   `(cond
-    ((eq window-system 'x) ,(purecopy-maybe "xdvi"))
-    ((eq window-system 'w32) ,(purecopy-maybe "yap"))
-    (t ,(purecopy-maybe "dvi2tty * | cat -s")))
+    ((eq window-system 'x) ,(purify-if-dumping "xdvi"))
+    ((eq window-system 'w32) ,(purify-if-dumping "yap"))
+    (t ,(purify-if-dumping "dvi2tty * | cat -s")))
   "Command used by \\[tex-view] to display a `.dvi' file.
 If it is a string, that specifies the command directly.
 If this string contains an asterisk (`*'), that is replaced by the file name;
@@ -213,7 +213,7 @@ If the value is a form, it is evaluated to get the command to use."
   :group 'tex-view)
 
 ;;;###autoload
-(defcustom tex-show-queue-command (purecopy-maybe "lpq")
+(defcustom tex-show-queue-command (purify-if-dumping "lpq")
   "Command used by \\[tex-show-print-queue] to show the print queue.
 Should show the queue(s) that \\[tex-print] puts jobs on."
   :type 'string
@@ -229,14 +229,14 @@ Normally set to either `plain-tex-mode' or `latex-mode'."
   :group 'tex)
 
 ;;;###autoload
-(defcustom tex-open-quote (purecopy-maybe "``")
+(defcustom tex-open-quote (purify-if-dumping "``")
   "String inserted by typing \\[tex-insert-quote] to open a quotation."
   :type 'string
   :options '("``" "\"<" "\"`" "<<" "«")
   :group 'tex)
 
 ;;;###autoload
-(defcustom tex-close-quote (purecopy-maybe "''")
+(defcustom tex-close-quote (purify-if-dumping "''")
   "String inserted by typing \\[tex-insert-quote] to close a quotation."
   :type 'string
   :options '("''" "\">" "\"'" ">>" "»")

@@ -187,7 +187,7 @@ EVENT is a `preedit-text' event."
 
 (defcustom x-gtk-stock-map
   (mapcar (lambda (arg)
-	    (cons (purecopy-maybe (car arg)) (purecopy-maybe (cdr arg))))
+	    (cons (purify-if-dumping (car arg)) (purify-if-dumping (cdr arg))))
   '(
     ("etc/images/new" . ("document-new" "gtk-new"))
     ("etc/images/open" . ("document-open" "gtk-open"))

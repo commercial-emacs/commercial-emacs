@@ -441,7 +441,7 @@ don't include."
                                        (file-name-sans-extension
                                         (file-name-nondirectory file)))))
             (push (list (or local-outfile main-outfile) file
-                        `(push (purecopy-maybe ',(cons (intern package) version))
+                        `(push (purify-if-dumping ',(cons (intern package) version))
                                package--builtin-versions))
                   defs))))
 

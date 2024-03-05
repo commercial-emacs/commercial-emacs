@@ -355,7 +355,7 @@ looked for.
 Setting `init-file-user' does not prevent Emacs from loading
 `site-start.el'.  The only way to do that is to use `--no-site-file'.")
 
-(defcustom site-run-file (purecopy-maybe "site-start")
+(defcustom site-run-file (purify-if-dumping "site-start")
   "File containing site-wide run-time initializations.
 This file is loaded at run-time before `user-init-file'.  It contains
 inits that need to be in place for the entire site, but which, due to
@@ -430,7 +430,7 @@ from being initialized."
 (defvar pure-space-overflow nil
   "Non-nil if building Emacs overflowed pure space.")
 
-(defvar pure-space-overflow-message (purecopy-maybe "\
+(defvar pure-space-overflow-message (purify-if-dumping "\
 Warning Warning!!!  Pure space overflow    !!!Warning Warning
 \(See the node Pure Storage in the Lisp manual for details.)\n"))
 
@@ -1648,7 +1648,7 @@ Changed settings will be marked as \"CHANGED outside of Customize\"."
 	   `((changed ((t :background ,color)))))
       (put 'cursor 'face-modified t))))
 
-(defcustom initial-scratch-message (purecopy-maybe "\
+(defcustom initial-scratch-message (purify-if-dumping "\
 ;; This buffer is for text that is not saved, and for Lisp evaluation.
 ;; To create a file, visit it with `\\[find-file]' and enter text in its buffer.
 

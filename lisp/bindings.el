@@ -67,7 +67,7 @@ corresponding to the mode line clicked."
 	(interactive "e")
 	(with-selected-window (posn-window (event-start e))
 	  (describe-current-input-method))))
-    (purecopy-maybe map)))
+    (purify-if-dumping map)))
 
 (defvar mode-line-coding-system-map
   (let ((map (make-sparse-keymap)))
@@ -83,7 +83,7 @@ corresponding to the mode line clicked."
 	(interactive "e")
 	(with-selected-window (posn-window (event-start e))
 	  (call-interactively 'set-buffer-file-coding-system))))
-    (purecopy-maybe map))
+    (purify-if-dumping map))
   "Local keymap for the coding-system part of the mode line.")
 
 (defun mode-line-change-eol (event)
@@ -203,9 +203,9 @@ mouse-3: Set coding system"
     (current-input-method
      (:propertize ("" current-input-method-title)
 		  help-echo (concat
-			     ,(purecopy-maybe "Current input method: ")
+			     ,(purify-if-dumping "Current input method: ")
 			     current-input-method
-			     ,(purecopy-maybe "\n\
+			     ,(purify-if-dumping "\n\
 mouse-2: Disable input method\n\
 mouse-3: Describe current input method"))
 		  local-map ,mode-line-input-method-map
@@ -228,7 +228,7 @@ mnemonics of the following coding systems:
 (defvar mode-line-client
   `(:eval
     (if (frame-parameter nil 'client)
-	,(propertize "@" 'help-echo (purecopy-maybe "emacsclient frame"))))
+	,(propertize "@" 'help-echo (purify-if-dumping "emacsclient frame"))))
   "Mode line construct for identifying emacsclient frames.")
 ;; Autoload if this file no longer dumped.
 ;;;###autoload
@@ -250,14 +250,14 @@ mnemonics of the following coding systems:
   (list (propertize
 	 "%1*"
 	 'help-echo 'mode-line-read-only-help-echo
-	 'local-map (purecopy-maybe (make-mode-line-mouse-map
+	 'local-map (purify-if-dumping (make-mode-line-mouse-map
 			       'mouse-1
 			       #'mode-line-toggle-read-only))
 	 'mouse-face 'mode-line-highlight)
 	(propertize
 	 "%1+"
 	 'help-echo 'mode-line-modified-help-echo
-	 'local-map (purecopy-maybe (make-mode-line-mouse-map
+	 'local-map (purify-if-dumping (make-mode-line-mouse-map
 			       'mouse-1 #'mode-line-toggle-modified))
 	 'mouse-face 'mode-line-highlight))
   "Mode line construct for displaying whether current buffer is modified.")
@@ -268,7 +268,7 @@ mnemonics of the following coding systems:
   (list (propertize
 	 "%1@"
 	 'mouse-face 'mode-line-highlight
-	 'help-echo (purecopy-maybe (lambda (window _object _point)
+	 'help-echo (purify-if-dumping (lambda (window _object _point)
  				(format "%s"
 					(with-selected-window window
 					  (if (stringp default-directory)
@@ -301,7 +301,7 @@ Value is used for `mode-line-frame-identification', which see."
 (defvar mode-line-window-dedicated-keymap
   (let ((map (make-sparse-keymap)))
     (define-key map [mode-line mouse-1] #'toggle-window-dedicated)
-    (purecopy-maybe map)) "\
+    (purify-if-dumping map)) "\
 Keymap for what is displayed by `mode-line-window-dedicated'.")
 
 (defun mode-line-window-control ()
@@ -414,13 +414,13 @@ of the menu's data."
      ((keymapp item) item)
      ((stringp (car item))
       (if (keymapp (cdr item))
-          (cons (purecopy-maybe (car item)) (cdr item))
-        (purecopy-maybe item)))
+          (cons (purify-if-dumping (car item)) (cdr item))
+        (purify-if-dumping item)))
      ((eq 'menu-item (car item))
       (if (keymapp (nth 2 item))
-          `(menu-item ,(purecopy-maybe (nth 1 item)) ,(nth 2 item)
-                      ,@(purecopy-maybe (nthcdr 3 item)))
-        (purecopy-maybe item)))
+          `(menu-item ,(purify-if-dumping (nth 1 item)) ,(nth 2 item)
+                      ,@(purify-if-dumping (nthcdr 3 item)))
+        (purify-if-dumping item)))
      (t (message "non-menu-item: %S" item) item))))
 
 (defvar mode-line-mode-menu (make-sparse-keymap "Minor Modes") "\
@@ -671,7 +671,7 @@ text properties for face, help-echo, and local-map to it."
   (list (propertize fmt
 		    'face 'mode-line-buffer-id
 		    'help-echo
-		    (purecopy-maybe "Buffer name
+		    (purify-if-dumping "Buffer name
 mouse-1: Previous buffer\nmouse-3: Next buffer")
 		    'mouse-face 'mode-line-highlight
 		    'local-map mode-line-buffer-identification-keymap)))

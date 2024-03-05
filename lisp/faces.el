@@ -25,7 +25,7 @@
 
 ;;; Code:
 
-(defcustom term-file-prefix (purecopy-maybe "term/")
+(defcustom term-file-prefix (purify-if-dumping "term/")
   "If non-nil, Emacs startup performs terminal-specific initialization.
 It does this by: (load (concat term-file-prefix (getenv \"TERM\")))
 
@@ -355,7 +355,7 @@ is either `foreground-color', `background-color', or a keyword."
    (lambda (arg)
      ;; FIXME; can we purecopy some of the conses too?
      (cons (car arg)
-	   (cons (purecopy-maybe (car (cdr arg))) (purecopy-maybe (cdr (cdr arg))))))
+	   (cons (purify-if-dumping (car (cdr arg))) (purify-if-dumping (cdr (cdr arg))))))
   '((:family (".attributeFamily" . "Face.AttributeFamily"))
     (:foundry (".attributeFoundry" . "Face.AttributeFoundry"))
     (:width (".attributeWidth" . "Face.AttributeWidth"))
@@ -661,7 +661,7 @@ If FACE is a face-alias, get the documentation for the target face."
 (defun set-face-documentation (face string)
   "Set the documentation string for FACE to STRING."
   ;; Perhaps the text should go in DOC.
-  (put face 'face-documentation (purecopy-maybe string)))
+  (put face 'face-documentation (purify-if-dumping string)))
 
 
 (define-obsolete-function-alias 'face-doc-string #'face-documentation "29.1")
@@ -860,7 +860,7 @@ setting `:weight' to `bold', and a value of t for `:italic' is
 equivalent to setting `:slant' to `italic'.  But if `:weight' is
 specified in the face spec, `:bold' is ignored, and if `:slant'
 is specified, `:italic' is ignored."
-  (setq args (purecopy-maybe args))
+  (setq args (purify-if-dumping args))
   (let ((where (if (null frame) 0 frame))
 	(spec args)
 	family foundry orig-family orig-foundry)
@@ -890,15 +890,15 @@ is specified, `:italic' is ignored."
           (setq family orig-family)
           (setq foundry orig-foundry)))
       (when (or (stringp family) (eq family 'unspecified))
-	(internal-set-lisp-face-attribute face :family (purecopy-maybe family)
+	(internal-set-lisp-face-attribute face :family (purify-if-dumping family)
 					  where))
       (when (or (stringp foundry) (eq foundry 'unspecified))
-	(internal-set-lisp-face-attribute face :foundry (purecopy-maybe foundry)
+	(internal-set-lisp-face-attribute face :foundry (purify-if-dumping foundry)
 					  where)))
     (while args
       (unless (memq (car args) '(:family :foundry))
 	(internal-set-lisp-face-attribute face (car args)
-					  (purecopy-maybe (cadr args))
+					  (purify-if-dumping (cadr args))
 					  where))
       (setq args (cddr args)))))
 
@@ -3164,16 +3164,16 @@ This face is used by `show-paren-mode'."
       (encoding		"[^-]+")
       )
   (setq x-font-regexp
-	(purecopy-maybe (concat "\\`\\*?[-?*]"
+	(purify-if-dumping (concat "\\`\\*?[-?*]"
 		foundry - family - weight\? - slant\? - swidth - adstyle -
 		pixelsize - pointsize - resx - resy - spacing - avgwidth -
 		registry - encoding "\\*?\\'"
 		)))
   (setq x-font-regexp-head
-	(purecopy-maybe (concat "\\`[-?*]" foundry - family - weight\? - slant\?
+	(purify-if-dumping (concat "\\`[-?*]" foundry - family - weight\? - slant\?
 		"\\([-*?]\\|\\'\\)")))
-  (setq x-font-regexp-slant (purecopy-maybe (concat - slant -)))
-  (setq x-font-regexp-weight (purecopy-maybe (concat - weight -)))
+  (setq x-font-regexp-slant (purify-if-dumping (concat - slant -)))
+  (setq x-font-regexp-weight (purify-if-dumping (concat - weight -)))
   nil)
 
 

@@ -103,7 +103,7 @@ If Emacs is not running under a window system,
   :version "22.1")
 
 (defcustom file-name-shadow-tty-properties
-  (purecopy-maybe '(before-string "{" after-string "} " field shadow))
+  (purify-if-dumping '(before-string "{" after-string "} " field shadow))
   "Properties given to the `shadowed' part of a filename in the minibuffer.
 Only used when `file-name-shadow-mode' is active and Emacs
 is not running under a window-system; if Emacs is running under a window

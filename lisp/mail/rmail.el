@@ -152,7 +152,7 @@ its character representation and its display representation.")
   :group 'rmail)
 
 ;;;###autoload
-(defcustom rmail-file-name (purecopy-maybe "~/RMAIL")
+(defcustom rmail-file-name (purify-if-dumping "~/RMAIL")
   "Name of user's primary mail file."
   :type 'string
   :group 'rmail
@@ -160,7 +160,7 @@ its character representation and its display representation.")
 
 ;;;###autoload
 (defcustom rmail-spool-directory
-  (purecopy-maybe
+  (purify-if-dumping
   (cond ((file-exists-p "/var/mail")
 	 ;; SVR4 and recent BSD are said to use this.
 	 ;; Rather than trying to know precisely which systems use it,
@@ -316,7 +316,7 @@ Setting this variable has an effect only before reading a mail."
 
 ;;;###autoload
 (defcustom rmail-ignored-headers
-  (purecopy-maybe
+  (purify-if-dumping
   (concat "^via:\\|^mail-from:\\|^origin:\\|^references:\\|^sender:"
 	  "\\|^status:\\|^received:\\|^x400-originator:\\|^x400-recipients:"
 	  "\\|^x400-received:\\|^x400-mts-identifier:\\|^x400-content-type:"
@@ -385,7 +385,7 @@ If nil, display all header fields except those matched by
   :version "29.1")
 
 ;;;###autoload
-(defcustom rmail-highlighted-headers (purecopy-maybe "^From:\\|^Subject:")
+(defcustom rmail-highlighted-headers (purify-if-dumping "^From:\\|^Subject:")
   "Regexp to match Header fields that Rmail should normally highlight.
 A value of nil means don't highlight.  Uses the face `rmail-highlight'."
   :type '(choice regexp (const :tag "None" nil))
@@ -436,12 +436,12 @@ the frame where you have the RMAIL buffer displayed."
   :group 'rmail-reply)
 
 ;;;###autoload
-(defcustom rmail-secondary-file-directory (purecopy-maybe "~/")
+(defcustom rmail-secondary-file-directory (purify-if-dumping "~/")
   "Directory for additional secondary Rmail files."
   :type 'directory
   :group 'rmail-files)
 ;;;###autoload
-(defcustom rmail-secondary-file-regexp (purecopy-maybe "\\.xmail\\'")
+(defcustom rmail-secondary-file-regexp (purify-if-dumping "\\.xmail\\'")
   "Regexp for which files are secondary Rmail files."
   :type 'regexp
   :group 'rmail-files)

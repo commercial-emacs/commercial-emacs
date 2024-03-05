@@ -56,7 +56,7 @@
   "CCL program to encode an Ethiopic code to code point of Ethiopic font.")
 
 (setq font-ccl-encoder-alist
-      (cons (cons (purecopy-maybe "ethiopic") ccl-encode-ethio-font) font-ccl-encoder-alist))
+      (cons (cons (purify-if-dumping "ethiopic") ccl-encode-ethio-font) font-ccl-encoder-alist))
 
 (set-language-info-alist
  "Ethiopic" '((setup-function . setup-ethiopic-environment-internal)

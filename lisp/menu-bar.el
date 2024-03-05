@@ -480,7 +480,7 @@
   (or (not (boundp 'xref-backend-functions))
       (eq (car xref-backend-functions) 'etags--xref-backend)))
 
-(defvar yank-menu (cons (purecopy-maybe "Select Yank") nil))
+(defvar yank-menu (cons (purify-if-dumping "Select Yank") nil))
 (fset 'yank-menu (cons 'keymap yank-menu))
 
 (defvar menu-bar-edit-menu
@@ -2184,7 +2184,7 @@ key, a click, or a menu-item"))
 (bindings--define-key global-map [menu-bar file]
   (cons "File" menu-bar-file-menu))
 (bindings--define-key global-map [menu-bar help-menu]
-  (cons (purecopy-maybe "Help") menu-bar-help-menu))
+  (cons (purify-if-dumping "Help") menu-bar-help-menu))
 
 (define-key global-map [menu-bar mouse-1] 'menu-bar-open-mouse)
 

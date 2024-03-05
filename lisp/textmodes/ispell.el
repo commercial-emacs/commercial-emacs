@@ -1428,66 +1428,66 @@ The variable `ispell-library-directory' defines their location."
   ;; Define commands in menu in opposite order you want them to appear.
   (let ((map (make-sparse-keymap "Spell")))
     (define-key map [ispell-change-dictionary]
-      `(menu-item ,(purecopy-maybe "Change Dictionary...") ispell-change-dictionary
-		  :help ,(purecopy-maybe "Supply explicit dictionary file name")))
+      `(menu-item ,(purify-if-dumping "Change Dictionary...") ispell-change-dictionary
+		  :help ,(purify-if-dumping "Supply explicit dictionary file name")))
     (define-key map [ispell-kill-ispell]
-      `(menu-item ,(purecopy-maybe "Kill Process")
+      `(menu-item ,(purify-if-dumping "Kill Process")
 		  (lambda () (interactive) (ispell-kill-ispell nil 'clear))
 		  :enable (and (boundp 'ispell-process) ispell-process
 			       (eq (ispell-process-status) 'run))
-		  :help ,(purecopy-maybe "Terminate Ispell subprocess")))
+		  :help ,(purify-if-dumping "Terminate Ispell subprocess")))
     (define-key map [ispell-pdict-save]
-      `(menu-item ,(purecopy-maybe "Save Dictionary")
+      `(menu-item ,(purify-if-dumping "Save Dictionary")
 		  (lambda () (interactive) (ispell-pdict-save t t))
-		  :help ,(purecopy-maybe "Save personal dictionary")))
+		  :help ,(purify-if-dumping "Save personal dictionary")))
     (define-key map [ispell-customize]
-      `(menu-item ,(purecopy-maybe "Customize...")
+      `(menu-item ,(purify-if-dumping "Customize...")
 		  (lambda () (interactive) (customize-group 'ispell))
-		  :help ,(purecopy-maybe "Customize spell checking options")))
+		  :help ,(purify-if-dumping "Customize spell checking options")))
     (define-key map [ispell-help]
       ;; use (x-popup-menu last-nonmenu-event(list "" ispell-help-list)) ?
-      `(menu-item ,(purecopy-maybe "Help")
+      `(menu-item ,(purify-if-dumping "Help")
 		  (lambda () (interactive) (describe-function 'ispell-help))
-		  :help ,(purecopy-maybe "Show standard Ispell keybindings and commands")))
+		  :help ,(purify-if-dumping "Show standard Ispell keybindings and commands")))
     (define-key map [flyspell-mode]
-      `(menu-item ,(purecopy-maybe "Automatic spell checking (Flyspell)")
+      `(menu-item ,(purify-if-dumping "Automatic spell checking (Flyspell)")
 		  flyspell-mode
-		  :help ,(purecopy-maybe "Check spelling while you edit the text")
+		  :help ,(purify-if-dumping "Check spelling while you edit the text")
 		  :button (:toggle . (bound-and-true-p flyspell-mode))))
     (define-key map [ispell-complete-word]
-      `(menu-item ,(purecopy-maybe "Complete Word") ispell-complete-word
-		  :help ,(purecopy-maybe "Complete word at cursor using dictionary")))
+      `(menu-item ,(purify-if-dumping "Complete Word") ispell-complete-word
+		  :help ,(purify-if-dumping "Complete word at cursor using dictionary")))
     (define-key map [ispell-complete-word-interior-frag]
-      `(menu-item ,(purecopy-maybe "Complete Word Fragment")
+      `(menu-item ,(purify-if-dumping "Complete Word Fragment")
                   ispell-complete-word-interior-frag
-		  :help ,(purecopy-maybe "Complete word fragment at cursor")))
+		  :help ,(purify-if-dumping "Complete word fragment at cursor")))
 
     (define-key map [ispell-continue]
-      `(menu-item ,(purecopy-maybe "Continue Spell-Checking") ispell-continue
+      `(menu-item ,(purify-if-dumping "Continue Spell-Checking") ispell-continue
 		  :enable (and (boundp 'ispell-region-end)
 			       (marker-position ispell-region-end)
 			       (equal (marker-buffer ispell-region-end)
 				      (current-buffer)))
-		  :help ,(purecopy-maybe "Continue spell checking last region")))
+		  :help ,(purify-if-dumping "Continue spell checking last region")))
     (define-key map [ispell-word]
-      `(menu-item ,(purecopy-maybe "Spell-Check Word") ispell-word
-		  :help ,(purecopy-maybe "Spell-check word at cursor")))
+      `(menu-item ,(purify-if-dumping "Spell-Check Word") ispell-word
+		  :help ,(purify-if-dumping "Spell-check word at cursor")))
     (define-key map [ispell-comments-and-strings]
-      `(menu-item ,(purecopy-maybe "Spell-Check Comments")
+      `(menu-item ,(purify-if-dumping "Spell-Check Comments")
                   ispell-comments-and-strings
-		  :help ,(purecopy-maybe "Spell-check only comments and strings")))
+		  :help ,(purify-if-dumping "Spell-check only comments and strings")))
 
     (define-key map [ispell-region]
-      `(menu-item ,(purecopy-maybe "Spell-Check Region") ispell-region
+      `(menu-item ,(purify-if-dumping "Spell-Check Region") ispell-region
 		  :enable mark-active
-		  :help ,(purecopy-maybe "Spell-check text in marked region")))
+		  :help ,(purify-if-dumping "Spell-check text in marked region")))
     (define-key map [ispell-message]
-      `(menu-item ,(purecopy-maybe "Spell-Check Message") ispell-message
+      `(menu-item ,(purify-if-dumping "Spell-Check Message") ispell-message
 		  :visible (eq major-mode 'mail-mode)
-		  :help ,(purecopy-maybe "Skip headers and included message text")))
+		  :help ,(purify-if-dumping "Skip headers and included message text")))
     (define-key map [ispell-buffer]
-      `(menu-item ,(purecopy-maybe "Spell-Check Buffer") ispell-buffer
-		  :help ,(purecopy-maybe "Check spelling of selected buffer")))
+      `(menu-item ,(purify-if-dumping "Spell-Check Buffer") ispell-buffer
+		  :help ,(purify-if-dumping "Check spelling of selected buffer")))
     map)
   "Key map for ispell menu.")
 ;;;###autoload
@@ -1657,17 +1657,17 @@ objects as practicable, without too many false matches happening."
     (ispell-dictionary-keyword	   forward-line)
     (ispell-pdict-keyword	   forward-line)
     (ispell-parsing-keyword	   forward-line)
-    (,(purecopy-maybe "^---*BEGIN PGP [A-Z ]*--*")
-     . ,(purecopy-maybe "^---*END PGP [A-Z ]*--*"))
+    (,(purify-if-dumping "^---*BEGIN PGP [A-Z ]*--*")
+     . ,(purify-if-dumping "^---*END PGP [A-Z ]*--*"))
     ;; assume multiline uuencoded file? "\nM.*$"?
-    (,(purecopy-maybe "^begin [0-9][0-9][0-9] [^ \t]+$") . ,(purecopy-maybe "\nend\n"))
-    (,(purecopy-maybe "^%!PS-Adobe-[123].0")	 . ,(purecopy-maybe "\n%%EOF\n"))
-    (,(purecopy-maybe "^---* \\(Start of \\)?[Ff]orwarded [Mm]essage")
-     . ,(purecopy-maybe "^---* End of [Ff]orwarded [Mm]essage"))
+    (,(purify-if-dumping "^begin [0-9][0-9][0-9] [^ \t]+$") . ,(purify-if-dumping "\nend\n"))
+    (,(purify-if-dumping "^%!PS-Adobe-[123].0")	 . ,(purify-if-dumping "\n%%EOF\n"))
+    (,(purify-if-dumping "^---* \\(Start of \\)?[Ff]orwarded [Mm]essage")
+     . ,(purify-if-dumping "^---* End of [Ff]orwarded [Mm]essage"))
     ;; Matches e-mail addresses, file names, http addresses, etc.  The
     ;; `-+' `_+' patterns are necessary for performance reasons when
     ;; `-' or `_' part of word syntax.
-;    (,(purecopy-maybe "\\(--+\\|_+\\|\\(/\\w\\|\\(\\(\\w\\|[-_]\\)+[.:@]\\)\\)\\(\\w\\|[-_]\\)*\\([.:/@]+\\(\\w\\|[-_~=?&]\\)+\\)+\\)"))
+;    (,(purify-if-dumping "\\(--+\\|_+\\|\\(/\\w\\|\\(\\(\\w\\|[-_]\\)+[.:@]\\)\\)\\(\\w\\|[-_]\\)*\\([.:/@]+\\(\\w\\|[-_~=?&]\\)+\\)+\\)"))
     ;; above checks /.\w sequences
     ;;("\\(--+\\|\\(/\\|\\(\\(\\w\\|[-_]\\)+[.:@]\\)\\)\\(\\w\\|[-_]\\)*\\([.:/@]+\\(\\w\\|[-_~=?&]\\)+\\)+\\)")
     ;; This is a pretty complex regexp.  It can be simplified to the following:
@@ -1690,7 +1690,7 @@ Valid forms include:
 
 ;;;###autoload
 (defvar ispell-tex-skip-alists
-  (purecopy-maybe
+  (purify-if-dumping
   '((;;("%\\[" . "%\\]") ; AMStex block comment...
      ;; All the standard LaTeX keywords from L. Lamport's guide:
      ;; \cite, \hspace, \hspace*, \hyphenation, \include, \includeonly, \input,

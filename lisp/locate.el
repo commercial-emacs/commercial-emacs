@@ -182,7 +182,7 @@ or `locate-make-command-line', determines the database."
   :type '(choice (const :tag "None" nil) face))
 
 ;;;###autoload
-(defcustom locate-ls-subdir-switches (purecopy-maybe "-al")
+(defcustom locate-ls-subdir-switches (purify-if-dumping "-al")
   "`ls' switches for inserting subdirectories in `*Locate*' buffers.
 This should contain the \"-l\" switch, but not the \"-F\" or \"-b\" switches."
   :type 'string

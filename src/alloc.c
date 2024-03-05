@@ -3905,7 +3905,7 @@ purecopy_hash_table (struct Lisp_Hash_Table *table)
   return pure;
 }
 
-DEFUN ("purecopy-maybe", Fpurecopy_maybe, Spurecopy_maybe, 1, 1, 0,
+DEFUN ("purify-if-dumping", Fpurecopy_maybe, Spurecopy_maybe, 1, 1, 0,
        doc: /* Monnier's half-measure to reduce pdump footprint.  */)
   (register Lisp_Object obj)
 {

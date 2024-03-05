@@ -66,26 +66,26 @@
 
 (defvar format-alist
   ;; FIXME: maybe each item can be purecopied instead of just the strings.
-  `((text/enriched ,(purecopy-maybe "Extended MIME text/enriched format.")
-		   ,(purecopy-maybe "Content-[Tt]ype:[ \t]*text/enriched")
+  `((text/enriched ,(purify-if-dumping "Extended MIME text/enriched format.")
+		   ,(purify-if-dumping "Content-[Tt]ype:[ \t]*text/enriched")
 		   enriched-decode enriched-encode t enriched-mode)
-    (plain ,(purecopy-maybe "ISO 8859-1 standard format, no text properties.")
+    (plain ,(purify-if-dumping "ISO 8859-1 standard format, no text properties.")
 	   ;; Plain only exists so that there is an obvious neutral choice in
 	   ;; the completion list.
 	   nil nil nil nil nil)
-    (TeX   ,(purecopy-maybe "TeX (encoding)")
+    (TeX   ,(purify-if-dumping "TeX (encoding)")
 	   nil
 	   iso-tex2iso iso-iso2tex t nil)
-    (gtex  ,(purecopy-maybe "German TeX (encoding)")
+    (gtex  ,(purify-if-dumping "German TeX (encoding)")
 	   nil
 	   iso-gtex2iso iso-iso2gtex t nil)
-    (html  ,(purecopy-maybe "HTML/SGML \"ISO 8879:1986//ENTITIES Added Latin 1//EN\" (encoding)")
+    (html  ,(purify-if-dumping "HTML/SGML \"ISO 8879:1986//ENTITIES Added Latin 1//EN\" (encoding)")
 	   nil
 	   iso-sgml2iso iso-iso2sgml t nil)
-    (rot13 ,(purecopy-maybe "rot13")
+    (rot13 ,(purify-if-dumping "rot13")
 	   nil
 	   rot13-region rot13-region t nil)
-    (duden ,(purecopy-maybe "Duden Ersatzdarstellung")
+    (duden ,(purify-if-dumping "Duden Ersatzdarstellung")
 	   nil
 	   ;; FROM-FN used to call the "diac" command which is not widely
 	   ;; available and apparently not under a free software license:
@@ -93,14 +93,14 @@
 	   ;; Reliable round-trip conversion is not possible anyway
 	   ;; and would be by heuristic method, so use nil for now.
 	   nil iso-iso2duden t nil)
-    (de646 ,(purecopy-maybe "German ASCII (ISO 646)")
+    (de646 ,(purify-if-dumping "German ASCII (ISO 646)")
 	   nil
-	   ,(purecopy-maybe "iconv -f iso646-de -t utf-8")
-	   ,(purecopy-maybe "iconv -f utf-8 -t iso646-de") t nil)
-    (denet ,(purecopy-maybe "net German")
+	   ,(purify-if-dumping "iconv -f iso646-de -t utf-8")
+	   ,(purify-if-dumping "iconv -f utf-8 -t iso646-de") t nil)
+    (denet ,(purify-if-dumping "net German")
 	   nil
 	   iso-german iso-cvt-read-only t nil)
-    (esnet ,(purecopy-maybe "net Spanish")
+    (esnet ,(purify-if-dumping "net Spanish")
 	   nil
 	   iso-spanish iso-cvt-read-only t nil))
   "List of information about understood file formats.

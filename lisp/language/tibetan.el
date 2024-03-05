@@ -574,7 +574,7 @@ The result of matching is to be used for indexing alists at conversion
 from a roman transcription to the corresponding Tibetan character.")
 
 (defvar tibetan-precomposed-regexp
-  (purecopy-maybe
+  (purify-if-dumping
    (eval-when-compile
      (concat "^"
              (regexp-opt (mapcar #'car tibetan-precomposed-transcription-alist)
@@ -584,7 +584,7 @@ The result of matching is to be used for indexing alists when the input key
 from an input method is converted to the corresponding precomposed glyph.")
 
 (defvar tibetan-precomposition-rule-regexp
-  (purecopy-maybe
+  (purify-if-dumping
    (eval-when-compile
      (regexp-opt (mapcar #'car tibetan-precomposition-rule-alist) t)))
   "Regexp string to match a sequence of Tibetan consonantic components.

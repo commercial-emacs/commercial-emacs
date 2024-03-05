@@ -35,10 +35,10 @@
              (not (documentation-stringp doc)))
     (error "Invalid (or missing) doc string %S" doc))
   (unless (get face 'face-defface-spec)
-    (face-spec-set face (purecopy-maybe spec) 'face-defface-spec)
+    (face-spec-set face (purify-if-dumping spec) 'face-defface-spec)
     (push (cons 'defface face) current-load-list)
     (when doc
-      (set-face-documentation face (purecopy-maybe doc)))
+      (set-face-documentation face (purify-if-dumping doc)))
     (custom-handle-all-keywords face args 'custom-face)
     (run-hooks 'custom-define-hook))
   face)

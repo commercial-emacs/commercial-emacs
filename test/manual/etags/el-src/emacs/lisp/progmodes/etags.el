@@ -37,7 +37,7 @@ To switch to a new tags table, setting this variable is sufficient.
 If you set this variable, do not also set `tags-table-list'.
 Use the `etags' program to make a tags table file.")
 ;; Make M-x set-variable tags-file-name like M-x visit-tags-table.
-;;;###autoload (put 'tags-file-name 'variable-interactive (purecopy-maybe "fVisit tags table: "))
+;;;###autoload (put 'tags-file-name 'variable-interactive (purify-if-dumping "fVisit tags table: "))
 ;;;###autoload (put 'tags-file-name 'safe-local-variable 'stringp)
 
 (defgroup etags nil "Tags tables."
@@ -67,7 +67,7 @@ Use the `etags' program to make a tags table file."
 
 ;;;###autoload
 (defcustom tags-compression-info-list
-  (purecopy-maybe '("" ".Z" ".bz2" ".gz" ".xz" ".tgz"))
+  (purify-if-dumping '("" ".Z" ".bz2" ".gz" ".xz" ".tgz"))
   "List of extensions tried by etags when `auto-compression-mode' is on.
 An empty string means search the non-compressed file."
   :version "24.1"			; added xz

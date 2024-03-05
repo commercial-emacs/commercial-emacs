@@ -42,11 +42,11 @@
 
 ;;;###autoload
 (defcustom dnd-protocol-alist
-  `((,(purecopy-maybe "^file:///")    . dnd-open-local-file)	; XDND format.
-    (,(purecopy-maybe "^file://[^/]") . dnd-open-file)	; URL with host
-    (,(purecopy-maybe "^file:/[^/]")  . dnd-open-local-file)	; Old KDE, Motif, Sun
-    (,(purecopy-maybe "^file:[^/]")   . dnd-open-local-file)	; MS-Windows
-    (,(purecopy-maybe "^\\(https?\\|ftp\\|nfs\\)://") . dnd-open-file))
+  `((,(purify-if-dumping "^file:///")    . dnd-open-local-file)	; XDND format.
+    (,(purify-if-dumping "^file://[^/]") . dnd-open-file)	; URL with host
+    (,(purify-if-dumping "^file:/[^/]")  . dnd-open-local-file)	; Old KDE, Motif, Sun
+    (,(purify-if-dumping "^file:[^/]")   . dnd-open-local-file)	; MS-Windows
+    (,(purify-if-dumping "^\\(https?\\|ftp\\|nfs\\)://") . dnd-open-file))
   "The functions to call for different protocols when a drop is made.
 This variable is used by `dnd-handle-multiple-urls'.
 The list contains of (REGEXP . FUNCTION) pairs.

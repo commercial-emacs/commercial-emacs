@@ -168,7 +168,7 @@
 
 ;;; Mule related hyperlinks.
 (defconst help-xref-mule-regexp-template
-  (purecopy-maybe (concat "\\(\\<\\("
+  (purify-if-dumping (concat "\\(\\<\\("
 		    "\\(coding system\\)\\|"
 		    "\\(input method\\)\\|"
 		    "\\(character set\\)\\|"
@@ -1199,7 +1199,7 @@ Arguments are the same as `set-language-info'."
 	(progn
 	  (setq key-slot (list key))
 	  (setcdr lang-slot (cons key-slot (cdr lang-slot)))))
-    (setcdr key-slot (purecopy-maybe info))
+    (setcdr key-slot (purify-if-dumping info))
     ;; Update the custom-type of `current-language-environment'.
     (put 'current-language-environment 'custom-type
 	 (cons 'choice (mapcar
@@ -1230,7 +1230,7 @@ in the European submenu in each of those two menus."
   (cond ((symbolp lang-env)
 	 (setq lang-env (symbol-name lang-env)))
 	((stringp lang-env)
-	 (setq lang-env (purecopy-maybe lang-env))))
+	 (setq lang-env (purify-if-dumping lang-env))))
   (if parents
       (while parents
 	(let (describe-map setup-map parent-symbol parent prompt)
@@ -1439,11 +1439,11 @@ without loading the relevant Quail packages.
 \n(fn INPUT-METHOD LANG-ENV ACTIVATE-FUNC TITLE DESCRIPTION &rest ARGS)"
   (setq lang-env (if (symbolp lang-env)
                      (symbol-name lang-env)
-                   (purecopy-maybe lang-env)))
+                   (purify-if-dumping lang-env)))
   (setq input-method (if (symbolp input-method)
                          (symbol-name input-method)
-                       (purecopy-maybe input-method)))
-  (setq args (mapcar #'purecopy-maybe args))
+                       (purify-if-dumping input-method)))
+  (setq args (mapcar #'purify-if-dumping args))
   (let ((info (cons lang-env args))
 	(slot (assoc input-method input-method-alist)))
     (if slot
@@ -2254,7 +2254,7 @@ See `set-language-info-alist' for use in programs."
 ;; purecopied, since they're normally used on startup, and probably
 ;; should reflect the facilities of the base Emacs.
 (defconst locale-language-names
-  (purecopy-maybe
+  (purify-if-dumping
    '(
      ;; Locale names of the form LANGUAGE[_TERRITORY][.CODESET][@MODIFIER]
      ;; as specified in the Single Unix Spec, Version 2.
@@ -2526,7 +2526,7 @@ In this case, LANG-ENV is one of generic language environments for an
 specific encoding such as \"Latin-1\" and \"UTF-8\".")
 
 (defconst locale-charset-language-names
-  (purecopy-maybe
+  (purify-if-dumping
    '((".*8859[-_]?1\\>" . "Latin-1")
      (".*8859[-_]?2\\>" . "Latin-2")
      (".*8859[-_]?3\\>" . "Latin-3")
@@ -2545,7 +2545,7 @@ This language name is used if the locale is not listed in
 `locale-language-names'.")
 
 (defconst locale-preferred-coding-systems
-  (purecopy-maybe
+  (purify-if-dumping
    '((".*8859[-_]?1\\>" . iso-8859-1)
      (".*8859[-_]?2\\>" . iso-8859-2)
      (".*8859[-_]?3\\>" . iso-8859-3)
@@ -2963,7 +2963,7 @@ See also the documentation of `get-char-code-property' and
 	  (error "Invalid char-table: %s" table))
     (or (stringp table)
 	(error "Not a char-table nor a file name: %s" table)))
-  (if (stringp table) (setq table (purecopy-maybe table)))
+  (if (stringp table) (setq table (purify-if-dumping table)))
   (if (and (stringp table)
            (char-table-p (alist-get name char-code-property-alist)))
       ;; The table is already setup and we're apparently trying to
@@ -2971,7 +2971,7 @@ See also the documentation of `get-char-code-property' and
       ;; Just skip it, in order to work around a recursive load (bug#52945).
       nil
     (setf (alist-get name char-code-property-alist) table)
-    (put name 'char-code-property-documentation (purecopy-maybe docstring))))
+    (put name 'char-code-property-documentation (purify-if-dumping docstring))))
 
 (defvar char-code-property-table
   (make-char-table 'char-code-property-table)

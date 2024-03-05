@@ -116,7 +116,7 @@
 
 (let ((new (make-hash-table :test #'equal)))
   ;; Now that loaddefs has populated definition-prefixes, purify its contents.
-  (maphash (lambda (k v) (puthash (purecopy-maybe k) (purecopy-maybe v) new))
+  (maphash (lambda (k v) (puthash (purify-if-dumping k) (purify-if-dumping v) new))
            definition-prefixes)
   (setq definition-prefixes new))
 
@@ -371,7 +371,7 @@
 ;; We keep the load-history data in PURE space.
 ;; Make sure that the spine of the list is not in pure space because it can
 ;; be destructively mutated in lread.c:build_load_history.
-(setq load-history (mapcar #'purecopy-maybe load-history))
+(setq load-history (mapcar #'purify-if-dumping load-history))
 (set-buffer-modified-p nil)
 
 (remove-hook 'after-load-functions (lambda (_) (garbage-collect)))

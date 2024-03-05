@@ -2491,11 +2491,11 @@ should be made by `quail-build-decode-map' (which see)."
                    (help-setup-xref `(quail-keyboard-layout-button ,layout)
                                     nil)
                    (quail-show-keyboard-layout layout))
-  'help-echo (purecopy-maybe "mouse-2, RET: show keyboard layout"))
+  'help-echo (purify-if-dumping "mouse-2, RET: show keyboard layout"))
 
 (define-button-type 'quail-keyboard-customize-button
   :supertype 'help-customize-variable
-  'help-echo (purecopy-maybe "mouse-2, RET: customize keyboard layout"))
+  'help-echo (purify-if-dumping "mouse-2, RET: customize keyboard layout"))
 
 (defun quail-help (&optional package)
   "Show brief description of the current Quail package.

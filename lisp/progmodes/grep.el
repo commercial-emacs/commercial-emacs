@@ -528,18 +528,18 @@ redundant).")
 This gets tacked on the end of the generated expressions.")
 
 ;;;###autoload
-(defvar grep-program (purecopy-maybe "grep")
+(defvar grep-program (purify-if-dumping "grep")
   "The default grep program for `grep-command' and `grep-find-command'.
 This variable's value takes effect when `grep-compute-defaults' is called.")
 
 ;;;###autoload
-(defvar find-program (purecopy-maybe "find")
+(defvar find-program (purify-if-dumping "find")
   "The default find program.
 This is used by commands like `grep-find-command', `find-dired'
 and others.")
 
 ;;;###autoload
-(defvar xargs-program (purecopy-maybe "xargs")
+(defvar xargs-program (purify-if-dumping "xargs")
   "The default xargs program for `grep-find-command'.
 See `grep-find-use-xargs'.
 This variable's value takes effect when `grep-compute-defaults' is called.")

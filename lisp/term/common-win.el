@@ -235,7 +235,7 @@ have been processed."
 
 (defvar x-colors
   (if (featurep 'ns) (ns-list-colors)
-    (purecopy-maybe
+    (purify-if-dumping
      '("gray100" "grey100" "gray99" "grey99" "gray98" "grey98" "gray97"
        "grey97" "gray96" "grey96" "gray95" "grey95" "gray94" "grey94"
        "gray93" "grey93" "gray92" "grey92" "gray91" "grey91" "gray90"

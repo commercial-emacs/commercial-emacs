@@ -266,7 +266,7 @@ INIT-VALUE LIGHTER KEYMAP.
       (setq body (cdr body))
       (pcase keyw
 	(:init-value (setq init-value (pop body)))
-	(:lighter (setq lighter (purecopy-maybe (pop body))))
+	(:lighter (setq lighter (purify-if-dumping (pop body))))
 	(:global (setq globalp (pop body))
                  (when (and globalp (symbolp mode))
                    (setq setter `(setq-default ,mode))
