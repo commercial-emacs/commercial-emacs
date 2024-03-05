@@ -228,9 +228,13 @@ selected or deselected at the end of executing the current command.
 
 ** Tab Bars and Tab Lines
 
+---
 *** New user option 'tab-bar-tab-name-format-functions'.
 It can be used to add, remove and reorder functions that change
 the appearance of every tab on the tab bar.
+
+---
+*** New hook 'tab-bar-tab-post-select-functions'.
 
 +++
 ** New optional argument for modifying directory-local variables.
@@ -1887,6 +1891,12 @@ treesitter grammar.
 +++
 ** New buffer-local variable 'tabulated-list-groups'.
 It controls display and separate sorting of groups of entries.
+
+---
+** New text property 'context-menu-functions'.
+Like the variable with the same name, it adds menus from the list that
+is the value of the property to context menus shown when clicking on the
+text which as this property.
 
 
 * Changes in Emacs 30.1 on Non-Free Operating Systems

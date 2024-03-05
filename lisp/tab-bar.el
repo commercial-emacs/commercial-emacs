@@ -1502,7 +1502,10 @@ Negative TAB-NUMBER counts tabs from the end of the tab bar."
               (tab-bar--current-tab-make (nth to-index tabs)))
 
         (unless tab-bar-mode
-          (message "Selected tab '%s'" (alist-get 'name to-tab))))
+          (message "Selected tab '%s'" (alist-get 'name to-tab)))
+
+        (run-hook-with-args 'tab-bar-tab-post-select-functions
+                            from-tab to-tab))
 
       (force-mode-line-update))))
 
