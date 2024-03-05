@@ -2054,10 +2054,6 @@ splash screen in another window."
 	(make-local-variable 'startup-screen-inhibit-startup-screen)
 	(if pure-space-overflow
 	    (insert pure-space-overflow-message))
-        ;; Insert the permissions notice if the user has yet to grant Emacs
-        ;; storage permissions.
-        (when (fboundp 'android-before-splash-screen)
-          (funcall 'android-before-splash-screen t))
 	(unless concise
 	  (fancy-splash-head))
 	(dolist (text fancy-startup-text)
@@ -2164,10 +2160,7 @@ splash screen in another window."
 
       (if pure-space-overflow
 	  (insert pure-space-overflow-message))
-      ;; Insert the permissions notice if the user has yet to grant
-      ;; Emacs storage permissions.
-      (when (fboundp 'android-before-splash-screen)
-        (funcall 'android-before-splash-screen nil))
+
       ;; The convention for this piece of code is that
       ;; each piece of output starts with one or two newlines
       ;; and does not end with any newlines.
