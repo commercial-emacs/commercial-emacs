@@ -41,7 +41,7 @@
 
 ;; The `assert' macro from the cl package signals
 ;; `cl-assertion-failed' at runtime so always define it.
-(define-error 'cl-assertion-failed (purecopy-maybe "Assertion failed"))
+(define-error 'cl-assertion-failed (purecopy "Assertion failed"))
 
 (defun cl--assertion-failed (form &optional string sargs args)
   (if debug-on-error
@@ -50,38 +50,75 @@
         (apply #'error string (append sargs args))
       (signal 'cl-assertion-failed `(,form ,@sargs)))))
 
+(defconst cl--direct-supertypes-of-type
+  ;; Please run `sycdoc-update-type-hierarchy' in
+  ;; `admin/syncdoc-type-hierarchy.el' each time this is modified to
+  ;; reflect the change in the documentation.
+  (let ((table (make-hash-table :test #'eq)))
+    ;; FIXME: Our type DAG has various quirks:
+    ;; - `subr' says it's a `compiled-function' but that's not true
+    ;;   for those subrs that are special forms!
+    ;; - An OClosure can be an interpreted function or a `byte-code-function',
+    ;;   so the DAG of OClosure types is "orthogonal" to the distinction
+    ;;   between interpreted and compiled functions.
+    (dolist (x '((sequence t)
+                 (atom t)
+                 (list sequence)
+                 (array sequence atom)
+                 (float number)
+                 (integer number integer-or-marker)
+                 (marker integer-or-marker)
+                 (integer-or-marker number-or-marker)
+                 (number number-or-marker)
+                 (bignum integer)
+                 (fixnum integer)
+                 (keyword symbol)
+                 (boolean symbol)
+                 (vector array)
+                 (bool-vector array)
+                 (char-table array)
+                 (string array)
+                 ;; FIXME: This results in `atom' coming before `list' :-(
+                 (null boolean list)
+                 (cons list)
+                 (function atom)
+                 (byte-code-function compiled-function)
+                 (subr compiled-function)
+                 (module-function function)
+                 (compiled-function function)
+                 (subr-native-elisp subr)
+                 (subr-primitive subr)))
+      (puthash (car x) (cdr x) table))
+    ;; And here's the flat part of the hierarchy.
+    (dolist (atom '( tree-sitter-node
+                     tree-sitter-parser user-ptr
+                     font-object font-entity font-spec
+                     condvar mutex thread terminal hash-table frame
+                     ;; function ;; FIXME: can be a list as well.
+                     buffer window process window-configuration
+                     overlay number-or-marker
+                     symbol obarray native-comp-unit))
+      (cl-assert (null (gethash atom table)))
+      (puthash atom '(atom) table))
+    table)
+  "Hash table TYPE -> SUPERTYPES.")
+
 (defconst cl--typeof-types
-  ;; Hand made from the source code of `type-of'.
-  '((integer number integer-or-marker number-or-marker atom)
-    (symbol atom) (string array sequence atom)
-    (cons list sequence)
-    ;; Markers aren't `numberp', yet they are accepted wherever integers are
-    ;; accepted, pretty much.
-    (marker integer-or-marker number-or-marker atom)
-    (overlay atom) (float number number-or-marker atom)
-    (window-configuration atom) (process atom) (window atom)
-    ;; FIXME: We'd want to put `function' here, but that's only true
-    ;; for those `subr's which aren't special forms!
-    (subr atom)
-    ;; FIXME: We should probably reverse the order between
-    ;; `compiled-function' and `byte-code-function' since arguably
-    ;; `subr' is also "compiled functions" but not "byte code functions",
-    ;; but it would require changing the value returned by `type-of' for
-    ;; byte code objects, which risks breaking existing code, which doesn't
-    ;; seem worth the trouble.
-    (compiled-function byte-code-function function atom)
-    (module-function function atom)
-    (buffer atom) (char-table array sequence atom)
-    (bool-vector array sequence atom)
-    (frame atom) (hash-table atom) (terminal atom) (obarray atom)
-    (thread atom) (mutex atom) (condvar atom)
-    (font-spec atom) (font-entity atom) (font-object atom)
-    (vector array sequence atom)
-    (user-ptr atom)
-    (tree-sitter-parser atom)
-    (tree-sitter-node atom)
-    ;; Plus, really hand made:
-    (null symbol list sequence atom))
+  (letrec ((alist nil)
+           (allparents
+            (lambda (type)
+              ;; FIXME: copy&pasted from `cl--class-allparents'.
+              (let ((parents (gethash type cl--direct-supertypes-of-type)))
+                (unless parents
+                  (message "Warning: Type without parent: %S!" type))
+                (cons type
+                      (merge-ordered-lists
+                       ;; FIXME: Can't remember why `t' is excluded.
+                       (mapcar allparents (remq t parents))))))))
+    (maphash (lambda (type _)
+              (push (funcall allparents type) alist))
+             cl--direct-supertypes-of-type)
+    alist)
   "Alist of supertypes.
 Each element has the form (TYPE . SUPERTYPES) where TYPE is one of
 the symbols returned by `type-of', and SUPERTYPES is the list of its
