@@ -3247,6 +3247,12 @@ of file names not excluded by `native-comp-bootstrap-deny-list'."
        (kill-buffer temp-buffer))
      target-file)))
 
+(cl-pushnew comp-trampoline-dir load-path :test #'equal)
+
+(dolist (path (split-string (or (getenv "EMACSNATIVELOADPATH") "")
+                            path-separator :omit-null))
+  (cl-pushnew path load-path :test #'equal))
+
 (provide 'comp)
 
 ;; LocalWords: limplified limplification limplify Limple LIMPLE libgccjit elc eln

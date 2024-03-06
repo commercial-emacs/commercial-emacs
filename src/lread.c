@@ -5199,6 +5199,9 @@ This list should not include the empty string.
 to the specified file name if a suffix is allowed or required.  */);
   Vload_suffixes = list2 (build_pure_c_string (".elc"),
 			  build_pure_c_string (".el"));
+#ifdef HAVE_NATIVE_COMP
+  Vload_suffixes = Fcons (build_pure_c_string (".eln"), Vload_suffixes);
+#endif
 #ifdef HAVE_MODULES
   Vload_suffixes = Fcons (build_pure_c_string (MODULES_SUFFIX), Vload_suffixes);
 #ifdef MODULES_SECONDARY_SUFFIX
@@ -5206,6 +5209,7 @@ to the specified file name if a suffix is allowed or required.  */);
     Fcons (build_pure_c_string (MODULES_SECONDARY_SUFFIX), Vload_suffixes);
 #endif
 #endif
+
   DEFVAR_LISP ("module-file-suffix", Vmodule_file_suffix,
 	       doc: /* Suffix of loadable module file, or nil if modules are not supported.  */);
 #ifdef HAVE_MODULES

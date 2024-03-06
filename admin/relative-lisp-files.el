@@ -27,6 +27,8 @@
 
 ;;; Code:
 
+(require 'comp)
+
 (defconst relative-lisp-files-explicit '("ldefs-boot")
   "Elisp we don't want `make -C lisp` making without explicit consent.")
 

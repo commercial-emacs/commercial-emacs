@@ -581,13 +581,6 @@ It is the default value of the variable `top-level'."
         ;; of load-path and we want to take it into account.
         (setq tail (cdr tail))))
 
-    (when (featurep 'native-compile)
-      (require 'comp)
-      (setq load-path (nconc (split-string (or (getenv "EMACSNATIVELOADPATH") "")
-                                           path-separator :omit-null)
-                             (list comp-trampoline-dir)
-                             load-path)))
-
     ;; Set the default strings to display in mode line for end-of-line
     ;; formats that aren't native to this platform.  This should be
     ;; done before calling set-locale-environment, as the latter might
