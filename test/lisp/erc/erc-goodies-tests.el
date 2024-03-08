@@ -131,37 +131,35 @@
 
 (ert-deftest erc-controls-highlight--inverse ()
   (should (eq t erc-interpret-controls-p))
-  (let ((erc-insert-modify-hook '(erc-controls-highlight))
-        erc-kill-channel-hook erc-kill-server-hook erc-kill-buffer-hook)
-    (with-current-buffer (get-buffer-create "#chan")
-      (erc-mode)
-      (setq-local erc-interpret-mirc-color t)
-      (erc--initialize-markers (point) nil)
-
-      (let* ((m "Spoiler: \C-c0,0Hello\C-c1,1World!")
-             (msg (erc-format-privmessage "bob" m nil t)))
-        (erc-display-message nil nil (current-buffer) msg))
-      (forward-line -1)
-      (should (search-forward "<bob> " nil t))
-      (save-restriction
-        (narrow-to-region (point) (pos-eol))
-        (should (eq (get-text-property (+ 9 (point)) 'mouse-face)
-                    'erc-inverse-face))
-        (should (eq (get-text-property (1- (pos-eol)) 'mouse-face)
-                    'erc-inverse-face))
-        (erc-goodies-tests--assert-face
-         0 "Spoiler: " 'erc-default-face
-         '(fg:erc-color-face0 bg:erc-color-face0))
-        (erc-goodies-tests--assert-face
-         9 "Hello" '(erc-spoiler-face)
-         '( fg:erc-color-face0 bg:erc-color-face0
-            fg:erc-color-face1 bg:erc-color-face1))
-        (erc-goodies-tests--assert-face
-         18 " World" '(erc-spoiler-face)
-         '( fg:erc-color-face0 bg:erc-color-face0
-            fg:erc-color-face1 bg:erc-color-face1 )))
-      (when noninteractive
-        (kill-buffer)))))
+  (erc-tests-common-make-server-buf)
+  (with-current-buffer (erc--open-target "#chan")
+    (setq-local erc-interpret-mirc-color t)
+    (let* ((m "Spoiler: \C-c0,0Hello\C-c1,1World!")
+           (msg (erc-format-privmessage "bob" m nil t)))
+      (erc-display-message nil nil (current-buffer) msg))
+    (forward-line -1)
+    (should (search-forward "<bob> " nil t))
+    (save-restriction
+      ;; Narrow to EOL or start of right-side stamp.
+      (narrow-to-region (point) (line-end-position))
+      (should (eq (get-text-property (+ 9 (point)) 'mouse-face)
+                  'erc-spoiler-face))
+      (should (eq (get-text-property (1- (pos-eol)) 'mouse-face)
+                  'erc-spoiler-face))
+      ;; "Spoiler" appears in ERC default face.
+      (erc-goodies-tests--assert-face
+       0 "Spoiler: " 'erc-default-face
+       '(fg:erc-color-face0 bg:erc-color-face0))
+      ;; "Hello" is masked in all white.
+      (erc-goodies-tests--assert-face
+       9 "Hello" '(fg:erc-color-face0 bg:erc-color-face0)
+       '(fg:erc-color-face1 bg:erc-color-face1))
+      ;; "World" is masked in all black.
+      (erc-goodies-tests--assert-face
+       18 " World" '(fg:erc-color-face1 bg:erc-color-face1 )
+       '(fg:erc-color-face0 bg:erc-color-face0))))
+  (when noninteractive
+    (erc-tests-common-kill-buffers)))
 
 (defvar erc-goodies-tests--motd
   ;; This is from ergo's MOTD

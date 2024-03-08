@@ -3531,6 +3531,38 @@ repeatedly with VAL set to each of VAL's members."
             old (get-text-property pos prop object)
             end (next-single-property-change pos prop object to)))))
 
+(defun erc--reserve-important-text-props (beg end plist)
+  "Record text-property pairs in PLIST as important between BEG and END.
+Also mark the message being inserted as containing these important props
+so modules performing destructive modifications can later restore them.
+Expect to run in a narrowed buffer at message-insertion time."
+  (when erc--msg-props
+    (let ((existing (erc--check-msg-prop 'erc--important-prop-names)))
+      (puthash 'erc--important-prop-names
+               (seq-union existing (cl-loop for (key _) on plist by #'cddr
+                                            collect key))
+               erc--msg-props)))
+  (erc--merge-prop beg end 'erc--important-props plist))
+
+;; FIXME use a region instead of point-min/max.
+(defun erc--restore-important-text-props (props)
+  "Restore PROPS where recorded in the accessible portion of the buffer.
+Expect to run in a narrowed buffer at message-insertion time."
+  (when-let ((registered (erc--check-msg-prop 'erc--important-prop-names))
+             (present (seq-intersection props registered))
+             (p (point-min))
+             (end (point-max)))
+    (while-let (((setq p (text-property-not-all p end
+                                                'erc--important-props nil)))
+                (val (get-text-property p 'erc--important-props))
+                (q (next-single-property-change p 'erc--important-props
+                                                nil end)))
+      (while-let ((k (pop val))
+                  (v (pop val)))
+        (when (memq k present)
+          (put-text-property p q k v)))
+      (setq p q))))
+
 (defvar erc-legacy-invisible-bounds-p nil
   "Whether to hide trailing rather than preceding newlines.
 Beginning in ERC 5.6, invisibility extends from a message's
