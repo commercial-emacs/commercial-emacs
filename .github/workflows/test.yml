@@ -106,7 +106,7 @@ jobs:
       run: |
         ./autogen.sh
         ./configure --prefix=$HOME/.local --with-tree-sitter
-        make epaths-force
+        make epaths-force-ns-self-contained
         cat src/epaths.h
     - uses: msys2/setup-msys2@v2
       if: startsWith(runner.os, 'windows')
