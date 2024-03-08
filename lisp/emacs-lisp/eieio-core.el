@@ -973,7 +973,7 @@ need be... May remove that later...)"
 
 (defun eieio--class-precedence-c3 (class)
   "Return all parents of CLASS in c3 order."
-  (let ((parents (cl--class-parents class)))
+  (let ((parents (eieio--class-parents class)))
     (cons class
           (merge-ordered-lists
            (append
@@ -989,7 +989,7 @@ need be... May remove that later...)"
 
 (defun eieio--class-precedence-dfs (class)
   "Return all parents of CLASS in depth-first order."
-  (let* ((parents (cl--class-parents class))
+  (let* ((parents (eieio--class-parents class))
 	 (classes (copy-sequence
 		   (apply #'append
 			  (list class)
