@@ -11073,7 +11073,6 @@ With argument, do this that many times."
 
 ;; Local Variables:
 ;; coding: utf-8
-;; no-native-compile: t
 ;; End:
 
 ;;; thai-word.el ends here
