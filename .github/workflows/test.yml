@@ -20,8 +20,13 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         gearing: [standard]
+        include:
+          - os: ubuntu-latest
+            gearing: alt-x
+          - os: ubuntu-latest
+            gearing: multithread
     steps:
     - run: |
         git config --global core.autocrlf false
@@ -134,7 +139,7 @@ jobs:
       run: |
         bash ./autogen.sh
         bash ./configure --prefix=$HOME/.local --without-dbus
-        make -j4
+        make -j4 -C src
     - name: elisp-benchmarks
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'Linux')
       run: |
