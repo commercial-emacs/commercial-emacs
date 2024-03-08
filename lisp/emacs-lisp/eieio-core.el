@@ -1066,8 +1066,7 @@ method invocation orders of the involved classes."
   (lambda (tag &rest _)
     (let ((class (cl--find-class tag)))
       (and (eieio--class-p class)
-           (mapcar #'eieio--class-name
-                   (eieio--class-precedence-list class))))))
+           (cl--class-allparents class)))))
 
 (cl-defmethod cl-generic-generalizers :extra "class" (specializer)
   "Support for dispatch on types defined by EIEIO's `defclass'."
@@ -1089,10 +1088,9 @@ method invocation orders of the involved classes."
 ;; Instead, we add a new "subclass" specializer.
 
 (defun eieio--generic-subclass-specializers (tag &rest _)
-  (when (eieio--class-p tag)
-    (mapcar (lambda (class)
-              `(subclass ,(eieio--class-name class)))
-            (eieio--class-precedence-list tag))))
+  (when (cl--class-p tag)
+    (mapcar (lambda (class) `(subclass ,class))
+            (cl--class-allparents tag))))
 
 (cl-generic-define-generalizer eieio--generic-subclass-generalizer
   60 (lambda (name &rest _) `(and (symbolp ,name) (cl--find-class ,name)))
