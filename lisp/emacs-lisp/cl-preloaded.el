@@ -130,7 +130,7 @@ supertypes from the most specific to least specific.")
 (defun cl--struct-name-p (name)
   "Return t if NAME is a valid structure name for `cl-defstruct'."
   (and name (symbolp name) (not (keywordp name))
-       (not (cl--builtin-type-p name))))
+       (not (memq name cl--all-builtin-types))))
 
 ;; When we load this (compiled) file during pre-loading, the cl--struct-class
 ;; code below will need to access the `cl-struct' info, since it's considered
@@ -183,7 +183,7 @@ supertypes from the most specific to least specific.")
 (defun cl--struct-register-child (parent tag)
   ;; Can't use (cl-typep parent 'cl-structure-class) at this stage
   ;; because `cl-structure-class' is defined later.
-  (while (cl--struct-class-p parent)
+  (while (recordp parent)
     (add-to-list (cl--struct-class-children-sym parent) tag)
     ;; Only register ourselves as a child of the leftmost parent since structs
     ;; can only have one parent.
@@ -198,14 +198,9 @@ supertypes from the most specific to least specific.")
     (with-suppressed-warnings ((obsolete cl-old-struct-compat-mode))
       (message "cl-old-struct-compat-mode is obsolete!")
       (cl-old-struct-compat-mode 1)))
-  (when (eq type 'record)
-    ;; Defstruct using record objects.
-    (setq type nil)
-    ;; `cl-structure-class' and `cl-structure-object' are allowed to be
-    ;; defined without specifying the parent, because their parent
-    ;; doesn't exist yet when they're defined.
-    (cl-assert (or parent (memq name '(cl-structure-class
-                                       cl-structure-object)))))
+  (if (eq type 'record)
+      ;; Defstruct using record objects.
+      (setq type nil))
   (cl-assert (or type (not named)))
   (if (boundp children-sym)
       (add-to-list children-sym tag)
@@ -213,9 +208,7 @@ supertypes from the most specific to least specific.")
   (and (null type) (eq (caar slots) 'cl-tag-slot)
        ;; Hide the tag slot from "standard" (i.e. non-`type'd) structs.
        (setq slots (cdr slots)))
-  (let* ((parent-class (if parent (cl--struct-get-class parent)
-                         (cl--find-class (if (eq type 'list) 'cons
-                                           (or type 'record)))))
+  (let* ((parent-class (when parent (cl--struct-get-class parent)))
          (n (length slots))
          (index-table (make-hash-table :test 'eq :size n))
          (vslots (let ((v (make-vector n nil))
@@ -238,9 +231,7 @@ supertypes from the most specific to least specific.")
                  name docstring
                  (unless (symbolp parent-class) (list parent-class))
                  type named vslots index-table children-sym tag print)))
-    (cl-assert (or (not (symbolp parent-class))
-                   (memq name '(cl-structure-class cl-structure-object))))
-    (when (cl--struct-class-p parent-class)
+    (unless (symbolp parent-class)
       (let ((pslots (cl--struct-class-slots parent-class)))
         (or (>= n (length pslots))
             (let ((ok t))
@@ -372,137 +363,8 @@ supertypes from the most specific to least specific.")
         (merge-ordered-lists (mapcar #'cl--class-allparents
                                      (cl--class-parents class)))))
 
-(cl-defstruct (built-in-class
-               (:include cl--class)
-               (:constructor nil)
-               (:constructor built-in-class--make (name docstring parents))
-               (:copier nil))
-  )
-
-(defmacro cl--define-built-in-type (name parents &optional docstring &rest _slots)
-  ;; `slots' is currently unused, but we could make it take
-  ;; a list of "slot like properties" together with the corresponding
-  ;; accessor, and then we could maybe even make `slot-value' work
-  ;; on some built-in types :-)
-  (declare (indent 2) (doc-string 3))
-  (unless (listp parents) (setq parents (list parents)))
-  (unless (or parents (eq name t))
-    (error "Missing parents for %S: %S" name parents))
-  `(progn
-     (put ',name 'cl--class
-          (built-in-class--make ',name ,docstring
-                                (mapcar (lambda (type)
-                                          (let ((class (get type 'cl--class)))
-                                            (unless class
-                                              (error "Unknown type: %S" type))
-                                            class))
-                                        ',parents)))))
-
-;; FIXME: Our type DAG has various quirks:
-;; - `subr' says it's a `compiled-function' but that's not true
-;;   for those subrs that are special forms!
-;; - Some `keyword's are also `symbol-with-pos' but that's not reflected
-;;   in the DAG.
-;; - An OClosure can be an interpreted function or a `byte-code-function',
-;;   so the DAG of OClosure types is "orthogonal" to the distinction
-;;   between interpreted and compiled functions.
-
-(cl--define-built-in-type t nil "The type of everything.")
-(cl--define-built-in-type atom t "The type of anything but cons cells.")
-
-(cl--define-built-in-type tree-sitter-compiled-query atom)
-(cl--define-built-in-type tree-sitter-node atom)
-(cl--define-built-in-type tree-sitter-parser atom)
-(cl--define-built-in-type user-ptr atom)
-(cl--define-built-in-type font-object atom)
-(cl--define-built-in-type font-entity atom)
-(cl--define-built-in-type font-spec atom)
-(cl--define-built-in-type condvar atom)
-(cl--define-built-in-type mutex atom)
-(cl--define-built-in-type thread atom)
-(cl--define-built-in-type terminal atom)
-(cl--define-built-in-type hash-table atom)
-(cl--define-built-in-type frame atom)
-(cl--define-built-in-type buffer atom)
-(cl--define-built-in-type window atom)
-(cl--define-built-in-type process atom)
-(cl--define-built-in-type window-configuration atom)
-(cl--define-built-in-type overlay atom)
-(cl--define-built-in-type number-or-marker atom
-  "Abstract super type of both `number's and `marker's.")
-(cl--define-built-in-type symbol atom
-  "Type of symbols."
-  ;; Example of slots we could document.  It would be desirable to
-  ;; have some way to extract this from the C code, or somehow keep it
-  ;; in sync (probably not for `cons' and `symbol' but for things like
-  ;; `font-entity').
-  (name     symbol-name)
-  (value    symbol-value)
-  (function symbol-function)
-  (plist    symbol-plist))
-
-(cl--define-built-in-type obarray atom)
-(cl--define-built-in-type native-comp-unit atom)
-
-(cl--define-built-in-type sequence t "Abstract super type of sequences.")
-(cl--define-built-in-type list sequence)
-(cl--define-built-in-type array (sequence atom) "Abstract super type of arrays.")
-(cl--define-built-in-type number (number-or-marker)
-  "Abstract super type of numbers.")
-(cl--define-built-in-type float (number))
-(cl--define-built-in-type integer-or-marker (number-or-marker)
-  "Abstract super type of both `integer's and `marker's.")
-(cl--define-built-in-type integer (number integer-or-marker))
-(cl--define-built-in-type marker (integer-or-marker))
-(cl--define-built-in-type bignum (integer)
-  "Type of those integers too large to fit in a `fixnum'.")
-(cl--define-built-in-type fixnum (integer)
-  (format "Type of small (fixed-size) integers.
-The size depends on the Emacs version and compilation options.
-For this build of Emacs it's %dbit."
-          (1+ (logb (1+ most-positive-fixnum)))))
-(cl--define-built-in-type keyword (symbol)
-  "Type of those symbols whose first char is `:'.")
-(cl--define-built-in-type boolean (symbol)
-  "Type of the canonical boolean values, i.e. either nil or t.")
-(cl--define-built-in-type symbol-with-pos (symbol)
-  "Type of symbols augmented with source-position information.")
-(cl--define-built-in-type vector (array))
-(cl--define-built-in-type record (atom)
-  "Abstract type of objects with slots.")
-(cl--define-built-in-type bool-vector (array) "Type of bitvectors.")
-(cl--define-built-in-type char-table (array)
-  "Type of special arrays that are indexed by characters.")
-(cl--define-built-in-type string (array))
-(cl--define-built-in-type null (boolean list) ;FIXME: `atom' comes before `list'?
-  "Type of the nil value.")
-(cl--define-built-in-type cons (list)
-  "Type of cons cells."
-  ;; Example of slots we could document.
-  (car car) (cdr cdr))
-(cl--define-built-in-type function (atom)
-  "Abstract super type of function values.")
-(cl--define-built-in-type compiled-function (function)
-  "Abstract type of functions that have been compiled.")
-(cl--define-built-in-type byte-code-function (compiled-function)
-  "Type of functions that have been byte-compiled.")
-(cl--define-built-in-type subr (compiled-function)
-  "Abstract type of functions compiled to machine code.")
-(cl--define-built-in-type module-function (function)
-  "Type of functions provided via the module API.")
-(cl--define-built-in-type interpreted-function (function)
-  "Type of functions that have not been compiled.")
-(cl--define-built-in-type subr-native-elisp (subr)
-  "Type of function that have been compiled by the native compiler.")
-(cl--define-built-in-type subr-primitive (subr)
-  "Type of functions hand written in C.")
-
-(unless (cl--class-parents (cl--find-class 'cl-structure-object))
-  ;; When `cl-structure-object' is created, built-in classes didn't exist
-  ;; yet, so we couldn't put `record' as the parent.
-  ;; Fix it now to close the recursion.
-  (setf (cl--class-parents (cl--find-class 'cl-structure-object))
-      (list (cl--find-class 'record))))
+(eval-and-compile
+  (cl-assert (null (cl--class-parents (cl--find-class 'cl-structure-object)))))
 
 ;; Make sure functions defined with cl-defsubst can be inlined even in
 ;; packages which do not require CL.  We don't put an autoload cookie
