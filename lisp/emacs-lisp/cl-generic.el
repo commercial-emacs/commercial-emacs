@@ -679,16 +679,6 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
     ;; (Classic SM weak-sauce enforcement through longwinded comments).
     #'byte-compile))
 
-(defvar cl--generic-compiler
-  (if (or (consp (lambda (x) (+ x 1)))
-          (not (featurep 'bytecomp)))
-      (lambda (exp) (eval exp t))
-    #'byte-compile)
-  "Don't byte-compile the dispatchers if cl-generic itself is not
-  compiled.  Otherwise the byte-compiler and all the code on
-  which it depends needs to be usable before cl-generic is loaded,
-  which imposes a significant burden on the bootstrap.")
-
 (defun cl--generic-get-dispatcher (dispatch)
   (with-memoization
       ;; We need `copy-sequence` here because this `dispatch' object might be
