@@ -506,7 +506,7 @@ define pdump
 endef
 
 define relative-lisp-files
-	[ -s "../src/$(1).pdmp" ] && \
+	[ -s "../src/$(basename $(1)).pdmp" ] && \
 	   ../src/$(1) --batch -l ../admin/relative-lisp-files \
 	   --eval "(relative-lisp-files $(2))"
 endef
