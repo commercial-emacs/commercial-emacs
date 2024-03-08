@@ -134,7 +134,7 @@ jobs:
       run: |
         bash ./autogen.sh
         bash ./configure --prefix=$HOME/.local --without-dbus
-        make -j4 -C src
+        make -j4
     - name: elisp-benchmarks
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'Linux')
       run: |
