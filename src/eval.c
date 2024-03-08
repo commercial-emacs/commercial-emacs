@@ -1233,10 +1233,17 @@ unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
   do
     {
       /* Unwind to next recorded frame... */
+      fprintf (stderr, "catch is %p %d %u\n", catch,
+	       current_thread->exception_stack_top == catch,
+	       catch->type);
+      Fprin1 (catch->what, Qexternal_debugging_output, Qnil);
+      fprintf (stderr, "\n(%ld) %p > %p\n", catch->pdlcount.bytes,
+	       specpdl_ptr, specpdl_ref_to_ptr (catch->pdlcount));
       unbind_to (current_thread->exception_stack_top->pdlcount, Qnil);
       if (current_thread->exception_stack_top == catch)
 	break;
       /* ... then restore corresponding handlers. */
+      fprintf (stderr, "got here\n");
       exception_stack_pop (current_thread);
     }
   while (true);
@@ -1607,6 +1614,11 @@ push_exception (Lisp_Object what, enum exception_type type)
 #ifdef HAVE_X_WINDOWS
   top->x_error_handler_depth = x_error_message_count;
 #endif
+  fprintf (stderr, "push is %p %u\n", top, top->type);
+  fprintf (stderr, "(%ld) %p > %p\n", top->pdlcount.bytes,
+	   specpdl_ptr, specpdl_ref_to_ptr (top->pdlcount));
+  Fprin1 (top->what, Qexternal_debugging_output, Qnil);
+  fprintf (stderr, "\n");
   return top;
 }
 
@@ -3381,6 +3393,13 @@ unbind_to (specpdl_ref count, Lisp_Object value)
   while (specpdl_ptr != specpdl_ref_to_ptr (count))
     {
       eassert (specpdl_ptr > specpdl_ref_to_ptr (count));
+      if (count.bytes) {
+	fprintf (stderr, "(%ld) %p %p -> ", count.bytes,
+		 specpdl_ref_to_ptr (count),
+		 specpdl_ptr);
+	if (specpdl_ptr <= specpdl_ref_to_ptr (count))
+	  emacs_abort ();
+      }
       switch ((--specpdl_ptr)->kind)
 	{
 	case SPECPDL_UNWIND:
@@ -3450,6 +3469,14 @@ unbind_to (specpdl_ref count, Lisp_Object value)
 	  break;
 	default:
 	  break;
+	}
+      if (count.bytes)
+	{
+	  fprintf (stderr, "%p", specpdl_ptr);
+	  if (current_thread->exception_stack_top)
+	    fprintf (stderr, " (%p)",
+		     specpdl_ref_to_ptr (current_thread->exception_stack_top->pdlcount));
+	  fprintf (stderr, "\n");
 	}
     }
 
