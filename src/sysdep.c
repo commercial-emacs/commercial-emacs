@@ -1846,6 +1846,8 @@ stack_overflow (siginfo_t *siginfo)
     return 0 <= top - addr && top - addr < (bot - top) >> LG_STACK_HEURISTIC;
 }
 
+/* Signal handler for SIGSEGV before our new handler was installed.  */
+static struct sigaction old_sigsegv_handler;
 
 /* Attempt to recover from SIGSEGV caused by C stack overflow.  */
 
@@ -1860,6 +1862,15 @@ handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
 #endif
       stack_overflow (siginfo))
     siglongjmp (return_to_command_loop, 1);
+
+#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
+  /* Tombstones (crash reports with stack traces) won't be generated on
+     Android unless the original SIGSEGV handler is installed and the
+     signal is resent, such as by returning from the first signal
+     handler called.  */
+  sigaction (SIGSEGV, &old_sigsegv_handler, NULL);
+  return;
+#endif /* HAVE_ANDROID && ANDROID_STUBIFY */
 
   /* Otherwise we can't do anything with this.  */
   deliver_fatal_thread_signal (sig);
@@ -1883,7 +1894,7 @@ init_sigsegv (void)
   sigfillset (&sa.sa_mask);
   sa.sa_sigaction = handle_sigsegv;
   sa.sa_flags = SA_SIGINFO | SA_ONSTACK | emacs_sigaction_flags ();
-  if (sigaction (SIGSEGV, &sa, NULL) < 0)
+  if (sigaction (SIGSEGV, &sa, &old_sigsegv_handler) < 0)
     return 0;
 
   return 1;
