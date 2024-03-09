@@ -7276,7 +7276,7 @@ from `default-directory'.
 (autoload 'disassemble "disass" "\
 Print disassembled code for OBJECT in (optional) BUFFER.
 OBJECT can be a symbol defined as a function, or a function itself
-(a lambda expression or a compiled-function object).
+(a lambda expression or a byte-code-function object).
 If OBJECT is not already compiled, we compile it, but do not
 redefine OBJECT if it is a symbol.
 
@@ -8886,7 +8886,7 @@ SUPERCLASSES as children.
 It creates an autoload function for CNAME's constructor.
 
 (fn CNAME SUPERCLASSES FILENAME DOC)")
-(register-definition-prefixes "eieio-core" '("class-" "eieio-" "inconsistent-class-hierarchy" "invalid-slot-" "unbound-slot"))
+(register-definition-prefixes "eieio-core" '("cl--generic-struct-tag" "class-" "eieio-" "inconsistent-class-hierarchy" "invalid-slot-" "unbound-slot"))
 
 
 ;;; Generated autoloads from emacs-lisp/eieio-custom.el
@@ -16744,9 +16744,13 @@ use its file extension as image type.
 Optional DATA-P non-nil means FILE-OR-DATA is a string containing image data.
 
 Optional PROPS are additional image attributes to assign to the image,
-like, e.g. `:mask MASK'.  If the property `:scale' is not given and the
-display has a high resolution (more exactly, when the average width of a
-character in the default font is more than 10 pixels), the image is
+like, e.g. `:mask MASK'.  See Info node `(elisp)Image Descriptors' for
+the list of supported properties; see the nodes following that node
+for properties specific to certain image types.
+
+If the property `:scale' is not given and the display has a high
+resolution (more exactly, when the average width of a character
+in the default font is more than 10 pixels), the image is
 automatically scaled up in proportion to the default font.
 
 Value is the image created, or nil if images of type TYPE are not supported.
@@ -24859,8 +24863,8 @@ Otherwise, `default-directory' is temporarily set to the current
 project's root.
 
 If OVERRIDING-MAP is non-nil, it will be used as
-`overriding-local-map' to provide shorter bindings from that map
-which will take priority over the global ones.
+`overriding-terminal-local-map' to provide shorter bindings
+from that map which will take priority over the global ones.
 
 (fn &optional OVERRIDING-MAP PROMPT-FORMAT)" t)
 (autoload 'project-prefix-or-any-command "project" "\
@@ -30805,6 +30809,9 @@ such as if there are no commands in the file, the value of `tex-default-mode'
 says which mode to use.
 
 (fn)" t)
+ (add-to-list 'major-mode-remap-defaults '(TeX-mode . tex-mode))
+ (add-to-list 'major-mode-remap-defaults '(plain-TeX-mode . plain-tex-mode))
+ (add-to-list 'major-mode-remap-defaults '(LaTeX-mode . latex-mode))
  (defalias 'TeX-mode #'tex-mode)
  (defalias 'plain-TeX-mode #'plain-tex-mode)
  (defalias 'LaTeX-mode #'latex-mode)
@@ -31876,6 +31883,61 @@ holds a keymap.
 ;;; Generated autoloads from tooltip.el
 
 (register-definition-prefixes "tooltip" '("tooltip-"))
+
+
+;;; Generated autoloads from touch-screen.el
+
+(autoload 'touch-screen-hold "touch-screen" "\
+Handle a long press EVENT.
+Ding and select the window at EVENT, then activate the mark.  If
+`touch-screen-word-select' is enabled, try to select the whole
+word around EVENT; otherwise, set point to the location of EVENT.
+
+(fn EVENT)" t)
+(autoload 'touch-screen-track-tap "touch-screen" "\
+Track a single tap starting from EVENT.
+EVENT should be a `touchscreen-begin' event.
+
+Read touch screen events until a `touchscreen-end' event is
+received with the same ID as in EVENT.  If UPDATE is non-nil and
+a `touchscreen-update' event is received in the mean time and
+contains a touch point with the same ID as in EVENT, call UPDATE
+with that event and DATA.
+
+If THRESHOLD is non-nil, enforce a threshold of movement that is
+either itself or 10 pixels when it is not a number.  If the
+aforementioned touch point moves beyond that threshold on any
+axis, return nil immediately, and further resume mouse event
+translation for the touch point at hand.
+
+Return nil immediately if any other kind of event is received;
+otherwise, return t once the `touchscreen-end' event arrives.
+
+(fn EVENT &optional UPDATE DATA THRESHOLD)")
+(autoload 'touch-screen-track-drag "touch-screen" "\
+Track a single drag starting from EVENT.
+EVENT should be a `touchscreen-begin' event.
+
+Read touch screen events until a `touchscreen-end' event is
+received with the same ID as in EVENT.  For each
+`touchscreen-update' event received in the mean time containing a
+touch point with the same ID as in EVENT, call UPDATE with the
+touch point in event and DATA, once the touch point has moved
+significantly by at least 5 pixels from where it was in EVENT.
+
+Return nil immediately if any other kind of event is received;
+otherwise, return either t or `no-drag' once the
+`touchscreen-end' event arrives; return `no-drag' returned if the
+touch point in EVENT did not move significantly, and t otherwise.
+
+(fn EVENT UPDATE &optional DATA)")
+(autoload 'touch-screen-inhibit-drag "touch-screen" "\
+Inhibit subsequent `touchscreen-drag' events from being sent.
+Prevent `touchscreen-drag' and translated mouse events from being
+sent until the touch sequence currently being translated ends.
+Must be called from a command bound to a `touchscreen-hold' or
+`touchscreen-drag' event.")
+(register-definition-prefixes "touch-screen" '("touch-screen-"))
 
 
 ;;; Generated autoloads from emacs-lisp/tq.el
@@ -35251,6 +35313,57 @@ Turn on Viper emulation of Vi in Emacs.  See Info node `(viper)Top'." t)
 (register-definition-prefixes "quail/viqr" '("viet-quail-define-rules"))
 
 
+;;; Generated autoloads from visual-wrap.el
+
+(autoload 'visual-wrap-prefix-mode "visual-wrap" "\
+Display continuation lines with prefixes from surrounding context.
+
+To enable this minor mode across all buffers, enable
+`global-visual-wrap-prefix-mode'.
+
+This is a minor mode.  If called interactively, toggle the
+`Visual-Wrap-Prefix mode' mode.  If the prefix argument is positive,
+enable the mode, and if it is zero or negative, disable the mode.
+
+If called from Lisp, toggle the mode if ARG is `toggle'.  Enable the
+mode if ARG is nil, omitted, or is a positive number.  Disable the mode
+if ARG is a negative number.
+
+To check whether the minor mode is enabled in the current buffer,
+evaluate `visual-wrap-prefix-mode'.
+
+The mode's hook is called both when the mode is enabled and when it is
+disabled.
+
+(fn &optional ARG)" t)
+(put 'global-visual-wrap-prefix-mode 'globalized-minor-mode t)
+(defvar global-visual-wrap-prefix-mode nil "\
+Non-nil if Global Visual-Wrap-Prefix mode is enabled.
+See the `global-visual-wrap-prefix-mode' command
+for a description of this minor mode.
+Setting this variable directly does not take effect;
+either customize it (see the info node `Easy Customization')
+or call the function `global-visual-wrap-prefix-mode'.")
+(custom-autoload 'global-visual-wrap-prefix-mode "visual-wrap" nil)
+(autoload 'global-visual-wrap-prefix-mode "visual-wrap" "\
+Toggle Visual-Wrap-Prefix mode in all buffers.
+With prefix ARG, enable Global Visual-Wrap-Prefix mode if ARG is
+positive; otherwise, disable it.
+
+If called from Lisp, toggle the mode if ARG is `toggle'.
+Enable the mode if ARG is nil, omitted, or is a positive number.
+Disable the mode if ARG is a negative number.
+
+Visual-Wrap-Prefix mode is enabled in all buffers where
+`visual-wrap-prefix-mode' would do it.
+
+See `visual-wrap-prefix-mode' for more information on
+Visual-Wrap-Prefix mode.
+
+(fn &optional ARG)" t)
+(register-definition-prefixes "visual-wrap" '("visual-wrap-"))
+
+
 ;;; Generated autoloads from emacs-lisp/vtable.el
 
 (register-definition-prefixes "vtable" '("vtable"))
@@ -36539,6 +36652,7 @@ run a specific program.  The program must be a member of
 ;; version-control: never
 ;; no-update-autoloads: t
 ;; no-native-compile: t
+;; no-byte-compile: t
 ;; coding: utf-8-emacs-unix
 ;; End:
 
