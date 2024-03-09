@@ -181,13 +181,12 @@ If nil, then no messages will ever be printed to the minibuffer."
   :type '(choice (const :tag "Align a large region silently" nil) integer)
   :group 'align)
 
-(defcustom align-c++-modes '( c++-mode c-mode java-mode
-                              c-ts-mode c++-ts-mode)
+(defcustom align-c++-modes '( c++-mode c-mode java-mode)
   "A list of modes whose syntax resembles C/C++."
   :type '(repeat symbol)
   :group 'align)
 
-(defcustom align-perl-modes '(perl-mode cperl-mode)
+(defcustom align-perl-modes '(perl-mode)
   "A list of modes where Perl syntax is to be seen."
   :type '(repeat symbol)
   :group 'align)
