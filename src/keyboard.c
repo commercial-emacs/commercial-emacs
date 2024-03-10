@@ -2326,8 +2326,7 @@ read_char (int commandflag, Lisp_Object map,
       goto reread_for_input_method;
     }
 
-  /* If we're executing a macro, process it unless we are at its end. */
-  if (!NILP (Vexecuting_kbd_macro) && !at_end_of_macro_p ())
+  if (!NILP (Vexecuting_kbd_macro))
     {
       /* We set this to Qmacro; since that's not a frame, nobody will
 	 try to switch frames on us, and the selected window will
@@ -2340,6 +2339,16 @@ read_char (int commandflag, Lisp_Object map,
 	 events read from a macro should never cause a new frame to be
 	 selected.  */
       Vlast_event_frame = internal_last_event_frame = Qmacro;
+
+      /* Exit the macro if we are at the end.
+	 Also, some things replace the macro with t
+	 to force an early exit.  */
+      if (EQ (Vexecuting_kbd_macro, Qt)
+	  || executing_kbd_macro_index >= XFIXNAT (Flength (Vexecuting_kbd_macro)))
+	{
+	  XSETINT (c, -1);
+	  goto exit;
+	}
 
       c = Faref (Vexecuting_kbd_macro, make_int (executing_kbd_macro_index));
       if (STRINGP (Vexecuting_kbd_macro)
@@ -9633,16 +9642,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	    }
 	  used_mouse_menu = used_mouse_menu_history[t];
 	}
-      /* If we're at the end of a macro, exit it by returning 0,
-	 unless there are unread events pending.  */
-      else if (!NILP (Vexecuting_kbd_macro)
-	  && at_end_of_macro_p ()
-	  && !requeued_events_pending_p ())
-	{
-	  t = 0;
-	  goto done;
-	}
-      /* Otherwise, we should actually read a character.  */
+
+      /* If not, we should actually read a character.  */
       else
 	{
 	  {
@@ -9732,6 +9733,18 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	    {
 	      unbind_to (count, Qnil);
 	      return -1;
+	    }
+
+	  /* read_char returns -1 at the end of a macro.
+	     Emacs 18 handles this by returning immediately with a
+	     zero, so that's what we'll do.  */
+	  if (FIXNUMP (key) && XFIXNUM (key) == -1)
+	    {
+	      t = 0;
+	      /* The Microsoft C compiler can't handle the goto that
+		 would go here.  */
+	      dummyflag = true;
+	      break;
 	    }
 
 	  /* If the current buffer has been changed from under us, the
@@ -10227,7 +10240,10 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	  && help_char_p (EVENT_HEAD (key)) && t > 1)
 	    {
 	      read_key_sequence_cmd = Vprefix_help_command;
-	      goto done;
+	      /* The Microsoft C compiler can't handle the goto that
+		 would go here.  */
+	      dummyflag = true;
+	      break;
 	    }
 
       /* If KEY is not defined in any of the keymaps,
@@ -10276,9 +10292,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	    }
 	}
     }
-  read_key_sequence_cmd = current_binding;
-
-  done:
+  if (!dummyflag)
+    read_key_sequence_cmd = current_binding;
   read_key_sequence_remapped
     /* Remap command through active keymaps.
        Do the remapping here, before the unbind_to so it uses the keymaps
@@ -10467,24 +10482,16 @@ clear_input_pending (void)
   input_pending = false;
 }
 
-/* Return true if there are pending requeued command events.  */
-
-bool
-requeued_command_events_pending_p (void)
-{
-  return (CONSP (Vunread_command_events));
-}
-
-/* Return true if there are any pending requeued events (command events
-   or events to be processed by other levels of the input processing
-   stages).  */
+/* Return true if there are pending requeued events.
+   This isn't used yet.  The hope is to make wait_reading_process_output
+   call it, and return if it runs Lisp code that unreads something.
+   The problem is, kbd_buffer_get_event needs to be fixed to know what
+   to do in that case.  It isn't trivial.  */
 
 bool
 requeued_events_pending_p (void)
 {
-  return (requeued_command_events_pending_p ()
-	  || !NILP (Vunread_post_input_method_events)
-	  || !NILP (Vunread_input_method_events));
+  return (CONSP (Vunread_command_events));
 }
 
 DEFUN ("input-pending-p", Finput_pending_p, Sinput_pending_p, 0, 1, 0,
@@ -10492,7 +10499,9 @@ DEFUN ("input-pending-p", Finput_pending_p, Sinput_pending_p, 0, 1, 0,
 If CHECK-TIMERS is non-nil, run timers that are ready.  */)
   (Lisp_Object check_timers)
 {
-  if (requeued_events_pending_p ())
+  if (CONSP (Vunread_command_events)
+      || !NILP (Vunread_post_input_method_events)
+      || !NILP (Vunread_input_method_events))
     return (Qt);
 
   /* Process non-user-visible events (Bug#10195).  */

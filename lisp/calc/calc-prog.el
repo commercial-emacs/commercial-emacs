@@ -1225,17 +1225,13 @@ Redefine the corresponding command."
   (interactive)
   (calc-kbd-if))
 
-(defun calc--at-end-of-kmacro-p ()
-  (and (arrayp executing-kbd-macro)
-       (>= executing-kbd-macro-index (length executing-kbd-macro))))
-
 (defun calc-kbd-skip-to-else-if (else-okay)
   (let ((count 0)
 	ch)
     (while (>= count 0)
-      (if (calc--at-end-of-kmacro-p)
-	  (error "Unterminated Z[ in keyboard macro"))
       (setq ch (read-char))
+      (if (= ch -1)
+	  (error "Unterminated Z[ in keyboard macro"))
       (if (= ch ?Z)
 	  (progn
 	    (setq ch (read-char))
@@ -1303,9 +1299,9 @@ Redefine the corresponding command."
     (or executing-kbd-macro
 	(message "Reading loop body..."))
     (while (>= count 0)
-      (if (calc--at-end-of-kmacro-p)
-	  (error "Unterminated Z%c in keyboard macro" open))
       (setq ch (read-event))
+      (if (eq ch -1)
+	  (error "Unterminated Z%c in keyboard macro" open))
       (if (eq ch ?Z)
 	  (progn
 	    (setq ch (read-event)
@@ -1431,9 +1427,9 @@ Redefine the corresponding command."
 	   (if defining-kbd-macro
 	       (message "Reading body..."))
 	   (while (>= count 0)
-	     (if (calc--at-end-of-kmacro-p)
-		 (error "Unterminated Z` in keyboard macro"))
 	     (setq ch (read-char))
+	     (if (= ch -1)
+		 (error "Unterminated Z` in keyboard macro"))
 	     (if (= ch ?Z)
 		 (progn
 		   (setq ch (read-char)
