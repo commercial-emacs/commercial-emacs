@@ -5141,7 +5141,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
 	  /* If there is unread keyboard input, also return.  */
 	  if (read_kbd != 0
-	      && requeued_events_pending_p ())
+	      && requeued_command_events_pending_p ())
 	    break;
         }
 
@@ -5421,7 +5421,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
       /* If there is unread keyboard input, also return.  */
       if (read_kbd != 0
-	  && requeued_events_pending_p ())
+	  && requeued_command_events_pending_p ())
 	break;
 
       /* If we are not checking for keyboard input now,
