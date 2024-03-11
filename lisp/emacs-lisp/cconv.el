@@ -709,37 +709,46 @@ are subsets of LEXVARS and DYNVARS, respectively."
             (seq-keep (lambda (var) (car (memq var dynvars)))
                       cconv--dynvars-seen)))))
 
-(defun cconv-make-interpreted-closure (fun env)
+(defun cconv-make-interpreted-closure (args body env docstring iform)
   "Make a closure for the interpreter at runtime.
 FUN must be a lambda expression.  ENV is the runtime
 representation of the lexical environment, i.e. elements are
 dynamically scoped plain symbols or lexically scoped (SYMBOL
 . VAL) pairs."
-  (cl-assert (eq (car-safe fun) 'lambda))
+  (cl-assert (consp body))
+  (cl-assert (listp args))
   (let ((lexvars (delq nil (mapcar #'car-safe env))))
-    (if (or (null lexvars)
-            ;; exception keeping context untrimmed (Bug#59213)
-            (and (eq :closure-dont-trim-context (nth 2 fun))
-                 (nthcdr 3 fun)))
+    (if (or
+         ;; exception keeping context untrimmed (Bug#59213)
+         (and (eq :closure-dont-trim-context (car body))
+              ;; Check the function doesn't just return the magic keyword.
+              (cdr body)
+              ;; Drop the magic marker from the closure.
+              (setq body (cdr body)))
+         ;; There's no var to capture, so skip the analysis.
+         (null lexvars))
         ;; Return trivial closure if the lexical environment is empty,
         ;; or needs to be preserved.  Attempting to replace ,(cdr fun)
         ;; by a macroexpanded version causes bootstrap to fail.
-        `(closure ,env . ,(cdr fun))
-      (let* ((form `#',fun)
+        (make-interpreted-closure args body env docstring iform)
+      (let* ((form `#'(lambda ,args ,iform . ,body))
              (expanded-form
               (let ((lexical-binding t)
                     (macroexp--dynvars (append env macroexp--dynvars)))
                 (macroexpand-all form macroexpand-all-environment)))
-             (expanded-fun-cdr
+             ;; Since we macroexpanded the body, we may as well use that.
+             (expanded-fun-body
               (pcase expanded-form
-                (`#'(lambda . ,cdr) cdr)
-                (_ (cdr fun))))
-             (dynvars (delq nil (mapcar (lambda (b) (when (symbolp b) b)) env)))
-             (new-env
-              (cl-destructuring-bind (lexv . dynv)
-                  (cconv-fv expanded-form lexvars dynvars)
-                (nconc (mapcar (lambda (fv) (assq fv env)) lexv) dynv))))
-        `(closure ,(or new-env '(t)) . ,expanded-fun-cdr)))))
+                (`#'(lambda ,_args ,_iform . ,newbody) newbody)
+                (_ body)))
+             (dynvars (delq nil (mapcar (lambda (b) (if (symbolp b) b)) env)))
+             (new-env (cl-destructuring-bind (lexv . dynv)
+			  (cconv-fv expanded-form lexvars dynvars)
+			(nconc (mapcar (lambda (fv) (assq fv env)) lexv) dynv))))
+        ;; Never return a nil env which was conflated to mean dynbind
+        (make-interpreted-closure args expanded-fun-body (or new-env '(t))
+                                  docstring iform)))))
+
 
 (provide 'cconv)
 ;;; cconv.el ends here

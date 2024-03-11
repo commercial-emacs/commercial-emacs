@@ -161,16 +161,7 @@ Earlier variables shadow later ones with the same name.")
       ((pred byte-code-function-p)
        (byte-compile--check-arity-bytecode form fn)
        `(,fn ,@(cdr form)))
-      ((or `(lambda . ,_) `(closure . ,_))
-       ;; While byte-compile-unfold-byte-code-function can inline
-       ;; dynbind byte-code into letbind byte-code (or any other
-       ;; combination for that matter), we can only inline dynbind
-       ;; source into dynbind source or lexbind source into lexbind
-       ;; source.  When the function comes from another file, we
-       ;; byte-compile the inlined function first, and then inline its
-       ;; byte-code.  This also has the advantage that the final code
-       ;; does not depend on the order of compilation of ELisp files,
-       ;; making the build more reproducible.
+      ((pred interpreted-function-p)
        (if (eq fn localfn)
            ;; From the same file => same mode.
            (let* ((unoptimized `(,fn ,@(cdr form)))
@@ -1869,6 +1860,7 @@ See Info node `(elisp) Integer Basics'."
          charsetp
          ;; data.c
          arrayp atom bare-symbol-p bool-vector-p bufferp byte-code-function-p
+         interpreted-function-p closurep
          byteorder car-safe cdr-safe char-or-string-p char-table-p
          condition-variable-p consp eq floatp indirect-function
          integer-or-marker-p integerp keywordp listp markerp

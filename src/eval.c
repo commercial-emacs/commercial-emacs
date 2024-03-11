@@ -490,6 +490,33 @@ usage: (quote ARG)  */)
   return XCAR (args);
 }
 
+DEFUN ("make-interpreted-closure", Fmake_interpreted_closure,
+       Smake_interpreted_closure, 3, 5, 0,
+       doc: /* Make an interpreted closure.
+ARGS should be the list of formal arguments.
+BODY should be a non-empty list of forms.
+ENV should be a lexical environment, like the second argument of `eval'.
+IFORM if non-nil should be of the form (interactive ...).  */)
+  (Lisp_Object args, Lisp_Object body, Lisp_Object env,
+   Lisp_Object docstring, Lisp_Object iform)
+{
+  CHECK_CONS (body);          /* Make sure it's not confused with byte-code! */
+  CHECK_LIST (args);
+  CHECK_LIST (iform);
+  Lisp_Object ifcdr = Fcdr (iform);
+  Lisp_Object slots[] = { args,  body, env, Qnil, docstring,
+			  NILP (Fcdr (ifcdr))
+			  ? Fcar (ifcdr)
+			  : CALLN (Fvector, XCAR (ifcdr), XCDR (ifcdr)) };
+  /* Adjusting the size is indispensable since, as for byte-code objects,
+     we distinguish interactive functions by the presence or absence of the
+     iform slot.  */
+  Lisp_Object val
+    = Fvector (!NILP (iform) ? 6 : !NILP (docstring) ? 5 : 3, slots);
+  XSETPVECTYPE (XVECTOR (val), PVEC_CLOSURE);
+  return val;
+}
+
 DEFUN ("function", Ffunction, Sfunction, 1, UNEVALLED, 0,
        doc: /* Like `quote', but potentially byte-compiles or macroexpands ARG.
 usage: (function ARG)  */)
@@ -499,36 +526,59 @@ usage: (function ARG)  */)
   if (!NILP (XCDR (args)))
     xsignal2 (Qwrong_number_of_arguments, Qfunction, Flength (args));
 
-  if (!NILP (current_thread->lexical_environment)
-      && CONSP (quoted)
+  if (CONSP (quoted)
       && EQ (XCAR (quoted), Qlambda))
     {
       /* A lambda expression within a lexical environment.  Return an
 	 interpreted closure.  */
       Lisp_Object cdr = XCDR (quoted);
-      Lisp_Object tmp = cdr;
-      if (CONSP (tmp)
-	  && (tmp = XCDR (tmp), CONSP (tmp))
-	  && (tmp = XCAR (tmp), CONSP (tmp))
-	  && (EQ (QCdocumentation, XCAR (tmp))))
-	{
-	  /* Build docstring from (:documentation <form>).  */
-	  Lisp_Object docstring = eval_form (CAR (XCDR (tmp)));
-	  if (SYMBOLP (docstring) && !NILP (docstring))
-	    /* OClosure docstrings are just their types, and thus symbols.  */
-	    docstring = Fsymbol_name (docstring);
-	  CHECK_STRING (docstring);
-	  cdr = Fcons (XCAR (cdr), Fcons (docstring, XCDR (XCDR (cdr))));
-	}
-      return (!NILP (Vinternal_make_interpreted_closure_function)
+      Lisp_Object args = Fcar (cdr);
+      cdr = Fcdr (cdr);
+      Lisp_Object docstring = Qnil, iform = Qnil;
+      if (CONSP (cdr))
+        {
+          docstring = XCAR (cdr);
+          if (STRINGP (docstring))
+            {
+              Lisp_Object tmp = XCDR (cdr);
+              if (!NILP (tmp))
+                cdr = tmp;
+              else     /* It's not a docstring, it's a return value.  */
+                docstring = Qnil;
+            }
+          /* Handle the special (:documentation <form>) to build the docstring
+	     dynamically.  */
+          else if (CONSP (docstring)
+                   && EQ (QCdocumentation, XCAR (docstring))
+                   && (docstring = eval_form (Fcar (XCDR (docstring))),
+                       true))
+            cdr = XCDR (cdr);
+          else
+            docstring = Qnil;   /* Not a docstring after all.  */
+        }
+      if (CONSP (cdr))
+        {
+          iform = XCAR (cdr);
+          if (CONSP (iform)
+              && EQ (Qinteractive, XCAR (iform)))
+            cdr = XCDR (cdr);
+          else
+            iform = Qnil;   /* Not an interactive-form after all.  */
+        }
+      if (NILP (cdr))
+        cdr = Fcons (Qnil, Qnil); /* Make sure the body is never empty! */
+
+      return (!NILP (current_thread->lexical_environment)
+	      && !NILP (Vinternal_make_interpreted_closure_function)
 #ifdef HAVE_GCC_TLS
 	      && main_thread_p (current_thread)
 #endif
-	      )
-	? call2 (Vinternal_make_interpreted_closure_function,
-		 Fcons (Qlambda, cdr),
-		 current_thread->lexical_environment)
-	: Fcons (Qclosure, Fcons (current_thread->lexical_environment, cdr));
+	      ? call5 (Vinternal_make_interpreted_closure_function,
+		       args, cdr, current_thread->lexical_environment,
+		       docstring, iform)
+	      : Fmake_interpreted_closure (args, cdr,
+					   current_thread->lexical_environment,
+					   docstring, iform));
     }
   else
     /* Simply quote the argument.  */
@@ -1950,15 +2000,12 @@ then strings and vectors are not accepted.  */)
       else
         {
           Lisp_Object body = CDR_SAFE (XCDR (fun));
-          if (EQ (funcar, Qclosure))
-            body = CDR_SAFE (body);
-          else if (!EQ (funcar, Qlambda))
+          if (!EQ (funcar, Qlambda))
 	    return Qnil;
 	  if (!NILP (Fassq (Qinteractive, body)))
 	    return Qt;
-	  else if (VALID_DOCSTRING_P (CAR_SAFE (body)))
-            /* A "docstring" is a sign that we may have an OClosure.  */
-	    genfun = true;
+	  else
+	    return Qnil;
 	}
     }
 
@@ -2342,8 +2389,7 @@ eval_form (Lisp_Object form)
 	  exp = unbind_to (count1, exp);
 	  result = eval_form (exp);
 	}
-      else if (EQ (XCAR (fun), Qlambda)
-	       || EQ (XCAR (fun), Qclosure))
+      else if (EQ (XCAR (fun), Qlambda))
 	{
 	  const ptrdiff_t nargs = list_length (args);
 	  Lisp_Object *evaluated_args;
@@ -2687,7 +2733,7 @@ FUNCTIONP (Lisp_Object object)
   else if (CONSP (object))
     {
       Lisp_Object car = XCAR (object);
-      return EQ (car, Qlambda) || EQ (car, Qclosure);
+      return EQ (car, Qlambda);
     }
   else
     return false;
@@ -2717,8 +2763,7 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
       Lisp_Object funcar = XCAR (fun);
       if (!SYMBOLP (funcar))
 	xsignal1 (Qinvalid_function, original_fun);
-      if (EQ (funcar, Qlambda)
-	  || EQ (funcar, Qclosure))
+      if (EQ (funcar, Qlambda))
 	return funcall_lambda (fun, numargs, args);
       else if (EQ (funcar, Qautoload))
 	{
@@ -2873,21 +2918,14 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 	  /* Otherwise the slot represents a formal arglist of
 	     dynamically scoped variables.  */
 	  args = first_slot;
-	  lexenv = Qnil;
+	  lexenv = CONSP (AREF (fun, CLOSURE_CODE))
+	    ? AREF (fun, CLOSURE_CONSTANTS)
+	    : Qnil;
 	}
     }
   else if (CONSP (fun))
     {
-      if (EQ (XCAR (fun), Qclosure))
-	{
-	  Lisp_Object cdr = XCDR (fun);	/* Drop 'closure.  */
-	  if (!CONSP (cdr))
-	    xsignal1 (Qinvalid_function, fun);
-	  fun = cdr;
-	  lexenv = XCAR (fun);
-	}
-      else
-	lexenv = Qnil;
+      lexenv = Qnil;
       args = XCDR (fun);
       if (CONSP (args))
 	args = XCAR (args);
@@ -2975,9 +3013,14 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
     : SUBR_NATIVE_COMPILEDP (fun)
     /* save call to funcall_subr since 0 args by construction */
     ? XSUBR (fun)->function.a0 ()
-    : args_template < 0
-    ? exec_byte_code (fun, 0, 0, NULL)
-    : exec_byte_code (fun, args_template, nargs, arg_vector);
+    : args_template >= 0
+    /* from the goto: defer all argument binding to the bytecode interpreter */
+    ? exec_byte_code (fun, args_template, nargs, arg_vector)
+    : CONSP (AREF (fun, CLOSURE_CODE))
+    /* interpreted function */
+    ? Fprogn (AREF (fun, CLOSURE_CODE))
+    /* dynbound bytecode */
+    : exec_byte_code (fun, 0, 0, NULL);
   return specpdl_ptr == specpdl_ref_to_ptr (count)
     ? retval : unbind_to (count, retval);
 }
@@ -3027,8 +3070,7 @@ function with `&rest' args, or `unevalled' for a special form.  */)
       funcar = XCAR (function);
       if (!SYMBOLP (funcar))
 	xsignal1 (Qinvalid_function, original);
-      if (EQ (funcar, Qlambda)
-	  || EQ (funcar, Qclosure))
+      if (EQ (funcar, Qlambda))
 	result = lambda_arity (function);
       else if (EQ (funcar, Qautoload))
 	{
@@ -3049,11 +3091,6 @@ lambda_arity (Lisp_Object fun)
 
   if (CONSP (fun))
     {
-      if (EQ (XCAR (fun), Qclosure))
-	{
-	  fun = XCDR (fun);	/* Drop `closure'.  */
-	  CHECK_CONS (fun);
-	}
       syms_left = XCDR (fun);
       if (CONSP (syms_left))
 	syms_left = XCAR (syms_left);
@@ -3876,7 +3913,6 @@ clearing `quit-flag' before clearing `inhibit-quit'.  */);
   DEFSYM (Qcommandp, "commandp");
   DEFSYM (Qand_rest, "&rest");
   DEFSYM (Qand_optional, "&optional");
-  DEFSYM (Qclosure, "closure");
   DEFSYM (QCdocumentation, ":documentation");
   DEFSYM (Qdebug, "debug");
   DEFSYM (Qdebug_early, "debug-early");
@@ -4005,6 +4041,7 @@ Don't set this unless you're sure that can't happen.  */);
   defsubr (&Ssetq);
   defsubr (&Squote_);
   defsubr (&Sfunction);
+  defsubr (&Smake_interpreted_closure);
   defsubr (&Sdefault_toplevel_value);
   defsubr (&Sset_default_toplevel_value);
   defsubr (&Sdefvar);
