@@ -296,16 +296,37 @@ DEFUN ("null", Fnull, Snull, 1, 1, 0,
 DEFUN ("type-of", Ftype_of, Stype_of, 1, 1, 0,
        doc: /* Return a symbol representing the type of OBJECT.
 The symbol returned names the object's basic type;
-for example, (type-of 1) returns `integer'.  */)
+for example, (type-of 1) returns `integer'.
+Contrary to `cl-type-of', the returned type is not always the most
+precise type possible, because instead this function tries to preserve
+compatibility with the return value of previous Emacs versions.  */)
+  (Lisp_Object object)
+{
+  return SYMBOLP (object)    ? Qsymbol
+         : INTEGERP (object) ? Qinteger
+         : SUBRP (object)    ? Qsubr
+         : Fcl_type_of (object);
+}
+
+DEFUN ("cl-type-of", Fcl_type_of, Scl_type_of, 1, 1, 0,
+       doc: /* Return a symbol representing the type of OBJECT.
+The returned symbol names the most specific possible type of the object.
+for example, (cl-type-of nil) returns `null'.
+The specific type returned may change depending on Emacs versions,
+so we recommend you use `cl-typep', `cl-typecase', or other predicates
+rather than compare the return value of this function against
+a fixed set of types.  */)
   (Lisp_Object object)
 {
   switch (XTYPE (object))
     {
     case_Lisp_Int:
-      return Qinteger;
+      return Qfixnum;
 
     case Lisp_Symbol:
-      return Qsymbol;
+      return NILP (object) ? Qnull
+             : EQ (object, Qt) ? Qboolean
+             : Qsymbol;
 
     case Lisp_String:
       return Qstring;
@@ -318,7 +339,7 @@ for example, (type-of 1) returns `integer'.  */)
       switch (PVTYPE (XVECTOR (object)))
         {
         case PVEC_NORMAL_VECTOR: return Qvector;
-	case PVEC_BIGNUM: return Qinteger;
+	case PVEC_BIGNUM: return Qbignum;
 	case PVEC_MARKER: return Qmarker;
 	case PVEC_OVERLAY: return Qoverlay;
 	case PVEC_FINALIZER: return Qfinalizer;
@@ -326,7 +347,10 @@ for example, (type-of 1) returns `integer'.  */)
         case PVEC_WINDOW_CONFIGURATION: return Qwindow_configuration;
         case PVEC_PROCESS: return Qprocess;
         case PVEC_WINDOW: return Qwindow;
-        case PVEC_SUBR: return Qsubr;
+        case PVEC_SUBR:
+          return XSUBR (object)->max_args == UNEVALLED ? Qspecial_form
+                 : SUBR_NATIVE_COMPILEDP (object) ? Qsubr_native_elisp
+                 : Qsubr_primitive;
         case PVEC_COMPILED: return Qcompiled_function;
         case PVEC_BUFFER: return Qbuffer;
         case PVEC_CHAR_TABLE: return Qchar_table;
@@ -3868,7 +3892,9 @@ syms_of_data (void)
             "Lisp nesting exceeds `max-lisp-eval-depth'");
 
   /* Types that type-of returns.  */
+  DEFSYM (Qboolean, "boolean");
   DEFSYM (Qinteger, "integer");
+  DEFSYM (Qbignum, "bignum");
   DEFSYM (Qsymbol, "symbol");
   DEFSYM (Qstring, "string");
   DEFSYM (Qcons, "cons");
@@ -3883,6 +3909,9 @@ syms_of_data (void)
   DEFSYM (Qprocess, "process");
   DEFSYM (Qwindow, "window");
   DEFSYM (Qsubr, "subr");
+  DEFSYM (Qspecial_form, "special-form");
+  DEFSYM (Qsubr_primitive, "subr-primitive");
+  DEFSYM (Qsubr_native_elisp, "subr-native-elisp");
   DEFSYM (Qcompiled_function, "compiled-function");
   DEFSYM (Qbuffer, "buffer");
   DEFSYM (Qframe, "frame");
@@ -3921,6 +3950,7 @@ syms_of_data (void)
   defsubr (&Seq);
   defsubr (&Snull);
   defsubr (&Stype_of);
+  defsubr (&Scl_type_of);
   defsubr (&Slistp);
   defsubr (&Snlistp);
   defsubr (&Sconsp);

@@ -1494,6 +1494,11 @@ That convention was: '(sit-for SECONDS MILLISEC &optional NODISP)'.
 
 * Lisp Changes in Emacs 30.1
 
+** New function 'cl-type-of'.
+This function is like 'type-of' except that it sometimes returns
+a more precise type.  For example, for nil and t it returns 'null'
+and 'boolean' respectively, instead of just 'symbol'.
+
 ** Built-in types have now corresponding classes.
 At the Lisp level, this means that things like (cl-find-class 'integer)
 will now return a class object, and at the UI level it means that
