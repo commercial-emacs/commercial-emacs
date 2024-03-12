@@ -142,6 +142,37 @@
       (sqlite-select db "select * from test4 where col2 = ?" [1])
       '(("foo" 1))))))
 
+(ert-deftest sqlite-keyword-params ()
+  (skip-unless (sqlite-available-p))
+  (let ((db (sqlite-open)))
+    (sqlite-execute
+     db "CREATE TABLE IF NOT EXISTS test4a (col1 TEXT, col2 NUMBER)")
+    (sqlite-execute db "INSERT INTO test4a VALUES (:a, :b)" '(:a "foo" :b 1))
+    (should
+     (equal
+      (sqlite-select db "SELECT * FROM test4a WHERE col2 = :a" '(:a 1))
+      '(("foo" 1))))
+    (should
+     (equal
+      (sqlite-select db "SELECT * FROM test4a WHERE col1 = :b" [:b "foo"])
+      '(("foo" 1))))
+
+    ;; Template specifiers reused.
+    (sqlite-execute
+     db (concat "CREATE TABLE IF NOT EXISTS test4b ("
+                " u, v, w, x, y, z, FOREIGN KEY(v) REFERENCES test4a(rowid)"
+                ")"))
+    ;; Here, t matches `col2' because it's a boolean and is coerced to 1.
+    (sqlite-execute db (concat "INSERT INTO test4b(u, v, w, x, y, z)"
+                               " SELECT :a, t.rowid, :b, :c, :d, :e"
+                               " FROM test4a as t "
+                               " WHERE t.col1 = :a AND t.col2 = :b")
+                    '(:a "foo" :b t :c false :d 3.14159 :e nil)) ; e is NULL
+    (should
+     (equal
+      (sqlite-select db "SELECT * FROM test4b WHERE v = :a AND w = :a" '(:a 1))
+      '(("foo" 1 1 0 3.14159 nil))))))
+
 (ert-deftest sqlite-binary ()
   (skip-unless (sqlite-available-p))
   (let (db)
