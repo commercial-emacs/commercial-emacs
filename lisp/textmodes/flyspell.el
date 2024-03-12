@@ -1159,7 +1159,9 @@ spell-check."
 		  (set-process-query-on-exit-flag ispell-process nil)
                   ;; Wait until ispell has processed word.
                   (while (progn
-                           (accept-process-output ispell-process)
+                           ;; don't force save-excursion to timers.
+                           ;; only accept output from ispell-process.
+                           (accept-process-output ispell-process nil nil t)
                            (not (string= "" (car ispell-filter)))))
                   ;; (ispell-send-string "!\n")
                   ;; back to terse mode.
