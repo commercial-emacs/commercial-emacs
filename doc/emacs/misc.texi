@@ -1650,6 +1650,10 @@ screenful of output, or @kbd{?} to see your other options.  The
 interface is similar to the @code{more} program.
 @end table
 
+@cindex keymap in Term mode
+  To add custom keybindings to the Term mode use @code{term-raw-map}
+keymap.
+
 @node Remote Host
 @subsection Remote Host Shell
 @cindex remote host
