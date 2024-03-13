@@ -85,22 +85,33 @@ not get notifications."
 (defun gnus-notifications-notify (from subject photo-file)
   "Send a notification about a new mail.
 Return a notification id if any, or t on success."
-  (if (fboundp 'notifications-notify)
+  (if (featurep 'android)
       (gnus-funcall-no-warning
-       'notifications-notify
+       'android-notifications-notify
        :title from
        :body subject
        :actions '("read" "Read" "mark-read" "Mark As Read")
        :on-action 'gnus-notifications-action
-       :app-icon (gnus-funcall-no-warning
-                  'image-search-load-path "gnus/gnus.png")
-       :image-path photo-file
-       :app-name "Gnus"
-       :category "email.arrived"
+       :on-close 'gnus-notifications-close
+       :group "Email arrivals"
        :timeout gnus-notifications-timeout)
-    (message "New message from %s: %s" from subject)
-    ;; Don't return an id
-    t))
+    (if (fboundp 'notifications-notify)
+        (gnus-funcall-no-warning
+         'notifications-notify
+         :title from
+         :body subject
+         :actions '("read" "Read" "mark-read" "Mark As Read")
+         :on-action 'gnus-notifications-action
+         :on-close 'gnus-notifications-close
+         :app-icon (gnus-funcall-no-warning
+                    'image-search-load-path "gnus/gnus.png")
+         :image-path photo-file
+         :app-name "Gnus"
+         :category "email.arrived"
+         :timeout gnus-notifications-timeout)
+      (message "New message from %s: %s" from subject)
+      ;; Don't return an id
+      t)))
 
 (declare-function gravatar-retrieve-synchronously "gravatar.el"
 		  (mail-address))
