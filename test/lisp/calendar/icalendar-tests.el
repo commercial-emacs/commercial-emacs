@@ -77,7 +77,7 @@
                             tare-date)
               (icalendar-export-region (point-min) (point-max) file))
           (remove-function (symbol-function 'icalendar--convert-sexp-to-ical) tare-date))))
-    (with-current-buffer (get-buffer "*icalendar-errors*")
+    (with-current-buffer "*icalendar-errors*"
       (buffer-string))))
 
 ;; ======================================================================
