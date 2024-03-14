@@ -1610,7 +1610,7 @@ archive file and the source category is deleted."
 	 (garchive (concat (file-name-sans-extension gfile) ".toda"))
 	 (archived-count (todo-get-count 'archived))
 	 here)
-    (with-current-buffer (get-buffer (find-file-noselect tfile))
+    (with-current-buffer (find-file-noselect tfile)
       (widen)
       (let* ((inhibit-read-only t)
 	     (cbeg (progn
@@ -1636,7 +1636,7 @@ archive file and the source category is deleted."
 	     (todo-count (todo-get-count 'todo cat))
 	     (done-count (todo-get-count 'done cat)))
 	;; Merge into goal todo category.
-	(with-current-buffer (get-buffer (find-file-noselect gfile))
+	(with-current-buffer (find-file-noselect gfile)
 	  (unless (derived-mode-p 'todo-mode) (todo-mode))
 	  (widen)
 	  (goto-char (point-min))
@@ -1675,7 +1675,7 @@ archive file and the source category is deleted."
 	(mapc (lambda (m) (set-marker m nil))
 	      (list cbeg tbeg dbeg tend cend))))
     (when (> archived-count 0)
-      (with-current-buffer (get-buffer (find-file-noselect tarchive))
+      (with-current-buffer (find-file-noselect tarchive)
 	(widen)
 	(goto-char (point-min))
 	(let* ((inhibit-read-only t)
@@ -1695,7 +1695,7 @@ archive file and the source category is deleted."
 			(forward-line)
 			(buffer-substring-no-properties (point) cend))))
 	  ;; Merge into goal archive category, if it exists, else create it.
-	  (with-current-buffer (get-buffer (find-file-noselect garchive))
+	  (with-current-buffer (find-file-noselect garchive)
 	    (let ((gbeg (when (re-search-forward
 			       (concat "^" (regexp-quote
 					    (concat todo-category-beg goal))

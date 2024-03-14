@@ -636,7 +636,7 @@ Complete list of commands:
     (princ (debugger-eval-expression exp))
     (terpri))
 
-  (with-current-buffer (get-buffer debugger-record-buffer)
+  (with-current-buffer debugger-record-buffer
     (message "%s"
 	     (buffer-substring (line-beginning-position 0)
 			       (line-end-position 0)))))
