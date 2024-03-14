@@ -4782,6 +4782,7 @@ def foo():
   (python-tests-with-temp-buffer-with-shell
    ""
    (python-shell-with-shell-buffer
+     (skip-unless python-shell-readline-completer-delims)
      (insert "import abc")
      (comint-send-input)
      (python-tests-shell-wait-for-prompt)
@@ -4796,6 +4797,7 @@ def foo():
    ""
    (python-shell-completion-native-turn-on)
    (python-shell-with-shell-buffer
+     (skip-unless python-shell-readline-completer-delims)
      (insert "import abc")
      (comint-send-input)
      (python-tests-shell-wait-for-prompt)
@@ -4818,6 +4820,8 @@ def foo():
 import abc
 "
    (let ((inhibit-message t))
+     (python-shell-with-shell-buffer
+       (skip-unless python-shell-readline-completer-delims))
      (python-shell-send-buffer)
      (python-tests-shell-wait-for-prompt)
      (goto-char (point-max))
@@ -4834,6 +4838,8 @@ import abc
 import abc
 "
    (let ((inhibit-message t))
+     (python-shell-with-shell-buffer
+       (skip-unless python-shell-readline-completer-delims))
      (python-shell-send-buffer)
      (python-tests-shell-wait-for-prompt)
      (python-shell-with-shell-buffer
@@ -4853,6 +4859,8 @@ pdb.set_trace()
 print('Hello')
 "
    (let ((inhibit-message t))
+     (python-shell-with-shell-buffer
+       (skip-unless python-shell-readline-completer-delims))
      (python-shell-send-buffer)
      (python-tests-shell-wait-for-prompt)
      (goto-char (point-max))
@@ -4869,6 +4877,8 @@ import time
 time.sleep(3)
 "
    (let ((inhibit-message t))
+     (python-shell-with-shell-buffer
+       (skip-unless python-shell-readline-completer-delims))
      (python-shell-send-buffer)
      (goto-char (point-max))
      (insert "time.")
@@ -4881,6 +4891,8 @@ time.sleep(3)
 import abc
 "
    (let ((inhibit-message t))
+     (python-shell-with-shell-buffer
+       (skip-unless python-shell-readline-completer-delims))
      (python-shell-completion-native-turn-on)
      (python-shell-send-buffer)
      (python-tests-shell-wait-for-prompt)
@@ -4898,6 +4910,8 @@ import abc
 import abc
 "
    (let ((inhibit-message t))
+     (python-shell-with-shell-buffer
+       (skip-unless python-shell-readline-completer-delims))
      (python-shell-completion-native-turn-on)
      (python-shell-send-buffer)
      (python-tests-shell-wait-for-prompt)
@@ -4914,6 +4928,8 @@ import abc
 import abc
 "
    (let ((inhibit-message t))
+     (python-shell-with-shell-buffer
+       (skip-unless python-shell-readline-completer-delims))
      (python-shell-completion-native-turn-on)
      (python-shell-send-buffer)
      (python-tests-shell-wait-for-prompt)
@@ -4930,6 +4946,8 @@ import abc
 import abc
 "
    (let ((inhibit-message t))
+     (python-shell-with-shell-buffer
+       (skip-unless python-shell-readline-completer-delims))
      (python-shell-completion-native-turn-on)
      (python-shell-send-buffer)
      (python-tests-shell-wait-for-prompt)
