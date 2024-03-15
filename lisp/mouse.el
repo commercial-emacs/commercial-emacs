@@ -387,7 +387,6 @@ and should return the same menu with changes such as added new menu items."
                   (function-item context-menu-local)
                   (function-item context-menu-minor)
                   (function-item context-menu-buffers)
-                  (function-item context-menu-project)
                   (function-item context-menu-vc)
                   (function-item context-menu-ffap)
                   (function-item hi-lock-context-menu)
@@ -526,12 +525,6 @@ Some context functions add menu items below the separator."
                   (define-key-after menu (vector key)
                     (copy-sequence binding))))
               (mouse-buffer-menu-keymap))
-  menu)
-
-(defun context-menu-project (menu _click)
-  "Populate MENU with project commands."
-  (define-key-after menu [separator-project] menu-bar-separator)
-  (define-key-after menu [project-menu] menu-bar-project-item)
   menu)
 
 (defun context-menu-vc (menu _click)

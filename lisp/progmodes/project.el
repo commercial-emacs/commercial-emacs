@@ -720,9 +720,8 @@ DIRS must contain directory names."
   (with-temp-buffer
     (setq default-directory dir)
     (let ((enable-local-variables :all))
-      (hack-dir-local-variables))
-    ;; Don't use `hack-local-variables-apply' to avoid setting modes.
-    (alist-get var file-local-variables-alist)))
+      (hack-dir-local-variables-non-file-buffer))
+    (symbol-value var)))
 
 (declare-function tramp-tramp-file-p "tramp")
 (cl-defmethod project-buffers ((project (head vc)))
@@ -2048,10 +2047,12 @@ is part of the default mode line beginning with Emacs 30."
   :group 'project
   :version "30.1")
 
+(defvar project-menu-entry
+  `(menu-item "Project" ,(bound-and-true-p menu-bar-project-menu)))
+
 (defvar project-mode-line-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [mode-line down-mouse-1]
-                (bound-and-true-p menu-bar-project-item))
+    (define-key map [mode-line down-mouse-1] project-menu-entry)
     map))
 
 (defvar project-mode-line-face nil

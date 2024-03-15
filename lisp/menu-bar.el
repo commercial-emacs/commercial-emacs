@@ -1817,9 +1817,6 @@ mail status in mode line"))
     (bindings--define-key menu [project-open-file] '(menu-item "Open File..." project-find-file :help "Open an existing file that belongs to current project"))
     menu))
 
-(defvar menu-bar-project-item
-  `(menu-item "Project" ,menu-bar-project-menu))
-
 (defun menu-bar-read-mail ()
   "Read mail using `read-mail-command'."
   (interactive)
@@ -1903,7 +1900,7 @@ mail status in mode line"))
                   :button (:toggle . (bound-and-true-p semantic-mode))))
 
     (bindings--define-key menu [project]
-      menu-bar-project-item)
+      `(menu-item "Project" ,menu-bar-project-menu))
 
     (bindings--define-key menu [ede]
       '(menu-item "Project Support (EDE)"
