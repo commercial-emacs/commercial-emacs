@@ -240,7 +240,7 @@ selected or deselected at the end of executing the current command.
 *** New variable 'window-restore-killed-buffer-windows'.
 It specifies how 'set-window-configuration' and 'window-state-put'
 should proceed with windows whose buffer was killed after the
-corresponding configuration or state was made.
+corresponding configuration or state was recorded.
 
 ** Tab Bars and Tab Lines
 
@@ -1655,6 +1655,10 @@ calls to functions such as `completion-all-completions'.  This hints
 at the underlying completion styles to skip eager fontification of
 completion candidates, which increases performance.  Frontends then
 use the 'completion-lazy-hilit' function to fontify just in time.
+
+** New primitive 'buffer-last-name'.
+It returns the name of a buffer before the last time it was renamed or
+killed.
 
 ** Functions and variables to transpose sexps
 
