@@ -2665,6 +2665,7 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
   else
     eassert (buffer->window_count == -1);
   buffer->local_minor_modes_ = Qnil;
+  buffer->last_name_ = Qnil;
   buffer->last_selected_window_ = Qnil;
   buffer->display_count_ = make_fixnum (0);
   buffer->clip_changed = 0;
