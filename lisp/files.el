@@ -3418,7 +3418,7 @@ set the major mode only if that would change it.  In other words
 we don't actually set it to the same mode the buffer already has."
   ;; Look for -*-MODENAME-*- or -*- ... mode: MODENAME; ... -*-
   (let ((try-locals (not (inhibit-local-variables-p)))
-	end modes)
+	end done mode modes)
     ;; Once we drop the deprecated feature where mode: is also allowed to
     ;; specify minor-modes (ie, there can be more than one "mode:"), we can
     ;; remove this section and just let (hack-local-variables t) handle it.
@@ -3578,29 +3578,18 @@ and it is meant to be modified by packages rather than users.")
   "Apply MODE and return it.
 If optional arg KEEP-MODE-IF-SAME is non-nil, MODE is chased of
 any aliases and compared to current major mode.  If they are the
-same, do nothing and return `:keep'.
-Return nil if MODE could not be applied."
-  (when mode
-    (if (and keep-mode-if-same
-	     (or (eq (indirect-function mode)
-		     (indirect-function major-mode))
-		 (and set-auto-mode--last
-		      (eq mode (car set-auto-mode--last))
-		      (eq major-mode (cdr set-auto-mode--last)))))
-	:keep
-      (let ((modefun (major-mode-remap mode)))
-        (if (not (functionp modefun))
-            (progn
-              (message "Ignoring unknown mode `%s'%s" mode
-                       (if (eq mode modefun) ""
-                         (format " (remapped to `%S')" modefun)))
-              nil)
-          (funcall modefun)
-          (unless (or (eq mode major-mode) ;`set-auto-mode--last' is overkill.
-                      ;; `modefun' is something like a minor mode.
-                      (local-variable-p 'set-auto-mode--last))
-            (setq set-auto-mode--last (cons mode major-mode)))
-          mode)))))
+same, do nothing and return nil."
+  (unless (and keep-mode-if-same
+	       (or (eq (indirect-function mode)
+		       (indirect-function major-mode))
+		   (and set-auto-mode--last
+		        (eq mode (car set-auto-mode--last))
+		        (eq major-mode (cdr set-auto-mode--last)))))
+    (when mode
+      (funcall (major-mode-remap mode))
+      (unless (eq mode major-mode)
+        (setq set-auto-mode--last (cons mode major-mode)))
+      mode)))
 
 (defvar file-auto-mode-skip "^\\(#!\\|'\\\\\"\\)"
   "Regexp of lines to skip when looking for file-local settings.
@@ -4207,9 +4196,8 @@ major-mode."
 			   (not (string-match
 			         "-minor\\'"
 			         (setq val2 (downcase (symbol-name val)))))
-			   (let ((mode (intern (concat val2 "-mode"))))
-                             (when (fboundp (major-mode-remap mode))
-                               (setq result mode))))
+                           ;; Allow several mode: elements.
+                           (push (intern (concat val2 "-mode")) result))
 		    (cond ((eq var 'coding))
 			  ((eq var 'lexical-binding)
 			   (unless hack-local-variables--warned-lexical
@@ -4240,7 +4228,10 @@ major-mode."
 				         val)
                                    result))))))
 	        (forward-line 1)))))))
-    result))
+    (if (eq handle-mode t)
+        ;; Return the final mode: setting that's defined.
+        (car (seq-filter #'fboundp result))
+      result)))
 
 (defun hack-local-variables-apply ()
   "Apply the elements of `file-local-variables-alist'.

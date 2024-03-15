@@ -525,7 +525,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
         (goto-char (point-min))
         ;; Kind of a hack to distinguish a submodule from
         ;; other cases of .git files pointing elsewhere.
-        (looking-at "gitdir: .+/\\.git/\\(worktrees/.*\\)?modules/"))
+        (looking-at "gitdir: [./]+/\\.git/modules/"))
       t)
      (t nil))))
 
@@ -722,8 +722,7 @@ DIRS must contain directory names."
     (let ((enable-local-variables :all))
       (hack-dir-local-variables))
     ;; Don't use `hack-local-variables-apply' to avoid setting modes.
-    (alist-get var file-local-variables-alist
-               (symbol-value var))))
+    (alist-get var file-local-variables-alist)))
 
 (declare-function tramp-tramp-file-p "tramp")
 (cl-defmethod project-buffers ((project (head vc)))
