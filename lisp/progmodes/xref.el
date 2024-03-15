@@ -265,7 +265,7 @@ IDENTIFIER can be any string returned by
 
 To create an xref object, call `xref-make'.")
 
-(cl-defgeneric xref-backend-references (_backend identifier)
+(cl-defgeneric xref-backend-references (_backend _identifier)
   "Find references of IDENTIFIER.
 The result must be a list of xref objects.  If no references can
 be found, return nil.
