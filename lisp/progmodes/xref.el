@@ -277,9 +277,7 @@ current project's main and external roots."
    (lambda (dir)
      (message "Searching %s..." dir)
      (redisplay)
-     (prog1
-         (xref-references-in-directory identifier dir)
-       (message "Searching %s... done" dir)))
+     (message "Searching %s... done" dir))
    (let ((pr (project-current t)))
      (project-combine-directories
       (cons
@@ -1731,47 +1729,8 @@ and just use etags."
         (kill-local-variable 'xref-backend-functions))
     (setq-local xref-backend-functions xref-etags-mode--saved)))
 
-(declare-function semantic-symref-instantiate "semantic/symref")
-(declare-function semantic-symref-perform-search "semantic/symref")
 (declare-function grep-expand-template "grep")
 (defvar ede-minor-mode) ;; ede.el
-
-;;;###autoload
-(defun xref-references-in-directory (symbol dir)
-  "Find all references to SYMBOL in directory DIR.
-Return a list of xref values.
-
-This function uses the Semantic Symbol Reference API, see
-`semantic-symref-tool-alist' for details on which tools are used,
-and when."
-  (cl-assert (directory-name-p dir))
-  (require 'semantic/symref)
-  (defvar semantic-symref-tool)
-
-  ;; Some symref backends use `ede-project-root-directory' as the root
-  ;; directory for the search, rather than `default-directory'. Since
-  ;; the caller has specified `dir', we bind `ede-minor-mode' to nil
-  ;; to force the backend to use `default-directory'.
-  (let* ((ede-minor-mode nil)
-         (default-directory dir)
-         ;; FIXME: Remove CScope and Global from the recognized tools?
-         ;; The current implementations interpret the symbol search as
-         ;; "find all calls to the given function", but not function
-         ;; definition. And they return nothing when passed a variable
-         ;; name, even a global one.
-         (semantic-symref-tool 'detect)
-         (case-fold-search nil)
-         (inst (semantic-symref-instantiate :searchfor symbol
-                                            :searchtype 'symbol
-                                            :searchscope 'subdirs
-                                            :resulttype 'line-and-text)))
-    (xref--convert-hits (semantic-symref-perform-search inst)
-                        (format "\\_<%s\\_>" (regexp-quote symbol)))))
-
-(define-obsolete-function-alias
-  'xref-collect-references
-  #'xref-references-in-directory
-  "27.1")
 
 ;;;###autoload
 (defun xref-matches-in-directory (regexp files dir ignores)
@@ -1821,6 +1780,16 @@ IGNORES is a list of glob patterns for files to ignore."
                     (buffer-substring-no-properties (point) (line-end-position)))
               hits)))
     (xref--convert-hits (nreverse hits) regexp)))
+
+(define-obsolete-function-alias
+  'xref-collect-references
+  nil
+  "27.1")
+
+(define-obsolete-function-alias
+  'xref-references-in-directory
+  nil
+  "30.1")
 
 (define-obsolete-function-alias
   'xref-collect-matches

@@ -1215,7 +1215,7 @@ This is the name BUFFER had before the last time it was renamed or
 immediately before it was killed.  */)
   (Lisp_Object buffer)
 {
-  return BVAR (decode_buffer (buffer), last_name);
+  return BVAR (!NILP (buffer) ? XBUFFER (buffer) : current_buffer, last_name);
 }
 
 DEFUN ("buffer-file-name", Fbuffer_file_name, Sbuffer_file_name, 0, 1, 0,
