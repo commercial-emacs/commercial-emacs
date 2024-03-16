@@ -283,8 +283,13 @@ If it can't be found, return nil and don't move point."
       (goto-char (prop-match-beginning match))
     (end-of-line)))
 
-(defun vtable-update-object (table object old-object)
-  "Replace OLD-OBJECT in TABLE with OBJECT."
+(defun vtable-update-object (table object &optional old-object)
+  "Update OBJECT's representation in TABLE.
+When OLD-OBJECT is non-nil, replace OLD-OBJECT with OBJECT and display
+it.  In either case, if the existing object is not found in the
+table (being compared with `equal'), signal an error."
+  (unless old-object
+    (setq old-object object))
   (let* ((objects (vtable-objects table))
          (inhibit-read-only t))
     ;; First replace the object in the object storage.
