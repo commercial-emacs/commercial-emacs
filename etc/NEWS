@@ -1660,6 +1660,11 @@ use the 'completion-lazy-hilit' function to fontify just in time.
 It returns the name of a buffer before the last time it was renamed or
 killed.
 
+** New primitive 'marker-last-position'.
+It returns the last position of MARKER in its buffer even if that buffer
+has been killed.
+
+
 ** Functions and variables to transpose sexps
 
 +++
