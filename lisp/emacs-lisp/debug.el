@@ -155,6 +155,12 @@ where CAUSE can be:
     (insert (debugger--buffer-state-content state)))
   (goto-char (debugger--buffer-state-pos state)))
 
+(defvar debugger--last-error nil)
+
+(defun debugger--duplicate-p (args)
+  (pcase args
+    (`(error ,err . ,_) (and (consp err) (eq err debugger--last-error)))))
+
 ;;;###autoload
 (setq debugger 'debug)
 ;;;###autoload
@@ -168,6 +174,7 @@ A non-nil `inhibit-redisplay' precludes any action."
   (interactive)
   (if inhibit-redisplay
       debugger-value
+    (setq debugger--last-error nil)
     (let ((non-interactive-frame
            (or noninteractive           ;FIXME: Presumably redundant.
                ;; If we're in the initial-frame (where `message' just
@@ -303,6 +310,12 @@ A non-nil `inhibit-redisplay' precludes any action."
                   (kill-buffer debugger-buffer))))
 	    (with-timeout-unsuspend debugger-with-timeout-suspend)
 	    (set-match-data debugger-outer-match-data)))
+	(when (eq 'error (car-safe debugger-args))
+	  ;; Remember the error we just debugged, to avoid re-entering
+          ;; the debugger if some higher-up `handler-bind' invokes us
+          ;; again, oblivious that the error was already debugged from
+          ;; a more deeply nested `handler-bind'.
+	  (setq debugger--last-error (nth 1 debugger-args)))
         (setq debug-on-next-call debugger-step-after-exit)
         debugger-value))))
 
