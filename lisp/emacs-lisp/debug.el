@@ -172,7 +172,12 @@ symbol \\='debug to avoid printing extraneous debugger stack frames.
 
 A non-nil `inhibit-redisplay' precludes any action."
   (interactive)
-  (if inhibit-redisplay
+  (if (or inhibit-redisplay
+          (debugger--duplicate-p args))
+      ;; Don't really try to enter debugger within an eval from redisplay
+      ;; or if we already popper into the debugger for this error,
+      ;; which can happen when we have several nested `handler-bind's that
+      ;; want to invoke the debugger.
       debugger-value
     (setq debugger--last-error nil)
     (let ((non-interactive-frame
