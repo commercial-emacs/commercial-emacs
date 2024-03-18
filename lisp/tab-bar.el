@@ -1433,10 +1433,7 @@ Negative TAB-NUMBER counts tabs from the end of the tab bar."
       (let* ((from-tab (tab-bar--tab))
              (to-tab (nth to-index tabs))
              (wc (alist-get 'wc to-tab))
-             (ws (alist-get 'ws to-tab))
-             (window-restore-killed-buffer-windows
-              (or tab-bar-select-restore-windows
-                  window-restore-killed-buffer-windows)))
+             (ws (alist-get 'ws to-tab)))
 
         ;; During the same session, use window-configuration to switch
         ;; tabs, because window-configurations are more reliable
