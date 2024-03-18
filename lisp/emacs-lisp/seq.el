@@ -362,7 +362,8 @@ the result.
 
 The result is a sequence of the same type as SEQUENCE."
   (seq-concatenate
-   (if (listp sequence) 'list (type-of sequence))
+   (let ((type (type-of sequence)))
+     (if (eq type 'cons) 'list type))
    (seq-subseq sequence 0 n)
    (seq-subseq sequence (1+ n))))
 
