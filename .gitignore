@@ -84,7 +84,6 @@ src/verbose.mk
 # Lisp-level sources built by 'make'.
 *cus-load.el
 *loaddefs.el
-cldefs.el
 lisp/eshell/esh-groups.el
 lisp/finder-inf.el
 lisp/leim/ja-dic/

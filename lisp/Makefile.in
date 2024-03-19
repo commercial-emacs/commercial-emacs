@@ -119,25 +119,6 @@ autoloads: ./loaddefs.el
             -l ./emacs-lisp/loaddefs-gen \
 	    -f loaddefs-generate--emacs-batch ${SUBDIRS_ALMOST}
 
-./emacs-lisp/cldefs.el: ./emacs-lisp/cldefs.el.in
-	$(AM_V_GEN)$(emacs) -l pp -l "cldefs.el.in" \
-	    --eval "(with-temp-file (expand-file-name (unmsys--file-name \"$@\")) \
-	              (insert \";; Automatically generated from cldefs.el.in. \" \
-	                \"DO NOT EDIT  -*- lexical-binding: t -*-\n\" \
-                        \"(defconst cldefs-cl-lib-functions\n\" \
-	                \"(quote \" \
-	                (pp-to-string cldefs--cl-lib-functions) \
-	                \"))\n\" \
-	                \"(provide (quote cldefs))\n\" \
-	                \";; Local Variables:\n\" \
-	                \";; version-control: never\n\" \
-	                \";; no-byte-compile: t\n\" \
-	                \";; no-update-autoloads: t\n\" \
-	                \";; coding: utf-8-emacs-unix\n\" \
-	                \";; End:\n\" \
-	                \";;; cldefs.el ends here\n\" \
-	                ))"
-
 # Overwrought load-path augmentation dates back to 1994.
 ./subdirs.el:
 	$(AM_V_GEN)for file in ${SUBDIRS_SUBDIRS}; do \
@@ -159,8 +140,7 @@ update-authors:
 	$(emacs) -L "$(top_srcdir)/admin" -l authors \
 	  -f batch-update-authors "$(top_srcdir)/etc/AUTHORS" "$(top_srcdir)"
 
-tagsfiles = $(shell find ${srcdir} -name '*.el' \
-	        ! -name '.*' ! -name '*loaddefs.el' ! -name '*cldefs.el')
+tagsfiles = $(shell find ${srcdir} -name '*.el' ! -name '.*' ! -name '*loaddefs.el')
 tagsfiles := $(filter-out ${srcdir}/ldefs-boot.el,${tagsfiles})
 tagsfiles := $(filter-out ${srcdir}/eshell/esh-groups.el,${tagsfiles})
 

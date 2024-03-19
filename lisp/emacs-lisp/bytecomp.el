@@ -122,8 +122,7 @@
 ;;     Some versions of `file' can be customized to recognize that.
 
 (eval-when-compile (require 'compile))
-(eval-when-compile (require 'cl-lib))
-(require 'cldefs nil t) ;; bootstrap-emacs won't have it in time
+(require 'cl-lib)
 (require 'backquote)
 (require 'macroexp)
 (require 'cconv)
@@ -1490,14 +1489,7 @@ that means treat it as not defined."
                 (not compiled-def))
            ;; function only defined within eval-when-compile block
            (and (not (memq f byte-compile--defined-funcs))
-                (memq f byte-compile--noruntime-funcs))
-           ;; cl-lib function without require of cl-lib (Bug#30635)
-           (and (not (assq f byte-compile-function-environment))
-                (boundp 'cldefs-cl-lib-functions)
-                (memq f cldefs-cl-lib-functions)
-                (cl-every (lambda (cl)
-                            (not (memq cl byte-compile--seen-requires)))
-                          '(cl-lib cl-seq cl-macs))))))
+                (memq f byte-compile--noruntime-funcs)))))
     (when (and undefined-p
                (not (eq f byte-compile-current-func)))
       (let ((cell (assq f byte-compile--undefined-funcs)))

@@ -987,11 +987,6 @@ byte-compiled.  Run with dynamic binding."
                              ,re-warnings))
          (should (re-search-forward (string-replace " " "[ \n]+" re-warning)))))))
 
-(ert-deftest bytecomp-warn-absent-require-cl-lib ()
-  (bytecomp--buffer-with-warning-test
-   "cl-member-if. is not defined"
-   (cl-member-if (function cl-evenp) (list 1 2 3))))
-
 (ert-deftest bytecomp-warn-coordinates ()
   (let ((byte-compile-current-file "his-fooness.el"))
     (bytecomp--buffer-with-warning-test
@@ -1006,7 +1001,6 @@ byte-compiled.  Run with dynamic binding."
        "his-fooness.el:32:2" ;; let special form kicks back to defun
        "his-fooness.el:34:10"
        "his-fooness.el:32:2" ;; this one too
-       "his-fooness.el:4:4"  ;; cl-lib might not be defined at runtime.
        )
      "
 (bytecomp-tests-warn-coordinates-basic)

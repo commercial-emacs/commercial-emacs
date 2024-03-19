@@ -511,9 +511,6 @@ define relative-lisp-files
 	   --eval "(relative-lisp-files $(2))"
 endef
 
-../lisp/emacs-lisp/cldefs.el: | bootstrap-emacs.pdmp
-	$(MAKE) -C ../lisp emacs-lisp/cldefs.el EMACS=../src/bootstrap-emacs
-
 ../lisp/subdirs.el:
 	$(MAKE) -C ../lisp subdirs.el
 
@@ -525,7 +522,7 @@ bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT) ../lisp/subdirs.el
 
 .SECONDEXPANSION:
 emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el ../lisp/loaddefs.elc \
-  ../lisp/international/charprop.el ../lisp/emacs-lisp/cldefs.el \
+  ../lisp/international/charprop.el \
   $(patsubst %,../lisp/%.el,$(shell $(call relative-lisp-files,bootstrap-emacs$(EXEEXT),nil)))
 	$(call pdump,$@) # pdmp some interpreted elisp
 	@# if relative-lisp-files empty, .DEFAULT_GOAL=none
