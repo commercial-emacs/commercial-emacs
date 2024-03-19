@@ -511,7 +511,7 @@ define relative-lisp-files
 	   --eval "(relative-lisp-files $(2))"
 endef
 
-../lisp/emacs-lisp/cldefs.el:
+../lisp/emacs-lisp/cldefs.el: | bootstrap-emacs.pdmp
 	$(MAKE) -C ../lisp emacs-lisp/cldefs.el EMACS=../src/bootstrap-emacs
 
 ../lisp/subdirs.el:
