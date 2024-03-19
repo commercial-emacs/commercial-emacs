@@ -512,7 +512,7 @@ define relative-lisp-files
 endef
 
 ../lisp/emacs-lisp/cldefs.el:
-	$(MAKE) -C ../lisp emacs-lisp/cldefs.el
+	$(MAKE) -C ../lisp emacs-lisp/cldefs.el EMACS=../src/bootstrap-emacs
 
 ../lisp/subdirs.el:
 	$(MAKE) -C ../lisp subdirs.el
