@@ -124,7 +124,6 @@ deps/
 # Time stamps.
 *.stamp
 stamp_BLD
-src/gl-stamp
 
 # Object files and debugging.
 *.a

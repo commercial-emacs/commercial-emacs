@@ -107,7 +107,7 @@ none:
 	@true
 
 .PHONY: all
-all: compile ./cus-load.el ./finder-inf.el ./emacs-lisp/cldefs.el
+all: compile ./cus-load.el ./finder-inf.el
 
 .PHONY: autoloads
 autoloads: ./loaddefs.el
