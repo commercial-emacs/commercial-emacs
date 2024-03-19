@@ -1722,10 +1722,10 @@ See Info node `(elisp) Integer Basics'."
          get-variable-watchers indirect-variable
          local-variable-if-set-p local-variable-p
          logand logcount logior lognot logxor max min mod
-         number-to-string position-symbol string-to-number
+         number-to-string string-to-number
          subr-arity subr-name subr-native-lambda-list subr-type
          symbol-function symbol-name symbol-plist symbol-value
-         symbol-with-pos-pos variable-binding-locus
+         variable-binding-locus
          ;; doc.c
          documentation
          ;; editfns.c
@@ -1875,7 +1875,7 @@ See Info node `(elisp) Integer Basics'."
          integer-or-marker-p integerp keywordp listp markerp
          module-function-p multibyte-string-p mutexp natnump nlistp null
          number-or-marker-p numberp recordp remove-pos-from-symbol
-         sequencep stringp subr-native-elisp-p subrp symbol-with-pos-p symbolp
+         sequencep stringp subr-native-elisp-p subrp symbolp
          threadp type-of user-ptrp vector-or-char-table-p vectorp wholenump
          ;; editfns.c
          bobp bolp buffer-size buffer-string current-message emacs-pid

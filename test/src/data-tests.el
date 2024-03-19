@@ -844,14 +844,10 @@ comparing the subr with a much slower Lisp implementation."
   ;; it's a `cons' or a `vector').
   (dolist (val (list -2 10 (expt 2 128) nil t 'car
                      (symbol-function 'car)
-                     (symbol-function 'progn)
-                     (position-symbol 'car 7)))
+                     (symbol-function 'progn)))
     (let* ((type (cl-type-of val))
            (class (cl-find-class type))
-           (alltypes (cl--class-allparents class))
-           ;; FIXME: Our type DAG is affected by `symbols-with-pos-enabled'.
-           ;; (e.g. `symbolp' returns nil on a sympos if that var is nil).
-           (symbols-with-pos-enabled t))
+           (alltypes (cl--class-allparents class)))
       (dolist (parent alltypes)
         (should (cl-typep val parent))
         (dolist (subtype (cl--class-children (cl-find-class parent)))

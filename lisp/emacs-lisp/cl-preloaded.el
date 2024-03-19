@@ -341,8 +341,6 @@
                                           ',parents))))))
 
 ;; FIXME: Our type DAG has various quirks:
-;; - Some `keyword's are also `symbol-with-pos' but that's not reflected
-;;   in the DAG.
 ;; - An OClosure can be an interpreted function or a `byte-code-function',
 ;;   so the DAG of OClosure types is "orthogonal" to the distinction
 ;;   between interpreted and compiled functions.
@@ -408,8 +406,6 @@ For this build of Emacs it's %dbit."
   "Type of those symbols whose first char is `:'.")
 (cl--define-built-in-type boolean (symbol)
   "Type of the canonical boolean values, i.e. either nil or t.")
-(cl--define-built-in-type symbol-with-pos (symbol)
-  "Type of symbols augmented with source-position information.")
 (cl--define-built-in-type vector (array))
 (cl--define-built-in-type record (atom)
   "Abstract type of objects with slots.")
