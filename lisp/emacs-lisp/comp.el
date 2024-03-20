@@ -2953,6 +2953,18 @@ These are substituted with a normal `set' op."
 ;; the variable tested by the conditional branch is of the predicted
 ;; value type and signal an error otherwise.
 
+;;; Example:
+;; Assuming we want to compile 'test.el' and test function `foo' defined
+;; into it.
+
+;; Native compile 'test.el' instrumenting it for sanitizer usage.
+;; (let ((comp-sanitizer-emit t))
+;;   (load (native-compile "test.el")))
+
+;; Run `foo' with the sanitizer active.
+;; (let ((comp-sanitizer-active t))
+;;   (foo))
+
 (defvar comp-sanitizer-emit nil
   "Gates the sanitizer pass.
 In use for native compiler development and verification only.")
