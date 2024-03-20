@@ -474,7 +474,7 @@ load_gccjit_if_necessary (bool mandatory)
 
 
 /* Increase this number to force a new Vcomp_abi_hash to be generated.  */
-#define ABI_VERSION "5"
+#define ABI_VERSION "6"
 
 /* Length of the hashes used for eln file naming.  */
 #define HASH_LENGTH 8
@@ -506,11 +506,9 @@ load_gccjit_if_necessary (bool mandatory)
 #define THIRD(x)				\
   XCAR (XCDR (XCDR (x)))
 
-#if 0	/* unused for now */
 /* Like call0 but stringify and intern.  */
 #define CALL0I(fun)				\
   CALLN (Ffuncall, intern_c_string (STR (fun)))
-#endif
 
 /* Like call1 but stringify and intern.  */
 #define CALL1I(fun, arg)				\
@@ -4164,6 +4162,8 @@ Return t on success.  */)
 			emit_simple_limple_call_void_ret);
       register_emitter (Qhelper_save_restriction,
 			emit_simple_limple_call_void_ret);
+      register_emitter (Qhelper_sanitizer_assert,
+			emit_simple_limple_call_lisp_ret);
       /* Inliners.  */
       register_emitter (Qadd1, emit_add1);
       register_emitter (Qsub1, emit_sub1);
@@ -5043,6 +5043,7 @@ syms_of_comp (void)
   DEFSYM (Qhelper_unbind_n, "helper_unbind_n");
   DEFSYM (Qhelper_unwind_protect, "helper_unwind_protect");
   DEFSYM (Qhelper_save_restriction, "helper_save_restriction");
+  DEFSYM (Qhelper_sanitizer_assert, "helper_sanitizer_assert");
   /* Inliners.  */
   DEFSYM (Qadd1, "1+");
   DEFSYM (Qsub1, "1-");
@@ -5110,6 +5111,12 @@ syms_of_comp (void)
         build_pure_c_string ("eln file inconsistent with current runtime "
 			     "configuration, please recompile"));
 
+  DEFSYM (Qcomp_sanitizer_error, "comp-sanitizer-error");
+  Fput (Qcomp_sanitizer_error, Qerror_conditions,
+	pure_list (Qcomp_sanitizer_error, Qerror));
+  Fput (Qcomp_sanitizer_error, Qerror_message,
+        build_pure_c_string ("Native code sanitizer runtime error"));
+
   DEFSYM (Qnative__compile_async, "native--compile-async");
 
   defsubr (&Scomp__subr_signature);
@@ -5163,6 +5170,13 @@ a cycle when `macroexpand' gets advised.  */);
 	       doc: /* Hash primitive name to its arity.
 For internal use.  */);
   Vcomp_subr_arities_h = CALLN (Fmake_hash_table, QCtest, Qequal);
+
+  DEFVAR_BOOL ("comp-sanitizer-active", comp_sanitizer_active,
+    doc: /* When non-nil enable sanitizer runtime execution.
+To be effective Lisp Code must have been compiled with
+`comp-sanitizer-emit' non-nil.
+In use for native compiler development and verification only.  */);
+  comp_sanitizer_active = false;
 
   Fprovide (intern_c_string ("native-compile"), Qnil);
 #endif /* #ifdef HAVE_NATIVE_COMP */

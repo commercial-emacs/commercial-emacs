@@ -162,6 +162,7 @@ Can be one of: `d-default', `d-impure' or `d-ephemeral'.  See `comp-ctxt'.")
                         comp--tco
                         comp--fwprop
                         comp--remove-type-hints
+                        comp--sanitizer
                         comp--compute-function-types
                         comp--final)
   "Passes to be executed in order.")
