@@ -58,6 +58,32 @@
    "git version .2.30.1.5"
    "0"))
 
+(defmacro vc-git-test--mock-repo (&rest body)
+  (declare (indent defun))
+  `(let* ((dir (make-temp-file "vc-git-tests" t))
+          (default-directory dir))
+     (unwind-protect
+         (progn
+           (vc-git-create-repo)
+           (vc-git-command nil 0 nil "config" "--add" "user.name" "frou")
+           (vc-git-command nil 0 nil "config" "--add" "user.email" "frou@frou.org")
+           ,@body)
+       (delete-directory dir t))))
+
+(ert-deftest vc-git-test-detached-head ()
+  (skip-unless (executable-find vc-git-program))
+  (require 'log-edit)
+  (vc-git-test--mock-repo
+    (with-temp-file "foo")
+    (condition-case err
+        (progn
+          (vc-git-register (split-string "foo"))
+          (vc-git-checkin (split-string "foo") "No-Verify: yes
+his fooness")
+          (vc-git-checkout nil (vc-git--rev-parse "HEAD")))
+      (error (signal (car err) (with-current-buffer "*vc*" (buffer-string)))))
+    (find-file-noselect "foo")))
+
 (defun vc-git-test--run-program-version-test
     (mock-version-string expected-output)
   (cl-letf* (((symbol-function 'vc-git--run-command-string)
