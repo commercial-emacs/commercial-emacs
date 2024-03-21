@@ -7754,9 +7754,7 @@ bidi_reseat (struct it *it)
 	  bytepos = IT_BYTEPOS (*it);
 	}
       if (it->bidi_it.scan_dir < 0)
-	stop = STRINGP (it->string)
-	       ? -1
-	       : bidi_level_start (it->bidi_it.resolved_level) - 1;
+	stop = -1;
       composition_compute_stop_pos (&it->cmp_it, charpos, bytepos, stop,
 				    it->string);
     }
