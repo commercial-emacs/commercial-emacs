@@ -3404,7 +3404,9 @@ compute_stop_pos (struct it *it)
     {
       composition_compute_stop_pos
 	(&it->cmp_it, charpos, bytepos,
-	 (it->bidi_p && it->bidi_it.scan_dir < 0) ? -1 : it->end_charpos,
+	 (it->bidi_p && it->bidi_it.scan_dir < 0)
+	 ? bidi_level_start (it->bidi_it.resolved_level) - 1
+	 : it->end_charpos,
 	 it->string);
     }
 }
@@ -7346,7 +7348,9 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	    {
 	      /* No more clusters.  Compute next stop position.
 		 If we're now scanning backward, all bets are off.  */
-	      ptrdiff_t stop = (it->bidi_it.scan_dir < 0) ? -1 : it->end_charpos;
+	      ptrdiff_t stop = (it->bidi_it.scan_dir < 0)
+		? bidi_level_start (it->bidi_it.resolved_level) - 1
+		: it->end_charpos;
 	      composition_compute_stop_pos (&it->cmp_it, IT_CHARPOS (*it),
 					    IT_BYTEPOS (*it), stop, Qnil);
 	    }
@@ -7373,7 +7377,9 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	      if (prev_scan_dir != it->bidi_it.scan_dir)
 		{
 		  /* Direction switched; recompute composition stop */
-		  ptrdiff_t stop = (it->bidi_it.scan_dir < 0) ? -1 : it->end_charpos;
+		  ptrdiff_t stop = (it->bidi_it.scan_dir < 0)
+		    ? bidi_level_start (it->bidi_it.resolved_level) - 1
+		    : it->end_charpos;
 		  composition_compute_stop_pos (&it->cmp_it, IT_CHARPOS (*it),
 						IT_BYTEPOS (*it), stop, Qnil);
 		}
@@ -7754,7 +7760,9 @@ bidi_reseat (struct it *it)
 	  bytepos = IT_BYTEPOS (*it);
 	}
       if (it->bidi_it.scan_dir < 0)
-	stop = -1;
+	stop = STRINGP (it->string)
+	       ? -1
+	       : bidi_level_start (it->bidi_it.resolved_level) - 1;
       composition_compute_stop_pos (&it->cmp_it, charpos, bytepos, stop,
 				    it->string);
     }
@@ -8226,7 +8234,9 @@ get_element_from_buffer (struct it *it)
 	 previously seen overlays is no longer valid.  */
       it->ignore_overlay_strings_at_pos_p = false;
 
-      stop = it->bidi_it.scan_dir < 0 ? -1 : it->end_charpos;
+      stop = it->bidi_it.scan_dir < 0
+	  ? bidi_level_start (it->bidi_it.resolved_level) - 1
+	  : it->end_charpos;
       if (CHAR_COMPOSED_P (it, IT_CHARPOS (*it), IT_BYTEPOS (*it), stop)
 	  && get_element_from_composition (it))
 	{

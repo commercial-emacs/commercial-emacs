@@ -3286,6 +3286,7 @@ extern int bidi_fetch_char (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t *dis
 			    struct window *w,
 			    bool frame_window_p, ptrdiff_t *ch_len, ptrdiff_t *nchars);
 extern bidi_type_t bidi_get_type (int ch, bidi_dir_t override);
+extern ptrdiff_t bidi_level_start (int);
 
 /* Defined in xdisp.c */
 struct glyph_row *row_containing_pos (struct window *, ptrdiff_t,
