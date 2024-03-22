@@ -3507,15 +3507,17 @@ Of course, we really can't know that for sure, so it's just a heuristic."
       ((and (pred symbolp) type)
        (macroexp-warn-and-return
         (format-message "Unknown type: %S" type)
-        (let* ((name (symbol-name type))
-               (namep (intern (concat name "p"))))
-          (cond
-           ((cl--macroexp-fboundp namep) (inline-quote (funcall #',namep ,val)))
-           ((cl--macroexp-fboundp
-             (setq namep (intern (concat name "-p"))))
-            (inline-quote (funcall #',namep ,val)))
-           ((cl--macroexp-fboundp type) (inline-quote (funcall #',type ,val)))
-           (t (error "Unknown type %S" type))))))
+        (let ((namep (intern (concat (symbol-name type) "p")))
+              (name-p (intern (concat (symbol-name type) "-p"))))
+          (cond ((cl--macroexp-fboundp namep)
+                 (inline-quote (funcall #',namep ,val)))
+                ((cl--macroexp-fboundp name-p)
+                 (inline-quote (funcall #',name-p ,val)))
+                ((cl--macroexp-fboundp type)
+                 (inline-quote (funcall #',type ,val)))
+                (t
+                 (error "No predicate for: %S" type))))
+        nil :compile-only))
       (type (error "Bad type spec: %S" type)))))
 
 

@@ -158,13 +158,9 @@ Other uses risk returning non-nil value that point to the wrong file."
 (define-obsolete-function-alias 'macroexp--warn-and-return
   #'macroexp-warn-and-return "28.1")
 (defun macroexp-warn-and-return (msg form &optional category compile-only)
-  "Return code equivalent to FORM labeled with warning MSG.
-ARG is a symbol (or a form) giving the source code position of FORM
-for the message.  It should normally be a symbol with position.
-CATEGORY is the category of the warning, like the categories that
-can appear in `byte-compile-warnings'.
-COMPILE-ONLY non-nil means no warning should be emitted if the code
-is executed without being compiled first."
+  "Returns FORM with the added side effect of issuing a warning MSG.
+CATEGORY is one of categories as for `byte-compile-warnings'.  Executing
+code without compiling first would emit warnings unless COMPILE-ONLY."
   (cond
    ((null msg) form)
    ((macroexp-compiling-p)
