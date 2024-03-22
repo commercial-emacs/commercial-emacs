@@ -178,6 +178,11 @@ The format is (FUNCTION ARGS...).")
   'help-function 'describe-variable
   'help-echo (purify-if-dumping "mouse-2, RET: describe this variable"))
 
+(define-button-type 'help-type
+  :supertype 'help-xref
+  'help-function #'cl-describe-type
+  'help-echo (purecopy "mouse-2, RET: describe this type"))
+
 (define-button-type 'help-face
   :supertype 'help-xref
   'help-function 'describe-face
