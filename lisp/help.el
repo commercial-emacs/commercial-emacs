@@ -859,6 +859,8 @@ If INSERT (the prefix arg) is non-nil, insert the message in the buffer."
 (defun help--binding-undefined-p (defn)
   (or (null defn) (integerp defn) (equal defn #'undefined)))
 
+(declare-function help-fns-function-name "help-fns")
+
 (defun help--analyze-key (key untranslated &optional buffer)
   "Get information about KEY its corresponding UNTRANSLATED events.
 Returns a list of the form (BRIEF-DESC DEFN EVENT MOUSE-MSG).
