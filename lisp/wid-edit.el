@@ -1366,6 +1366,7 @@ When not inside a field, signal an error."
 			     (marker-position from) (marker-position to))
        (set-marker from nil)
        (set-marker to nil))))
+  (setq widget-field-new nil)
   (widget-clear-undo)
   (widget-add-change))
 
