@@ -185,13 +185,7 @@ and then returns."
                                                 (help--key-description-fontified (kbd "SPC"))
                                                 "/"
                                                 (help--key-description-fontified (kbd "DEL"))
-                                                " to scroll")))
-                             nil nil nil nil
-                             ;; Disable ``text conversion''.  OS
-                             ;; input methods might otherwise chose
-                             ;; to insert user input directly into
-                             ;; a buffer.
-                             t)
+                                                " to scroll"))))
                         char (aref key 0)))
 
                 ;; If this is a scroll bar command, just run it.
