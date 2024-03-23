@@ -524,6 +524,7 @@ bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT) ../lisp/subdirs.el
 emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el ../lisp/loaddefs.elc \
   ../lisp/international/charprop.el \
   $(patsubst %,../lisp/%.el,$(shell $(call relative-lisp-files,bootstrap-emacs$(EXEEXT),nil)))
+	rm -f -- $(patsubst %.el,%.elc,$(filter %.el,$?))
 	$(call pdump,$@) # pdmp some interpreted elisp
 	@# if relative-lisp-files empty, .DEFAULT_GOAL=none
 	$(MAKE) .DEFAULT_GOAL=none -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\")`
