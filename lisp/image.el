@@ -121,11 +121,6 @@ If `create-image' is called with a :format attribute whose value
 equals a content-type found in this list, the ImageMagick library is
 told that the data would have the associated suffix if saved to a file.")
 
-(defcustom image-recompute-map-p t
-  "Recompute image map when scaling, rotating, or flipping an image."
-  :type 'boolean
-  :version "30.1")
-
 (defcustom image-load-path
   (list (file-name-as-directory (expand-file-name "images" data-directory))
         'data-directory 'load-path)
@@ -1416,6 +1411,11 @@ is recomputed to fit the newly transformed image."
 (define-obsolete-function-alias 'image-refresh #'image-flush "29.1")
 
 ;;; Map transformation
+
+(defcustom image-recompute-map-p t
+  "Recompute image map when scaling, rotating, or flipping an image."
+  :type 'boolean
+  :version "30.1")
 
 (defun image--compute-map (image)
   "Compute map for IMAGE suitable to be used as its :map property.
