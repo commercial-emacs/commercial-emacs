@@ -777,7 +777,7 @@ Call `cl--find-class' to get TYPE's propname `cl--class'"
     (insert (symbol-name type)
             (substitute-command-keys " is a type (of kind `"))
     (help-insert-xref-button (symbol-name metatype)
-                             'help-type metatype)
+                             'cl-help-type metatype)
     (insert (substitute-command-keys "')"))
     (when location
       (insert (substitute-command-keys " in `"))
@@ -796,7 +796,7 @@ Call `cl--find-class' to get TYPE's propname `cl--class'"
           (setq cur (cl--class-name cur))
           (insert (substitute-quotes "`"))
           (help-insert-xref-button (symbol-name cur)
-                                   'help-type cur)
+                                   'cl-help-type cur)
           (insert (substitute-command-keys (if pl "', " "'"))))
         (insert ".\n")))
 
@@ -808,7 +808,7 @@ Call `cl--find-class' to get TYPE's propname `cl--class'"
         (while (setq cur (pop ch))
           (insert (substitute-quotes "`"))
           (help-insert-xref-button (symbol-name cur)
-                                   'help-type cur)
+                                   'cl-help-type cur)
           (insert (substitute-command-keys (if ch "', " "'"))))
         (insert ".\n")))
 
