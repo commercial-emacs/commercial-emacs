@@ -614,9 +614,10 @@ inhibit_flag (int encoded_flag, bool var)
 static bool
 growable_destination (struct coding_system *coding)
 {
-  return STRINGP (coding->dst_object) || BUFFERP (coding->dst_object);
+  return (STRINGP (coding->dst_object)
+	  || BUFFERP (coding->dst_object)
+	  || NILP (coding->dst_object));
 }
-
 
 /* Safely get one byte from the source text pointed by SRC which ends
    at SRC_END, and set C to that byte.  If there are not enough bytes
@@ -6982,7 +6983,6 @@ get_translation (Lisp_Object trans, int *buf, int *buf_end, ptrdiff_t *nchars)
   return Qnil;
 }
 
-
 static int
 produce_chars (struct coding_system *coding, Lisp_Object translation_table,
 	       bool last_block)
@@ -7040,7 +7040,10 @@ produce_chars (struct coding_system *coding, Lisp_Object translation_table,
 		      || ckd_add (&dst_size, dst_size, buf_end - buf))
 		    memory_full (SIZE_MAX);
 		  dst = alloc_destination (coding, dst_size, dst);
-		  if (EQ (coding->src_object, coding->dst_object))
+		  if (EQ (coding->src_object, coding->dst_object)
+		      /* Input and output are not C buffers, which are safe to
+			 assume to be different.  */
+		      && !NILP (coding->src_object))
 		    {
 		      coding_set_source (coding);
 		      dst_end = (((unsigned char *) coding->source)
@@ -7075,7 +7078,10 @@ produce_chars (struct coding_system *coding, Lisp_Object translation_table,
       const unsigned char *src = coding->source;
       const unsigned char *src_end = src + coding->consumed;
 
-      if (EQ (coding->dst_object, coding->src_object))
+      if (EQ (coding->dst_object, coding->src_object)
+	  /* Input and output are not C buffers, which are safe to
+	     assume to be different.  */
+	  && !NILP (coding->src_object))
 	{
 	  eassert (growable_destination (coding));
 	  dst_end = (unsigned char *) src;
@@ -7096,7 +7102,8 @@ produce_chars (struct coding_system *coding, Lisp_Object translation_table,
 		  if (dst == dst_end)
 		    {
 		      eassert (growable_destination (coding));
-		      if (EQ (coding->src_object, coding->dst_object))
+		      if (EQ (coding->src_object, coding->dst_object)
+			  && !NILP (coding->src_object))
 			dst_end = (unsigned char *) src;
 		      if (dst == dst_end)
 			{
@@ -7108,7 +7115,8 @@ produce_chars (struct coding_system *coding, Lisp_Object translation_table,
 			  coding_set_source (coding);
 			  src = coding->source + offset;
 			  src_end = coding->source + coding->consumed;
-			  if (EQ (coding->src_object, coding->dst_object))
+			  if (EQ (coding->src_object, coding->dst_object)
+			      && !NILP (coding->src_object))
 			    dst_end = (unsigned char *) src;
 			}
 		    }
@@ -7127,14 +7135,16 @@ produce_chars (struct coding_system *coding, Lisp_Object translation_table,
 		if (dst >= dst_end - 1)
 		  {
 		    eassert (growable_destination (coding));
-		    if (EQ (coding->src_object, coding->dst_object))
+		    if (EQ (coding->src_object, coding->dst_object)
+			&& !NILP (coding->src_object))
 		      dst_end = (unsigned char *) src;
 		    if (dst >= dst_end - 1)
 		      {
 			ptrdiff_t offset = src - coding->source;
 			ptrdiff_t more_bytes;
 
-			if (EQ (coding->src_object, coding->dst_object))
+			if (EQ (coding->src_object, coding->dst_object)
+			    && !NILP (coding->src_object))
 			  more_bytes = ((src_end - src) / 2) + 2;
 			else
 			  more_bytes = src_end - src + 2;
@@ -7143,7 +7153,8 @@ produce_chars (struct coding_system *coding, Lisp_Object translation_table,
 			coding_set_source (coding);
 			src = coding->source + offset;
 			src_end = coding->source + coding->consumed;
-			if (EQ (coding->src_object, coding->dst_object))
+			if (EQ (coding->src_object, coding->dst_object)
+			    && !NILP (coding->src_object))
 			  dst_end = (unsigned char *) src;
 		      }
 		  }
@@ -7152,7 +7163,8 @@ produce_chars (struct coding_system *coding, Lisp_Object translation_table,
 	}
       else
 	{
-	  if (!EQ (coding->src_object, coding->dst_object))
+	  if (!EQ (coding->src_object, coding->dst_object)
+	      && !NILP (coding->src_object))
 	    {
 	      ptrdiff_t require = coding->src_bytes - coding->dst_bytes;
 
