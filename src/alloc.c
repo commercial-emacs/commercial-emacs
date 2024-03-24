@@ -2526,20 +2526,20 @@ and the R bit flags the presence of &rest arguments.
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   Lisp_Object val;
-  if (!((FIXNUMP (args[COMPILED_ARGLIST])
-	  || CONSP (args[COMPILED_ARGLIST])
-	  || NILP (args[COMPILED_ARGLIST]))
-	 && STRINGP (args[COMPILED_BYTECODE])
-	 && !STRING_MULTIBYTE (args[COMPILED_BYTECODE])
-	 && VECTORP (args[COMPILED_CONSTANTS])
-	 && FIXNATP (args[COMPILED_STACK_DEPTH])))
+  if (!((FIXNUMP (args[CLOSURE_ARGLIST])
+	  || CONSP (args[CLOSURE_ARGLIST])
+	  || NILP (args[CLOSURE_ARGLIST]))
+	 && STRINGP (args[CLOSURE_CODE])
+	 && !STRING_MULTIBYTE (args[CLOSURE_CODE])
+	 && VECTORP (args[CLOSURE_CONSTANTS])
+	 && FIXNATP (args[CLOSURE_STACK_DEPTH])))
     error ("Invalid byte-code object");
 
-  pin_string (args[COMPILED_BYTECODE]); /* Bytecode is immovable. */
+  pin_string (args[CLOSURE_CODE]); /* Bytecode is immovable. */
 
   /* Under lexical binding, closures can no longer be pure copied. */
   val = Fvector (nargs, args);
-  XSETPVECTYPE (XVECTOR (val), PVEC_COMPILED);
+  XSETPVECTYPE (XVECTOR (val), PVEC_CLOSURE);
   return val;
 }
 
@@ -2551,12 +2551,12 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   Lisp_Object protofun = args[0];
-  CHECK_TYPE (COMPILEDP (protofun), Qbyte_code_function_p, protofun);
+  CHECK_TYPE (CLOSUREP (protofun), Qbyte_code_function_p, protofun);
 
   /* Create a copy of the constant vector, filling it with the closure
      variables in the beginning.  (The overwritten part should just
      contain placeholder values.) */
-  Lisp_Object proto_constvec = AREF (protofun, COMPILED_CONSTANTS);
+  Lisp_Object proto_constvec = AREF (protofun, CLOSURE_CONSTANTS);
   ptrdiff_t constsize = ASIZE (proto_constvec);
   ptrdiff_t nvars = nargs - 1;
   if (nvars > constsize)
@@ -2572,7 +2572,7 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
   struct Lisp_Vector *vec = static_vector_allocator (protosize, false);
   vec->header = XVECTOR (protofun)->header;
   memcpy (vec->contents, XVECTOR (protofun)->contents, protosize * word_size);
-  vec->contents[COMPILED_CONSTANTS] = constvec;
+  vec->contents[CLOSURE_CONSTANTS] = constvec;
   return make_lisp_ptr (vec, Lisp_Vectorlike);
 }
 
@@ -3971,7 +3971,7 @@ purecopy (Lisp_Object obj)
 
       obj = make_lisp_hash_table (purecopy_hash_table (table));
     }
-  else if (COMPILEDP (obj) || VECTORP (obj) || RECORDP (obj))
+  else if (CLOSUREP (obj) || VECTORP (obj) || RECORDP (obj))
     {
       struct Lisp_Vector *objp = XVECTOR (obj);
       ptrdiff_t nbytes = vector_nbytes (objp);
@@ -3984,7 +3984,7 @@ purecopy (Lisp_Object obj)
       for (i = 0; i < size; ++i)
 	vec->contents[i] = purecopy (vec->contents[i]);
       /* Byte code strings must be pinned.  */
-      if (COMPILEDP (obj) && size >= 2 && STRINGP (vec->contents[1])
+      if (CLOSUREP (obj) && size >= 2 && STRINGP (vec->contents[1])
 	  && !STRING_MULTIBYTE (vec->contents[1]))
 	pin_string (vec->contents[1]);
       XSETVECTOR (obj, vec);
@@ -5898,11 +5898,11 @@ symbol_uses_obj (Lisp_Object symbol, Lisp_Object obj)
   return (EQ (val, obj)
 	  || EQ (sym->u.s.function, obj)
 	  || (!NILP (sym->u.s.function)
-	      && COMPILEDP (sym->u.s.function)
-	      && EQ (AREF (sym->u.s.function, COMPILED_BYTECODE), obj))
+	      && CLOSUREP (sym->u.s.function)
+	      && EQ (AREF (sym->u.s.function, CLOSURE_CODE), obj))
 	  || (!NILP (val)
-	      && COMPILEDP (val)
-	      && EQ (AREF (val, COMPILED_BYTECODE), obj)));
+	      && CLOSUREP (val)
+	      && EQ (AREF (val, CLOSURE_CODE), obj)));
 }
 
 /* Find at most FIND_MAX symbols which have OBJ as their value or
@@ -6198,7 +6198,7 @@ union
   enum CHECK_LISP_OBJECT_TYPE CHECK_LISP_OBJECT_TYPE;
   enum DEFAULT_HASH_SIZE DEFAULT_HASH_SIZE;
   enum Lisp_Bits Lisp_Bits;
-  enum Lisp_Compiled Lisp_Compiled;
+  enum Lisp_Closure Lisp_Closure;
   enum maxargs maxargs;
   enum MAX_ALLOCA MAX_ALLOCA;
   enum More_Lisp_Bits More_Lisp_Bits;

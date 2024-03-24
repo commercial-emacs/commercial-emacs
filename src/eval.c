@@ -1908,15 +1908,15 @@ then strings and vectors are not accepted.  */)
         return Qt;
     }
   /* Bytecode objects are interactive if they are long enough to
-     have an element whose index is COMPILED_INTERACTIVE, which is
+     have an element whose index is CLOSURE_INTERACTIVE, which is
      where the interactive spec is stored.  */
-  else if (COMPILEDP (fun))
+  else if (CLOSUREP (fun))
     {
-      if (PVSIZE (fun) > COMPILED_INTERACTIVE)
+      if (PVSIZE (fun) > CLOSURE_INTERACTIVE)
         return Qt;
-      else if (PVSIZE (fun) > COMPILED_DOC_STRING)
+      else if (PVSIZE (fun) > CLOSURE_DOC_STRING)
         {
-          Lisp_Object doc = AREF (fun, COMPILED_DOC_STRING);
+          Lisp_Object doc = AREF (fun, CLOSURE_DOC_STRING);
           /* An invalid "docstring" is a sign that we have an OClosure.  */
           genfun = !(NILP (doc) || VALID_DOCSTRING_P (doc));
         }
@@ -2284,7 +2284,7 @@ eval_form (Lisp_Object form)
 		  }
 	    }
 	}
-      else if (COMPILEDP (fun)
+      else if (CLOSUREP (fun)
 	       || SUBR_NATIVE_COMPILED_DYNP (fun)
 	       || MODULE_FUNCTIONP (fun))
 	{
@@ -2682,7 +2682,7 @@ FUNCTIONP (Lisp_Object object)
 
   if (SUBRP (object))
     return XSUBR (object)->max_args != UNEVALLED;
-  else if (COMPILEDP (object) || MODULE_FUNCTIONP (object))
+  else if (CLOSUREP (object) || MODULE_FUNCTIONP (object))
     return true;
   else if (CONSP (object))
     {
@@ -2704,7 +2704,7 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
 
   if (SUBRP (fun) && !SUBR_NATIVE_COMPILED_DYNP (fun))
     return funcall_subr (XSUBR (fun), numargs, args);
-  else if (COMPILEDP (fun)
+  else if (CLOSUREP (fun)
 	   || SUBR_NATIVE_COMPILED_DYNP (fun)
 	   || MODULE_FUNCTIONP (fun))
     return funcall_lambda (fun, numargs, args);
@@ -2856,9 +2856,9 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
   Lisp_Object args, lexenv;
   ptrdiff_t args_template = -1;
 
-  if (COMPILEDP (fun))
+  if (CLOSUREP (fun))
     {
-      Lisp_Object first_slot = AREF (fun, COMPILED_ARGLIST);
+      Lisp_Object first_slot = AREF (fun, CLOSURE_ARGLIST);
       eassert (!CONSP (fun));
       if (FIXNUMP (first_slot))
 	{
@@ -3012,7 +3012,7 @@ function with `&rest' args, or `unevalled' for a special form.  */)
 
   if (SUBRP (function))
     result = Fsubr_arity (function);
-  else if (COMPILEDP (function))
+  else if (CLOSUREP (function))
     result = lambda_arity (function);
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (function))
@@ -3060,9 +3060,9 @@ lambda_arity (Lisp_Object fun)
       else
 	xsignal1 (Qinvalid_function, fun);
     }
-  else if (COMPILEDP (fun))
+  else if (CLOSUREP (fun))
     {
-      syms_left = AREF (fun, COMPILED_ARGLIST);
+      syms_left = AREF (fun, CLOSURE_ARGLIST);
       if (FIXNUMP (syms_left))
         return get_byte_code_arity (syms_left);
     }
