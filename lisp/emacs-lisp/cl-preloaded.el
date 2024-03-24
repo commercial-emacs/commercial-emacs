@@ -260,7 +260,7 @@
 (cl-defstruct (cl--class
                (:constructor nil)
                (:copier nil))
-  "Type of descriptors for any kind of structure-like data."
+  "Abstract supertype of all type descriptors."
   ;; Intended to be shared between defstruct and defclass.
   (name nil :type symbol)               ;The type name.
   (docstring nil :type string)
@@ -306,6 +306,8 @@
                (:constructor nil)
                (:constructor built-in-class--make (name docstring parents))
                (:copier nil))
+  "Type descriptors for built-in types.
+The `slots' (and hence `index-table') are currently unused."
   )
 
 (defmacro cl--define-built-in-type (name parents &optional docstring &rest slots)
@@ -352,8 +354,12 @@
 (cl--define-built-in-type tree-sitter-compiled-query atom)
 (cl--define-built-in-type tree-sitter-node atom)
 (cl--define-built-in-type tree-sitter-parser atom)
-(cl--define-built-in-type user-ptr atom
-  nil :predicate user-ptrp) ;; FIXME: Shouldn't it be called `user-ptr-p'?
+(declare-function user-ptrp "data.c")
+(when (fboundp 'user-ptrp)
+  (cl--define-built-in-type user-ptr atom nil
+                            ;; FIXME: Shouldn't it be called
+                            ;; `user-ptr-p'?
+                            :predicate user-ptrp))
 (cl--define-built-in-type font-object atom)
 (cl--define-built-in-type font-entity atom)
 (cl--define-built-in-type font-spec atom)
