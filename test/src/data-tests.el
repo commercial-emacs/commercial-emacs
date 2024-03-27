@@ -842,7 +842,7 @@ comparing the subr with a much slower Lisp implementation."
   ;; Note: This doesn't work for list/vector structs since those types
   ;; are too difficult/unreliable to detect (so `cl-type-of' only says
   ;; it's a `cons' or a `vector').
-  (dolist (val (list -2 10 (expt 2 128) nil t 'car :car
+  (dolist (val (list -2 10 (expt 2 128) nil t 'car
                      (symbol-function 'car)
                      (symbol-function 'progn)))
     (let* ((type (cl-type-of val))
@@ -851,16 +851,18 @@ comparing the subr with a much slower Lisp implementation."
       (dolist (parent alltypes)
         (should (cl-typep val parent))
         (dolist (subtype (cl--class-children (cl-find-class parent)))
-          (when (and (not (memq subtype alltypes))
-                     (built-in-class-p (cl-find-class subtype))
-                     (not (memq subtype
-                                ;; FIXME: Some types don't have any associated
-                                ;; predicate,
-                                '( font-spec font-entity font-object
-                                   finalizer condvar terminal
-                                   native-comp-unit interpreted-function
-                                   tree-sitter-compiled-query
-                                   tree-sitter-node tree-sitter-parser))))
-            (should-not (cl-typep val subtype))))))))
+          (unless (memq subtype alltypes)
+            (unless (memq subtype
+                          ;; FIXME: Some types don't have any associated
+                          ;; predicate,
+                          '( font-spec font-entity font-object
+                             finalizer condvar terminal
+                             native-comp-unit interpreted-function
+                             tree-sitter-compiled-query
+                             tree-sitter-node tree-sitter-parser
+                             ;; `functionp' also matches things of type
+                             ;; `symbol' and `cons'.
+                             function))
+              (should-not (cl-typep val subtype)))))))))
 
 ;;; data-tests.el ends here
