@@ -21,6 +21,12 @@
 
 ;;; Code:
 (require 'sqlite)
+(declare-function sqlite-commit "sqlite.c")
+(declare-function sqlite-rollback "sqlite.c")
+(declare-function sqlite-execute "sqlite.c")
+(declare-function sqlite-available-p "sqlite.c")
+(declare-function sqlite-select "sqlite.c")
+(declare-function sqlite-open "sqlite.c")
 
 (ert-deftest with-sqlite-transaction ()
   (skip-unless (sqlite-available-p))
