@@ -91,7 +91,7 @@ MAP can be an alist, plist, hash-table, or array."
 
 (defconst map--plist-has-predicate
   (condition-case nil
-      (with-no-warnings (plist-get () nil #'eq) t)
+      (with-no-warnings (prog1 t (ignore (plist-get () nil #'eq))))
     (wrong-number-of-arguments))
   "Non-nil means `plist-get' & co. accept a predicate in Emacs 29+.
 Note that support for this predicate in map.el is patchy and

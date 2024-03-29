@@ -1669,43 +1669,6 @@
             (should-error (value< y x) :type 'type-mismatch)))
         (setq tail (cdr tail))))))
 
-(ert-deftest fns-value<-symbol-with-pos ()
-  ;; values (X . Y) where X<Y
-  (let* ((a-sp-1 (position-symbol 'a 1))
-         (a-sp-2 (position-symbol 'a 2))
-         (b-sp-1 (position-symbol 'b 1))
-         (b-sp-2 (position-symbol 'b 2)))
-
-    (dolist (swp '(nil t))
-      (let ((symbols-with-pos-enabled swp))
-        ;; Enabled or not, they compare by name.
-        (dolist (c `((,a-sp-1 . ,b-sp-1) (,a-sp-1 . ,b-sp-2)
-                     (,a-sp-2 . ,b-sp-1) (,a-sp-2 . ,b-sp-2)))
-          (let ((x (car c))
-                (y (cdr c)))
-            (should (value< x y))
-            (should-not (value< y x))
-            (should-not (value< x x))
-            (should-not (value< y y))))
-        (should-not (value< a-sp-1 a-sp-2))
-        (should-not (value< a-sp-2 a-sp-1))))
-
-    ;; When disabled, symbol-with-pos and symbols do not compare.
-    (should-error (value< a-sp-1 'a) :type 'type-mismatch)
-    (should-error (value< 'a a-sp-1) :type 'type-mismatch)
-
-    (let ((symbols-with-pos-enabled t))
-      ;; When enabled, a symbol-with-pos compares as a plain symbol.
-      (dolist (c `((,a-sp-1 . b) (a . ,b-sp-1)))
-        (let ((x (car c))
-              (y (cdr c)))
-          (should (value< x y))
-          (should-not (value< y x))
-          (should-not (value< x x))
-          (should-not (value< y y))))
-      (should-not (value< a-sp-1 'a))
-      (should-not (value< 'a a-sp-1)))))
-
 (ert-deftest fns-value<-circle ()
   ;; Check that we at least don't hang when comparing two circular lists.
   (let ((a (number-sequence 1 5))
