@@ -1769,7 +1769,7 @@ See Info node `(elisp) Integer Basics'."
          string-version-lessp
          substring substring-no-properties
          sxhash-eq sxhash-eql sxhash-equal sxhash-equal-including-properties
-         take vconcat
+         take value< vconcat
          ;; frame.c
          frame-ancestor-p frame-bottom-divider-width frame-char-height
          frame-char-width frame-child-frame-border-width frame-focus
@@ -1968,7 +1968,7 @@ See Info node `(elisp) Integer Basics'."
          hash-table-p identity length length< length=
          length> member memq memql nth nthcdr proper-list-p rassoc rassq
          safe-length string-bytes string-distance string-equal string-lessp
-         string-search string-version-lessp take
+         string-search string-version-lessp take value<
          ;; search.c
          regexp-quote
          ;; syntax.c
