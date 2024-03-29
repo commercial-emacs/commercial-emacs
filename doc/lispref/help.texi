@@ -231,7 +231,7 @@ in the *Help* buffer."
     (help-setup-xref (list 'describe-symbols pattern)
                  (called-interactively-p 'interactive))
     (with-help-window (help-buffer)
-      (mapcar describe-func (sort sym-list)))))
+      (mapcar describe-func (sort sym-list 'string<)))))
 @end group
 @end smallexample
 

@@ -3264,15 +3264,6 @@ value should be byte-discard."
     (when byte-compile--for-effect
       (byte-compile-discard))))
 
-(defun bytecomp--actually-important-return-value-p (form)
-  "Whether FORM is really a call with a return value that should not go unused.
-This assumes the function has the `important-return-value' property."
-  (cond ((eq (car form) 'sort)
-         ;; For `sort', we only care about non-destructive uses.
-         (and (zerop (% (length form) 2))  ; new-style call
-              (not (plist-get (cddr form) :in-place))))
-        (t t)))
-
 (let ((important-return-value-fns
        '(
          ;; These functions are side-effect-free except for the
@@ -3280,11 +3271,9 @@ This assumes the function has the `important-return-value' property."
          mapcar mapcan mapconcat
          assoc plist-get plist-member
 
-         ;; It's safe to ignore the value of `nreverse'
+         ;; It's safe to ignore the value of `sort' and `nreverse'
          ;; when used on arrays, but most calls pass lists.
-         nreverse
-
-         sort      ; special handling (non-destructive calls only)
+         nreverse sort
 
          match-data
 

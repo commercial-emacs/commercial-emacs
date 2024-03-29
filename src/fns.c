@@ -27,7 +27,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <vla.h>
 #include <errno.h>
 #include <ctype.h>
-#include <math.h>
 
 #include "lisp.h"
 #include "bignum.h"
@@ -463,19 +462,28 @@ load_unaligned_size_t (const void *p)
   return x;
 }
 
-/* Return -1/0/1 to indicate the relation </=/> between string1 and string2.  */
-static int
-string_cmp (Lisp_Object string1, Lisp_Object string2)
+DEFUN ("string-lessp", Fstring_lessp, Sstring_lessp, 2, 2, 0,
+       doc: /* Return non-nil if STRING1 is less than STRING2 in lexicographic order.
+Case is significant.
+Symbols are also allowed; their print names are used instead.  */)
+  (Lisp_Object string1, Lisp_Object string2)
 {
+  if (SYMBOLP (string1))
+    string1 = SYMBOL_NAME (string1);
+  else
+    CHECK_STRING (string1);
+  if (SYMBOLP (string2))
+    string2 = SYMBOL_NAME (string2);
+  else
+    CHECK_STRING (string2);
+
   ptrdiff_t n = min (SCHARS (string1), SCHARS (string2));
   if (!STRING_MULTIBYTE (string1) && !STRING_MULTIBYTE (string2))
     {
       /* Each argument is either unibyte or all-ASCII multibyte:
 	 we can compare bytewise.  */
       int d = memcmp (SSDATA (string1), SSDATA (string2), n);
-      if (d)
-	return d;
-      return n < SCHARS (string2) ? -1 : n > SCHARS (string2);
+      return d < 0 || (d == 0 && n < SCHARS (string2)) ? Qt : Qnil;
     }
   else if (STRING_MULTIBYTE (string1) && STRING_MULTIBYTE (string2))
     {
@@ -509,7 +517,7 @@ string_cmp (Lisp_Object string1, Lisp_Object string2)
 
       if (b >= nb)
 	/* One string is a prefix of the other.  */
-	return b < nb2 ? -1 : b > nb2;
+	return b < nb2 ? Qt : Qnil;
 
       /* Now back up to the start of the differing characters:
 	 it's the last byte not having the bit pattern 10xxxxxx.  */
@@ -521,7 +529,7 @@ string_cmp (Lisp_Object string1, Lisp_Object string2)
       ptrdiff_t i1_byte = b, i2_byte = b;
       int c1 = fetch_string_char_advance_no_check (string1, &i1, &i1_byte);
       int c2 = fetch_string_char_advance_no_check (string2, &i2, &i2_byte);
-      return c1 < c2 ? -1 : c1 > c2;
+      return c1 < c2 ? Qt : Qnil;
     }
   else if (STRING_MULTIBYTE (string1))
     {
@@ -532,9 +540,9 @@ string_cmp (Lisp_Object string1, Lisp_Object string2)
 	  int c1 = fetch_string_char_advance_no_check (string1, &i1, &i1_byte);
 	  int c2 = SREF (string2, i2++);
 	  if (c1 != c2)
-	    return c1 < c2 ? -1 : 1;
+	    return c1 < c2 ? Qt : Qnil;
 	}
-      return i1 < SCHARS (string2) ? -1 : i1 > SCHARS (string2);
+      return i1 < SCHARS (string2) ? Qt : Qnil;
     }
   else
     {
@@ -545,28 +553,10 @@ string_cmp (Lisp_Object string1, Lisp_Object string2)
 	  int c1 = SREF (string1, i1++);
 	  int c2 = fetch_string_char_advance_no_check (string2, &i2, &i2_byte);
 	  if (c1 != c2)
-	    return c1 < c2 ? -1 : 1;
+	    return c1 < c2 ? Qt : Qnil;
 	}
-      return i1 < SCHARS (string2) ? -1 : i1 > SCHARS (string2);
+      return i1 < SCHARS (string2) ? Qt : Qnil;
     }
-}
-
-DEFUN ("string-lessp", Fstring_lessp, Sstring_lessp, 2, 2, 0,
-       doc: /* Return non-nil if STRING1 is less than STRING2 in lexicographic order.
-Case is significant.
-Symbols are also allowed; their print names are used instead.  */)
-  (Lisp_Object string1, Lisp_Object string2)
-{
-  if (SYMBOLP (string1))
-    string1 = SYMBOL_NAME (string1);
-  else
-    CHECK_STRING (string1);
-  if (SYMBOLP (string2))
-    string2 = SYMBOL_NAME (string2);
-  else
-    CHECK_STRING (string2);
-
-  return string_cmp (string1, string2) < 0 ? Qt : Qnil;
 }
 
 DEFUN ("string-version-lessp", Fstring_version_lessp,
@@ -2345,17 +2335,17 @@ See also the function `nreverse', which is used more often.  */)
 }
 
 
-/* Stably sort LIST ordered by PREDICATE and KEYFUNC, optionally reversed.
-   This converts the list to a vector, sorts the vector, and returns the
-   result converted back to a list.  If INPLACE, the input list is
-   reused to hold the sorted result; otherwise a new list is returned.  */
+/* Stably sort LIST ordered by PREDICATE using the TIMSORT
+   algorithm.  This converts the list to a vector, sorts the vector,
+   and returns the result converted back to a list.  The input list
+   is destructively reused to hold the sorted result.  */
+
 static Lisp_Object
-sort_list (Lisp_Object list, Lisp_Object predicate, Lisp_Object keyfunc,
-	   bool reverse, bool inplace)
+sort_list (Lisp_Object list, Lisp_Object predicate)
 {
   ptrdiff_t length = list_length (list);
   if (length < 2)
-    return inplace ? list : list1 (XCAR (list));
+    return list;
   else
     {
       Lisp_Object *result;
@@ -2367,109 +2357,49 @@ sort_list (Lisp_Object list, Lisp_Object predicate, Lisp_Object keyfunc,
 	  result[i] = Fcar (tail);
 	  tail = XCDR (tail);
 	}
-      tim_sort (predicate, keyfunc, result, length, reverse);
+      tim_sort (predicate, result, length);
 
-      if (inplace)
+      ptrdiff_t i = 0;
+      tail = list;
+      while (CONSP (tail))
 	{
-	  /* Copy sorted vector contents back onto the original list.  */
-	  ptrdiff_t i = 0;
-	  tail = list;
-	  while (CONSP (tail))
-	    {
-	      XSETCAR (tail, result[i]);
-	      tail = XCDR (tail);
-	      i++;
-	    }
-	}
-      else
-	{
-	  /* Create a new list for the sorted vector contents.  */
-	  list = Qnil;
-	  for (ptrdiff_t i = length - 1; i >= 0; i--)
-	    list = Fcons (result[i], list);
+	  XSETCAR (tail, result[i]);
+	  tail = XCDR (tail);
+	  i++;
 	}
       SAFE_FREE ();
       return list;
     }
 }
 
-/* Stably sort VECTOR in-place ordered by PREDICATE and KEYFUNC,
-   optionally reversed.  */
-static Lisp_Object
-sort_vector (Lisp_Object vector, Lisp_Object predicate, Lisp_Object keyfunc,
-	     bool reverse)
+/* Stably sort VECTOR ordered by PREDICATE using the TIMSORT
+   algorithm.  */
+
+static void
+sort_vector (Lisp_Object vector, Lisp_Object predicate)
 {
   ptrdiff_t length = ASIZE (vector);
-  if (length >= 2)
-    tim_sort (predicate, keyfunc, XVECTOR (vector)->contents, length, reverse);
-  return vector;
+  if (length < 2)
+    return;
+
+  tim_sort (predicate, XVECTOR (vector)->contents, length);
 }
 
-DEFUN ("sort", Fsort, Ssort, 1, MANY, 0,
-       doc: /* Sort SEQ, stably, and return the sorted sequence.
-SEQ should be a list or vector.
-Optional arguments are specified as keyword/argument pairs.  The following
-arguments are defined:
-
-:key FUNC -- FUNC is a function that takes a single element from SEQ and
-  returns the key value to be used in comparison.  If absent or nil,
-  `identity' is used.
-
-:lessp FUNC -- FUNC is a function that takes two arguments and returns
-  non-nil if the first element should come before the second.
-  If absent or nil, `value<' is used.
-
-:reverse BOOL -- if BOOL is non-nil, the sorting order implied by FUNC is
-  reversed.  This does not affect stability: equal elements still retain
-  their order in the input sequence.
-
-:in-place BOOL -- if BOOL is non-nil, SEQ is sorted in-place and returned.
-  Otherwise, a sorted copy of SEQ is returned and SEQ remains unmodified;
-  this is the default.
-
-For compatibility, the calling convention (sort SEQ LESSP) can also be used;
-in this case, sorting is always done in-place.
-
-usage: (sort SEQ &key KEY LESSP REVERSE IN-PLACE)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
+DEFUN ("sort", Fsort, Ssort, 2, 2, 0,
+       doc: /* Sort SEQ, stably, comparing elements using PREDICATE.
+Returns the sorted sequence.  SEQ should be a list or vector.  SEQ is
+modified by side effects.  PREDICATE is called with two elements of
+SEQ, and should return non-nil if the first element should sort before
+the second.  */)
+  (Lisp_Object seq, Lisp_Object predicate)
 {
-  Lisp_Object seq = args[0];
-  Lisp_Object key = Qnil;
-  Lisp_Object lessp = Qnil;
-  bool inplace = false;
-  bool reverse = false;
-  if (nargs == 2)
-    {
-      /* old-style invocation without keywords */
-      lessp = args[1];
-      inplace = true;
-    }
-  else if ((nargs & 1) == 0)
-    error ("Invalid argument list");
-  else
-    for (ptrdiff_t i = 1; i < nargs - 1; i += 2)
-      {
-	if (EQ (args[i], QCkey))
-	  key = args[i + 1];
-	else if (EQ (args[i], QClessp))
-	  lessp = args[i + 1];
-	else if (EQ (args[i], QCin_place))
-	  inplace = !NILP (args[i + 1]);
-	else if (EQ (args[i], QCreverse))
-	  reverse = !NILP (args[i + 1]);
-	else
-	  signal_error ("Invalid keyword argument", args[i]);
-      }
-
   if (CONSP (seq))
-    return sort_list (seq, lessp, key, reverse, inplace);
-  else if (NILP (seq))
-    return seq;
+    seq = sort_list (seq, predicate);
   else if (VECTORP (seq))
-    return sort_vector (inplace ? seq : Fcopy_sequence (seq),
-			lessp, key, reverse);
-  else
+    sort_vector (seq, predicate);
+  else if (!NILP (seq))
     wrong_type_argument (Qlist_or_vector_p, seq);
+  return seq;
 }
 
 Lisp_Object
@@ -6564,7 +6494,6 @@ For best results this should end in a space.  */);
   defsubr (&Seql);
   defsubr (&Sequal);
   defsubr (&Sequal_including_properties);
-  defsubr (&Svaluelt);
   defsubr (&Sfillarray);
   defsubr (&Sclear_string);
   defsubr (&Snconc);

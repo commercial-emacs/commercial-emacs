@@ -1607,40 +1607,10 @@ precedence over the variable when present.
 Mostly used internally to do a kind of topological sort of
 inheritance hierarchies.
 
-+++
-** New polymorphic comparison function 'value<'.
-This function returns non-nil if the first argument is less than the
-second.  It works for any two values of the same type with reasonable
-ordering for numbers, strings, symbols, bool-vectors, markers, buffers
-and processes.  Conses, lists, vectors and records are ordered
-lexicographically.
-It is intended as a convenient ordering predicate for sorting, and is
-likely to be faster than hand-written Lisp functions.
-
-+++
-** New 'sort' arguments and features.
-The 'sort' function can now be called using the signature
-
-    (sort SEQ &rest KEYWORD-ARGUMENTS)
-
-where arguments after the first are keyword/value pairs, all optional:
-':key' specifies a function that produces the sorting key from an element,
-':lessp' specifies the ordering predicate, defaulting to 'value<',
-':reverse' is used to reverse the sorting order,
-':in-place is used for in-place sorting, as the default is now to
-sort a copy of the input.
-
-The new signature is less error-prone and reduces the need to write
-ordering predicates by hand.  We recommend that you use the ':key'
-argument instead of ':lessp' unless a suitable ordering predicate is
-already available.  This can also be used for multi-key sorting:
-
-    (sort seq :key (lambda (x) (list (age x) (size x) (cost x))))
-
-sorts by the return value of 'age', then by 'size', then by 'cost'.
-
-The old signature, '(sort SEQ PREDICATE)', can still be used and sorts
-its input in-place as before.
+** New function 'sort-on'.
+This function implements the Schwartzian transform, and is appropriate
+for sorting lists when the computation of the sort key of a list
+element can be expensive.
 
 ** New API for 'derived-mode-p' and control of the graph of major modes.
 

@@ -612,7 +612,6 @@ that collation implements.
 @end defun
 
 @cindex lexical comparison of strings
-@anchor{definition of string<}
 @defun string< string1 string2
 @c (findex string< causes problems for permuted index!!)
 This function compares two strings a character at a time.  It
@@ -692,8 +691,7 @@ for sorting (@pxref{Sequence Functions}):
 
 @example
 @group
-(sort '("11" "12" "1 1" "1 2" "1.1" "1.2")
-       :lessp #'string-collate-lessp)
+(sort (list "11" "12" "1 1" "1 2" "1.1" "1.2") 'string-collate-lessp)
      @result{} ("11" "1 1" "1.1" "12" "1 2" "1.2")
 @end group
 @end example
@@ -710,8 +708,8 @@ systems.  The @var{locale} value of @code{"POSIX"} or @code{"C"} lets
 
 @example
 @group
-(sort '("11" "12" "1 1" "1 2" "1.1" "1.2")
-      :lessp (lambda (s1 s2) (string-collate-lessp s1 s2 "POSIX")))
+(sort (list "11" "12" "1 1" "1 2" "1.1" "1.2")
+      (lambda (s1 s2) (string-collate-lessp s1 s2 "POSIX")))
      @result{} ("1 1" "1 2" "1.1" "1.2" "11" "12")
 @end group
 @end example
