@@ -3111,8 +3111,6 @@ Other types are considered unordered and the return value will be `nil'.  */)
   return value_cmp (a, b, maxdepth) < 0 ? Qt : Qnil;
 }
 
-
-
 DEFUN ("fillarray", Ffillarray, Sfillarray, 2, 2, 0,
        doc: /* Store each element of ARRAY with ITEM.
 ARRAY is a vector, string, char-table, or bool-vector.  */)
