@@ -3247,7 +3247,9 @@ value should be byte-discard."
              ((and (or sef (function-get (car form) 'important-return-value))
                    ;; Don't warn for arguments to `ignore'.
                    (not (eq byte-compile--for-effect 'for-effect-no-warn))
-		   (bytecomp--actually-important-return-value-p form))
+		   (bytecomp--actually-important-return-value-p form)
+		   (byte-compile-warning-enabled-p 'ignored-return-value
+						   (car form)))
               (byte-compile-warn
                "value from call to `%s' is unused%s"
                (car form)
