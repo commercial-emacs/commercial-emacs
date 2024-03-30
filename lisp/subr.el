@@ -6968,9 +6968,8 @@ sentence (see Info node `(elisp) Documentation Tips')."
   (internal--fill-string-single-line (apply #'format string objects)))
 
 (defun json-available-p ()
-  "Return non-nil if Emacs has libjansson support."
-  (and (fboundp 'json--available-p)
-       (json--available-p)))
+  "Return non-nil if Emacs has native JSON support."
+  t)
 
 (defun ensure-list (object)
   "Return OBJECT as a list.
