@@ -1835,6 +1835,10 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_random ();
   init_xfaces ();
 
+#if defined HAVE_JSON && !defined WINDOWSNT
+  init_json ();
+#endif
+
   if (!initialized)
     syms_of_comp ();
 
@@ -2282,7 +2286,10 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_threads ();
       syms_of_profiler ();
       syms_of_pdumper ();
+
+#ifdef HAVE_JSON
       syms_of_json ();
+#endif
 
       keys_of_keyboard ();
 
