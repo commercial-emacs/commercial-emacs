@@ -32,7 +32,6 @@
 (require 'mail-source)
 (require 'mm-util)
 (require 'gnus-int)
-(require 'browse-url)
 
 (autoload 'mail-send-and-exit "sendmail" nil t)
 
@@ -627,7 +626,7 @@ These will be logged to the \"*nnmail split*\" buffer."
   (concat
    (let ((dir (file-name-as-directory (expand-file-name dir))))
      (setq group (nnheader-replace-duplicate-chars-in-string
-		  (browse-url-url-encode-chars group "[/%]")
+		  (nnheader-replace-chars-in-string group ?/ ?_)
 		  ?. ?_))
      (setq group (nnheader-translate-file-chars group))
      ;; If this directory exists, we use it directly.
