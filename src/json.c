@@ -32,8 +32,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "coding.h"
 #include "process.h"
 
-#define JSON_HAS_ERROR_CODE (JANSSON_VERSION_HEX >= 0x020B00)
-
 #ifdef WINDOWSNT
 # include <windows.h>
 # include "w32common.h"
@@ -58,23 +56,7 @@ DEF_DLL_FN (char *, json_dumps, (const json_t *json, size_t flags));
 DEF_DLL_FN (int, json_dump_callback,
 	    (const json_t *json, json_dump_callback_t callback, void *data,
 	     size_t flags));
-DEF_DLL_FN (json_int_t, json_integer_value, (const json_t *integer));
-DEF_DLL_FN (double, json_real_value, (const json_t *real));
-DEF_DLL_FN (const char *, json_string_value, (const json_t *string));
-DEF_DLL_FN (size_t, json_string_length, (const json_t *string));
-DEF_DLL_FN (json_t *, json_array_get, (const json_t *array, size_t index));
 DEF_DLL_FN (json_t *, json_object_get, (const json_t *object, const char *key));
-DEF_DLL_FN (size_t, json_object_size, (const json_t *object));
-DEF_DLL_FN (const char *, json_object_iter_key, (void *iter));
-DEF_DLL_FN (void *, json_object_iter, (json_t *object));
-DEF_DLL_FN (json_t *, json_object_iter_value, (void *iter));
-DEF_DLL_FN (void *, json_object_key_to_iter, (const char *key));
-DEF_DLL_FN (void *, json_object_iter_next, (json_t *object, void *iter));
-DEF_DLL_FN (json_t *, json_loads,
-	    (const char *input, size_t flags, json_error_t *error));
-DEF_DLL_FN (json_t *, json_load_callback,
-	    (json_load_callback_t callback, void *data, size_t flags,
-	     json_error_t *error));
 
 /* This is called by json_decref, which is an inline function.  */
 void json_delete(json_t *json)
@@ -107,20 +89,7 @@ init_json_functions (void)
   LOAD_DLL_FN (library, json_stringn);
   LOAD_DLL_FN (library, json_dumps);
   LOAD_DLL_FN (library, json_dump_callback);
-  LOAD_DLL_FN (library, json_integer_value);
-  LOAD_DLL_FN (library, json_real_value);
-  LOAD_DLL_FN (library, json_string_value);
-  LOAD_DLL_FN (library, json_string_length);
-  LOAD_DLL_FN (library, json_array_get);
   LOAD_DLL_FN (library, json_object_get);
-  LOAD_DLL_FN (library, json_object_size);
-  LOAD_DLL_FN (library, json_object_iter_key);
-  LOAD_DLL_FN (library, json_object_iter);
-  LOAD_DLL_FN (library, json_object_iter_value);
-  LOAD_DLL_FN (library, json_object_key_to_iter);
-  LOAD_DLL_FN (library, json_object_iter_next);
-  LOAD_DLL_FN (library, json_loads);
-  LOAD_DLL_FN (library, json_load_callback);
 
   init_json ();
 
@@ -141,20 +110,7 @@ init_json_functions (void)
 #define json_stringn fn_json_stringn
 #define json_dumps fn_json_dumps
 #define json_dump_callback fn_json_dump_callback
-#define json_integer_value fn_json_integer_value
-#define json_real_value fn_json_real_value
-#define json_string_value fn_json_string_value
-#define json_string_length fn_json_string_length
-#define json_array_get fn_json_array_get
 #define json_object_get fn_json_object_get
-#define json_object_size fn_json_object_size
-#define json_object_iter_key fn_json_object_iter_key
-#define json_object_iter fn_json_object_iter
-#define json_object_iter_value fn_json_object_iter_value
-#define json_object_key_to_iter fn_json_object_key_to_iter
-#define json_object_iter_next fn_json_object_iter_next
-#define json_loads fn_json_loads
-#define json_load_callback fn_json_load_callback
 
 #endif	/* WINDOWSNT */
 
@@ -192,29 +148,6 @@ init_json (void)
   json_set_alloc_funcs (json_malloc, json_free);
 }
 
-#if !JSON_HAS_ERROR_CODE
-
-/* Return whether STRING starts with PREFIX.  */
-
-static bool
-json_has_prefix (const char *string, const char *prefix)
-{
-  return strncmp (string, prefix, strlen (prefix)) == 0;
-}
-
-/* Return whether STRING ends with SUFFIX.  */
-
-static bool
-json_has_suffix (const char *string, const char *suffix)
-{
-  size_t string_len = strlen (string);
-  size_t suffix_len = strlen (suffix);
-  return string_len >= suffix_len
-    && memcmp (string + string_len - suffix_len, suffix, suffix_len) == 0;
-}
-
-#endif
-
 /* Note that all callers of make_string_from_utf8 and build_string_from_utf8
    below either pass only value UTF-8 strings or use the functionf for
    formatting error messages; in the latter case correctness isn't
@@ -237,41 +170,6 @@ static AVOID
 json_out_of_memory (void)
 {
   xsignal0 (Qjson_out_of_memory);
-}
-
-/* Signal a Lisp error corresponding to the JSON ERROR.  */
-
-static AVOID
-json_parse_error (const json_error_t *error)
-{
-  Lisp_Object symbol;
-#if JSON_HAS_ERROR_CODE
-  switch (json_error_code (error))
-    {
-    case json_error_premature_end_of_input:
-      symbol = Qjson_end_of_file;
-      break;
-    case json_error_end_of_input_expected:
-      symbol = Qjson_trailing_content;
-      break;
-    default:
-      symbol = Qjson_parse_error;
-      break;
-    }
-#else
-  if (json_has_suffix (error->text, "expected near end of file"))
-    symbol = Qjson_end_of_file;
-  else if (json_has_prefix (error->text, "end of file expected"))
-    symbol = Qjson_trailing_content;
-  else
-    symbol = Qjson_parse_error;
-#endif
-  xsignal (symbol,
-           list5 (build_string_from_utf8 (error->text),
-                  build_string_from_utf8 (error->source),
-		  INT_TO_INTEGER (error->line),
-                  INT_TO_INTEGER (error->column),
-		  INT_TO_INTEGER (error->position)));
 }
 
 static void
@@ -795,30 +693,940 @@ usage: (json-insert OBJECT &rest ARGS)  */)
   return unbind_to (count, Qnil);
 }
 
-/* Convert a JSON object to a Lisp object.  */
+#define JSON_PARSER_INTERNAL_OBJECT_WORKSPACE_SIZE 64
+#define JSON_PARSER_INTERNAL_BYTE_WORKSPACE_SIZE 512
 
-static Lisp_Object ARG_NONNULL ((1))
-json_to_lisp (json_t *json, const struct json_configuration *conf)
+struct json_parser
 {
-  switch (json_typeof (json))
+  /* Because of a possible gap in the input (an emacs buffer can have
+     a gap), the input is described by [input_begin;input_end) and
+     [secondary_input_begin;secondary_input_end).  If the input is
+     continuous, then secondary_input_begin and secondary_input_end
+     should be NULL */
+  const unsigned char *input_current;
+  const unsigned char *input_begin;
+  const unsigned char *input_end;
+
+  const unsigned char *secondary_input_begin;
+  const unsigned char *secondary_input_end;
+
+  ptrdiff_t current_line;
+  ptrdiff_t current_column;
+  ptrdiff_t point_of_current_line;
+
+  /* The parser has a maximum allowed depth.  available_depth
+     decreases at each object/array begin.  If reaches zero, then an
+     error is generated */
+  int available_depth;
+
+  struct json_configuration conf;
+
+  size_t additional_bytes_count;
+
+  /* Lisp_Objects are collected in this area during object/array
+     parsing.  To avoid allocations, initially
+     internal_object_workspace is used.  If it runs out of space then
+     we switch to allocated space.  Important note: with this design,
+     GC must not run during JSON parsing, otherwise Lisp_Objects in
+     the workspace may get incorrectly collected. */
+  Lisp_Object internal_object_workspace
+  [JSON_PARSER_INTERNAL_OBJECT_WORKSPACE_SIZE];
+  Lisp_Object *object_workspace;
+  size_t object_workspace_size;
+  size_t object_workspace_current;
+
+  /* String and number parsing uses this workspace.  The idea behind
+     internal_byte_workspace is the same as the idea behind
+     internal_object_workspace */
+  unsigned char
+  internal_byte_workspace[JSON_PARSER_INTERNAL_BYTE_WORKSPACE_SIZE];
+  unsigned char *byte_workspace;
+  unsigned char *byte_workspace_end;
+  unsigned char *byte_workspace_current;
+};
+
+static AVOID
+json_signal_error (struct json_parser *parser, Lisp_Object error)
+{
+  xsignal3 (error, INT_TO_INTEGER (parser->current_line),
+            INT_TO_INTEGER (parser->current_column),
+            INT_TO_INTEGER (parser->point_of_current_line
+                            + parser->current_column));
+}
+
+static void
+json_parser_init (struct json_parser *parser,
+		  struct json_configuration conf,
+		  const unsigned char *input,
+		  const unsigned char *input_end,
+		  const unsigned char *secondary_input,
+		  const unsigned char *secondary_input_end)
+{
+  if (secondary_input >= secondary_input_end)
     {
-    case JSON_NULL:
-      return conf->null_object;
-    case JSON_FALSE:
-      return conf->false_object;
-    case JSON_TRUE:
-      return Qt;
-    case JSON_INTEGER:
+      secondary_input = NULL;
+      secondary_input_end = NULL;
+    }
+
+  if (input < input_end)
+    {
+      parser->input_begin = input;
+      parser->input_end = input_end;
+
+      parser->secondary_input_begin = secondary_input;
+      parser->secondary_input_end = secondary_input_end;
+    }
+  else
+    {
+      parser->input_begin = secondary_input;
+      parser->input_end = secondary_input_end;
+
+      parser->secondary_input_begin = NULL;
+      parser->secondary_input_end = NULL;
+    }
+
+  parser->input_current = parser->input_begin;
+
+  parser->current_line = 1;
+  parser->current_column = 0;
+  parser->point_of_current_line = 0;
+  parser->available_depth = 10000;
+  parser->conf = conf;
+
+  parser->additional_bytes_count = 0;
+
+  parser->object_workspace = parser->internal_object_workspace;
+  parser->object_workspace_size
+    = JSON_PARSER_INTERNAL_OBJECT_WORKSPACE_SIZE;
+  parser->object_workspace_current = 0;
+
+  parser->byte_workspace = parser->internal_byte_workspace;
+  parser->byte_workspace_end
+          = (parser->byte_workspace
+             + JSON_PARSER_INTERNAL_BYTE_WORKSPACE_SIZE);
+}
+
+static void
+json_parser_done (void *parser)
+{
+  struct json_parser *p = (struct json_parser *) parser;
+  if (p->object_workspace != p->internal_object_workspace)
+    xfree (p->object_workspace);
+  if (p->byte_workspace != p->internal_byte_workspace)
+    xfree (p->byte_workspace);
+}
+
+/* Makes sure that the object_workspace has 'size' available space for
+   Lisp_Objects */
+NO_INLINE static void
+json_make_object_workspace_for_slow_path (struct json_parser *parser,
+					  size_t size)
+{
+  size_t needed_workspace_size
+    = (parser->object_workspace_current + size);
+  size_t new_workspace_size = parser->object_workspace_size;
+  while (new_workspace_size < needed_workspace_size)
+    {
+      if (ckd_mul (&new_workspace_size, new_workspace_size, 2))
+	{
+	  json_signal_error (parser, Qjson_out_of_memory);
+	}
+    }
+
+  Lisp_Object *new_workspace_ptr;
+  if (parser->object_workspace_size
+      == JSON_PARSER_INTERNAL_OBJECT_WORKSPACE_SIZE)
+    {
+      new_workspace_ptr
+	= xnmalloc (new_workspace_size, sizeof (Lisp_Object));
+      memcpy (new_workspace_ptr, parser->object_workspace,
+	      (sizeof (Lisp_Object)
+	       * parser->object_workspace_current));
+    }
+  else
+    {
+      new_workspace_ptr
+	= xnrealloc (parser->object_workspace, new_workspace_size,
+		     sizeof (Lisp_Object));
+    }
+
+  parser->object_workspace = new_workspace_ptr;
+  parser->object_workspace_size = new_workspace_size;
+}
+
+INLINE void
+json_make_object_workspace_for (struct json_parser *parser,
+				size_t size)
+{
+  if (parser->object_workspace_size - parser->object_workspace_current
+      < size)
+    {
+      json_make_object_workspace_for_slow_path (parser, size);
+    }
+}
+
+static void
+json_byte_workspace_reset (struct json_parser *parser)
+{
+  parser->byte_workspace_current = parser->byte_workspace;
+}
+
+/* Puts 'value' into the byte_workspace.  If there is no space
+   available, it allocates space */
+NO_INLINE static void
+json_byte_workspace_put_slow_path (struct json_parser *parser,
+				   unsigned char value)
+{
+  size_t new_workspace_size
+    = parser->byte_workspace_end - parser->byte_workspace;
+  if (ckd_mul (&new_workspace_size, new_workspace_size, 2))
+    {
+      json_signal_error (parser, Qjson_out_of_memory);
+    }
+
+  size_t offset
+    = parser->byte_workspace_current - parser->byte_workspace;
+
+  if (parser->byte_workspace == parser->internal_byte_workspace)
+    {
+      parser->byte_workspace = xmalloc (new_workspace_size);
+      memcpy (parser->byte_workspace, parser->internal_byte_workspace,
+	      offset);
+    }
+  else
+    {
+      parser->byte_workspace
+	= xrealloc (parser->byte_workspace, new_workspace_size);
+    }
+  parser->byte_workspace_end
+    = parser->byte_workspace + new_workspace_size;
+  parser->byte_workspace_current = parser->byte_workspace + offset;
+  *parser->byte_workspace_current++ = value;
+}
+
+INLINE void
+json_byte_workspace_put (struct json_parser *parser,
+			 unsigned char value)
+{
+  if (parser->byte_workspace_current < parser->byte_workspace_end)
+    {
+      *parser->byte_workspace_current++ = value;
+    }
+  else
+    {
+      json_byte_workspace_put_slow_path (parser, value);
+    }
+}
+
+static bool
+json_input_at_eof (struct json_parser *parser)
+{
+  if (parser->input_current < parser->input_end)
+    return false;
+  return parser->secondary_input_end == NULL;
+}
+
+/* If there is a secondary buffer, this switches to it */
+static int
+json_input_switch_to_secondary (struct json_parser *parser)
+{
+  if (parser->secondary_input_begin < parser->secondary_input_end)
+    {
+      parser->additional_bytes_count
+	= parser->input_end - parser->input_begin;
+      parser->input_begin = parser->secondary_input_begin;
+      parser->input_end = parser->secondary_input_end;
+      parser->input_current = parser->secondary_input_begin;
+      parser->secondary_input_begin = NULL;
+      parser->secondary_input_end = NULL;
+      return 0;
+    }
+  else
+    return -1;
+}
+
+/* Reads a byte from the JSON input stream */
+NO_INLINE static unsigned char
+json_input_get_slow_path (struct json_parser *parser)
+{
+  if (json_input_switch_to_secondary (parser) < 0)
+    json_signal_error (parser, Qjson_end_of_file);
+  return *parser->input_current++;
+}
+
+static unsigned char
+json_input_get (struct json_parser *parser)
+{
+  if (parser->input_current < parser->input_end)
+    return *parser->input_current++;
+  return json_input_get_slow_path (parser);
+}
+
+/* Reads a byte from the JSON input stream, if the stream is not at
+ * eof.  At eof, returns -1 */
+static int
+json_input_get_if_possible (struct json_parser *parser)
+{
+  if (parser->input_current >= parser->input_end
+      && json_input_switch_to_secondary (parser) < 0)
+    return -1;
+  return *parser->input_current++;
+}
+
+/* Puts back the last read input byte.  Only one byte can be put back,
+   because otherwise this code would need to handle switching from
+   the secondary buffer to the initial */
+static void
+json_input_put_back (struct json_parser *parser)
+{
+  parser->input_current--;
+}
+
+static bool
+json_skip_whitespace_internal (struct json_parser *parser, int c)
+{
+  parser->current_column++;
+  if (c == 0x20 || c == 0x09 || c == 0x0d)
+    return false;
+  else if (c == 0x0a)
+    {
+      parser->current_line++;
+      parser->point_of_current_line += parser->current_column;
+      parser->current_column = 0;
+      return false;
+    }
+  else
+    return true;
+}
+
+/* Skips JSON whitespace, and returns with the first non-whitespace
+ * character */
+static int
+json_skip_whitespace (struct json_parser *parser)
+{
+  for (;;)
+    {
+      int c = json_input_get (parser);
+      if (json_skip_whitespace_internal (parser, c))
+	return c;
+    }
+}
+
+/* Skips JSON whitespace, and returns with the first non-whitespace
+ * character, if possible.  If there is no non-whitespace character
+ * (because we reached the end), it returns -1 */
+static int
+json_skip_whitespace_if_possible (struct json_parser *parser)
+{
+  for (;;)
+    {
+      int c = json_input_get_if_possible (parser);
+      if (c < 0)
+	return c;
+      if (json_skip_whitespace_internal (parser, c))
+	return c;
+    }
+}
+
+static int
+json_hex_value (int c)
+{
+  if (c >= '0' && c <= '9')
+    return c - '0';
+  else if (c >= 'A' && c <= 'F')
+    return c - 'A' + 10;
+  else if (c >= 'a' && c <= 'f')
+    return c - 'a' + 10;
+  else
+    return -1;
+}
+
+/* Parses the CCCC part of the unicode escape sequence \uCCCC */
+static int
+json_parse_unicode (struct json_parser *parser)
+{
+  unsigned char v[4];
+  for (int i = 0; i < 4; i++)
+    {
+      int c = json_hex_value (json_input_get (parser));
+      parser->current_column++;
+      if (c < 0)
+	json_signal_error (parser, Qjson_escape_sequence_error);
+      v[i] = c;
+    }
+
+  return v[0] << 12 | v[1] << 8 | v[2] << 4 | v[3];
+}
+
+/* Parses an utf-8 code-point encoding (except the first byte), and
+   returns the numeric value of the code-point (without considering
+   the first byte) */
+static int
+json_handle_utf8_tail_bytes (struct json_parser *parser, int n)
+{
+  int v = 0;
+  for (int i = 0; i < n; i++)
+    {
+      int c = json_input_get (parser);
+      json_byte_workspace_put (parser, c);
+      if ((c & 0xc0) != 0x80)
+	json_signal_error (parser, Qjson_utf8_decode_error);
+      v = (v << 6) | (c & 0x3f);
+    }
+  return v;
+}
+
+/* Reads a JSON string, and puts the result into the byte workspace */
+static void
+json_parse_string (struct json_parser *parser)
+{
+  /* a single_uninteresting byte can be simply copied from the input
+     to output, it doesn't need any extra care.  This means all the
+     characters between [0x20;0x7f], except the double quote and
+     the backslash */
+  static const char is_single_uninteresting[256] = {
+    /*      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f */
+    /* 0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* 1 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* 2 */ 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    /* 3 */ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    /* 4 */ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    /* 5 */ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1,
+    /* 6 */ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    /* 7 */ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    /* 8 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* 9 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* a */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* b */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* c */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* d */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* e */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* f */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  };
+
+  for (;;)
+    {
+      /* This if is only here for a possible speedup.  If there are 4
+	 bytes available, and all of them are single_uninteresting,
+	 then we can just copy these 4 bytes to output */
+      if (parser->input_end - parser->input_current >= 4)
+	{
+	  int c0 = parser->input_current[0];
+	  int c1 = parser->input_current[1];
+	  int c2 = parser->input_current[2];
+	  int c3 = parser->input_current[3];
+	  bool v0 = is_single_uninteresting[c0];
+	  bool v1 = is_single_uninteresting[c1];
+	  bool v2 = is_single_uninteresting[c2];
+	  bool v3 = is_single_uninteresting[c3];
+	  if (v0 && v1 && v2 && v3)
+	    {
+	      json_byte_workspace_put (parser, c0);
+	      json_byte_workspace_put (parser, c1);
+	      json_byte_workspace_put (parser, c2);
+	      json_byte_workspace_put (parser, c3);
+	      parser->input_current += 4;
+	      parser->current_column += 4;
+	      continue;
+	    }
+	}
+
+      int c = json_input_get (parser);
+      parser->current_column++;
+      if (is_single_uninteresting[c])
+	{
+	  json_byte_workspace_put (parser, c);
+	  continue;
+	}
+
+      if (c == '"')
+	return;
+      else if (c & 0x80)
+	{
+	  /* Handle utf-8 encoding */
+	  json_byte_workspace_put (parser, c);
+	  if (c < 0xc0)
+	    json_signal_error (parser, Qjson_utf8_decode_error);
+	  else if (c < 0xe0)
+	    {
+	      int n = ((c & 0x1f) << 6
+		       | json_handle_utf8_tail_bytes (parser, 1));
+	      if (n < 0x80)
+		json_signal_error (parser, Qjson_utf8_decode_error);
+	    }
+	  else if (c < 0xf0)
+	    {
+	      int n = ((c & 0xf) << 12
+		       | json_handle_utf8_tail_bytes (parser, 2));
+	      if (n < 0x800 || (n >= 0xd800 && n < 0xe000))
+		json_signal_error (parser, Qjson_utf8_decode_error);
+	    }
+	  else if (c < 0xf8)
+	    {
+	      int n = ((c & 0x7) << 18
+		       | json_handle_utf8_tail_bytes (parser, 3));
+	      if (n < 0x10000 || n > 0x10ffff)
+		json_signal_error (parser, Qjson_utf8_decode_error);
+	    }
+	  else
+	    json_signal_error (parser, Qjson_utf8_decode_error);
+	}
+      else if (c == '\\')
+	{
+	  /* Handle escape sequences */
+	  c = json_input_get (parser);
+	  parser->current_column++;
+	  if (c == '"')
+	    json_byte_workspace_put (parser, '"');
+	  else if (c == '\\')
+	    json_byte_workspace_put (parser, '\\');
+	  else if (c == '/')
+	    json_byte_workspace_put (parser, '/');
+	  else if (c == 'b')
+	    json_byte_workspace_put (parser, '\b');
+	  else if (c == 'f')
+	    json_byte_workspace_put (parser, '\f');
+	  else if (c == 'n')
+	    json_byte_workspace_put (parser, '\n');
+	  else if (c == 'r')
+	    json_byte_workspace_put (parser, '\r');
+	  else if (c == 't')
+	    json_byte_workspace_put (parser, '\t');
+	  else if (c == 'u')
+	    {
+	      int num = json_parse_unicode (parser);
+	      /* is the first half of the surrogate pair */
+	      if (num >= 0xd800 && num < 0xdc00)
+		{
+		  parser->current_column++;
+		  if (json_input_get (parser) != '\\')
+		    json_signal_error (parser,
+				       Qjson_invalid_surrogate_error);
+		  parser->current_column++;
+		  if (json_input_get (parser) != 'u')
+		    json_signal_error (parser,
+				       Qjson_invalid_surrogate_error);
+		  int num2 = json_parse_unicode (parser);
+		  if (num2 < 0xdc00 || num2 >= 0xe000)
+		    json_signal_error (parser,
+				       Qjson_invalid_surrogate_error);
+		  num = (0x10000
+			 + ((num - 0xd800) << 10 | (num2 - 0xdc00)));
+		}
+	      else if (num >= 0xdc00 && num < 0xe000)
+		/* is the second half of the surrogate pair without
+		   the first half */
+		json_signal_error (parser,
+				   Qjson_invalid_surrogate_error);
+
+	      /* utf-8 encode the code-point */
+	      if (num < 0x80)
+		json_byte_workspace_put (parser, num);
+	      else if (num < 0x800)
+		{
+		  json_byte_workspace_put (parser, 0xc0 | num >> 6);
+		  json_byte_workspace_put (parser,
+					   0x80 | (num & 0x3f));
+		}
+	      else if (num < 0x10000)
+		{
+		  json_byte_workspace_put (parser, 0xe0 | num >> 12);
+		  json_byte_workspace_put (parser,
+					   (0x80
+					    | ((num >> 6) & 0x3f)));
+		  json_byte_workspace_put (parser,
+					   0x80 | (num & 0x3f));
+		}
+	      else
+		{
+		  json_byte_workspace_put (parser, 0xf0 | num >> 18);
+		  json_byte_workspace_put (parser,
+					   (0x80
+					    | ((num >> 12) & 0x3f)));
+		  json_byte_workspace_put (parser,
+					   (0x80
+					    | ((num >> 6) & 0x3f)));
+		  json_byte_workspace_put (parser,
+					   0x80 | (num & 0x3f));
+		}
+	    }
+	  else
+	    json_signal_error (parser, Qjson_escape_sequence_error);
+	}
+      else
+	json_signal_error (parser, Qjson_parse_error);
+    }
+}
+
+/* If there was no integer overflow during parsing the integer, this
+   puts 'value' to the output. Otherwise this calls string_to_number
+   to parse integer on the byte workspace.  This could just always
+   call string_to_number, but for performance reasons, during parsing
+   the code tries to calculate the value, so in most cases, we can
+   save call of string_to_number */
+static Lisp_Object
+json_create_integer (struct json_parser *parser,
+		     bool integer_overflow, bool negative,
+		     EMACS_UINT value)
+{
+  if (!integer_overflow)
+    {
+      if (negative)
+	{
+	  uintmax_t v = value;
+	  if (v <= (uintmax_t) INTMAX_MAX + 1)
+	    return INT_TO_INTEGER ((intmax_t) -v);
+	}
+      else
+	return INT_TO_INTEGER (value);
+    }
+
+  json_byte_workspace_put (parser, 0);
+  ptrdiff_t len;
+  Lisp_Object result
+    = string_to_number ((const char *) parser->byte_workspace, 10,
+			&len);
+  if (len
+      != parser->byte_workspace_current - parser->byte_workspace - 1)
+    json_signal_error (parser, Qjson_error);
+  return result;
+}
+
+/* Parses a float using the byte workspace */
+static Lisp_Object
+json_create_float (struct json_parser *parser)
+{
+  json_byte_workspace_put (parser, 0);
+  errno = 0;
+  char *e;
+  double value = strtod ((const char *) parser->byte_workspace, &e);
+  bool out_of_range
+    = (errno != 0 && (value == HUGE_VAL || value == -HUGE_VAL));
+  if (out_of_range)
+    json_signal_error (parser, Qjson_number_out_of_range);
+  else if ((const unsigned char *) e
+	   != parser->byte_workspace_current - 1)
+    json_signal_error (parser, Qjson_error);
+  else
+    return make_float (value);
+}
+
+/* Parses a number.  The first character is the input parameter 'c'.
+ */
+static Lisp_Object
+json_parse_number (struct json_parser *parser, int c)
+{
+  json_byte_workspace_reset (parser);
+  json_byte_workspace_put (parser, c);
+
+  bool negative = false;
+  if (c == '-')
+    {
+      negative = true;
+      c = json_input_get (parser);
+      json_byte_workspace_put (parser, c);
+      parser->current_column++;
+    }
+  if (c < '0' || c > '9')
+    json_signal_error (parser, Qjson_parse_error);
+
+  /* The idea is that during finding the last character of the
+     number, the for loop below also tries to calculate the value.  If
+     the parsed number is an integer which fits into unsigned long,
+     then the parser can use the value of 'integer' right away,
+     instead of having to re-parse the byte workspace later.
+     Ideally, this integer should have the same size as a CPU general
+     purpose register. */
+  EMACS_UINT integer = c - '0';
+  bool integer_overflow = false;
+
+  if (integer == 0)
+    {
+      if (json_input_at_eof (parser))
+	return INT_TO_INTEGER (0);
+      c = json_input_get (parser);
+    }
+  else
+    {
+      for (;;)
+	{
+	  if (json_input_at_eof (parser))
+	    return json_create_integer (parser, integer_overflow,
+					negative, integer);
+	  c = json_input_get (parser);
+	  if (c < '0' || c > '9')
+	    break;
+	  json_byte_workspace_put (parser, c);
+	  parser->current_column++;
+
+	  integer_overflow |= ckd_mul (&integer, integer, 10);
+	  integer_overflow |= ckd_add (&integer, integer, c - '0');
+	}
+    }
+
+  bool is_float = false;
+  if (c == '.')
+    {
+      json_byte_workspace_put (parser, c);
+      parser->current_column++;
+
+      is_float = true;
+      c = json_input_get (parser);
+      json_byte_workspace_put (parser, c);
+      parser->current_column++;
+      if (c < '0' || c > '9')
+	json_signal_error (parser, Qjson_parse_error);
+      for (;;)
+	{
+	  if (json_input_at_eof (parser))
+	    return json_create_float (parser);
+	  c = json_input_get (parser);
+	  if (c < '0' || c > '9')
+	    break;
+	  json_byte_workspace_put (parser, c);
+	  parser->current_column++;
+	}
+    }
+  if (c == 'e' || c == 'E')
+    {
+      json_byte_workspace_put (parser, c);
+      parser->current_column++;
+
+      is_float = true;
+      c = json_input_get (parser);
+      json_byte_workspace_put (parser, c);
+      parser->current_column++;
+      if (c == '-' || c == '+')
+	{
+	  c = json_input_get (parser);
+	  json_byte_workspace_put (parser, c);
+	  parser->current_column++;
+	}
+      if (c < '0' || c > '9')
+	json_signal_error (parser, Qjson_parse_error);
+      for (;;)
+	{
+	  if (json_input_at_eof (parser))
+	    return json_create_float (parser);
+	  c = json_input_get (parser);
+	  if (c < '0' || c > '9')
+	    break;
+	  json_byte_workspace_put (parser, c);
+	  parser->current_column++;
+	}
+    }
+
+  /* 'c' contains a character which is not part of the number,
+     so it is need to be put back */
+  json_input_put_back (parser);
+
+  if (is_float)
+    return json_create_float (parser);
+  else
+    return json_create_integer (parser, integer_overflow, negative,
+				integer);
+}
+
+static Lisp_Object json_parse_value (struct json_parser *parser,
+				     int c);
+
+/* Parses a JSON array. */
+static Lisp_Object
+json_parse_array (struct json_parser *parser)
+{
+  int c = json_skip_whitespace (parser);
+
+  const size_t first = parser->object_workspace_current;
+  Lisp_Object result = Qnil;
+
+  if (c != ']')
+    {
+      parser->available_depth--;
+      if (parser->available_depth < 0)
+	json_signal_error (parser, Qjson_object_too_deep);
+
+      size_t number_of_elements = 0;
+      Lisp_Object *cdr = &result;
+      /* This loop collects the array elements in the object workspace
+       */
+      for (;;)
+	{
+	  Lisp_Object element = json_parse_value (parser, c);
+	  switch (parser->conf.array_type)
+	    {
+	    case json_array_array:
+	      json_make_object_workspace_for (parser, 1);
+	      parser->object_workspace[parser->object_workspace_current]
+		= element;
+	      parser->object_workspace_current++;
+	      break;
+	    case json_array_list:
+	      {
+		Lisp_Object nc = Fcons (element, Qnil);
+		*cdr = nc;
+		cdr = xcdr_addr (nc);
+		break;
+	      }
+	    default:
+	      emacs_abort ();
+	    }
+
+	  c = json_skip_whitespace (parser);
+
+	  number_of_elements++;
+	  if (c == ']')
+	    {
+	      parser->available_depth++;
+	      break;
+	    }
+
+	  if (c != ',')
+	    json_signal_error (parser, Qjson_parse_error);
+
+	  c = json_skip_whitespace (parser);
+	}
+    }
+
+  switch (parser->conf.array_type)
+    {
+    case json_array_array:
       {
-	json_int_t i = json_integer_value (json);
-	return INT_TO_INTEGER (i);
+	size_t number_of_elements
+	  = parser->object_workspace_current - first;
+	result = make_vector (number_of_elements, Qnil);
+	for (size_t i = 0; i < number_of_elements; i++)
+	  {
+	    rarely_quit (i);
+	    ASET (result, i, parser->object_workspace[first + i]);
+	  }
+	parser->object_workspace_current = first;
+	break;
       }
-    case JSON_REAL:
-      return make_float (json_real_value (json));
-    case JSON_STRING:
-      return make_string_from_utf8 (json_string_value (json),
-				    json_string_length (json));
-    case JSON_ARRAY:
+    case json_array_list:
+      break;
+    default:
+      emacs_abort ();
+    }
+
+  return result;
+}
+
+/* Parses the ": value" part of a JSON object member. */
+static Lisp_Object
+json_parse_object_member_value (struct json_parser *parser)
+{
+  int c = json_skip_whitespace (parser);
+  if (c != ':')
+    json_signal_error (parser, Qjson_parse_error);
+
+  c = json_skip_whitespace (parser);
+
+  return json_parse_value (parser, c);
+}
+
+/* Parses a JSON object. */
+static Lisp_Object
+json_parse_object (struct json_parser *parser)
+{
+  int c = json_skip_whitespace (parser);
+
+  const size_t first = parser->object_workspace_current;
+  Lisp_Object result = Qnil;
+
+  if (c != '}')
+    {
+      parser->available_depth--;
+      if (parser->available_depth < 0)
+	json_signal_error (parser, Qjson_object_too_deep);
+
+      Lisp_Object *cdr = &result;
+
+      /* This loop collects the object members (key/value pairs) in
+       * the object workspace */
+      for (;;)
+	{
+	  if (c != '"')
+	    json_signal_error (parser, Qjson_parse_error);
+
+	  json_byte_workspace_reset (parser);
+	  switch (parser->conf.object_type)
+	    {
+	    case json_object_hashtable:
+	      {
+		json_parse_string (parser);
+		Lisp_Object key
+		  = make_string_from_utf8 ((char *)
+                                           parser->byte_workspace,
+					   (parser->byte_workspace_current
+					    - parser->byte_workspace));
+		Lisp_Object value
+		  = json_parse_object_member_value (parser);
+		json_make_object_workspace_for (parser, 2);
+		parser->object_workspace[parser->object_workspace_current]
+		  = key;
+		parser->object_workspace_current++;
+		parser->object_workspace[parser->object_workspace_current]
+		  = value;
+		parser->object_workspace_current++;
+		break;
+	      }
+	    case json_object_alist:
+	      {
+		json_parse_string (parser);
+		Lisp_Object key
+		  = Fintern (make_string_from_utf8 (
+                                                    (char *) parser->byte_workspace,
+                                                    (parser->byte_workspace_current
+                                                     - parser->byte_workspace)),
+			     Qnil);
+		Lisp_Object value
+		  = json_parse_object_member_value (parser);
+		Lisp_Object nc = Fcons (Fcons (key, value), Qnil);
+		*cdr = nc;
+		cdr = xcdr_addr (nc);
+		break;
+	      }
+	    case json_object_plist:
+	      {
+		json_byte_workspace_put (parser, ':');
+		json_parse_string (parser);
+		Lisp_Object key
+		  = intern_1 ((char *) parser->byte_workspace,
+			      (parser->byte_workspace_current
+			       - parser->byte_workspace));
+		Lisp_Object value
+		  = json_parse_object_member_value (parser);
+		Lisp_Object nc = Fcons (key, Qnil);
+		*cdr = nc;
+		cdr = xcdr_addr (nc);
+
+		nc = Fcons (value, Qnil);
+		*cdr = nc;
+		cdr = xcdr_addr (nc);
+		break;
+	      }
+	    default:
+	      emacs_abort ();
+	    }
+
+	  c = json_skip_whitespace (parser);
+
+	  if (c == '}')
+	    {
+	      parser->available_depth++;
+	      break;
+	    }
+
+	  if (c != ',')
+	    json_signal_error (parser, Qjson_parse_error);
+
+	  c = json_skip_whitespace (parser);
+	}
+    }
+
+  switch (parser->conf.object_type)
+    {
+    case json_object_hashtable:
       {
 	check_eval_depth (Qjson_object_too_deep);
         size_t size = json_array_size (json);
@@ -855,7 +1663,115 @@ json_to_lisp (json_t *json, const struct json_configuration *conf)
         --lisp_eval_depth;
         return result;
       }
-    case JSON_OBJECT:
+    case json_object_alist:
+    case json_object_plist:
+      break;
+    default:
+      emacs_abort ();
+    }
+
+  return result;
+}
+
+/* Token-char is not a JSON terminology.  When parsing
+   null/false/true, this function tells the character set that is need
+   to be considered as part of a token.  For example, if the input is
+   "truesomething", then the parser shouldn't consider it as "true",
+   and an additional later "something" token. An additional example:
+   if the input is "truetrue", then calling (json-parse-buffer) twice
+   shouldn't produce two successful calls which return t, but a
+   parsing error */
+static bool
+json_is_token_char (int c)
+{
+  return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+	  || (c >= '0' && c <= '9') || (c == '-'));
+}
+
+/* This is the entry point to the value parser, this parses a JSON
+ * value */
+Lisp_Object
+json_parse_value (struct json_parser *parser, int c)
+{
+  if (c == '{')
+    return json_parse_object (parser);
+  else if (c == '[')
+    return json_parse_array (parser);
+  else if (c == '"')
+    {
+      json_byte_workspace_reset (parser);
+      json_parse_string (parser);
+      Lisp_Object result
+	= make_string_from_utf8 ((const char *)
+                                 parser->byte_workspace,
+				 (parser->byte_workspace_current
+				  - parser->byte_workspace));
+      return result;
+    }
+  else if ((c >= '0' && c <= '9') || (c == '-'))
+    return json_parse_number (parser, c);
+  else
+    {
+      int c2 = json_input_get (parser);
+      int c3 = json_input_get (parser);
+      int c4 = json_input_get (parser);
+      int c5 = json_input_get_if_possible (parser);
+
+      if (c == 't' && c2 == 'r' && c3 == 'u' && c4 == 'e'
+	  && (c5 < 0 || !json_is_token_char (c5)))
+	{
+	  if (c5 >= 0)
+	    json_input_put_back (parser);
+	  parser->current_column += 3;
+	  return Qt;
+	}
+      if (c == 'n' && c2 == 'u' && c3 == 'l' && c4 == 'l'
+	  && (c5 < 0 || !json_is_token_char (c5)))
+	{
+	  if (c5 >= 0)
+	    json_input_put_back (parser);
+	  parser->current_column += 3;
+	  return parser->conf.null_object;
+	}
+      if (c == 'f' && c2 == 'a' && c3 == 'l' && c4 == 's'
+	  && c5 == 'e')
+	{
+	  int c6 = json_input_get_if_possible (parser);
+	  if (c6 < 0 || !json_is_token_char (c6))
+	    {
+	      if (c6 >= 0)
+		json_input_put_back (parser);
+	      parser->current_column += 4;
+	      return parser->conf.false_object;
+	    }
+	}
+
+      json_signal_error (parser, Qjson_parse_error);
+    }
+}
+
+enum ParseEndBehavior
+  {
+    PARSEENDBEHAVIOR_CheckForGarbage,
+    PARSEENDBEHAVIOR_MovePoint
+  };
+
+static Lisp_Object
+json_parse (struct json_parser *parser,
+	    enum ParseEndBehavior parse_end_behavior)
+{
+  int c = json_skip_whitespace (parser);
+
+  Lisp_Object result = json_parse_value (parser, c);
+
+  switch (parse_end_behavior)
+    {
+    case PARSEENDBEHAVIOR_CheckForGarbage:
+      c = json_skip_whitespace_if_possible (parser);
+      if (c >= 0)
+	json_signal_error (parser, Qjson_trailing_content);
+      break;
+    case PARSEENDBEHAVIOR_MovePoint:
       {
 	check_eval_depth (Qjson_object_too_deep);
         Lisp_Object result;
@@ -946,7 +1862,9 @@ The arguments ARGS are a list of keyword/argument pairs:
 
 The keyword argument `:object-type' specifies which Lisp type is used
 to represent objects; it can be `hash-table', `alist' or `plist'.  It
-defaults to `hash-table'.
+defaults to `hash-table'.  If an object has members with the same
+key, `hash-table' keeps only the last value of such keys, while
+`alist' and `plist' keep all the members.
 
 The keyword argument `:array-type' specifies which Lisp type is used
 to represent arrays; it can be `array' (the default) or `list'.
@@ -957,62 +1875,27 @@ to represent a JSON null value.  It defaults to `:null'.
 The keyword argument `:false-object' specifies which object to use to
 represent a JSON false value.  It defaults to `:false'.
 usage: (json-parse-string STRING &rest ARGS) */)
-  (ptrdiff_t nargs, Lisp_Object *args)
+(ptrdiff_t nargs, Lisp_Object *args)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-
-#ifdef WINDOWSNT
-  ensure_json_available ();
-#endif
 
   Lisp_Object string = args[0];
   CHECK_STRING (string);
   Lisp_Object encoded = json_encode (string);
-  check_string_without_embedded_nulls (encoded);
-  struct json_configuration conf =
-    {json_object_hashtable, json_array_array, QCnull, QCfalse};
+  struct json_configuration conf
+    = { json_object_hashtable, json_array_array, QCnull, QCfalse };
   json_parse_args (nargs - 1, args + 1, &conf, true);
 
-  json_error_t error;
-  json_t *object
-    = json_loads (SSDATA (encoded), JSON_DECODE_ANY | JSON_ALLOW_NUL, &error);
-  if (object == NULL)
-    json_parse_error (&error);
+  struct json_parser p;
+  const unsigned char *begin
+    = (const unsigned char *) SSDATA (encoded);
+  json_parser_init (&p, conf, begin, begin + SBYTES (encoded), NULL,
+		    NULL);
+  record_unwind_protect_ptr (json_parser_done, &p);
 
-  /* Avoid leaking the object in case of further errors.  */
-  if (object != NULL)
-    record_unwind_protect_ptr (json_release_object, object);
-
-  return unbind_to (count, json_to_lisp (object, &conf));
-}
-
-struct json_read_buffer_data
-{
-  /* Byte position of position to read the next chunk from.  */
-  ptrdiff_t point;
-};
-
-/* Callback for json_load_callback that reads from the current buffer.
-   DATA must point to a structure of type json_read_buffer_data.
-   data->point must point to the byte position to read from; after
-   reading, data->point is advanced accordingly.  The buffer point
-   itself is ignored.  This function may not exit nonlocally.  */
-
-static size_t
-json_read_buffer_callback (void *buffer, size_t buflen, void *data)
-{
-  struct json_read_buffer_data *d = data;
-
-  /* First, parse from point to the gap or the end of the accessible
-     portion, whatever is closer.  */
-  ptrdiff_t point = d->point;
-  ptrdiff_t end = BUFFER_CEILING_OF (point) + 1;
-  ptrdiff_t count = end - point;
-  if (buflen < count)
-    count = buflen;
-  memcpy (buffer, BYTE_POS_ADDR (point), count);
-  d->point += count;
-  return count;
+  return unbind_to (count,
+		    json_parse (&p,
+				PARSEENDBEHAVIOR_CheckForGarbage));
 }
 
 DEFUN ("json-parse-buffer", Fjson_parse_buffer, Sjson_parse_buffer,
@@ -1034,7 +1917,9 @@ The arguments ARGS are a list of keyword/argument pairs:
 
 The keyword argument `:object-type' specifies which Lisp type is used
 to represent objects; it can be `hash-table', `alist' or `plist'.  It
-defaults to `hash-table'.
+defaults to `hash-table'.  If an object has members with the same
+key, `hash-table' keeps only the last value of such keys, while
+`alist' and `plist' keep all the members.
 
 The keyword argument `:array-type' specifies which Lisp type is used
 to represent arrays; it can be `array' (the default) or `list'.
@@ -1045,16 +1930,12 @@ to represent a JSON null value.  It defaults to `:null'.
 The keyword argument `:false-object' specifies which object to use to
 represent a JSON false value.  It defaults to `:false'.
 usage: (json-parse-buffer &rest args) */)
-     (ptrdiff_t nargs, Lisp_Object *args)
+(ptrdiff_t nargs, Lisp_Object *args)
 {
   specpdl_ref count = SPECPDL_INDEX ();
 
-#ifdef WINDOWSNT
-  ensure_json_available ();
-#endif
-
-  struct json_configuration conf =
-    {json_object_hashtable, json_array_array, QCnull, QCfalse};
+  struct json_configuration conf
+    = { json_object_hashtable, json_array_array, QCnull, QCfalse };
   json_parse_args (nargs, args, &conf, true);
 
   ptrdiff_t point = PT_BYTE;
@@ -1077,11 +1958,12 @@ usage: (json-parse-buffer &rest args) */)
   /* Convert and then move point only if everything succeeded.  */
   Lisp_Object lisp = json_to_lisp (object, &conf);
 
-  /* Adjust point by how much we just read.  */
-  point += error.position;
-  SET_PT_BOTH (BYTE_TO_CHAR (point), point);
+  json_parser_init (&p, conf, begin, end, secondary_begin,
+		    secondary_end);
+  record_unwind_protect_ptr (json_parser_done, &p);
 
-  return unbind_to (count, lisp);
+  return unbind_to (count,
+		    json_parse (&p, PARSEENDBEHAVIOR_MovePoint));
 }
 
 static void
@@ -1237,6 +2119,10 @@ syms_of_json (void)
   DEFSYM (Qjson_end_of_file, "json-end-of-file");
   DEFSYM (Qjson_trailing_content, "json-trailing-content");
   DEFSYM (Qjson_object_too_deep, "json-object-too-deep");
+  DEFSYM (Qjson_utf8_decode_error, "json-utf8-decode-error")
+  DEFSYM (Qjson_invalid_surrogate_error, "json-invalid-surrogate-error")
+  DEFSYM (Qjson_number_out_of_range, "json-number-out-of-range-error")
+  DEFSYM (Qjson_escape_sequence_error, "json-escape-sequence-error")
   DEFSYM (Qjson_unavailable, "json-unavailable");
   define_error (Qjson_error, "generic JSON error", Qerror);
   define_error (Qjson_out_of_memory,
@@ -1248,6 +2134,14 @@ syms_of_json (void)
                 Qjson_parse_error);
   define_error (Qjson_object_too_deep,
                 "object cyclic or Lisp evaluation too deep", Qjson_error);
+  define_error (Qjson_utf8_decode_error,
+                "invalid utf-8 encoding", Qjson_error);
+  define_error (Qjson_invalid_surrogate_error,
+                "invalid surrogate pair", Qjson_error);
+  define_error (Qjson_number_out_of_range,
+                "number out of range", Qjson_error);
+  define_error (Qjson_escape_sequence_error,
+                "invalid escape sequence", Qjson_parse_error);
 
   DEFSYM (Qpure, "pure");
   DEFSYM (Qside_effect_free, "side-effect-free");
