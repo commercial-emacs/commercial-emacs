@@ -441,6 +441,7 @@ json_out_object_cons (json_out_t *jo, Lisp_Object obj)
 	  value = XCAR (tail);
 	}
 
+      CHECK_SYMBOL (key);
       if (symset_add (jo, &ss, key))
 	{
 	  if (!first)
