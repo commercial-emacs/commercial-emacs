@@ -200,10 +200,10 @@ symset_expand (symset_t *ss)
   for (ptrdiff_t i = 0; i < oldsize; i++)
     {
       Lisp_Object sym = old_table->entries[i];
-      if (!BASE_EQ (sym, Qunbound))
+      if (!EQ (sym, Qunbound))
 	{
 	  ptrdiff_t j = symset_hash (sym, bits);
-	  while (!BASE_EQ (tbl->entries[j], Qunbound))
+	  while (!EQ (tbl->entries[j], Qunbound))
 	    j = (j + 1) & mask;
 	  tbl->entries[j] = sym;
 	}
@@ -228,9 +228,9 @@ symset_add (json_out_t *jo, symset_t *ss, Lisp_Object sym)
   for (ptrdiff_t i = symset_hash (sym, ss->bits); ; i = (i + 1) & mask)
     {
       Lisp_Object s = tbl->entries[i];
-      if (BASE_EQ (s, sym))
+      if (EQ (s, sym))
 	return false;		/* Previous occurrence found.  */
-      if (BASE_EQ (s, Qunbound))
+      if (EQ (s, Qunbound))
 	{
 	  /* Not in set, add it.  */
 	  tbl->entries[i] = sym;
@@ -440,8 +440,6 @@ json_out_object_cons (json_out_t *jo, Lisp_Object obj)
 	  CHECK_CONS (tail);
 	  value = XCAR (tail);
 	}
-      key = maybe_remove_pos_from_symbol (key);
-      CHECK_TYPE (BARE_SYMBOL_P (key), Qsymbolp, key);
 
       if (symset_add (jo, &ss, key))
 	{
@@ -637,7 +635,7 @@ usage: (json-insert OBJECT &rest ARGS)  */)
   /* FIXME: All the work below just to insert a string into a buffer?  */
 
   prepare_to_modify_buffer (PT, PT, NULL);
-  move_gap_both (PT, PT_BYTE);
+  move_gap (PT, PT_BYTE);
   if (GAP_SIZE < jo.size)
     make_gap (jo.size - GAP_SIZE);
   memcpy ((char *) BEG_ADDR + PT_BYTE - BEG_BYTE, jo.buf, jo.size);
@@ -659,7 +657,7 @@ usage: (json-insert OBJECT &rest ARGS)  */)
       /* Now we have all the new bytes at the beginning of the gap,
 	 but `decode_coding_gap` needs them at the end of the gap, so
 	 we need to move them.  */
-      memmove (GAP_END_ADDR - inserted_bytes, GPT_ADDR, inserted_bytes);
+      memmove (GAP_END_ADDR - inserted_bytes, GAP_BEG_ADDR, inserted_bytes);
       decode_coding_gap (&coding, inserted_bytes);
       inserted = coding.produced_char;
     }
