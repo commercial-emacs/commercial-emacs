@@ -1124,6 +1124,7 @@ json_byte_workspace_put (struct json_parser *parser,
     {
       json_byte_workspace_put_slow_path (parser, value);
     }
+  *parser->byte_workspace_current = '\0';
 }
 
 static bool
@@ -1677,6 +1678,7 @@ json_parse_array (struct json_parser *parser)
 	      }
 	    default:
 	      emacs_abort ();
+	      break;
 	    }
 
 	  c = json_skip_whitespace (parser);
@@ -1714,6 +1716,7 @@ json_parse_array (struct json_parser *parser)
       break;
     default:
       emacs_abort ();
+      break;
     }
 
   return result;
@@ -1737,131 +1740,144 @@ static Lisp_Object
 json_parse_object (struct json_parser *parser)
 {
   int c = json_skip_whitespace (parser);
-
   const size_t first = parser->object_workspace_current;
-  Lisp_Object result = Qnil;
 
   if (c != '}')
     {
-      parser->available_depth--;
-      if (parser->available_depth < 0)
+      if (--parser->available_depth < 0)
 	json_signal_error (parser, Qjson_object_too_deep);
 
-      Lisp_Object *cdr = &result;
-
-      /* This loop collects the object members (key/value pairs) in
-       * the object workspace */
+      /* Collect the key/value pairs into workspace. */
       for (;;)
 	{
 	  if (c != '"')
 	    json_signal_error (parser, Qjson_parse_error);
-
 	  json_byte_workspace_reset (parser);
+
+	  Lisp_Object key;
 	  switch (parser->conf.object_type)
 	    {
 	    case json_object_hashtable:
 	      {
 		json_parse_string (parser);
-		Lisp_Object key
-		  = make_string_from_utf8 ((char *)
-                                           parser->byte_workspace,
-					   (parser->byte_workspace_current
-					    - parser->byte_workspace));
-		Lisp_Object value
-		  = json_parse_object_member_value (parser);
-		json_make_object_workspace_for (parser, 2);
-		parser->object_workspace[parser->object_workspace_current]
-		  = key;
-		parser->object_workspace_current++;
-		parser->object_workspace[parser->object_workspace_current]
-		  = value;
-		parser->object_workspace_current++;
-		break;
+		key = make_string_from_utf8 ((char *) parser->byte_workspace,
+					     (parser->byte_workspace_current
+					      - parser->byte_workspace));
 	      }
+	      break;
 	    case json_object_alist:
 	      {
 		json_parse_string (parser);
-		Lisp_Object key
-		  = Fintern (make_string_from_utf8 (
-                                                    (char *) parser->byte_workspace,
-                                                    (parser->byte_workspace_current
-                                                     - parser->byte_workspace)),
-			     Qnil);
-		Lisp_Object value
-		  = json_parse_object_member_value (parser);
-		Lisp_Object nc = Fcons (Fcons (key, value), Qnil);
-		*cdr = nc;
-		cdr = xcdr_addr (nc);
-		break;
+		key = Fintern (make_string_from_utf8 ((char *) parser->byte_workspace,
+						      (parser->byte_workspace_current
+						       - parser->byte_workspace)),
+			       Qnil);
 	      }
+	      break;
 	    case json_object_plist:
 	      {
 		json_byte_workspace_put (parser, ':');
 		json_parse_string (parser);
-		*parser->byte_workspace_current = '\0';
-		Lisp_Object key
-		  = intern ((char *) parser->byte_workspace);
-		Lisp_Object value
-		  = json_parse_object_member_value (parser);
-		Lisp_Object nc = Fcons (key, Qnil);
-		*cdr = nc;
-		cdr = xcdr_addr (nc);
-
-		nc = Fcons (value, Qnil);
-		*cdr = nc;
-		cdr = xcdr_addr (nc);
-		break;
+		key = intern ((char *) parser->byte_workspace);
 	      }
+	      break;
 	    default:
 	      emacs_abort ();
-	    }
-
-	  c = json_skip_whitespace (parser);
-
-	  if (c == '}')
-	    {
-	      parser->available_depth++;
 	      break;
 	    }
-
-	  if (c != ',')
+	  Lisp_Object value = json_parse_object_member_value (parser);
+	  json_make_object_workspace_for (parser, 2);
+	  parser->object_workspace[parser->object_workspace_current++] = key;
+	  parser->object_workspace[parser->object_workspace_current++] = value;
+	  c = json_skip_whitespace (parser);
+	  if (c == '}')
+	    {
+	      ++parser->available_depth;
+	      break;
+	    }
+	  else if (c != ',')
 	    json_signal_error (parser, Qjson_parse_error);
-
 	  c = json_skip_whitespace (parser);
 	}
     }
 
+  const Lisp_Object hint = make_fixed_natnum
+    ((parser->object_workspace_current - first) / 2);
+  Lisp_Object dedupe = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize, hint);
+  struct Lisp_Hash_Table *xdedupe = XHASH_TABLE (dedupe);
+  for (size_t i = first;
+       i < parser->object_workspace_current;
+       i += 2)
+    {
+      hash_hash_t hash;
+      Lisp_Object key = parser->object_workspace[i];
+      ptrdiff_t where = hash_lookup_get_hash (xdedupe, key, &hash);
+      if (where < 0)
+	hash_put (xdedupe, key, make_fixed_natnum (i), hash);
+      else
+	{
+	  parser->object_workspace[XFIXNAT (HASH_VALUE (xdedupe, where))] = Qnil; /* invalidate */
+	  set_hash_value_slot (xdedupe, where, make_fixed_natnum (i)); /* supersede */
+	}
+    }
+
+  Lisp_Object result = Qnil;
   switch (parser->conf.object_type)
     {
     case json_object_hashtable:
       {
-	result
-	  = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize,
-		   make_fixed_natnum (
-                                      (parser->object_workspace_current - first) / 2));
-	struct Lisp_Hash_Table *h = XHASH_TABLE (result);
-	for (size_t i = first; i < parser->object_workspace_current;
+	result = CALLN (Fmake_hash_table, QCtest, Qequal, QCsize, hint);
+	struct Lisp_Hash_Table *xresult = XHASH_TABLE (result);
+	DOHASH_SAFE (xdedupe, where)
+	  {
+	    int i = XFIXNAT (HASH_VALUE (xdedupe, where));
+	    hash_hash_t hash;
+	    hash_lookup_get_hash (xresult, parser->object_workspace[i], &hash);
+	    hash_put (xresult, parser->object_workspace[i],
+		      parser->object_workspace[i + 1], hash);
+	  }
+      }
+      break;
+    case json_object_alist:
+      {
+	Lisp_Object *cdr = &result;
+	for (size_t i = first;
+	     i < parser->object_workspace_current;
 	     i += 2)
 	  {
-	    hash_hash_t hash;
-	    Lisp_Object key = parser->object_workspace[i];
-	    Lisp_Object value = parser->object_workspace[i + 1];
-	    ptrdiff_t i = hash_lookup_get_hash (h, key, &hash);
-	    if (i < 0)
-	      hash_put (h, key, value, hash);
-	    else
-	      set_hash_value_slot (h, i, value);
+	    if (!NILP (parser->object_workspace[i])) /* not invalidated */
+	      {
+		Lisp_Object nc = Fcons (Fcons (parser->object_workspace[i],
+					       parser->object_workspace[i + 1]),
+					Qnil);
+		*cdr = nc;
+		cdr = xcdr_addr (nc);
+	      }
 	  }
-	parser->object_workspace_current = first;
-	break;
       }
-    case json_object_alist:
-    case json_object_plist:
       break;
-    default:
-      emacs_abort ();
-    }
+    case json_object_plist:
+      {
+	Lisp_Object *cdr = &result;
+	for (size_t i = first;
+	     i < parser->object_workspace_current;
+	     i += 2)
+	  {
+	    if (!NILP (parser->object_workspace[i])) /* not invalidated */
+	      {
+		Lisp_Object nc = Fcons (parser->object_workspace[i], Qnil);
+		*cdr = nc;
+		cdr = xcdr_addr (nc);
 
+		nc = Fcons (parser->object_workspace[i + 1], Qnil);
+		*cdr = nc;
+		cdr = xcdr_addr (nc);
+	      }
+	  }
+      }
+      break;
+    }
+  parser->object_workspace_current = first;
   return result;
 }
 
