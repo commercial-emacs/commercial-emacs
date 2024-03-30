@@ -259,12 +259,6 @@ enum
   EXIT_ENOENT = 127 /* Could not find program to exec.  */
 };
 
-#ifdef HAVE_JSON
-/* Defined in json.c.  */
-
-extern void read_jsonrpc_forever (Lisp_Object proc);
-#endif
-
 /* Defined in callproc.c.  */
 
 extern Lisp_Object get_current_directory (bool);

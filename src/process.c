@@ -352,13 +352,7 @@ pset_thread (struct Lisp_Process *p, Lisp_Object val)
 {
   p->thread = val;
 }
-#ifdef HAVE_JSON
-static void
-pset_thread_managed (struct Lisp_Process *p, Lisp_Object val)
-{
-  p->thread_managed = val;
-}
-#endif
+
 static void
 pset_name (struct Lisp_Process *p, Lisp_Object val)
 {
@@ -7589,49 +7583,6 @@ call_process_filter (Lisp_Object process, Lisp_Object string)
 				    read_process_output_error_handler);
 }
 
-#ifdef HAVE_JSON
-DEFUN ("make-jsonrpc-thread", Fmake_jsonrpc_thread, Smake_jsonrpc_thread,
-       2, 2, 0,
-       doc: /* Manage PROCESS in a separate thread.  */)
-  (Lisp_Object name, Lisp_Object proc)
-{
-  int flags = 0;
-  struct Lisp_Process *p;
-  CHECK_PROCESS (proc);
-  p = XPROCESS (proc);
-  pset_thread_managed (p, Qt);
-#ifndef WINDOWSNT
-  flags = fcntl (p->infd, F_GETFL);
-#endif
-  if (flags == -1)
-    report_file_error ("Bad file descriptor", name);
-  else
-    fcntl(p->infd, F_SETFL, flags & ~O_NONBLOCK);
-  return Fmake_thread (call2 (intern ("apply-partially"),
-			      intern ("make-jsonrpc-thread--body"),
-			      proc),
-		       name, Qnil);
-}
-
-DEFUN ("make-jsonrpc-thread--body", Fmake_jsonrpc_thread__body,
-       Smake_jsonrpc_thread__body, 1, 1, 0,
-       doc: /* PIPE.  */)
-  (Lisp_Object pipe)
-{
-  struct Lisp_Process *p;
-  CHECK_PROCESS (pipe);
-  p = XPROCESS (pipe);
-  read_jsonrpc_forever (pipe);
-  p->tick = ++process_tick; /* static variable consistency issue */
-  deactivate_process (pipe);
-  if (p->raw_status_new)
-    update_status (p);
-  if (EQ (p->status, Qrun))
-    pset_status (p, list2 (Qexit, make_fixnum (0)));
-  return Qnil;
-}
-#endif
-
 /* The name "init_process" was already taken by Mach.  */
 void
 init_process_emacs (int sockfd)
@@ -8005,8 +7956,4 @@ sentinel or a process filter function has an error.  */);
   defsubr (&Sprocess_attributes);
   defsubr (&Snum_processors);
   defsubr (&Ssignal_names);
-#ifdef HAVE_JSON
-  defsubr (&Smake_jsonrpc_thread);
-  defsubr (&Smake_jsonrpc_thread__body);
-#endif
 }

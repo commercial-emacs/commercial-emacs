@@ -1494,7 +1494,7 @@ json_parse_array (struct json_parser *parser)
       {
 	size_t number_of_elements
 	  = parser->object_workspace_current - first;
-	result = make_vector (number_of_elements, Qnil);
+	result = initialize_vector (number_of_elements, Qnil);
 	for (size_t i = 0; i < number_of_elements; i++)
 	  {
 	    rarely_quit (i);
@@ -1591,10 +1591,9 @@ json_parse_object (struct json_parser *parser)
 	      {
 		json_byte_workspace_put (parser, ':');
 		json_parse_string (parser);
+		*parser->byte_workspace_current = '\0';
 		Lisp_Object key
-		  = intern_1 ((char *) parser->byte_workspace,
-			      (parser->byte_workspace_current
-			       - parser->byte_workspace));
+		  = intern ((char *) parser->byte_workspace);
 		Lisp_Object value
 		  = json_parse_object_member_value (parser);
 		Lisp_Object nc = Fcons (key, Qnil);
@@ -1870,10 +1869,10 @@ usage: (json-parse-buffer &rest args) */)
 
   struct json_parser p;
   unsigned char *begin = PT_ADDR;
-  unsigned char *end = GPT_ADDR;
+  unsigned char *end = GAP_BEG_ADDR;
   unsigned char *secondary_begin = NULL;
   unsigned char *secondary_end = NULL;
-  if (GPT_ADDR < Z_ADDR)
+  if (GAP_BEG_ADDR < Z_ADDR)
     {
       secondary_begin = GAP_END_ADDR;
       if (secondary_begin < PT_ADDR)
@@ -1887,144 +1886,6 @@ usage: (json-parse-buffer &rest args) */)
 
   return unbind_to (count,
 		    json_parse (&p, PARSEENDBEHAVIOR_MovePoint));
-}
-
-static void
-for_side_effect (void *arg)
-{
-  (void) arg;
-}
-
-/* Like read_process_output but json-specific.  */
-
-void
-read_jsonrpc_forever (Lisp_Object proc)
-{
-  struct Lisp_Process *p = XPROCESS (proc);
-  struct thread_state *self = current_thread;
-  bool releasable = !NILP (Fprocess_thread (proc)); /* is not rogue */
-  int channel = p->infd;
-  eassert (0 <= channel
-	   && channel < FD_SETSIZE
-#ifndef WINDOWSNT
-	   && !(fcntl (channel, F_GETFL) & O_NONBLOCK)
-#endif
-	   );
-  int factor = 1;
-  long content_length = -1;
-  char *buffer = xmalloc (factor * read_process_output_max + 1);
-  buffer[0] = '\0';
-
-  /* Allow other process-reading threads to run concurrently
-     if we're assured they won't contend on CHANNEL.  */
-  if (releasable)
-    {
-      with_flushed_stack (for_side_effect, NULL);
-#ifdef HAVE_GCC_TLS
-      if (self->cooperative)
-#endif
-	release_global_lock ();
-    }
-
-  while (EQ (p->status, Qrun))
-    {
-      ssize_t nbytes, extant = strlen (buffer);
-      int extant_frame = (1 + extant / read_process_output_max);
-      int to_read = extant_frame * read_process_output_max - extant;
-      if (factor < extant_frame)
-	{
-	  factor = extant_frame;
-	  buffer = xrealloc (buffer, factor * read_process_output_max + 1);
-	}
-#ifdef HAVE_GNUTLS
-      if (p->gnutls_state)
-	nbytes = emacs_gnutls_read (p, buffer + extant, to_read);
-      else
-#endif
-	nbytes = emacs_read (channel, buffer + extant, to_read);
-
-      if (nbytes == 0)
-	{
-	  break;
-	}
-      else if (nbytes > 0)
-	{
-	  char *ptr = buffer;
-	  char *end = buffer + extant + nbytes;
-	  *end = '\0';
-	  p->nbytes_read += nbytes;
-	  for (;;)
-	    {
-	      /* State 1: get content length.  */
-	      if (content_length < 0)
-		{
-		  char *header = strstr (ptr, "Content-Length:");
-		  char *newline = header ? strstr (header, "\n") : NULL;
-		  if (header && newline)
-		    {
-		      content_length = strtol (header + 15, NULL, 0);
-		      ptr = min (newline + 1, end);
-		    }
-		  else
-		    {
-		      /* fragment Content-Length */
-		      break;
-		    }
-		}
-
-	      /* State 2: get content.  */
-	      while (ptr < end && (*ptr == '\r' || *ptr == '\n'))
-		++ptr;
-
-	      if (ptr + content_length <= end)
-		{
-		  json_error_t err;
-		  char restore = ptr[content_length];
-		  ptr[content_length] = '\0';
-		  json_t *json =
-		    json_loads (ptr, JSON_DECODE_ANY | JSON_ALLOW_NUL, &err);
-		  ptr[content_length] = restore;
-		  if (releasable)
-#ifdef HAVE_GCC_TLS
-		    if (self->cooperative)
-#endif
-		      acquire_global_lock (self);
-		  if (json)
-		    {
-		      const struct json_configuration conf =
-			{json_object_plist, json_array_array, QCnull, QCfalse};
-		      call_process_filter (proc, json_to_lisp (json, &conf));
-		      free (json);
-		    }
-		  else
-		    json_parse_error (&err);
-		  if (releasable)
-		    {
-		      with_flushed_stack (for_side_effect, NULL);
-#ifdef HAVE_GCC_TLS
-		      if (self->cooperative)
-#endif
-			release_global_lock ();
-		    }
-		  ptr += content_length;
-		  content_length = -1;
-		}
-	      else
-		{
-		  /* fragment content */
-		  break;
-		}
-	    }
-	  memmove (buffer, ptr, end - ptr + 1);
-	}
-    }
-
-  xfree (buffer);
-  if (releasable)
-#ifdef HAVE_GCC_TLS
-    if (self->cooperative)
-#endif
-      acquire_global_lock (self);
 }
 
 void
