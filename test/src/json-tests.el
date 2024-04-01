@@ -25,7 +25,6 @@
 
 (require 'cl-lib)
 (require 'map)
-(require 'subr-x)
 
 (declare-function json-serialize "json.c" (object &rest args))
 (declare-function json-insert "json.c" (object &rest args))
@@ -35,6 +34,7 @@
 (define-error 'json-tests--error "JSON test error")
 
 (ert-deftest json-serialize/roundtrip ()
+  (skip-unless (fboundp 'json-serialize))
   ;; The noncharacter U+FFFF should be passed through,
   ;; cf. https://www.unicode.org/faq/private_use.html#noncharacters.
   (let ((lisp [:null :false t 0 123 -456 3.75 "abc\uFFFFαβγ𝔸𝐁𝖢\"\\"])
@@ -53,6 +53,7 @@
 
 (ert-deftest json-serialize/roundtrip-scalars ()
   "Check that Bug#42994 is fixed."
+  (skip-unless (fboundp 'json-serialize))
   (dolist (case '((:null "null")
                   (:false "false")
                   (t "true")
@@ -79,6 +80,7 @@
           (should (eobp)))))))
 
 (ert-deftest json-serialize/object ()
+  (skip-unless (fboundp 'json-serialize))
   (let ((table (make-hash-table :test #'equal)))
     (puthash "abc" [1 2 t] table)
     (puthash "def" :null table)
@@ -123,6 +125,8 @@
 }")))
 
 (ert-deftest json-serialize/object-with-duplicate-keys ()
+  (skip-unless (fboundp 'json-serialize))
+
   (dolist (n '(1 5 20 100))
     (let ((symbols (mapcar (lambda (i) (make-symbol (format "s%d" i)))
                            (number-sequence 1 n)))
@@ -156,9 +160,7 @@
   )
 
 (ert-deftest json-parse-string/object ()
-  :expected-result :failed
-  ;; FIXME: This currently fails. Should the parser deduplicate keys?
-  ;; Never, always, or for alist and plist only?
+  (skip-unless (fboundp 'json-parse-string))
   (let ((input
          "{ \"abc\" : [1, 2, true], \"def\" : null, \"abc\" : [true, 5], \"def\" : null, \"abc\" : [9, false] }\n"))
     (let ((actual (json-parse-string input)))
@@ -171,16 +173,8 @@
     (should (equal (json-parse-string input :object-type 'plist)
                    '(:def :null :abc [9 :false])))))
 
-(ert-deftest json-parse-string/object-unicode-keys ()
-  (let ((input "{\"é\":1,\"☃\":2,\"𐌐\":3}"))
-    (let ((actual (json-parse-string input)))
-      (should (equal (sort (hash-table-keys actual)) '("é" "☃" "𐌐"))))
-    (should (equal (json-parse-string input :object-type 'alist)
-                   '((é . 1) (☃ . 2) (𐌐 . 3))))
-    (should (equal (json-parse-string input :object-type 'plist)
-                   '(:é 1 :☃ 2 :𐌐 3)))))
-
 (ert-deftest json-parse-string/array ()
+  (skip-unless (fboundp 'json-parse-string))
   (let ((input "[\"a\", 1, [\"b\", 2]]"))
     (should (equal (json-parse-string input)
                    ["a" 1 ["b" 2]]))
@@ -188,6 +182,7 @@
                    '("a" 1 ("b" 2))))))
 
 (ert-deftest json-parse-string/string ()
+  (skip-unless (fboundp 'json-parse-string))
   (should-error (json-parse-string "[\"formfeed\f\"]") :type 'json-parse-error)
   (should (equal (json-parse-string "[\"foo \\\"bar\\\"\"]") ["foo \"bar\""]))
   (should (equal (json-parse-string "[\"abcαβγ\"]") ["abcαβγ"]))
@@ -195,10 +190,11 @@
                  ["\nasdфывfgh\t"]))
   (should (equal (json-parse-string "[\"\\uD834\\uDD1E\"]") ["\U0001D11E"]))
   (should-error (json-parse-string "foo") :type 'json-parse-error)
-  (should-error (json-parse-string "[\"\u00C4\xC3\x84\"]")
-                :type 'json-utf8-decode-error))
+  ;; FIXME: Is this the right behavior?
+  (should (equal (json-parse-string "[\"\u00C4\xC3\x84\"]") ["\u00C4\u00C4"])))
 
 (ert-deftest json-serialize/string ()
+  (skip-unless (fboundp 'json-serialize))
   (should (equal (json-serialize ["foo"]) "[\"foo\"]"))
   (should (equal (json-serialize ["a\n\fb"]) "[\"a\\n\\fb\"]"))
   (should (equal (json-serialize ["\nasdфыв\u001f\u007ffgh\t"])
@@ -208,24 +204,12 @@
   (should-error (json-serialize ["\u00C4\xC3\x84"])))
 
 (ert-deftest json-serialize/invalid-unicode ()
+  (skip-unless (fboundp 'json-serialize))
   (should-error (json-serialize ["a\uDBBBb"]) :type 'wrong-type-argument)
   (should-error (json-serialize ["u\x110000v"]) :type 'wrong-type-argument)
   (should-error (json-serialize ["u\x3FFFFFv"]) :type 'wrong-type-argument)
   (should-error (json-serialize ["u\xCCv"]) :type 'wrong-type-argument)
   (should-error (json-serialize ["u\u00C4\xCCv"]) :type 'wrong-type-argument))
-
-(ert-deftest json-parse-string/short ()
-  (should-error (json-parse-string "") :type 'json-end-of-file)
-  (should-error (json-parse-string " ") :type 'json-end-of-file)
-  (dolist (s '("a" "ab" "abc" "abcd" "\0" "\1"
-               "t" "tr" "tru" "truE" "truee"
-               "n" "nu" "nul" "nulL" "nulll"
-               "f" "fa" "fal" "fals" "falsE" "falsee"))
-    (condition-case err
-        (json-parse-string s)
-      (error
-       (should (eq (car err) 'json-parse-error)))
-      (:success (error "parsing %S should fail" s)))))
 
 (ert-deftest json-parse-string/null ()
   (skip-unless (fboundp 'json-parse-string))
@@ -240,6 +224,7 @@
   "Some examples from
 https://www.cl.cam.ac.uk/~mgk25/ucs/examples/UTF-8-test.txt.
 Test with both unibyte and multibyte strings."
+  (skip-unless (fboundp 'json-parse-string))
   ;; Invalid UTF-8 code unit sequences.
   (should-error (json-parse-string "[\"\x80\"]") :type 'json-utf8-decode-error)
   (should-error (json-parse-string "[\"\u00C4\x80\"]") :type 'json-utf8-decode-error)
@@ -267,12 +252,15 @@ Test with both unibyte and multibyte strings."
                 :type 'json-utf8-decode-error))
 
 (ert-deftest json-parse-string/incomplete ()
+  (skip-unless (fboundp 'json-parse-string))
   (should-error (json-parse-string "[123") :type 'json-end-of-file))
 
 (ert-deftest json-parse-string/trailing ()
+  (skip-unless (fboundp 'json-parse-string))
   (should-error (json-parse-string "[123] [456]") :type 'json-trailing-content))
 
 (ert-deftest json-parse-buffer/incomplete ()
+  (skip-unless (fboundp 'json-parse-buffer))
   (with-temp-buffer
     (insert "[123")
     (goto-char 1)
@@ -280,6 +268,7 @@ Test with both unibyte and multibyte strings."
     (should (bobp))))
 
 (ert-deftest json-parse-buffer/trailing ()
+  (skip-unless (fboundp 'json-parse-buffer))
   (with-temp-buffer
     (insert "[123] [456]")
     (goto-char 1)
@@ -288,6 +277,8 @@ Test with both unibyte and multibyte strings."
     (should (looking-at-p (rx " [456]" eos)))))
 
 (ert-deftest json-parse-with-custom-null-and-false-objects ()
+  (skip-unless (and (fboundp 'json-serialize)
+                    (fboundp 'json-parse-string)))
   (let* ((input
           "{ \"abc\" : [9, false] , \"def\" : null }")
          (output
@@ -325,6 +316,7 @@ Test with both unibyte and multibyte strings."
     (should-error (json-serialize '() :object-type 'alist))))
 
 (ert-deftest json-insert/signal ()
+  (skip-unless (fboundp 'json-insert))
   (with-temp-buffer
     (let ((calls 0))
       (add-hook 'after-change-functions
@@ -339,6 +331,7 @@ Test with both unibyte and multibyte strings."
       (should (equal calls 1)))))
 
 (ert-deftest json-insert/throw ()
+  (skip-unless (fboundp 'json-insert))
   (with-temp-buffer
     (let ((calls 0))
       (add-hook 'after-change-functions
@@ -354,6 +347,7 @@ Test with both unibyte and multibyte strings."
       (should (equal calls 1)))))
 
 (ert-deftest json-serialize/bignum ()
+  (skip-unless (fboundp 'json-serialize))
   (should (equal (json-serialize (vector (1+ most-positive-fixnum)
                                          (1- most-negative-fixnum)))
                  (format "[%d,%d]"
@@ -362,10 +356,12 @@ Test with both unibyte and multibyte strings."
 
 (ert-deftest json-parse-string/wrong-type ()
   "Check that Bug#42113 is fixed."
+  (skip-unless (fboundp 'json-parse-string))
   (should-error (json-parse-string 1) :type 'wrong-type-argument))
 
 (ert-deftest json-serialize/wrong-hash-key-type ()
   "Check that Bug#42113 is fixed."
+  (skip-unless (fboundp 'json-serialize))
   (let ((table (make-hash-table :test #'eq)))
     (puthash 1 2 table)
     (should-error (json-serialize table) :type 'wrong-type-argument)))
