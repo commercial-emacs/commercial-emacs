@@ -599,23 +599,27 @@ DEFUN ("json-serialize", Fjson_serialize, Sjson_serialize, 1, MANY,
        NULL,
        doc: /* Return the JSON representation of OBJECT as a string.
 
-OBJECT must be t, a number, string, vector, hashtable, alist, plist,
-or the Lisp equivalents to the JSON null and false values, and its
-elements must recursively consist of the same kinds of values.  t will
-be converted to the JSON true value.  Vectors will be converted to
-JSON arrays, whereas hashtables, alists and plists are converted to
-JSON objects.  Hashtable keys must be strings, unique within each object.
-Alist and plist keys must be symbols; if a key is duplicate, the first
-instance is used.  A leading colon in plist keys is elided.
+OBJECT is translated as follows:
+
+`t'        -- the JSON `true' value.
+number     -- a JSON number.
+string     -- a JSON string.
+vector     -- a JSON array.
+hash-table -- a JSON object.  Keys must be strings.
+alist      -- a JSON object.  Keys must be symbols.
+plist      -- a JSON object.  Keys must be symbols.
+              A leading colon in plist key names is elided.
+
+For duplicate object keys, the first value is used.
 
 The Lisp equivalents to the JSON null and false values are
 configurable in the arguments ARGS, a list of keyword/argument pairs:
 
-The keyword argument `:null-object' specifies which object to use
-to represent a JSON null value.  It defaults to `:null'.
+:null-object OBJ -- use OBJ to represent a JSON null value.
+  It defaults to `:null'.
 
-The keyword argument `:false-object' specifies which object to use to
-represent a JSON false value.  It defaults to `:false'.
+:false-object OBJ -- use OBJ to represent a JSON false value.
+  It defaults to `:false'.
 
 In you specify the same value for `:null-object' and `:false-object',
 a potentially ambiguous situation, the JSON output will not contain
@@ -632,9 +636,9 @@ usage: (json-serialize OBJECT &rest ARGS)  */)
 DEFUN ("json-insert", Fjson_insert, Sjson_insert, 1, MANY,
        NULL,
        doc: /* Insert the JSON representation of OBJECT before point.
-This is the same as (insert (json-serialize OBJECT)), but potentially
+This is the same as (insert (json-serialize OBJECT ...)), but potentially
 faster.  See the function `json-serialize' for allowed values of
-OBJECT.
+OBJECT and ARGS.
 usage: (json-insert OBJECT &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
@@ -1769,20 +1773,20 @@ error of type `json-parse-error'.
 
 The arguments ARGS are a list of keyword/argument pairs:
 
-The keyword argument `:object-type' specifies which Lisp type is used
-to represent objects; it can be `hash-table', `alist' or `plist'.  It
-defaults to `hash-table'.  If an object has members with the same
-key, `hash-table' keeps only the last value of such keys, while
-`alist' and `plist' keep all the members.
+:object-type TYPE -- use TYPE to represent JSON objects.
+  TYPE can be `hash-table' (the default), `alist' or `plist'.
+  If an object has members with the same key, `hash-table' keeps only
+  the last value of such keys, while `alist' and `plist' keep all the
+  members.
 
-The keyword argument `:array-type' specifies which Lisp type is used
-to represent arrays; it can be `array' (the default) or `list'.
+:array-type TYPE -- use TYPE to represent JSON arrays.
+  TYPE can be `array' (the default) or `list'.
 
-The keyword argument `:null-object' specifies which object to use
-to represent a JSON null value.  It defaults to `:null'.
+:null-object OBJ -- use OBJ to represent a JSON null value.
+  It defaults to `:null'.
 
-The keyword argument `:false-object' specifies which object to use to
-represent a JSON false value.  It defaults to `:false'.
+:false-object OBJ -- use OBJ to represent a JSON false value.
+  It defaults to `:false'.
 usage: (json-parse-string STRING &rest ARGS) */)
 (ptrdiff_t nargs, Lisp_Object *args)
 {
@@ -1806,35 +1810,34 @@ usage: (json-parse-string STRING &rest ARGS) */)
 
 DEFUN ("json-parse-buffer", Fjson_parse_buffer, Sjson_parse_buffer,
        0, MANY, NULL,
-       doc: /* Read JSON object from current buffer starting at point.
-Move point after the end of the object if parsing was successful.
+       doc: /* Read a JSON value from current buffer starting at point.
+Move point after the end of the value if parsing was successful.
 On error, don't move point.
 
-The returned object will be a vector, list, hashtable, alist, or
+The returned value will be a vector, list, hashtable, alist, or
 plist.  Its elements will be the JSON null value, the JSON false
 value, t, numbers, strings, or further vectors, lists, hashtables,
-alists, or plists.  If there are duplicate keys in an object, all
-but the last one are ignored.
+alists, or plists.
 
-If the current buffer doesn't contain a valid JSON object, the
+If the current buffer doesn't contain a valid JSON value, the
 function signals an error of type `json-parse-error'.
 
 The arguments ARGS are a list of keyword/argument pairs:
 
-The keyword argument `:object-type' specifies which Lisp type is used
-to represent objects; it can be `hash-table', `alist' or `plist'.  It
-defaults to `hash-table'.  If an object has members with the same
-key, `hash-table' keeps only the last value of such keys, while
-`alist' and `plist' keep all the members.
+:object-type TYPE -- use TYPE to represent JSON objects.
+  TYPE can be `hash-table' (the default), `alist' or `plist'.
+  If an object has members with the same key, `hash-table' keeps only
+  the last value of such keys, while `alist' and `plist' keep all the
+  members.
 
-The keyword argument `:array-type' specifies which Lisp type is used
-to represent arrays; it can be `array' (the default) or `list'.
+:array-type TYPE -- use TYPE to represent JSON arrays.
+  TYPE can be `array' (the default) or `list'.
 
-The keyword argument `:null-object' specifies which object to use
-to represent a JSON null value.  It defaults to `:null'.
+:null-object OBJ -- use OBJ to represent a JSON null value.
+  It defaults to `:null'.
 
-The keyword argument `:false-object' specifies which object to use to
-represent a JSON false value.  It defaults to `:false'.
+:false-object OBJ -- use OBJ to represent a JSON false value.
+  It defaults to `:false'.
 usage: (json-parse-buffer &rest args) */)
 (ptrdiff_t nargs, Lisp_Object *args)
 {
