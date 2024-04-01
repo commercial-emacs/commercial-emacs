@@ -443,6 +443,13 @@ The available underline styles for TTY frames are 'single',
 supported by Kitty, libvte, and st (through the undercurl patch) among
 other terminals.
 
++++
+** New command 'sqlite-execute-batch'.
+This command lets the user execute multiple SQL commands in one
+command.  It is useful when the user wants to evaluate an entire SQL
+file.
+
++++
 
 * Editing Changes in Emacs 30.1
 
