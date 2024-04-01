@@ -156,9 +156,6 @@
   )
 
 (ert-deftest json-parse-string/object ()
-  :expected-result :failed
-  ;; FIXME: This currently fails. Should the parser deduplicate keys?
-  ;; Never, always, or for alist and plist only?
   (let ((input
          "{ \"abc\" : [1, 2, true], \"def\" : null, \"abc\" : [true, 5], \"def\" : null, \"abc\" : [9, false] }\n"))
     (let ((actual (json-parse-string input)))
