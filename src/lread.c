@@ -4385,6 +4385,18 @@ intern_c_string (const char *str)
 		     obarray, val);
 }
 
+/* Intern STR of NBYTES bytes and NCHARS characters in the default obarray.  */
+Lisp_Object
+intern_c_multibyte (const char *str, ptrdiff_t nchars, ptrdiff_t nbytes)
+{
+  Lisp_Object obarray = check_obarray (Vobarray);
+  Lisp_Object sym = oblookup (obarray, str, nchars, nbytes);
+  if (BARE_SYMBOL_P (sym))
+    return sym;
+  return intern_driver (make_multibyte_string (str, nchars, nbytes),
+			obarray, sym);
+}
+
 static void
 define_symbol (Lisp_Object sym, char const *str)
 {
