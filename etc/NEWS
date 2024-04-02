@@ -244,14 +244,6 @@ right-aligned to is controlled by the new user option
 
 ** Windows
 
-+++
-*** New action alist entry 'category' for 'display-buffer'.
-If the caller of 'display-buffer' passes '(category . symbol)'
-in its 'action' argument, you can match the displayed buffer
-by adding '(category . symbol)' to the condition part of
-'display-buffer-alist' entries.
-
-+++
 *** New action alist entry 'post-command-select-window' for 'display-buffer'.
 It specifies whether the window of the displayed buffer should be
 selected or deselected at the end of executing the current command.
@@ -262,23 +254,7 @@ It specifies how 'set-window-configuration' and 'window-state-put'
 should proceed with windows whose buffer was killed after the
 corresponding configuration or state was made.
 
-*** New variable 'window-point-context-set-function'.
-It can be used to set a context for window point in all windows by
-'window-point-context-set' before calling 'current-window-configuration'
-and 'window-state-get'.  Then later another new variable
-'window-point-context-use-function' can be used by
-'window-point-context-use' after 'set-window-configuration' and
-'window-state-put' to restore positions of window points
-according to the context stored in a window parameter.
-
 ** Tab Bars and Tab Lines
-
----
-*** New user option 'tab-bar-select-restore-context'.
-It uses 'window-point-context-set' to save contexts where
-window points were located before switching away from the tab,
-and 'window-point-context-use' to restore positions of window
-points after switching back to that tab.
 
 ---
 *** New user option 'tab-bar-select-restore-windows'.
