@@ -637,16 +637,16 @@ DEFUN ("json-insert", Fjson_insert, Sjson_insert, 1, MANY,
        NULL,
        doc: /* Insert the JSON representation of OBJECT before point.
 This is the same as (insert (json-serialize OBJECT ...)), but potentially
-faster.  See the function `json-serialize' for allowed values of
-OBJECT and ARGS.
+faster, and with the difference that Unicode characters are inserted as
+themselves into multibyte buffers, and as UTF-8 byte sequencess into
+unibyte buffers.
+See the function `json-serialize' for allowed values of OBJECT and ARGS.
 usage: (json-insert OBJECT &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   json_out_t jo;
   json_serialize (&jo, args[0], nargs - 1, args + 1);
-
-  /* FIXME: All the work below just to insert a string into a buffer?  */
 
   prepare_to_modify_buffer (PT, PT, NULL);
   move_gap (PT, PT_BYTE);
@@ -657,8 +657,10 @@ usage: (json-insert OBJECT &rest ARGS)  */)
   /* No need to keep allocation beyond this point.  */
   unbind_to (count, Qnil);
 
-  ptrdiff_t inserted = 0;
+  bool ub_buffer = NILP (BVAR (current_buffer, enable_multibyte_characters));
   ptrdiff_t inserted_bytes = jo.size;
+  ptrdiff_t inserted = ub_buffer ? jo.size : jo.size - jo.chars_delta;
+  eassert (inserted > 0);
 
   /* If required, decode the stuff we've read into the gap.  */
   struct coding_system coding;
@@ -693,12 +695,10 @@ usage: (json-insert OBJECT &rest ARGS)  */)
 
   /* Call after-change hooks.  */
   signal_after_change (PT, 0, inserted);
-  if (inserted > 0)
-    {
-      update_compositions (PT, PT, CHECK_BORDER);
-      /* Move point to after the inserted text.  */
-      SET_PT_BOTH (PT + inserted, PT_BYTE + inserted_bytes);
-    }
+
+  update_compositions (PT, PT, CHECK_BORDER);
+  /* Move point to after the inserted text.  */
+  SET_PT_BOTH (PT + inserted, PT_BYTE + inserted_bytes);
 
   return Qnil;
 }
