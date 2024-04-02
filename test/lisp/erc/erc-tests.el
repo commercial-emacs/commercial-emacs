@@ -50,6 +50,30 @@
   (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "1d")))
     (should (equal (erc--read-time-period "foo: ") 86400))))
 
+(ert-deftest erc--labeled-time-duration ()
+  (should (equal (erc--labeled-time-duration 10) "10s"))
+  (should (equal (erc--labeled-time-duration 10.1) "10s"))
+  (should (equal (erc--labeled-time-duration 100) "1m40s"))
+  (should (equal (erc--labeled-time-duration 100.1) "1m40s"))
+  (should (equal (erc--labeled-time-duration 1000) "16m40s")))
+
+;; This asserts that the first pattern on file matching a supplied
+;; `user' parameter will be removed after confirmation.
+(ert-deftest erc-cmd-UNIGNORE ()
+  (should (local-variable-if-set-p 'erc-ignore-list))
+  (erc-tests-common-make-server-buf)
+
+  (setq erc-ignore-list (list ".")) ; match anything
+  (ert-simulate-keys (list ?\r)
+    (erc-cmd-IGNORE "abc"))
+  (should (equal erc-ignore-list '("abc" ".")))
+
+  (cl-letf (((symbol-function 'y-or-n-p) #'always))
+    (erc-cmd-UNIGNORE "abcdef")
+    (should (equal erc-ignore-list '(".")))
+    (erc-cmd-UNIGNORE "foo"))
+  (should-not erc-ignore-list))
+
 (ert-deftest erc-with-all-buffers-of-server ()
   (let (proc-exnet
         proc-onet
