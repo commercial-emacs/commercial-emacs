@@ -1057,7 +1057,7 @@ json_parse_string (struct json_parser *parser, bool intern, bool leading_colon)
   json_byte_workspace_reset (parser);
   if (leading_colon)
     json_byte_workspace_put (parser, ':');
-  ptrdiff_t chars_delta = 0;	/* nbytes - nchars */
+  ptrdiff_t chars_delta = 0;	/* nchars - nbytes */
   for (;;)
     {
       /* This if is only here for a possible speedup.  If there are 4
@@ -1107,7 +1107,7 @@ json_parse_string (struct json_parser *parser, bool intern, bool leading_colon)
       if (c & 0x80)
 	{
 	  /* Parse UTF-8, strictly.  This is the correct thing to do
-	     whether the input is a unibyte or multibyte string.  */
+	     whether or not the input is a unibyte or multibyte string.  */
 	  json_byte_workspace_put (parser, c);
 	  unsigned char c1 = json_input_get (parser);
 	  if ((c1 & 0xc0) != 0x80)
