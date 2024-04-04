@@ -583,6 +583,33 @@ comparing the subr with a much slower Lisp implementation."
       (setq data-tests-lvar 6)
       (should (null watch-data)))))
 
+(ert-deftest data-tests-get-variable-watchers-inputs ()
+  (should-not (get-variable-watchers t))
+  (should-not (get-variable-watchers nil))
+  (should-not (get-variable-watchers :type))
+  (should-not (get-variable-watchers 'a-variable-that-does-not-exist))
+  (with-no-warnings
+    (should-error (get-variable-watchers a-variable-that-does-not-exist)))
+  ;; Without BUG#00000 fix, the tests below have been observed either
+  ;; failing or producing a segmentation fault.
+  (let ((foo1 "")
+        (foo2 "1")
+        (foo3 "load-path")
+        (foo4 "'load-path")
+        (foo5 "A longer string that is not a symbol name."))
+    (should-error (get-variable-watchers foo1))
+    (should-error (get-variable-watchers foo2))
+    (should-error (get-variable-watchers foo3))
+    (should-error (get-variable-watchers foo4))
+    (should-error (get-variable-watchers foo5)))
+  ;; Without BUG#00000 fix the tests below will segmentation fault
+  (let ((bar1 5)
+        (bar2 '("test"))
+        (bar3 [1 2 3]))
+    (should-error (get-variable-watchers bar1))
+    (should-error (get-variable-watchers bar2))
+    (should-error (get-variable-watchers bar3))))
+
 (ert-deftest data-tests-kill-all-local-variables () ;bug#30846
   (with-temp-buffer
     (setq-local data-tests-foo1 1)

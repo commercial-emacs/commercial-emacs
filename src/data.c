@@ -1634,7 +1634,7 @@ SYMBOL (or its aliases) are set.  */)
   (Lisp_Object symbol, Lisp_Object watch_function)
 {
   symbol = Findirect_variable (symbol);
-  Lisp_Object watchers = Fget (symbol, Qwatchers);
+  Lisp_Object watchers = Fget (symbol, Qwatchers); /* CHECK_SYMBOL is in Fget */
   watchers = Fdelete (watch_function, watchers);
   if (NILP (watchers))
     {
@@ -1647,11 +1647,13 @@ SYMBOL (or its aliases) are set.  */)
 
 DEFUN ("get-variable-watchers", Fget_variable_watchers, Sget_variable_watchers,
        1, 1, 0,
-       doc: /* Return a list of SYMBOL's active watchers.  */)
+       doc: /* Return a list of functions actively watching SYMBOL (and its aliases).  */)
   (Lisp_Object symbol)
 {
+  symbol = Findirect_variable (symbol);
+  CHECK_SYMBOL (symbol); /* BUG#00000 Must guard SYMBOL_TRAPPED_WRITE_P */
   return (SYMBOL_TRAPPED_WRITE_P (symbol) == SYMBOL_TRAPPED_WRITE)
-    ? Fget (Findirect_variable (symbol), Qwatchers)
+    ? Fget (symbol , Qwatchers)
     : Qnil;
 }
 
