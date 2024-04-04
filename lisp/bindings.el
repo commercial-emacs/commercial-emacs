@@ -868,7 +868,7 @@ okay.  See `mode-line-format'.")
 	      '(".o" "~" ".bin" ".lbin" ".so"
 		".a" ".ln" ".blg" ".bbl"))))
        (mapcar 'purecopy
-       '(".elc" ".lof"
+       '(".elc" ".eln" ".lof"
 	 ".glo" ".idx" ".lot"
 	 ;; VCS metadata directories
 	 ".svn/" ".hg/" ".git/" ".bzr/" "CVS/" "_darcs/" "_MTN/"
