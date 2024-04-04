@@ -41,6 +41,7 @@
 
 (require 'json)
 (require 'password-cache)
+(require 'icons)
 
 (require 'cl-lib)
 (require 'eieio)
@@ -2583,7 +2584,8 @@ by doing (clear-string STRING)."
             (add-hook 'post-command-hook #'read-passwd--hide-password nil t))
         (unwind-protect
             (let ((enable-recursive-minibuffers t)
-		  (read-hide-char (or read-hide-char ?*)))
+		  (read-hide-char (or read-hide-char ?*))
+                  (overriding-text-conversion-style 'password))
               (read-string prompt nil t default)) ; t = "no history"
           (when (buffer-live-p minibuf)
             (with-current-buffer minibuf
@@ -2595,7 +2597,9 @@ by doing (clear-string STRING)."
                            #'read-passwd--hide-password 'local)
               (kill-local-variable 'post-self-insert-hook)
               ;; And of course, don't keep the sensitive data around.
-              (erase-buffer))))))))
+              (erase-buffer)
+              ;; Then restore the previous text conversion style.
+              (set-text-conversion-style text-conversion-style))))))))
 
 (provide 'auth-source)
 
