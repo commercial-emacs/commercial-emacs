@@ -1076,6 +1076,14 @@ Additionally the user can use the char \"*\" as a glob pattern.")
 I.e. when completing \"foo_bar\" (where _ is the position of point),
 it will consider all completions candidates matching the glob
 pattern \"*foo*bar*\".")
+    (substring-partial-completion
+     completion-substring-pcm-try-completion completion-substring-pcm-all-completions
+     "A combination of the partial-completion and substring styles.
+This is like the partial-completion style, but it will also
+expand at the start of a completion string.
+I.e. when completing \"l-co_h\" (where _ is the position of point),
+it will consider all completions candidates matching the glob
+pattern \"*l*-co*h*\".")
     (flex
      completion-flex-try-completion completion-flex-all-completions
      "Completion of an in-order subset of characters.
@@ -3837,10 +3845,13 @@ the commands start with a \"-\" or a SPC."
 	     (setq trivial nil)))
 	 trivial)))
 
-(defun completion-pcm--string->pattern (string &optional point)
+(defun completion-pcm--string->pattern (string &optional point startglob)
   "Split STRING into a pattern.
 A pattern is a list where each element is either a string
-or a symbol, see `completion-pcm--merge-completions'."
+or a symbol, see `completion-pcm--merge-completions'.
+
+If STARTGLOB is non-nil, the pattern will start with the symbol
+`prefix' if it would otherwise start with a string."
   (if (and point (< point (length string)))
       (let ((prefix (substring string 0 point))
             (suffix (substring string point)))
@@ -3887,7 +3898,10 @@ or a symbol, see `completion-pcm--merge-completions'."
       (when (> (length string) p0)
         (if pending (push pending pattern))
         (push (substring string p0) pattern))
-      (nreverse pattern))))
+      (setq pattern (nreverse pattern))
+      (if (not (stringp (car pattern)))
+          pattern
+        (cons 'prefix pattern)))))
 
 (defun completion-pcm--optimize-pattern (p)
   ;; Remove empty strings in a separate phase since otherwise a ""
@@ -4182,11 +4196,12 @@ see) for later lazy highlighting."
    (t completions)))
 
 (defun completion-pcm--find-all-completions (string table pred point
-                                                    &optional filter)
+                                                    &optional filter startglob)
   "Find all completions for STRING at POINT in TABLE, satisfying PRED.
 POINT is a position inside STRING.
 FILTER is a function applied to the return value, that can be used, e.g. to
-filter out additional entries (because TABLE might not obey PRED)."
+filter out additional entries (because TABLE might not obey PRED).
+STARTGLOB controls whether there's a leading glob in the pattern."
   (unless filter (setq filter 'identity))
   (let* ((beforepoint (substring string 0 point))
          (afterpoint (substring string point))
@@ -4197,7 +4212,7 @@ filter out additional entries (because TABLE might not obey PRED)."
     (setq string (substring string (car bounds) (+ point (cdr bounds))))
     (let* ((relpoint (- point (car bounds)))
            (pattern (completion-pcm--optimize-pattern
-                     (completion-pcm--string->pattern string relpoint)))
+                     (completion-pcm--string->pattern string relpoint startglob)))
            (all (condition-case-unless-debug err
                     (funcall filter
                              (completion-pcm--all-completions
@@ -4459,6 +4474,25 @@ the same set of elements."
                 string table pred point
                 (if minibuffer-completing-file-name
                     'completion-pcm--filename-try-filter))))
+    (completion-pcm--merge-try pattern all prefix suffix)))
+
+;; Substring-pcm completion
+;; A trivial copy of pcm completion, passing startglob=t
+
+(defun completion-substring-pcm-all-completions (string table pred point)
+  (pcase-let ((`(,pattern ,all ,prefix ,_suffix)
+               (completion-pcm--find-all-completions string table pred point nil t)))
+    (when all
+      (nconc (completion-pcm--hilit-commonality pattern all)
+             (length prefix)))))
+
+(defun completion-substring-pcm-try-completion (string table pred point)
+  (pcase-let ((`(,pattern ,all ,prefix ,suffix)
+               (completion-pcm--find-all-completions
+                string table pred point
+                (if minibuffer-completing-file-name
+                    'completion-pcm--filename-try-filter)
+                t)))
     (completion-pcm--merge-try pattern all prefix suffix)))
 
 ;;; Substring completion
