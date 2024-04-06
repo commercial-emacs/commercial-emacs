@@ -136,6 +136,8 @@ See `recenter'."
 (defun master-says (&optional command arg)
   "Display slave buffer and execute COMMAND with ARG in its window."
   (interactive)
+  (unless master-of
+    (error "Slave buffer does not exist"))
   (if (null (buffer-live-p (get-buffer master-of)))
       (error "Slave buffer has disappeared")
     (let ((window  (selected-window)))
