@@ -24,9 +24,10 @@
 
 (ert-deftest mwheel-test-enable/disable ()
   (mouse-wheel-mode 1)
-  (should (eq (lookup-key (current-global-map) `[,mouse-wheel-up-event]) 'mwheel-scroll))
+  (message "idiot %S" (lookup-key (current-global-map) '[wheel-up]))
+  (should (eq (lookup-key (current-global-map) '[wheel-up]) 'mwheel-scroll))
   (mouse-wheel-mode -1)
-  (should (eq (lookup-key (current-global-map) `[,mouse-wheel-up-event]) nil)))
+  (should-not (lookup-key (current-global-map) '[wheel-up])))
 
 (ert-deftest mwheel-test--create-scroll-keys ()
   (should (equal (mouse-wheel--create-scroll-keys 10 'mouse-4)
