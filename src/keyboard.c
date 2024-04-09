@@ -5895,17 +5895,8 @@ make_lispy_event (struct input_event *event)
 
 	if (CONSP (event->arg))
 	  return list5 (head, position, make_fixnum (double_click_count),
-			XCAR (event->arg),
-			/* FIXME: When a mouse-click on a tab-bar is
-                           converted into a wheel-event we get here something
-                           of an unexpected shape...  */
-			(CONSP (XCDR (event->arg))
-			 && CONSP (XCDR (XCDR (event->arg))))
-			? Fcons (XCAR (XCDR (event->arg)),
-			         XCAR (XCDR (XCDR (event->arg))))
-			/* ... not knowing what this "unexpected shape" means,
-			   we just use nil.  */
-			: Qnil);
+			XCAR (event->arg), Fcons (XCAR (XCDR (event->arg)),
+						  XCAR (XCDR (XCDR (event->arg)))));
         else if (NUMBERP (event->arg))
           return list4 (head, position, make_fixnum (double_click_count),
                         event->arg);
