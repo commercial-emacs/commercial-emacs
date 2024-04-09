@@ -10852,7 +10852,8 @@ Remember the returned context in the window parameter `context'."
                                         (window-buffer w)))
                 ((functionp fn))
                 (context (funcall fn w)))
-       (set-window-parameter w 'context (cons (buffer-name) context))))
+       (set-window-parameter
+        w 'context (cons (buffer-name (window-buffer w)) context))))
    'nomini))
 
 (defun window-point-context-use ()
@@ -10870,7 +10871,7 @@ found by the provided context."
                                         (window-buffer w)))
                 ((functionp fn))
                 (context (window-parameter w 'context))
-                ((equal (buffer-name) (car context))))
+                ((equal (buffer-name (window-buffer w)) (car context))))
        (funcall fn w (cdr context))
        (set-window-parameter w 'context nil)))
    'nomini))
