@@ -361,8 +361,6 @@ be used instead.
   (add-hook 'completion-at-point-functions
             #'elisp-completion-at-point nil 'local)
   (add-hook 'flymake-diagnostic-functions #'elisp-flymake-checkdoc nil t)
-  (add-hook 'flymake-diagnostic-functions
-              #'elisp-flymake-byte-compile nil t)
   (add-hook 'context-menu-functions #'elisp-context-menu 10 t))
 
 ;; Font-locking support.
@@ -2153,94 +2151,7 @@ Calls REPORT-FN directly."
 (defvar-local elisp-flymake--byte-compile-process nil
   "Buffer-local process started for byte-compiling the buffer.")
 
-(defvar elisp-flymake-byte-compile-load-path (list "./")
-  "Like `load-path' but used by `elisp-flymake-byte-compile'.
-The default value contains just \"./\" which includes the default
-directory of the buffer being compiled, and nothing else.")
-
-(put 'elisp-flymake-byte-compile-load-path 'safe-local-variable
-     (lambda (x) (and (listp x) (catch 'tag
-                                  (dolist (path x t) (unless (stringp path)
-                                                       (throw 'tag nil)))))))
-
 (defvar bytecomp--inhibit-lexical-cookie-warning)
-
-;;;###autoload
-(defun elisp-flymake-byte-compile (report-fn &rest _args)
-  "A Flymake backend for elisp byte compilation.
-Spawn an Emacs process that byte-compiles a file representing the
-current buffer state and calls REPORT-FN when done."
-  (when elisp-flymake--byte-compile-process
-    (when (process-live-p elisp-flymake--byte-compile-process)
-      (kill-process elisp-flymake--byte-compile-process)))
-  (let ((temp-file (make-temp-file "elisp-flymake-byte-compile"))
-        (source-buffer (current-buffer))
-        (coding-system-for-write 'utf-8-unix)
-        (coding-system-for-read 'utf-8))
-    (save-restriction
-      (widen)
-      (write-region (point-min) (point-max) temp-file nil 'nomessage))
-    (let* ((output-buffer (generate-new-buffer " *elisp-flymake-byte-compile*"))
-           ;; Hack: suppress warning about missing lexical cookie in
-           ;; *scratch* buffers.
-           (warning-suppression-opt
-            (and (derived-mode-p 'lisp-interaction-mode)
-                 '("--eval"
-                   "(setq bytecomp--inhibit-lexical-cookie-warning t)"))))
-      (setq
-       elisp-flymake--byte-compile-process
-       (make-process
-        :name "elisp-flymake-byte-compile"
-        :buffer output-buffer
-        :command `(,(expand-file-name invocation-name invocation-directory)
-                   "-Q"
-                   "--batch"
-                   ,@(mapcan (lambda (path) (list "-L" path))
-                             elisp-flymake-byte-compile-load-path)
-                   ,@warning-suppression-opt
-                   "-f" "elisp-flymake--batch-compile-for-flymake"
-                   ,temp-file)
-        :connection-type 'pipe
-        :sentinel
-        (lambda (proc _event)
-          (unless (process-live-p proc)
-            (unwind-protect
-                (cond
-                 ((not (and (buffer-live-p source-buffer)
-                            (eq proc (with-current-buffer source-buffer
-                                       elisp-flymake--byte-compile-process))))
-                  (flymake-log :warning
-                               "byte-compile process %s obsolete" proc))
-                 ((zerop (process-exit-status proc))
-                  (elisp-flymake--byte-compile-done report-fn
-                                                    source-buffer
-                                                    output-buffer))
-                 (t
-                  (funcall report-fn
-                           :panic
-                           :explanation
-                           (format "byte-compile process %s died" proc))))
-              (ignore-errors (delete-file temp-file))
-              (kill-buffer output-buffer))))
-        :stderr " *stderr of elisp-flymake-byte-compile*"
-        :noquery t)))))
-
-(defun elisp-flymake--batch-compile-for-flymake (&optional file)
-  "Helper for `elisp-flymake-byte-compile'.
-Runs in a batch-mode Emacs.  Interactively use variable
-`buffer-file-name' for FILE."
-  (interactive (list buffer-file-name))
-  (let* ((file (or file
-                   (car command-line-args-left)))
-         (coding-system-for-read 'utf-8-unix)
-         (coding-system-for-write 'utf-8)
-         (byte-compile-log-buffer
-          (generate-new-buffer " *dummy-byte-compile-log-buffer*"))
-         (byte-compile-dest-file-function #'ignore))
-    (unwind-protect
-        (byte-compile-file file)
-      (ignore-errors
-        (kill-buffer byte-compile-log-buffer)))))
 
 (defun elisp-eval-region-or-buffer ()
   "Evaluate the forms in the active region or the whole current buffer.
