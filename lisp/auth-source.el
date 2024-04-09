@@ -41,7 +41,6 @@
 
 (require 'json)
 (require 'password-cache)
-(require 'icons)
 
 (require 'cl-lib)
 (require 'eieio)
