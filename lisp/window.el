@@ -8943,11 +8943,6 @@ another window."
   :group 'windows
   :group 'comint)
 
-(make-obsolete-variable
- 'display-comint-buffer-action
- "use a `(category . comint)' condition in `display-buffer-alist'."
- "30.1")
-
 (defcustom display-tex-shell-buffer-action '(display-buffer-in-previous-window
                                              (inhibit-same-window . t)
                                              (category . tex-shell))
@@ -8957,11 +8952,6 @@ another window."
   :version "29.1"
   :group 'windows
   :group 'tex-run)
-
-(make-obsolete-variable
- 'display-tex-shell-buffer-action
- "use a `(category . tex-shell)' condition in `display-buffer-alist'."
- "30.1")
 
 (defun read-buffer-to-switch (prompt)
   "Read the name of a buffer to switch to, prompting with PROMPT.
