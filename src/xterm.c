@@ -14153,10 +14153,10 @@ x_construct_mouse_click (struct input_event *result,
                             Fsymbol_value (Qmouse_wheel_buttons)));
       int wheel
         = (NILP (base) ? -1
-           : BASE_EQ (base, Qwheel_down)  ? 0
-           : BASE_EQ (base, Qwheel_up)    ? 1
-           : BASE_EQ (base, Qwheel_left)  ? 2
-           : BASE_EQ (base, Qwheel_right) ? 3
+           : EQ (base, Qwheel_down)  ? 0
+           : EQ (base, Qwheel_up)    ? 1
+           : EQ (base, Qwheel_left)  ? 2
+           : EQ (base, Qwheel_right) ? 3
            : -1);
       if (wheel >= 0)
         {
