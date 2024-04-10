@@ -8098,8 +8098,9 @@ decode_coding_object (struct coding_system *coding,
 	    }
 	  saved_pt = PT, saved_pt_byte = PT_BYTE;
 	  TEMP_SET_PT_BOTH (from, from_byte);
-	  current_buffer->text->inhibit_shrinking = 1;
-	  del_range_both (from, from_byte, to, to_byte, 1);
+	  current_buffer->text->inhibit_shrinking = true;
+	  prepare_to_modify_buffer (from, to, NULL);
+	  del_range_2 (from, from_byte, to, to_byte, false);
 	  coding->src_pos = -chars;
 	  coding->src_pos_byte = -bytes;
 	}
@@ -8125,6 +8126,13 @@ decode_coding_object (struct coding_system *coding,
     }
   else if (BUFFERP (dst_object))
     {
+      if (!BASE_EQ (src_object, dst_object))
+	{
+	  struct buffer *current = current_buffer;
+	  set_buffer_internal (XBUFFER (dst_object));
+	  prepare_to_modify_buffer (PT, PT, NULL);
+	  set_buffer_internal (current);
+	}
       code_conversion_save (0, 0);
       coding->dst_object = dst_object;
       coding->dst_pos = BUF_PT (XBUFFER (dst_object));
@@ -8145,7 +8153,14 @@ decode_coding_object (struct coding_system *coding,
   decode_coding (coding);
 
   if (BUFFERP (coding->dst_object))
-    set_buffer_internal (XBUFFER (coding->dst_object));
+    {
+      set_buffer_internal (XBUFFER (coding->dst_object));
+      signal_after_change (coding->dst_pos,
+			   BASE_EQ (src_object, dst_object) ? to - from : 0,
+			   coding->produced_char);
+      update_compositions (coding->dst_pos,
+			   coding->dst_pos + coding->produced_char, CHECK_ALL);
+    }
 
   if (!NILP (CODING_ATTR_POST_READ (attrs)))
     {
@@ -8350,7 +8365,12 @@ encode_coding_object (struct coding_system *coding,
       if (same_buffer)
 	{
 	  saved_pt = PT, saved_pt_byte = PT_BYTE;
-	  coding->src_object = del_range_1 (from, to, 1, 1);
+	  /* Run 'prepare_to_modify_buffer' by hand because we don't want
+	     to run the after-change hooks yet.  */
+	  prepare_to_modify_buffer (from, to, &from);
+	  coding->src_object = del_range_2 (from, CHAR_TO_BYTE (from),
+					    to, CHAR_TO_BYTE (to),
+					    true);
 	  coding->src_pos = 0;
 	  coding->src_pos_byte = 0;
 	}
@@ -8381,11 +8401,12 @@ encode_coding_object (struct coding_system *coding,
 	{
 	  struct buffer *current = current_buffer;
 
-	  set_buffer_temp (XBUFFER (dst_object));
+	  set_buffer_internal (XBUFFER (dst_object));
+	  prepare_to_modify_buffer (PT, PT, NULL);
 	  coding->dst_pos = PT;
 	  coding->dst_pos_byte = PT_BYTE;
 	  move_gap (coding->dst_pos, coding->dst_pos_byte);
-	  set_buffer_temp (current);
+	  set_buffer_internal (current);
 	}
       coding->dst_multibyte
 	= !NILP (BVAR (XBUFFER (dst_object), enable_multibyte_characters));
@@ -8422,6 +8443,16 @@ encode_coding_object (struct coding_system *coding,
 				   coding->produced);
 	  xfree (coding->destination);
 	}
+    }
+  else if (BUFFERP (coding->dst_object))
+    {
+      struct buffer *current = current_buffer;
+      set_buffer_internal (XBUFFER (dst_object));
+      signal_after_change (coding->dst_pos, same_buffer ? to - from : 0,
+			   coding->produced_char);
+      update_compositions (coding->dst_pos,
+			   coding->dst_pos + coding->produced_char, CHECK_ALL);
+      set_buffer_internal (current);
     }
 
   if (saved_pt >= 0)
@@ -9466,7 +9497,7 @@ not fully specified.)  */)
 
 DEFUN ("encode-coding-region", Fencode_coding_region, Sencode_coding_region,
        3, 4, "r\nzCoding system: ",
-       doc: /* Encode the current region using th specified coding system.
+       doc: /* Encode the current region using the specified coding system.
 Interactively, prompt for the coding system to encode the region, and
 replace the region with the bytes that are the result of the encoding.
 
