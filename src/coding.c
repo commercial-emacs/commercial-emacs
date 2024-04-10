@@ -8126,7 +8126,7 @@ decode_coding_object (struct coding_system *coding,
     }
   else if (BUFFERP (dst_object))
     {
-      if (!BASE_EQ (src_object, dst_object))
+      if (!EQ (src_object, dst_object))
 	{
 	  struct buffer *current = current_buffer;
 	  set_buffer_internal (XBUFFER (dst_object));
@@ -8156,7 +8156,7 @@ decode_coding_object (struct coding_system *coding,
     {
       set_buffer_internal (XBUFFER (coding->dst_object));
       signal_after_change (coding->dst_pos,
-			   BASE_EQ (src_object, dst_object) ? to - from : 0,
+			   EQ (src_object, dst_object) ? to - from : 0,
 			   coding->produced_char);
       update_compositions (coding->dst_pos,
 			   coding->dst_pos + coding->produced_char, CHECK_ALL);
