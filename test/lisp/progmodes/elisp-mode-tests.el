@@ -1177,5 +1177,14 @@ evaluation of BODY."
         (when (buffer-live-p buf)
           (kill-buffer buf))))))
 
+(ert-deftest elisp-tests-syntax-propertize ()
+  (with-temp-buffer
+    (emacs-lisp-mode)
+    (insert "(a '@)")                   ;bug#24542
+    (should (equal (scan-sexps (+ (point-min) 3) 1) (1- (point-max))))
+    (erase-buffer)
+    (insert "(a ,@)")
+    (should-error (scan-sexps (+ (point-min) 3) 1))))
+
 (provide 'elisp-mode-tests)
 ;;; elisp-mode-tests.el ends here
