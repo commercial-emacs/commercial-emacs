@@ -3653,6 +3653,16 @@ non-@code{nil} @code{help-echo-inhibit-substitution} property, then it
 is displayed as-is by @code{show-help-function}, without being passed
 through @code{substitute-command-keys}.
 
+@item left-fringe-help
+@itemx right-fringe-help
+@cindex help-echo text on fringes
+If any visible text of a screen line has the @code{left-fringe-help} or
+@code{right-fringe-help} text property whose value is a string, then
+that string will be displayed when the mouse pointer hovers over the
+corresponding line's fringe through @code{show-help-function}
+(@pxref{Help display}).  This is useful when used together with fringe
+cursors and bitmaps (@pxref{Fringes}).
+
 @item keymap
 @cindex keymap of character
 @kindex keymap @r{(text property)}
