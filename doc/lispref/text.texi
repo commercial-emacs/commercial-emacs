@@ -67,6 +67,7 @@ the character after point.
 * JSONRPC::          JSON Remote Procedure Call protocol
 * Atomic Changes::   Installing several buffer changes atomically.
 * Change Hooks::     Supplying functions to be run when text is changed.
+* Tracking changes:: Monnier thing
 @end menu
 
 @node Near Point
