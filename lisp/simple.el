@@ -6978,7 +6978,7 @@ store it in a Lisp variable.  Example:
   (cons
    (let ((mark (mark-marker)))
      (and (marker-position mark) (copy-marker mark)))
-   mark-active))
+   (region-active-p)))
 
 (defun save-mark-and-excursion--restore (saved-mark-info)
   (let ((saved-mark (car saved-mark-info))
