@@ -6293,8 +6293,12 @@ do not result in lasting changes to buffer text contents (for example
 face changes or temporary modifications).
 @end defvar
 
+@menu
+* Tracking changes::       Keeping track of buffer modifications.
+@end menu
+
 @node Tracking changes
-@subsection Tracking changes
+@subsection Keeping track of buffer modifications
 @cindex track-changes
 @cindex change tracker
 
