@@ -438,8 +438,7 @@ Lowercase strings above are literals and uppercase are not."
 	  (insert (format "Content-Disposition: form-data; name=%S\r\n\r\n"
 			  name))
 	  (insert value)))
-	(unless (bolp)
-	  (insert "\r\n"))))
+	(insert "\r\n")))
     (insert "--" boundary "--\r\n")
     (buffer-string)))
 
