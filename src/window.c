@@ -5348,7 +5348,6 @@ grow_mini_window (struct window *w, int delta)
       struct window *r = XWINDOW (root);
       Lisp_Object grow;
 
-      FRAME_WINDOWS_FROZEN (f) = true;
       grow = call3 (Qwindow__resize_root_window_vertically,
 		    root, make_fixnum (- delta), Qt);
 
@@ -5362,6 +5361,8 @@ grow_mini_window (struct window *w, int delta)
 	  && window_resize_check (r, false))
 	resize_mini_window_apply (w, -XFIXNUM (grow));
     }
+  FRAME_WINDOWS_FROZEN (f)
+    = window_body_height (w, WINDOW_BODY_IN_PIXELS) > FRAME_LINE_HEIGHT (f);
 }
 
 /**
@@ -5385,7 +5386,6 @@ shrink_mini_window (struct window *w)
       struct window *r = XWINDOW (root);
       Lisp_Object grow;
 
-      FRAME_WINDOWS_FROZEN (f) = false;
       grow = call3 (Qwindow__resize_root_window_vertically,
 		    root, make_fixnum (delta), Qt);
 
@@ -5397,6 +5397,8 @@ shrink_mini_window (struct window *w)
        bar.  */
     grow_mini_window (w, -delta);
 
+  FRAME_WINDOWS_FROZEN (f)
+    = window_body_height (w, WINDOW_BODY_IN_PIXELS) > FRAME_LINE_HEIGHT (f);
 }
 
 DEFUN ("resize-mini-window-internal", Fresize_mini_window_internal,
