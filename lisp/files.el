@@ -3480,8 +3480,9 @@ we don't actually set it to the same mode the buffer already has."
     (unless done
       (with-demoted-errors "Directory-local variables error: %s"
 	;; Note this is a no-op if enable-local-variables is nil.
-        (let* ((mode-alist (cdr (hack-dir-local--get-variables
-                                 (lambda (key) (eq key 'auto-mode-alist))))))
+        (let* ((mode-alist (reverse (cdr (hack-dir-local--get-variables
+                                          (lambda (key)
+                                            (eq key 'auto-mode-alist)))))))
           (setq done (set-auto-mode--apply-alist mode-alist
                                                  keep-mode-if-same t)))))
     (and (not done)
