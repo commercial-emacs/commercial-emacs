@@ -3088,7 +3088,7 @@ To see the documentation for a defined struct type, use
 	       (setq warning
 	             (macroexp-warn-and-return
 	              (format "Structure option %S unrecognized" opt)
-	              warning nil nil (list opt struct)))))))
+	              nil nil (list opt struct)))))))
     (unless (or include-name type
                 ;; Don't create a bogus parent to `cl-structure-object'
                 ;; while compiling the (cl-defstruct cl-structure-object ..)
