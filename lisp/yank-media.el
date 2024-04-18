@@ -44,26 +44,26 @@ all the different selection types."
   (let ((all-types nil))
     (pcase-dolist (`(,handled-type . ,handler)
                    yank-media--registered-handlers)
-      (dolist (type (yank-media--find-matching-media handled-type))
-        (push (cons type handler) all-types)))
+      (pcase-dolist (`(,type . ,selection) (yank-media--find-matching-media handled-type))
+        (push (list type handler selection) all-types)))
     (unless all-types
       (user-error
        "No handler in the current buffer for anything on the clipboard"))
     ;; We have a handler in the current buffer; if there's just
     ;; matching type, just call the handler.
     (if (length= all-types 1)
-        (funcall (cdar all-types) (caar all-types)
-                 (yank-media--get-selection (caar all-types)))
+        (funcall (cadar all-types) (caar all-types)
+                 (caddar all-types))
       ;; More than one type the user for what type to insert.
       (let ((type
              (intern
               (completing-read "Several types available, choose one: "
                                (mapcar #'car all-types) nil t))))
-        (funcall (alist-get type all-types)
-                 type (yank-media--get-selection type))))))
+        (funcall (car (alist-get type all-types))
+                 type (cadr (alist-get type all-types)))))))
 
 (defun yank-media--find-matching-media (handled-type)
-  (seq-filter
+  (seq-keep
    (lambda (type)
      (pcase-let ((`(,major ,minor) (split-string (symbol-name type) "/")))
        (if (and (equal major "image")
@@ -73,11 +73,13 @@ all the different selection types."
            ;; `image/x-win-bitmap'.
            nil
          ;; Check that the handler wants this type.
-         (and (if (symbolp handled-type)
-                  (eq handled-type type)
-                (string-match-p handled-type (symbol-name type)))
-              ;; An element may be in TARGETS but be empty.
-              (yank-media--get-selection type)))))
+         (let ((selection (and (if (symbolp handled-type)
+                                   (eq handled-type type)
+                                 (string-match-p handled-type (symbol-name type)))
+                               ;; An element may be in TARGETS but be empty.
+                               (yank-media--get-selection type))))
+           (and selection
+                (cons type selection))))))
    (gui-get-selection 'CLIPBOARD 'TARGETS)))
 
 (defun yank-media--get-selection (data-type)
