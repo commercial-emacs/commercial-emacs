@@ -3723,6 +3723,8 @@ prompts (`sql-output-newline-count' is positive).  In this case:
 	  (save-excursion
 	    ;; Set product context
 	    (with-current-buffer sql-buffer
+              ;; Make sure point is at EOB before sending input to SQL.
+              (goto-char (point-max))
               (when sql-debug-send
                 (message ">>SQL> %S" s))
               (insert "\n")
