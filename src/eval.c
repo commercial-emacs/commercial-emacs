@@ -1280,6 +1280,7 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
   Lisp_Object CACHEABLE triggered_clause = Qnil,
     success_clause = Qnil, result = Qnil, rev = Qnil;
 
+  var = maybe_remove_pos_from_symbol (var);
   CHECK_SYMBOL (var);
 
   for (Lisp_Object tail = clauses; CONSP (tail); tail = XCDR (tail))
