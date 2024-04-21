@@ -24902,7 +24902,7 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 	Lisp_Object val = Qnil;
 
 	if (STRINGP (curdir))
-	  val = dsafe_call1 (Qfile_remote_p, curdir);
+	  val = dsafe_call1 (intern ("file-remote-p"), curdir);
 
 	val = unbind_to (count, val);
 
