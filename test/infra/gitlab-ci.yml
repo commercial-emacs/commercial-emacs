@@ -245,9 +245,9 @@ test-filenotify-gio:
     target: emacs-filenotify-gio
     # This is needed in order to get a JUnit test report.
     make_params: >-
-      'check-expensive
+      check-expensive
         TEST_HOME=/root
-        LOGFILES="lisp/autorevert-tests.log lisp/filenotify-tests.log"'
+        LOGFILES="lisp/autorevert-tests.log lisp/filenotify-tests.log"
 
 build-image-tree-sitter:
   stage: platform-images
@@ -267,7 +267,7 @@ test-tree-sitter:
       \(and\ \$\{SELECTOR_EXPENSIVE\}\ \(or\ \\\"^treesit\\\"\ \\\"-ts-\\\"\)\)
     # This is needed in order to get a JUnit test report.
     make_params: >-
-      'check SELECTOR=$selector TEST_HOME=/root LOGFILES="$tree_sitter_files"'
+      check SELECTOR=$selector TEST_HOME=/root LOGFILES="$tree_sitter_files"
 
 build-image-gnustep:
   stage: platform-images
@@ -315,7 +315,7 @@ test-native-comp-speed2:
       optional: true
   variables:
     target: emacs-native-comp-speed2
-    make_params: "check SELECTOR='(not (tag :unstable))'"
+    make_params: check SELECTOR='(not (tag :unstable))'
 
 # Local Variables:
 # add-log-current-defun-header-regexp: "^\\([-_.[:alnum:]]+\\)[ \t]*:"
