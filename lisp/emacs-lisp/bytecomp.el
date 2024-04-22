@@ -1576,8 +1576,8 @@ extra args."
           (setq start (match-end 0))
           (cond
            ((not spec)
-            (byte-compile-warn-x
-             form "Bad format sequence in call to `%s' at string offset %d"
+            (byte-compile-warn
+             "Bad format sequence in call to `%s' at string offset %d"
              (car form) (match-beginning 0)))
            ((not (eq spec ?%))
             (setq nfields (max field nfields))))))
