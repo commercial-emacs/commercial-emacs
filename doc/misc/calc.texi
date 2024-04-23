@@ -19479,9 +19479,39 @@ returns half of Calc's value:  @samp{UTPT(t,v) = .5*utpt(t,v)}.)
 
 While Calc does not provide inverses of the probability distribution
 functions, the @kbd{a R} command can be used to solve for the inverse.
-Since the distribution functions are monotonic, @kbd{a R} is guaranteed
-to be able to find a solution given any initial guess.
-@xref{Numerical Solutions}.
+@xref{Root Finding}.
+
+The distribution functions, while monotonic, are also be very flat,
+which can cause problems for the Newton's root-finding algorithm used
+by @kbd{a R}.  The problem can be avoided by providing a good starting
+guess.  Prefer guesses that occur where the slope of the plotted
+function is not flat.  Alternatively, use an interval range for the
+guess.  The table below provides a recommendation for each of the
+probability distribution functions.
+
+@multitable @columnfractions .25 .25 .25
+@headitem Function
+@tab When solving for
+@tab Recommended initial guess
+@item @samp{utpb(x,n,p)}
+@tab @expr{x}
+@tab @code{0.5}
+@item @samp{utpc(x,c)}
+@tab @expr{x}
+@tab @code{1.0}
+@item @samp{utpf(F,v1,v2)}
+@tab @expr{F}
+@tab @code{1.0}
+@item @samp{utpn(x,m,s)}
+@tab @expr{x}
+@tab @expr{m}
+@item @samp{utpp(n,x)}
+@tab @expr{n}
+@tab @expr{x}
+@item @samp{utpt(t,v)}
+@tab @expr{t}
+@tab @code{[0..1e4]}
+@end multitable
 
 @node Matrix Functions
 @chapter Vector/Matrix Functions
