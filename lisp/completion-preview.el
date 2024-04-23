@@ -146,19 +146,34 @@ If this option is nil, these commands do not display any message."
   ;; "M-p" #'completion-preview-prev-candidate
   )
 
+(defun completion-preview--ignore ()
+  "Do nothing, including updating the completion preview.
+
+This is the same as `ignore', except that Completion Preview mode skips
+hiding or updating the completion preview after this command runs."
+  (interactive)
+  nil)
+
+(put 'completion-preview--ignore 'completion-predicate #'ignore)
+
 (defvar-keymap completion-preview--mouse-map
   :doc "Keymap for mouse clicks on the completion preview."
-  "<down-mouse-1>" #'completion-preview-insert
-  "C-<down-mouse-1>" #'completion-preview-complete
-  "<down-mouse-2>" #'completion-preview-complete
-  "<wheel-up>"     #'completion-preview-prev-candidate
-  "<wheel-down>"   #'completion-preview-next-candidate)
+  "<mouse-1>"        #'completion-preview-insert
+  ;; Ignore the corresponding button-down event.
+  "<down-mouse-1>"   #'completion-preview--ignore
+  "C-<mouse-1>"      #'completion-preview-complete
+  "C-<down-mouse-1>" #'completion-preview--ignore
+  "<mouse-2>"        #'completion-preview-complete
+  "<down-mouse-2>"   #'completion-preview--ignore
+  "<wheel-up>"       #'completion-preview-prev-candidate
+  "<wheel-down>"     #'completion-preview-next-candidate)
 
 (defvar-local completion-preview--overlay nil)
 
 (defvar completion-preview--internal-commands
   '(completion-preview-next-candidate
     completion-preview-prev-candidate
+    completion-preview--ignore
     ;; Don't dismiss or update the preview when the user scrolls.
     mwheel-scroll)
   "List of commands that manipulate the completion preview.
@@ -473,16 +488,18 @@ completions list."
                              'keymap completion-preview--mouse-map))
                        'completion-preview-end pos))))))
 
-(defun completion-preview-prev-candidate ()
-  "Cycle the candidate that the preview is showing to the previous suggestion."
-  (interactive)
-  (completion-preview-next-candidate -1))
+(defun completion-preview-prev-candidate (n)
+  "Cycle the candidate the preview is showing N candidates backward.
 
-(defun completion-preview-next-candidate (direction)
-  "Cycle the candidate that the preview is showing in direction DIRECTION.
+If N is negative, cycle -N candidates forward.  Interactively, N is the
+prefix argument and defaults to 1."
+  (interactive "p")
+  (completion-preview-next-candidate (- n)))
 
-DIRECTION should be either 1 which means cycle forward, or -1
-which means cycle backward.  Interactively, DIRECTION is the
+(defun completion-preview-next-candidate (n)
+  "Cycle the candidate the preview is showing N candidates forward.
+
+If N is negative, cycle -N candidates backward.  Interactively, N is the
 prefix argument and defaults to 1."
   (interactive "p")
   (when completion-preview-active-mode
@@ -492,7 +509,7 @@ prefix argument and defaults to 1."
            (com (completion-preview--get 'completion-preview-common))
            (cur (completion-preview--get 'completion-preview-index))
            (len (length all))
-           (new (mod (+ cur direction) len))
+           (new (mod (+ cur n) len))
            (suf (nth new all))
            (lencom (length com)))
       ;; Skip suffixes that are no longer applicable.  This may happen
@@ -503,7 +520,7 @@ prefix argument and defaults to 1."
       (while (or (<= (+ beg lencom (length suf)) end)
                  (not (string-prefix-p (buffer-substring beg end)
                                        (concat com suf))))
-        (setq new (mod (+ new direction) len)
+        (setq new (mod (+ new n) len)
               suf (nth new all)))
       (set-text-properties 0 (length suf)
                            (list 'face (if (cdr all)
