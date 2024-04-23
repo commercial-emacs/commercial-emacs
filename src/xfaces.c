@@ -4543,14 +4543,18 @@ prepare_face_for_display (struct frame *f, struct face *face)
 #endif
 
       block_input ();
-#ifdef HAVE_X_WINDOWS
+#if defined HAVE_X_WINDOWS || defined HAVE_ANDROID
       if (face->stipple)
 	{
 	  egc.fill_style = FillOpaqueStippled;
+#ifndef ANDROID_STUBIFY
 	  egc.stipple = image_bitmap_pixmap (f, face->stipple);
+#else /* !ANDROID_STUBIFY */
+	  emacs_abort ();
+#endif /* !ANDROID_STUBIFY */
 	  mask |= GCFillStyle | GCStipple;
 	}
-#endif
+#endif /* HAVE_X_WINDOWS || HAVE_ANDROID */
       face->gc = x_create_gc (f, mask, &egc);
       if (face->font)
 	font_prepare_for_face (f, face);
