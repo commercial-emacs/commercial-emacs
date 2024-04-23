@@ -723,6 +723,11 @@ See bug#58531#25 and bug#58563."
     ;; Check that the function is only called once.
     (should (= num 1))))
 
+(ert-deftest test-setf-map-with-subplace ()
+  (let ((arr (string ?0 ?1 ?2 ?3 ?4 ?5 ?6)))
+    (setf (map-elt (substring arr 3) 0) ?x)
+    (should (equal arr (string ?0 ?1 ?2 ?x ?4 ?5 ?6)))))
+
 (ert-deftest test-map-plist-member ()
   "Test `map--plist-member' and `map--plist-member-1'."
   (dolist (mem '(map--plist-member map--plist-member-1))
