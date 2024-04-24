@@ -20,13 +20,11 @@ import argparse
 import os
 import shutil
 import re
-import functools
-import operator
 
 from subprocess import check_output
 
 ## Constants
-EMACS_MAJOR_VERSION="28"
+EMACS_MAJOR_VERSION="29"
 
 # This list derives from the features we want Emacs to compile with.
 PKG_REQ='''mingw-w64-x86_64-giflib
@@ -36,9 +34,13 @@ mingw-w64-x86_64-lcms2
 mingw-w64-x86_64-libjpeg-turbo
 mingw-w64-x86_64-libpng
 mingw-w64-x86_64-librsvg
+mingw-w64-x86_64-libwebp
 mingw-w64-x86_64-libtiff
 mingw-w64-x86_64-libxml2
-mingw-w64-x86_64-xpm-nox'''.split()
+mingw-w64-x86_64-gmp
+mingw-w64-x86_64-xpm-nox
+mingw-w64-x86_64-tree-sitter
+mingw-w64-x86_64-sqlite3'''.split()
 
 DLL_REQ='''libgif
 libgnutls
@@ -47,9 +49,14 @@ liblcms2
 libturbojpeg
 libpng
 librsvg
+libwebp
 libtiff
 libxml
-libXpm'''.split()
+libgmp
+libXpm
+libXpm-noX4
+libtree-sitter
+libsqlite3-0'''.split()
 
 
 ## Options
@@ -101,7 +108,7 @@ def ntldd_munge(out):
 
         ## if it's the former, we want it, if its the later we don't
         splt = dep.split()
-        if len(splt) > 2 and "msys64" in splt[2]:
+        if len(splt) > 2 and "mingw64" in splt[2]:
             print("Adding dep", splt[0])
             rtn.append(splt[0].split(".")[0])
 
@@ -112,11 +119,28 @@ def ntldd_munge(out):
 ## Packages to fiddle with
 ## Source for gcc-libs is part of gcc
 SKIP_SRC_PKGS=["mingw-w64-gcc-libs"]
-SKIP_DEP_PKGS=frozenset(["mingw-w64-x86_64-glib2"])
+SKIP_DEP_PKGS=["mingw-w64-glib2" "mingw-w64-ca-certificates-20211016-3"]
 MUNGE_SRC_PKGS={"mingw-w64-libwinpthread-git":"mingw-w64-winpthreads-git"}
 MUNGE_DEP_PKGS={
     "mingw-w64-x86_64-libwinpthread":"mingw-w64-x86_64-libwinpthread-git",
     "mingw-w64-x86_64-libtre": "mingw-w64-x86_64-libtre-git",
+}
+SRC_EXT={
+    "mingw-w64-freetype": ".src.tar.zst",
+    "mingw-w64-fribidi": ".src.tar.zst",
+    "mingw-w64-glib2": ".src.tar.zst",
+    "mingw-w64-harfbuzz": ".src.tar.zst",
+    "mingw-w64-libunistring": ".src.tar.zst",
+    "mingw-w64-winpthreads-git": ".src.tar.zst",
+    "mingw-w64-ca-certificates": ".src.tar.zst",
+    "mingw-w64-libxml2": ".src.tar.zst",
+    "mingw-w64-ncurses": ".src.tar.zst",
+    "mingw-w64-openssl": ".src.tar.zst",
+    "mingw-w64-pango": ".src.tar.zst",
+    "mingw-w64-python": ".src.tar.zst",
+    "mingw-w64-sqlite3": ".src.tar.zst",
+    "mingw-w64-xpm-nox": ".src.tar.zst",
+    "mingw-w64-xz": ".src.tar.zst",
 }
 
 ## Currently no packages seem to require this!
@@ -124,14 +148,16 @@ ARCH_PKGS=[]
 SRC_REPO="https://repo.msys2.org/mingw/sources"
 
 
-def immediate_deps(pkgs):
-    package_info = check_output(["pacman", "-Si"] + pkgs).decode("utf-8").splitlines()
+def immediate_deps(pkg):
+    package_info = check_output(["pacman", "-Si", pkg]).decode("utf-8").split("\n")
 
-    ## Extract the packages listed for "Depends On:" lines.
-    dependencies = [line.split(":")[1].split() for line in package_info
-                    if line.startswith("Depends On")]
-    ## Flatten dependency lists from multiple packages into one list.
-    dependencies = functools.reduce(operator.iconcat, dependencies, [])
+    ## Extract the "Depends On" line
+    depends_on = [x for x in package_info if x.startswith("Depends On")][0]
+    ## Remove "Depends On" prefix
+    dependencies = depends_on.split(":")[1]
+
+    ## Split into dependencies
+    dependencies = dependencies.strip().split(" ")
 
     ## Remove > signs TODO can we get any other punctuation here?
     dependencies = [d.split(">")[0] for d in dependencies if d]
@@ -147,18 +173,16 @@ def extract_deps():
     print( "Extracting deps" )
 
     # Get a list of all dependencies needed for packages mentioned above.
-    pkgs = set(PKG_REQ)
-    newdeps = pkgs
-    print("adding...")
-    while True:
-        subdeps = frozenset(immediate_deps(list(newdeps)))
-        newdeps = subdeps - SKIP_DEP_PKGS - pkgs
-        if not newdeps:
-            break
-        print('\n'.join(newdeps))
-        pkgs |= newdeps
+    pkgs = PKG_REQ[:]
+    n = 0
+    while n < len(pkgs):
+        subdeps = immediate_deps(pkgs[n])
+        for p in subdeps:
+            if not (p in pkgs or p in SKIP_DEP_PKGS):
+                pkgs.append(p)
+        n = n + 1
 
-    return list(pkgs)
+    return sorted(pkgs)
 
 
 def download_source(tarball):
@@ -206,7 +230,13 @@ def gather_source(deps):
         ## Switch names if necessary
         pkg_name = MUNGE_SRC_PKGS.get(pkg_name,pkg_name)
 
-        tarball = "{}-{}.src.tar.gz".format(pkg_name,pkg_version)
+        ## src archive is usually a .tar.gz
+        if pkg_name in SRC_EXT.keys():
+            src_ext = SRC_EXT[pkg_name]
+        else:
+            src_ext = ".src.tar.gz"
+
+        tarball = "{}-{}{}".format(pkg_name,pkg_version,src_ext)
 
         download_source(tarball)
 
@@ -255,7 +285,7 @@ DRY_RUN=args.d
 
 if( args.l ):
     print("List of dependencies")
-    print( deps )
+    print( extract_deps() )
     exit(0)
 
 if args.s:
