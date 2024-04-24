@@ -1501,7 +1501,7 @@ Use CMD as the process."
     (when (string= method "")
       (error "No method given"))
     (if (string-match "^[^% \t]+$" method)
-	(setq method (concat method " %s")))
+        (setq method (or (intern-soft method) (concat method " %s"))))
     (mm-display-external handle method)))
 
 (defun mm-preferred-alternative (handles &optional preferred)
