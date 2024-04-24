@@ -401,6 +401,7 @@ This is not required after changing `gnus-registry-cache-file'."
   (interactive)
   (let* ((file (or file gnus-registry-cache-file))
          (db (or db gnus-registry-db))
+         (gc-cons-threshold (max gc-cons-threshold (* 800000 500)))
 	 (clone (clone db)))
     (gnus-message 5 "Saving Gnus registry (%d entries) to %s..."
                   (registry-size db) file)
