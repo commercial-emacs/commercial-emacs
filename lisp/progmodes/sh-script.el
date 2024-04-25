@@ -1439,7 +1439,8 @@ If FORCE is non-nil and no process found, create one."
 (defun sh-show-shell ()
   "Pop the shell interaction buffer."
   (interactive)
-  (pop-to-buffer (process-buffer (sh-shell-process t)) display-comint-buffer-action))
+  (with-suppressed-warnings ((obsolete display-comint-buffer-action))
+    (pop-to-buffer (process-buffer (sh-shell-process t)) display-comint-buffer-action)))
 
 (defun sh-send-text (text)
   "Send TEXT to `sh-shell-process'."
