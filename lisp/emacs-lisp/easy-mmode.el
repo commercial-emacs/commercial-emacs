@@ -591,7 +591,19 @@ modes derived from `text-mode'\".  An element with value t means \"use\"
 and nil means \"don't use\".  There's an implicit nil at the end of the
 list."
                       mode)
-             :type '(repeat sexp)
+             :type '(choice (const :tag "Enable in all major modes" t)
+                            (const :tag "Don't enable in any major mode" nil)
+                            (repeat :tag "Only enable in"
+                                    (choice
+                                     (const :tag "All major modes" t)
+                                     (const :tag "No major mode" nil)
+                                     (symbol :value fundamental-mode
+                                             :tag "Specific major mode")
+                                     (cons :tag "Exclude modes"
+                                           (const :tag "Exclude..." not)
+                                           (repeat
+                                            (symbol :value fundamental-mode
+                                                    :tag "Major mode"))))))
              ,@group))
 
        ;; Autoloading define-globalized-minor-mode autoloads everything
