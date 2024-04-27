@@ -2109,50 +2109,74 @@ do that, use `get-text-property' and `get-char-property'."
         (delete-dups (nreverse faces))
       (car (last faces)))))
 
-(defun faces--attribute-at-point (attribute &optional attribute-unnamed)
+(defconst face--attribute-index
+  ;; From lface_attribute_index in src/dispextern.h.
+  '((:family             . 1)
+    (:foundry            . 2)
+    (:width              . 3)
+    (:height             . 4)
+    (:weight             . 5)
+    (:slant              . 6)
+    (:underline          . 7)
+    (:inverse-video      . 8)
+    (:reverse-video      . 8)
+    (:foreground         . 9)
+    (:background         . 10)
+    (:stipple            . 11)
+    (:overline           . 12)
+    (:strike-through     . 13)
+    (:box                . 14)
+    (:font               . 15)
+    (:inherit            . 16)
+    (:fontset            . 17)
+    (:distant-foreground . 18)
+    (:extend             . 19)
+    )
+  "Indices of face attributes in Lisp face vectors.")
+
+(defsubst face--attribute-unspecified-p (value)
+  "Return non-nil if face attribute VALUE means unspecified."
+  (member value '(unspecified "unspecified-fg" "unspecified-bg")))
+
+(defun face-attribute-lookup (face attribute &optional default)
+  "Return the value of FACE's ATTRIBUTE or nil if unspecified.
+FACE is a valid face specification.
+Optional argument DEFAULT is a face specification appended to FACE.
+If DEFAULT includes the `default' face, the return value is always
+specified and absolute."
+  (when-let ((index (cdr (assq attribute face--attribute-index)))
+             (value (aref (face-attributes-as-vector
+                           (append (ensure-list face)
+                                   (ensure-list default)))
+                          index)))
+    (unless (face--attribute-unspecified-p value)
+      value)))
+
+(defun faces--attribute-at-point (attribute)
   "Return the face ATTRIBUTE at point.
-ATTRIBUTE is a keyword.
-If ATTRIBUTE-UNNAMED is non-nil, it is a symbol to look for in
-unnamed faces (e.g, `foreground-color')."
+ATTRIBUTE is a keyword."
   ;; `face-at-point' alone is not sufficient.  It only gets named faces.
   ;; Need also pick up any face properties that are not associated with named faces.
   (let ((faces (or (get-char-property (point) 'read-face-name)
                    ;; If `font-lock-mode' is on, `font-lock-face' takes precedence.
                    (and font-lock-mode
                         (get-char-property (point) 'font-lock-face))
-                   (get-char-property (point) 'face)))
-        (found nil))
-    (dolist (face (if (face-list-p faces)
-                      faces
-                    (list faces)))
-      (cond (found)
-            ((and face (symbolp face))
-             (let ((value (face-attribute-specified-or
-                           (face-attribute face attribute nil t)
-                           nil)))
-               (unless (member value '(nil "unspecified-fg" "unspecified-bg"))
-                 (setq found value))))
-            ((consp face)
-             (setq found (cond ((and attribute-unnamed
-                                     (memq attribute-unnamed face))
-                                (cdr (memq attribute-unnamed face)))
-                               ((memq attribute face) (cadr (memq attribute face))))))))
-    (or found
-        (face-attribute 'default attribute))))
+                   (get-char-property (point) 'face))))
+    (face-attribute-lookup faces attribute 'default)))
 
 (defun foreground-color-at-point ()
   "Return the foreground color of the character after point.
 On TTY frames, the returned color name can be \"unspecified-fg\",
 which stands for the unknown default foreground color of the
 display where the frame is displayed."
-  (faces--attribute-at-point :foreground 'foreground-color))
+  (faces--attribute-at-point :foreground))
 
 (defun background-color-at-point ()
   "Return the background color of the character after point.
 On TTY frames, the returned color name can be \"unspecified-bg\",
 which stands for the unknown default background color of the
 display where the frame is displayed."
-  (faces--attribute-at-point :background 'background-color))
+  (faces--attribute-at-point :background))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
