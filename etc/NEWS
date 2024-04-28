@@ -287,6 +287,12 @@ and 'window-state-get'.  Then later another new variable
 'window-state-put' to restore positions of window points
 according to the context stored in a window parameter.
 
++++
+*** New window parameter 'cursor-type'.
+If this parameter is set to a cons cell, its 'car' specifies the shape
+of the window's cursor, using the same format as the buffer-local
+variable 'cursor-type'.
+
 ** Tab Bars and Tab Lines
 
 ---
