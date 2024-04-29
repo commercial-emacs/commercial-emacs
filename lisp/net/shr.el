@@ -1509,7 +1509,8 @@ Based on https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-infore
     (when-let ((rep (assoc-default (car attr) shr-correct-attribute-case)))
       (setcar attr rep)))
   (dolist (child (dom-children dom))
-    (shr-correct-dom-case child))
+    (when (consp child)
+      (shr-correct-dom-case child)))
   dom)
 
 (defun shr-tag-svg (dom)
