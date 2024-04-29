@@ -1318,9 +1318,16 @@ This consults the entries in `eww-readable-urls' (which see)."
   ;; desktop support
   (setq-local desktop-save-buffer #'eww-desktop-misc-data)
   (setq truncate-lines t)
+  ;; thingatpt support
   (setq-local thing-at-point-provider-alist
-              (append thing-at-point-provider-alist
-                      '((url . eww--url-at-point))))
+              (cons '(url . eww--url-at-point)
+                    thing-at-point-provider-alist))
+  (setq-local forward-thing-provider-alist
+              (cons '(url . eww--forward-url)
+                    forward-thing-provider-alist))
+  (setq-local bounds-of-thing-at-point-provider-alist
+              (cons '(url . eww--bounds-of-url-at-point)
+                    bounds-of-thing-at-point-provider-alist))
   (setq-local bookmark-make-record-function #'eww-bookmark-make-record)
   (buffer-disable-undo)
   (setq-local shr-url-transformer #'eww--transform-url)
@@ -1349,7 +1356,15 @@ This consults the entries in `eww-readable-urls' (which see)."
 
 (defun eww--url-at-point ()
   "`thing-at-point' provider function."
-  (get-text-property (point) 'shr-url))
+  (thing-at-point-for-text-property 'shr-url))
+
+(defun eww--forward-url (n)
+  "`forward-thing' provider function."
+  (forward-thing-for-text-property 'shr-url n))
+
+(defun eww--bounds-of-url-at-point ()
+  "`bounds-of-thing-at-point' provider function."
+  (bounds-of-thing-at-point-for-text-property 'shr-url))
 
 ;;;###autoload
 (defun eww-browse-url (url &optional new-window)
