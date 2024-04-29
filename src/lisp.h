@@ -4463,8 +4463,6 @@ extern void unmark_main_thread (void);
 
 /* Defined in editfns.c.  */
 extern void insert1 (Lisp_Object);
-extern void find_field (Lisp_Object, Lisp_Object, Lisp_Object,
-			ptrdiff_t *, Lisp_Object, ptrdiff_t *);
 extern void save_excursion_save (union specbinding *);
 extern void save_excursion_restore (Lisp_Object, Lisp_Object);
 extern Lisp_Object save_restriction_save (void);

@@ -116,15 +116,6 @@ textconv_query (struct frame *f, struct textconv_callback_struct *query)
   /* Temporarily switch to F's selected window.  */
   Fselect_window (f->selected_window, Qt);
 
-  /* Narrow to the field, if any.  */
-  if (!NILP (f->conversion.field))
-    {
-      record_unwind_protect (save_restriction_restore,
-			     save_restriction_save ());
-      Fnarrow_to_region (XCAR (f->conversion.field),
-			 XCAR (XCDR (f->conversion.field)));
-    }
-
   /* Now find the appropriate text bounds for QUERY.  First, move
      point QUERY->position steps forward or backwards.  */
 
