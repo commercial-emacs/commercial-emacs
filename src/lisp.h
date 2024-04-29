@@ -2836,16 +2836,16 @@ XFLOAT_DATA (Lisp_Object f)
 #define IEEE_FLOATING_POINT (FLT_RADIX == 2 && FLT_MANT_DIG == 24 \
 			     && FLT_MIN_EXP == -125 && FLT_MAX_EXP == 128)
 
-/* Meanings of slots in a Lisp_Closure:  */
+/* Meanings of slots in a Lisp_Compiled:  */
 
-enum Lisp_Closure
+enum Lisp_Compiled
   {
-    CLOSURE_ARGLIST = 0,
-    CLOSURE_CODE = 1,
-    CLOSURE_CONSTANTS = 2,
-    CLOSURE_STACK_DEPTH = 3,
-    CLOSURE_DOC_STRING = 4,
-    CLOSURE_INTERACTIVE = 5
+    COMPILED_ARGLIST = 0,
+    COMPILED_BYTECODE = 1,
+    COMPILED_CONSTANTS = 2,
+    COMPILED_STACK_DEPTH = 3,
+    COMPILED_DOC_STRING = 4,
+    COMPILED_INTERACTIVE = 5
   };
 
 /* Flag bits in a character.  These also get used in termhooks.h.
@@ -2920,9 +2920,9 @@ WINDOW_CONFIGURATIONP (Lisp_Object a)
 }
 
 INLINE bool
-CLOSUREP (Lisp_Object a)
+COMPILEDP (Lisp_Object a)
 {
-  return PSEUDOVECTORP (a, PVEC_CLOSURE);
+  return PSEUDOVECTORP (a, PVEC_COMPILED);
 }
 
 INLINE bool

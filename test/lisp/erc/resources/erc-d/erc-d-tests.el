@@ -367,9 +367,8 @@
       (should (equal (funcall it) "foo3foo")))
 
     (ert-info ("Exits clean")
-      (when (interpreted-function-p
-             (alist-get 'f (erc-d-dialog-vars dialog))) ; may be compiled
-        (should (aref (alist-get 'f (erc-d-dialog-vars dialog)) 2)))
+      (when (listp (alist-get 'f (erc-d-dialog-vars dialog))) ; may be compiled
+        (should (eq 'closure (car (alist-get 'f (erc-d-dialog-vars dialog))))))
       (should-not (funcall it))
       (should (equal (erc-d-dialog-vars dialog)
                      `((:a . 1)

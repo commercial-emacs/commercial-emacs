@@ -4255,7 +4255,7 @@ code location is known."
           ((pred edebug--symbol-prefixed-p) nil)
           (_
            (when (and skip-next-lambda
-                      (not (interpreted-function-p fun)))
+                      (not (memq (car-safe fun) '(closure lambda))))
              (warn "Edebug--strip-instrumentation expected an interpreted function:\n%S" fun))
 	   (unless skip-next-lambda
              (edebug--unwrap-frame new-frame)

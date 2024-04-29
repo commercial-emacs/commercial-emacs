@@ -490,33 +490,6 @@ usage: (quote ARG)  */)
   return XCAR (args);
 }
 
-DEFUN ("make-interpreted-closure", Fmake_interpreted_closure,
-       Smake_interpreted_closure, 3, 5, 0,
-       doc: /* Make an interpreted closure.
-ARGS should be the list of formal arguments.
-BODY should be a non-empty list of forms.
-ENV should be a lexical environment, like the second argument of `eval'.
-IFORM if non-nil should be of the form (interactive ...).  */)
-  (Lisp_Object args, Lisp_Object body, Lisp_Object env,
-   Lisp_Object docstring, Lisp_Object iform)
-{
-  CHECK_CONS (body);          /* Make sure it's not confused with byte-code! */
-  CHECK_LIST (args);
-  CHECK_LIST (iform);
-  Lisp_Object ifcdr = Fcdr (iform);
-  Lisp_Object slots[] = { args,  body, env, Qnil, docstring,
-			  NILP (Fcdr (ifcdr))
-			  ? Fcar (ifcdr)
-			  : CALLN (Fvector, XCAR (ifcdr), XCDR (ifcdr)) };
-  /* Adjusting the size is indispensable since, as for byte-code objects,
-     we distinguish interactive functions by the presence or absence of the
-     iform slot.  */
-  Lisp_Object val
-    = Fvector (!NILP (iform) ? 6 : !NILP (docstring) ? 5 : 3, slots);
-  XSETPVECTYPE (XVECTOR (val), PVEC_CLOSURE);
-  return val;
-}
-
 DEFUN ("function", Ffunction, Sfunction, 1, UNEVALLED, 0,
        doc: /* Like `quote', but potentially byte-compiles or macroexpands ARG.
 usage: (function ARG)  */)
@@ -1935,15 +1908,15 @@ then strings and vectors are not accepted.  */)
         return Qt;
     }
   /* Bytecode objects are interactive if they are long enough to
-     have an element whose index is CLOSURE_INTERACTIVE, which is
+     have an element whose index is COMPILED_INTERACTIVE, which is
      where the interactive spec is stored.  */
-  else if (CLOSUREP (fun))
+  else if (COMPILEDP (fun))
     {
-      if (PVSIZE (fun) > CLOSURE_INTERACTIVE)
+      if (PVSIZE (fun) > COMPILED_INTERACTIVE)
         return Qt;
-      else if (PVSIZE (fun) > CLOSURE_DOC_STRING)
+      else if (PVSIZE (fun) > COMPILED_DOC_STRING)
         {
-          Lisp_Object doc = AREF (fun, CLOSURE_DOC_STRING);
+          Lisp_Object doc = AREF (fun, COMPILED_DOC_STRING);
           /* An invalid "docstring" is a sign that we have an OClosure.  */
           genfun = !(NILP (doc) || VALID_DOCSTRING_P (doc));
         }
@@ -1977,12 +1950,15 @@ then strings and vectors are not accepted.  */)
       else
         {
           Lisp_Object body = CDR_SAFE (XCDR (fun));
-          if (!EQ (funcar, Qlambda))
+          if (EQ (funcar, Qclosure))
+            body = CDR_SAFE (body);
+          else if (!EQ (funcar, Qlambda))
 	    return Qnil;
 	  if (!NILP (Fassq (Qinteractive, body)))
 	    return Qt;
-	  else
-	    return Qnil;
+	  else if (VALID_DOCSTRING_P (CAR_SAFE (body)))
+            /* A "docstring" is a sign that we may have an OClosure.  */
+	    genfun = true;
 	}
     }
 
@@ -2706,12 +2682,12 @@ FUNCTIONP (Lisp_Object object)
 
   if (SUBRP (object))
     return XSUBR (object)->max_args != UNEVALLED;
-  else if (CLOSUREP (object) || MODULE_FUNCTIONP (object))
+  else if (COMPILEDP (object) || MODULE_FUNCTIONP (object))
     return true;
   else if (CONSP (object))
     {
       Lisp_Object car = XCAR (object);
-      return EQ (car, Qlambda);
+      return EQ (car, Qlambda) || EQ (car, Qclosure);
     }
   else
     return false;
@@ -2728,7 +2704,7 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
 
   if (SUBRP (fun) && !SUBR_NATIVE_COMPILED_DYNP (fun))
     return funcall_subr (XSUBR (fun), numargs, args);
-  else if (CLOSUREP (fun)
+  else if (COMPILEDP (fun)
 	   || SUBR_NATIVE_COMPILED_DYNP (fun)
 	   || MODULE_FUNCTIONP (fun))
     return funcall_lambda (fun, numargs, args);
@@ -2741,7 +2717,8 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
       Lisp_Object funcar = XCAR (fun);
       if (!SYMBOLP (funcar))
 	xsignal1 (Qinvalid_function, original_fun);
-      if (EQ (funcar, Qlambda))
+      if (EQ (funcar, Qlambda)
+	  || EQ (funcar, Qclosure))
 	return funcall_lambda (fun, numargs, args);
       else if (EQ (funcar, Qautoload))
 	{
@@ -3035,7 +3012,7 @@ function with `&rest' args, or `unevalled' for a special form.  */)
 
   if (SUBRP (function))
     result = Fsubr_arity (function);
-  else if (CLOSUREP (function))
+  else if (COMPILEDP (function))
     result = lambda_arity (function);
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (function))
@@ -3050,7 +3027,8 @@ function with `&rest' args, or `unevalled' for a special form.  */)
       funcar = XCAR (function);
       if (!SYMBOLP (funcar))
 	xsignal1 (Qinvalid_function, original);
-      if (EQ (funcar, Qlambda))
+      if (EQ (funcar, Qlambda)
+	  || EQ (funcar, Qclosure))
 	result = lambda_arity (function);
       else if (EQ (funcar, Qautoload))
 	{
@@ -3071,15 +3049,20 @@ lambda_arity (Lisp_Object fun)
 
   if (CONSP (fun))
     {
+      if (EQ (XCAR (fun), Qclosure))
+	{
+	  fun = XCDR (fun);	/* Drop `closure'.  */
+	  CHECK_CONS (fun);
+	}
       syms_left = XCDR (fun);
       if (CONSP (syms_left))
 	syms_left = XCAR (syms_left);
       else
 	xsignal1 (Qinvalid_function, fun);
     }
-  else if (CLOSUREP (fun))
+  else if (COMPILEDP (fun))
     {
-      syms_left = AREF (fun, CLOSURE_ARGLIST);
+      syms_left = AREF (fun, COMPILED_ARGLIST);
       if (FIXNUMP (syms_left))
         return get_byte_code_arity (syms_left);
     }
@@ -3893,6 +3876,7 @@ clearing `quit-flag' before clearing `inhibit-quit'.  */);
   DEFSYM (Qcommandp, "commandp");
   DEFSYM (Qand_rest, "&rest");
   DEFSYM (Qand_optional, "&optional");
+  DEFSYM (Qclosure, "closure");
   DEFSYM (QCdocumentation, ":documentation");
   DEFSYM (Qdebug, "debug");
   DEFSYM (Qdebug_early, "debug-early");
@@ -4021,7 +4005,6 @@ Don't set this unless you're sure that can't happen.  */);
   defsubr (&Ssetq);
   defsubr (&Squote_);
   defsubr (&Sfunction);
-  defsubr (&Smake_interpreted_closure);
   defsubr (&Sdefault_toplevel_value);
   defsubr (&Sset_default_toplevel_value);
   defsubr (&Sdefvar);

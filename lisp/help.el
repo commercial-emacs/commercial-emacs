@@ -2316,8 +2316,9 @@ the same names as used in the original source code, when possible."
   ;; If definition is a macro, find the function inside it.
   (if (eq (car-safe def) 'macro) (setq def (cdr def)))
   (cond
-   ((and (closurep def) (listp (aref def 0))) (aref def 0))
+   ((and (byte-code-function-p def) (listp (aref def 0))) (aref def 0))
    ((eq (car-safe def) 'lambda) (nth 1 def))
+   ((eq (car-safe def) 'closure) (nth 2 def))
    ((and (featurep 'native-compile)
          (subrp def)
          (listp (subr-native-lambda-list def)))

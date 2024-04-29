@@ -2551,12 +2551,12 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   Lisp_Object protofun = args[0];
-  CHECK_TYPE (CLOSUREP (protofun), Qbyte_code_function_p, protofun);
+  CHECK_TYPE (COMPILEDP (protofun), Qbyte_code_function_p, protofun);
 
   /* Create a copy of the constant vector, filling it with the closure
      variables in the beginning.  (The overwritten part should just
      contain placeholder values.) */
-  Lisp_Object proto_constvec = AREF (protofun, CLOSURE_CONSTANTS);
+  Lisp_Object proto_constvec = AREF (protofun, COMPILED_CONSTANTS);
   ptrdiff_t constsize = ASIZE (proto_constvec);
   ptrdiff_t nvars = nargs - 1;
   if (nvars > constsize)
@@ -3971,7 +3971,7 @@ purecopy (Lisp_Object obj)
 
       obj = make_lisp_hash_table (purecopy_hash_table (table));
     }
-  else if (CLOSUREP (obj) || VECTORP (obj) || RECORDP (obj))
+  else if (COMPILEDP (obj) || VECTORP (obj) || RECORDP (obj))
     {
       struct Lisp_Vector *objp = XVECTOR (obj);
       ptrdiff_t nbytes = vector_nbytes (objp);
@@ -3984,7 +3984,7 @@ purecopy (Lisp_Object obj)
       for (i = 0; i < size; ++i)
 	vec->contents[i] = purecopy (vec->contents[i]);
       /* Byte code strings must be pinned.  */
-      if (CLOSUREP (obj) && size >= 2 && STRINGP (vec->contents[1])
+      if (COMPILEDP (obj) && size >= 2 && STRINGP (vec->contents[1])
 	  && !STRING_MULTIBYTE (vec->contents[1]))
 	pin_string (vec->contents[1]);
       XSETVECTOR (obj, vec);
@@ -5898,11 +5898,11 @@ symbol_uses_obj (Lisp_Object symbol, Lisp_Object obj)
   return (EQ (val, obj)
 	  || EQ (sym->u.s.function, obj)
 	  || (!NILP (sym->u.s.function)
-	      && CLOSUREP (sym->u.s.function)
-	      && EQ (AREF (sym->u.s.function, CLOSURE_CODE), obj))
+	      && COMPILEDP (sym->u.s.function)
+	      && EQ (AREF (sym->u.s.function, COMPILED_BYTECODE), obj))
 	  || (!NILP (val)
-	      && CLOSUREP (val)
-	      && EQ (AREF (val, CLOSURE_CODE), obj)));
+	      && COMPILEDP (val)
+	      && EQ (AREF (val, COMPILED_BYTECODE), obj)));
 }
 
 /* Find at most FIND_MAX symbols which have OBJ as their value or
@@ -6198,7 +6198,7 @@ union
   enum CHECK_LISP_OBJECT_TYPE CHECK_LISP_OBJECT_TYPE;
   enum DEFAULT_HASH_SIZE DEFAULT_HASH_SIZE;
   enum Lisp_Bits Lisp_Bits;
-  enum Lisp_Closure Lisp_Closure;
+  enum Lisp_Compiled Lisp_Compiled;
   enum maxargs maxargs;
   enum MAX_ALLOCA MAX_ALLOCA;
   enum More_Lisp_Bits More_Lisp_Bits;

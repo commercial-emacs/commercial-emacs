@@ -107,9 +107,7 @@ those primitives unnecessary in case of function redefinition/advice."
     (buffer-substring
      (function ((or integer marker) (or integer marker)) string))
     (bufferp (function (t) boolean))
-    (closurep (function (t) boolean))
     (byte-code-function-p (function (t) boolean))
-    (interpreted-function-p (function (t) boolean))
     (capitalize (function ((or integer string)) (or integer string)))
     (car (function (list) t))
     (car-less-than-car (function (list list) boolean))

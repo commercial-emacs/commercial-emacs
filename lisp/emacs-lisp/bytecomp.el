@@ -2728,14 +2728,9 @@ otherwise, print without quoting."
 (defun byte-compile--reify-function (fun)
   "Return an expression which will evaluate to a function value FUN.
 FUN should be an interpreted closure."
-  (let* ((args (aref fun 0))
-         (body (aref fun 1))
-         (env (aref fun 2))
-         (docstring (function-documentation fun))
-         (iform (interactive-form fun))
-         (preamble `(,@(if docstring (list docstring))
-                     ,@(if iform (list iform))))
-         (renv ()))
+  (pcase-let* ((`(closure ,env ,args . ,body) fun)
+               (`(,preamble . ,body) (macroexp-parse-body body))
+               (renv ()))
     ;; Turn the function's closed vars (if any) into local let bindings.
     (dolist (binding env)
       (cond
@@ -2772,11 +2767,11 @@ If FORM is a lambda or a macro, compile into a function."
                  (if (symbolp form) form "provided"))
         fun)
        (t
-        (when (or (symbolp form) (interpreted-function-p fun))
+        (when (or (symbolp form) (eq (car-safe fun) 'closure))
           ;; `fun' is a function *value*, so try to recover its
           ;; corresponding source code.
-          (setq lexical-binding (not (null (aref fun 2))))
-          (setq fun (byte-compile--reify-function fun))
+          (when (setq lexical-binding (eq (car-safe fun) 'closure))
+            (setq fun (byte-compile--reify-function fun)))
           (setq need-a-value t))
         ;; Expand macros.
         (setq fun (byte-compile-preprocess fun))
@@ -4917,6 +4912,7 @@ binding slots have been popped."
             ;; `arglist' is the list of arguments (or t if not recognized).
             ;; `body' is the body of `lam' (or t if not recognized).
             ((or `(lambda ,arglist . ,body)
+                 ;; `(closure ,_ ,arglist . ,body)
                  (and `(internal-make-closure ,arglist . ,_) (let body t))
                  (and (let arglist t) (let body t)))
              lam))
