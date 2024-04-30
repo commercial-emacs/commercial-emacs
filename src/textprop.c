@@ -2188,6 +2188,7 @@ verify_interval_modification (struct buffer *buf,
 {
   INTERVAL intervals = buffer_intervals (buf);
   INTERVAL i;
+  ptrdiff_t p;
   Lisp_Object hooks;
   Lisp_Object prev_mod_hooks;
   Lisp_Object mod_hooks;
@@ -2316,10 +2317,16 @@ verify_interval_modification (struct buffer *buf,
     }
   else
     {
+      bool buffer_read_only;
+
       /* Loop over intervals on or next to START...END,
 	 collecting their hooks.  */
 
+      /* Extent of last writable interval.  */
       i = find_interval (intervals, start);
+      p = 0;
+      buffer_read_only = (!NILP (BVAR (current_buffer, read_only))
+			  && NILP (Vinhibit_read_only));
       do
 	{
 	  if (!INTERVAL_WRITABLE_P (i))
@@ -2335,15 +2342,17 @@ verify_interval_modification (struct buffer *buf,
 		}
 	    }
 
-	  if (i->position + LENGTH (i) < end
-	      && (!NILP (BVAR (current_buffer, read_only))
-		  && NILP (Vinhibit_read_only)))
-	    xsignal1 (Qbuffer_read_only, Fcurrent_buffer ());
-
+	  p = i->position + LENGTH (i);
 	  i = next_interval (i);
 	}
       /* Keep going thru the interval containing the char before END.  */
       while (i && i->position < end);
+
+      /* Should the buffer be read only while the last interval with an
+	 `inhibit-read-only' property does not enclose the entire change
+	 under consideration, signal error.  */
+      if (p < end && buffer_read_only)
+	xsignal1 (Qbuffer_read_only, Fcurrent_buffer ());
 
       if (!inhibit_modification_hooks)
 	{
