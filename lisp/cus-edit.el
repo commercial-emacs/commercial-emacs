@@ -5356,12 +5356,6 @@ If several parents are listed, go to the first of them."
     (setq-local widget-link-suffix ""))
   (setq show-trailing-whitespace nil))
 
-(defvar touch-screen-keyboard-function) ; In touch-screen.el.
-
-(defun Custom-display-on-screen-keyboard-p ()
-  "Return whether it is okay to display the virtual keyboard at point."
-  (get-char-property (point) 'field))
-
 (define-derived-mode Custom-mode nil "Custom"
   "Major mode for editing customization buffers.
 
