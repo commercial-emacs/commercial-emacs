@@ -1300,24 +1300,6 @@ This consults the entries in `eww-readable-urls' (which see)."
     map)
   "Tool bar for `eww-mode'.")
 
-(declare-function set-text-conversion-style "textconv.c")
-
-(defun eww-check-text-conversion ()
-  "Check if point is within a field and toggle text conversion.
-Set `text-conversion-style' to the value `action' if it isn't
-already and point is within the prompt field, or if
-`text-conversion-style' is `nil', so as to guarantee that
-the input method functions properly for the purpose of typing
-within text input fields."
-  (when (and (eq major-mode 'eww-mode)
-             (fboundp 'set-text-conversion-style))
-    (if (eq (car-safe (get-text-property (point) 'field))
-            :eww-form)
-        (unless (eq text-conversion-style 'action)
-          (set-text-conversion-style 'action))
-      (unless (not text-conversion-style)
-        (set-text-conversion-style nil)))))
-
 ;; Autoload cookie needed by desktop.el.
 ;;;###autoload
 (define-derived-mode eww-mode special-mode "eww"
@@ -1346,12 +1328,7 @@ within text input fields."
   (add-hook 'text-scale-mode-hook #'eww--rescale-images nil t)
   (setq-local outline-search-function 'shr-outline-search
               outline-level 'shr-outline-level)
-  (add-hook 'post-command-hook #'eww-check-text-conversion nil t)
-  (setq buffer-read-only t)
-  ;; Insertion at the first character of a field should inherit the
-  ;; field's face, form and field, not the previous character's.
-  (setq text-property-default-nonsticky '((face . t) (eww-form . t)
-                                          (field . t))))
+  (setq buffer-read-only t))
 
 (defvar text-scale-mode)
 (defvar text-scale-mode-amount)
@@ -1510,19 +1487,16 @@ just re-display the HTML already fetched."
 
 (defvar-keymap eww-submit-map
   "RET" #'eww-submit
-  "C-c C-c" #'eww-submit
-  "<mouse-2>" #'eww-submit)
+  "C-c C-c" #'eww-submit)
 
 (defvar-keymap eww-submit-file
   "RET" #'eww-select-file
-  "C-c C-c" #'eww-submit
-  "<mouse-2>" #'eww-select-file)
+  "C-c C-c" #'eww-submit)
 
 (defvar-keymap eww-checkbox-map
   "SPC" #'eww-toggle-checkbox
   "RET" #'eww-toggle-checkbox
-  "C-c C-c" #'eww-submit
-  "<mouse-2>" #'eww-toggle-checkbox)
+  "C-c C-c" #'eww-submit)
 
 (defvar-keymap eww-text-map
   :full t :parent text-mode-map
@@ -1611,8 +1585,6 @@ just re-display the HTML already fetched."
 			     :type "submit"
 			     :name (dom-attr dom 'name)))
     (put-text-property start (point) 'keymap eww-submit-map)
-    ;; Pretend to touch-screen.el that this is a button.
-    (put-text-property start (point) 'button t)
     (insert " ")))
 
 (defun eww-form-checkbox (dom)
@@ -1628,8 +1600,6 @@ just re-display the HTML already fetched."
 			     :checked (dom-attr dom 'checked)
 			     :name (dom-attr dom 'name)))
     (put-text-property start (point) 'keymap eww-checkbox-map)
-    ;; Pretend to touch-screen.el that this is a button.
-    (put-text-property start (point) 'button t)
     (insert " ")))
 
 (defun eww-form-file (dom)
@@ -1648,17 +1618,11 @@ just re-display the HTML already fetched."
 			     :type (downcase (dom-attr dom 'type))
 			     :name (dom-attr dom 'name)))
     (put-text-property start (point) 'keymap eww-submit-file)
-    ;; Pretend to touch-screen.el that this is a button.
-    (put-text-property start (point) 'button t)
     (insert " ")))
 
-(defun eww-select-file (&optional event)
-  "Change the value of the upload file menu under point.
-EVENT, if non-nil, is the mouse event that preceded this command.
-Interactively, EVENT is the value of `last-nonmenu-event'."
-  (interactive (list last-nonmenu-event) eww-mode)
-  (when (and event (setq event (event-start event)))
-    (goto-char (posn-point event)))
+(defun eww-select-file ()
+  "Change the value of the upload file menu under point."
+  (interactive nil eww-mode)
   (let*  ((input (get-text-property (point) 'eww-form)))
     (let ((filename
 	   (let ((insert-default-directory t))
@@ -1674,12 +1638,7 @@ Interactively, EVENT is the value of `last-nonmenu-event'."
         (readonly-property (if (or (dom-attr dom 'disabled)
 				   (dom-attr dom 'readonly))
                                'read-only
-                             'inhibit-read-only))
-        form)
-    (setq form (list :eww-form eww-form
-                     :value value
-                     :type type
-                     :name (dom-attr dom 'name)))
+                             'inhibit-read-only)))
     (insert value)
     (when (< (length value) width)
       (insert (make-string (- width (length value)) ? )))
@@ -1687,9 +1646,11 @@ Interactively, EVENT is the value of `last-nonmenu-event'."
     (put-text-property start (point) 'inhibit-read-only t)
     (put-text-property start (point) 'local-map eww-text-map)
     (put-text-property start (point) readonly-property t)
-    (put-text-property start (point) 'eww-form form)
-    (put-text-property start (point) 'field form)
-    (put-text-property start (point) 'front-sticky t)
+    (put-text-property start (point) 'eww-form
+                       (list :eww-form eww-form
+                             :value value
+                             :type type
+                             :name (dom-attr dom 'name)))
     (insert " ")))
 
 (defconst eww-text-input-types '("text" "password" "textarea"
@@ -1755,7 +1716,7 @@ See URL `https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Input'.")
         (value (or (dom-text dom) ""))
 	(lines (string-to-number (or (dom-attr dom 'rows) "10")))
 	(width (string-to-number (or (dom-attr dom 'cols) "10")))
-	end form)
+	end)
     (shr-ensure-newline)
     (insert value)
     (shr-ensure-newline)
@@ -1775,13 +1736,11 @@ See URL `https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Input'.")
       (put-text-property (line-beginning-position) (point)
 			 'local-map eww-textarea-map)
       (forward-line 1))
-    (setq form (list :eww-form eww-form
+    (put-text-property start (point) 'eww-form
+		       (list :eww-form eww-form
 		     :value value
 		     :type "textarea"
 		     :name (dom-attr dom 'name)))
-    (put-text-property start (point) 'eww-form form)
-    (put-text-property start (point) 'front-sticky t)
-    (put-text-property start (point) 'field form)
     (put-text-property start (1+ start) 'shr-tab-stop t)))
 
 (defun eww-tag-input (dom)
@@ -1845,8 +1804,6 @@ See URL `https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Input'.")
       (put-text-property start (point) 'eww-form menu)
       (add-face-text-property start (point) 'eww-form-select)
       (put-text-property start (point) 'keymap eww-select-map)
-      ;; Pretend to touch-screen.el that this is a button.
-      (put-text-property start (point) 'button t)
       (unless (= start (point))
        (put-text-property start (1+ start) 'help-echo "select field")
        (put-text-property start (1+ start) 'shr-tab-stop t))
@@ -1905,13 +1862,9 @@ See URL `https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Input'.")
       (set-text-properties start new-end properties))
     start))
 
-(defun eww-toggle-checkbox (&optional event)
-  "Toggle the value of the checkbox under point.
-EVENT, if non-nil, is the mouse event that preceded this command.
-Interactively, EVENT is the value of `last-nonmenu-event'."
-  (interactive (list last-nonmenu-event) eww-mode)
-  (when (and event (setq event (event-start event)))
-    (goto-char (posn-point event)))
+(defun eww-toggle-checkbox ()
+  "Toggle the value of the checkbox under point."
+  (interactive nil eww-mode)
   (let* ((input (get-text-property (point) 'eww-form))
 	 (type (plist-get input :type)))
     (if (equal type "checkbox")
@@ -1979,13 +1932,9 @@ Interactively, EVENT is the value of `last-nonmenu-event'."
 	  (substring value 0 (match-beginning 0))
 	value)))))
 
-(defun eww-submit (&optional event)
-  "Submit the form under point or EVENT.
-EVENT, if non-nil, is the mouse event that preceded this command.
-Interactively, EVENT is the value of `last-nonmenu-event'."
-  (interactive (list last-nonmenu-event) eww-mode)
-  (when (and event (setq event (event-start event)))
-    (goto-char (posn-point event)))
+(defun eww-submit ()
+  "Submit the current form."
+  (interactive nil eww-mode)
   (let* ((this-input (get-text-property (point) 'eww-form))
 	 (form (plist-get this-input :eww-form))
 	 values next-submit)
