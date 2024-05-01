@@ -3894,8 +3894,7 @@ extern void mark_fns (void);
 
 /* Defined in sort.c  */
 extern void tim_sort (Lisp_Object, Lisp_Object, Lisp_Object *, const ptrdiff_t,
-		      bool)
-  ARG_NONNULL ((3));
+		      bool);
 
 /* Defined in floatfns.c.  */
 verify (FLT_RADIX == 2 || FLT_RADIX == 16);

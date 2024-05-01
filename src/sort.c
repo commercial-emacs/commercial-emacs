@@ -38,6 +38,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static void
 reverse_slice(Lisp_Object *lo, Lisp_Object *hi)
 {
+    eassert (lo && hi);
+
     --hi;
     while (lo < hi) {
         Lisp_Object t = *lo;
@@ -1093,7 +1095,7 @@ tim_sort (Lisp_Object predicate, Lisp_Object keyfunc,
   Lisp_Object *allocated_keys = NULL;
   merge_state ms;
 
-  if (reverse && 0 < length)
+  if (reverse)
     reverse_slice (seq, seq + length);    /* preserve stability */
 
   if (NILP (keyfunc))

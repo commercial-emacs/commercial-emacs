@@ -2528,6 +2528,7 @@ x_dnd_free_toplevels (bool display_alive)
   unsigned long *prev_masks UNINIT;
   specpdl_ref count;
   Display *dpy UNINIT;
+  struct x_display_info *dpyinfo;
 
   if (!x_dnd_toplevels)
     /* Probably called inside an IO error handler.  */
@@ -2589,21 +2590,25 @@ x_dnd_free_toplevels (bool display_alive)
   record_unwind_protect_ptr (xfree, destroy_windows);
   record_unwind_protect_ptr (xfree, prev_masks);
 
-  if (display_alive && n_windows)
+  if (display_alive)
     {
-      struct x_display_info *dpyinfo = x_dpyinfo (dpy);
+      dpyinfo = x_display_info_for_display (dpy);
 
-      x_ignore_errors_for_next_request (dpyinfo, 0);
-
-      for (i = 0; i < n_windows; ++i)
+      if (n_windows)
 	{
-	  XSelectInput (dpy, destroy_windows[i], prev_masks[i]);
-#ifdef HAVE_XSHAPE
-	  XShapeSelectInput (dpy, destroy_windows[i], None);
-#endif
-	}
+	  eassume (dpyinfo);
+	  x_ignore_errors_for_next_request (dpyinfo, 0);
 
-      x_stop_ignoring_errors (dpyinfo);
+	  for (i = 0; i < n_windows; ++i)
+	    {
+	      XSelectInput (dpy, destroy_windows[i], prev_masks[i]);
+#ifdef HAVE_XSHAPE
+	      XShapeSelectInput (dpy, destroy_windows[i], None);
+#endif
+	    }
+
+	  x_stop_ignoring_errors (dpyinfo);
+	}
     }
 
   unbind_to (count, Qnil);
@@ -8481,7 +8486,7 @@ x_frame_of_widget (Widget widget)
   Lisp_Object tail, frame;
   struct frame *f;
 
-  dpyinfo = x_dpyinfo (XtDisplay (widget));
+  dpyinfo = x_display_info_for_display (XtDisplay (widget));
 
   /* Find the top-level shell of the widget.  Note that this function
      can be called when the widget is not yet realized, so XtWindow
@@ -8674,7 +8679,8 @@ cvt_pixel_dtor (XtAppContext app, XrmValuePtr to, XtPointer closure, XrmValuePtr
 static const XColor *
 x_color_cells (Display *dpy, int *ncells)
 {
-  struct x_display_info *dpyinfo = x_dpyinfo (dpy);
+  struct x_display_info *dpyinfo = x_display_info_for_display (dpy);
+  eassume (dpyinfo);
 
   if (dpyinfo->color_cells == NULL)
     {
@@ -8949,13 +8955,16 @@ x_parse_color (struct frame *f, const char *color_name,
 static bool
 x_alloc_nearest_color_1 (Display *dpy, Colormap cmap, XColor *color)
 {
-  struct x_display_info *dpyinfo = x_dpyinfo (dpy);
-  bool rc = XAllocColor (dpy, cmap, color) != 0;
+  struct x_display_info *dpyinfo = x_display_info_for_display (dpy);
+  bool rc;
+
+  eassume (dpyinfo);
+  rc = XAllocColor (dpy, cmap, color) != 0;
 
   if (dpyinfo->visual_info.class == DirectColor)
     return rc;
 
-  if (!rc)
+  if (rc == 0)
     {
       /* If we got to this point, the colormap is full, so we're going
 	 to try and get the next closest color.  The algorithm used is
@@ -9058,7 +9067,8 @@ x_alloc_nearest_color_1 (Display *dpy, Colormap cmap, XColor *color)
       /* If allocation succeeded, and the allocated pixel color is not
          equal to a cached pixel color recorded earlier, there was a
          change in the colormap, so clear the color cache.  */
-      struct x_display_info *dpyinfo = x_dpyinfo (dpy);
+      struct x_display_info *dpyinfo = x_display_info_for_display (dpy);
+      eassume (dpyinfo);
 
       if (dpyinfo->color_cells)
 	{
@@ -14169,7 +14179,12 @@ x_query_pointer (Display *dpy, Window w, Window *root_return,
 		 int *root_y_return, int *win_x_return,
 		 int *win_y_return, unsigned int *mask_return)
 {
-  struct x_display_info *dpyinfo = x_dpyinfo (dpy);
+  struct x_display_info *dpyinfo;
+
+  dpyinfo = x_display_info_for_display (dpy);
+
+  if (!dpyinfo)
+    emacs_abort ();
 
 #ifdef HAVE_XINPUT2
   return x_query_pointer_1 (dpyinfo, dpyinfo->client_pointer_device,
