@@ -434,15 +434,6 @@ See Bug#30460."
     (require 'dns)
     (dns-query "google.com")))
 
-(ert-deftest lookup-family-specification ()
-  "`network-lookup-address-info' should only accept valid family symbols."
-  (skip-unless internet-is-working)
-  (with-timeout (60 (ert-fail "Test timed out"))
-  (should-error (network-lookup-address-info "localhost" 'both))
-  (should (network-lookup-address-info "localhost" 'ipv4))
-  (when (ipv6-is-available)
-    (should (network-lookup-address-info "localhost" 'ipv6)))))
-
 (ert-deftest lookup-hints-specification ()
   "`network-lookup-address-info' should only accept valid hints arg."
   (should-error (network-lookup-address-info "1.1.1.1" nil t))
@@ -512,13 +503,14 @@ See Bug#30460."
   "Check that we can look up google IP addresses."
   (skip-unless internet-is-working)
   (with-timeout (60 (ert-fail "Test timed out"))
-  (let ((addresses-both (network-lookup-address-info "google.com"))
-        (addresses-v4 (network-lookup-address-info "google.com" 'ipv4)))
-    (should addresses-both)
-    (should addresses-v4))
-  (when (and (ipv6-is-available)
-             (dns-query "google.com" 'AAAA))
-    (should (network-lookup-address-info "google.com" 'ipv6)))))
+    (should-error (network-lookup-address-info "google.com" 'invalid-family))
+    (let ((addresses-both (network-lookup-address-info "google.com"))
+          (addresses-v4 (network-lookup-address-info "google.com" 'ipv4)))
+      (should addresses-both)
+      (should addresses-v4))
+    (when (and (ipv6-is-available)
+               (dns-query "google.com" 'AAAA))
+      (should (network-lookup-address-info "google.com" 'ipv6)))))
 
 (ert-deftest non-existent-lookup-failure ()
   "Check that looking up non-existent domain returns nil."
