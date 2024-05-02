@@ -727,8 +727,10 @@ the C sources, too."
 		       (res (comp-function-type-spec function)))
               (cl-destructuring-bind (type-spec . kind)
                   res
-                (insert (format "\n%s: %s\n"
-                                (if (eq kind 'inferred) "Inferred type" "Type")
+                (insert (format "\n%s type: %s\n"
+                                (if (eq kind 'inferred)
+				    "Inferred"
+				  "Declared")
                                 type-spec)))))
           (fill-region fill-begin (point))
           high-doc)))))

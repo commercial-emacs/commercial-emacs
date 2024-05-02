@@ -520,7 +520,8 @@ It should move point to the first position after the defun.")
   "Return the \"far end\" position of the buffer, in direction ARG.
 If ARG is positive, that's the end of the buffer.
 Otherwise, that's the beginning of the buffer."
-  (declare (side-effect-free error-free))
+  (declare (type (function ((or number marker)) integer))
+           (side-effect-free error-free))
   (if (> arg 0) (point-max) (point-min)))
 
 (defun end-of-defun (&optional arg interactive)

@@ -57,7 +57,7 @@ those primitives unnecessary in case of function redefinition/advice."
   :type '(repeat symbol)
   :version "30.1")
 
-(defconst comp-known-type-specifiers
+(defconst comp-primitive-type-specifiers
   `(
     ;; Functions we can trust not to be redefined, or, if redefined,
     ;; to expose the same type.  The vast majority of these are
@@ -86,7 +86,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (assq (function (t list) list))
     (atan (function (number &optional number) float))
     (atom (function (t) boolean))
-    (bignump (function (t) boolean))
     (bobp (function () boolean))
     (bolp (function () boolean))
     (bool-vector-count-consecutive
@@ -96,7 +95,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (bool-vector-p (function (t) boolean))
     (bool-vector-subsetp (function (bool-vector bool-vector) boolean))
     (boundp (function (symbol) boolean))
-    (buffer-end (function ((or number marker)) integer))
     (buffer-file-name (function (&optional buffer) (or string null)))
     (buffer-list (function (&optional frame) list))
     (buffer-local-variables (function (&optional buffer) list))
@@ -146,8 +144,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (copy-sequence (function (sequence) sequence))
     (copysign (function (float float) float))
     (cos (function (number) float))
-    (count-lines
-     (function ((or integer marker) (or integer marker) &optional t) integer))
     (current-buffer (function () buffer))
     (current-global-map (function () cons))
     (current-indentation (function (&optional integer) integer))
@@ -160,7 +156,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (current-time-zone (function (&optional (or number list)
                                             (or symbol string cons integer))
                                  cons))
-    (custom-variable-p (function (symbol) t))
     (decode-char (function (cons t) (or fixnum null)))
     (decode-time (function (&optional (or number list)
                                       (or symbol string cons integer)
@@ -168,7 +163,6 @@ those primitives unnecessary in case of function redefinition/advice."
                            cons))
     (default-boundp (function (symbol) boolean))
     (default-value (function (symbol) t))
-    (degrees-to-radians (function (number) float))
     (documentation
      (function ((or function symbol subr) &optional t) (or null string)))
     (downcase (function ((or fixnum string)) (or fixnum string)))
@@ -181,7 +175,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (eql (function (t t) boolean))
     (equal (function (t t) boolean))
     (error-message-string (function (list) string))
-    (eventp (function (t) boolean))
     (exp (function (number) float))
     (expt (function (number number) number))
     (fboundp (function (symbol) boolean))
@@ -196,7 +189,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (file-readable-p (function (string) boolean))
     (file-symlink-p (function (string) (or boolean string)))
     (file-writable-p (function (string) boolean))
-    (fixnump (function (t) boolean))
     (float (function (number) float))
     (float-time (function (&optional (or number list)) float))
     (floatp (function (t) boolean))
@@ -219,18 +211,12 @@ those primitives unnecessary in case of function redefinition/advice."
      (function (&optional (or buffer string) (or symbol (integer 0 0)))
                (or null window)))
     (get-file-buffer (function (string) (or null buffer)))
-    (get-largest-window (function (&optional t t t) (or window null)))
-    (get-lru-window (function (&optional t t t) (or window null)))
-    (getenv (function (string &optional frame) (or null string)))
     (gethash (function (t hash-table &optional t) t))
     (hash-table-count (function (hash-table) integer))
     (hash-table-p (function (t) boolean))
     (identity (function (t) t))
-    (ignore (function (&rest t) null))
-    (int-to-string (function (number) string))
     (integer-or-marker-p (function (t) boolean))
     (integerp (function (t) boolean))
-    (interactive-p (function () boolean))
     (intern-soft (function ((or string symbol) &optional (or obarray vector))
                            symbol))
     (invocation-directory (function () string))
@@ -239,8 +225,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (keymap-parent (function (cons) (or cons null)))
     (keymapp (function (t) boolean))
     (keywordp (function (t) boolean))
-    (last (function (list &optional integer) list))
-    (lax-plist-get (function (list t) t))
     (ldexp (function (number integer) float))
     (length (function (t) (integer 0 *)))
     (length< (function (sequence fixnum) boolean))
@@ -254,7 +238,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (local-variable-p (function (symbol &optional buffer) boolean))
     (locale-info (function ((member codeset days months paper)) (or null string)))
     (log (function (number number) float))
-    (log10 (function (number) float))
     (logand (function (&rest (or integer marker)) integer))
     (logb (function (number) integer))
     (logcount (function (integer) integer))
@@ -262,7 +245,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (lognot (function (integer) integer))
     (logxor (function (&rest (or integer marker)) integer))
     ;; (lsh (function ((integer ,most-negative-fixnum *) integer) integer)) ?
-    (lsh (function (integer integer) integer))
     (make-byte-code
      (function ((or fixnum list) string vector integer &optional string t
                 &rest t)
@@ -271,14 +253,12 @@ those primitives unnecessary in case of function redefinition/advice."
     (make-marker (function () marker))
     (make-string (function (integer fixnum &optional t) string))
     (make-symbol (function (string) symbol))
-    (mark (function (&optional t) (or integer null)))
     (mark-marker (function () marker))
     (marker-buffer (function (marker) (or buffer null)))
     (markerp (function (t) boolean))
     (max (function ((or number marker) &rest (or number marker)) number))
     (max-char (function (&optional t) fixnum))
     (member (function (t list) list))
-    (memory-limit (function () integer))
     (memq (function (t list) list))
     (memql (function (t list) list))
     (min (function ((or number marker) &rest (or number marker)) number))
@@ -287,7 +267,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (mod
      (function ((or number marker) (or number marker))
                (or (integer 0 *) (float 0 *))))
-    (mouse-movement-p (function (t) boolean))
     (multibyte-char-to-unibyte (function (fixnum) fixnum))
     (natnump (function (t) boolean))
     (next-window (function (&optional window t t) window))
@@ -299,9 +278,7 @@ those primitives unnecessary in case of function redefinition/advice."
     (number-or-marker-p (function (t) boolean))
     (number-to-string (function (number) string))
     (numberp (function (t) boolean))
-    (one-window-p (function (&optional t t) boolean))
     (overlayp (function (t) boolean))
-    (parse-colon-path (function (string) list))
     (plist-get (function (list t &optional t) t))
     (plist-member (function (list t &optional t) list))
     (point (function () integer))
@@ -314,13 +291,11 @@ those primitives unnecessary in case of function redefinition/advice."
     (processp (function (t) boolean))
     (proper-list-p (function (t) (or fixnum null)))
     (propertize (function (string &rest t) string))
-    (radians-to-degrees (function (number) float))
     (rassoc (function (t list) list))
     (rassq (function (t list) list))
     (read-from-string (function (string &optional integer integer) cons))
     (recent-keys (function (&optional (or cons null)) vector))
     (recursion-depth (function () integer))
-    (regexp-opt (function (list) string))
     (regexp-quote (function (string) string))
     (region-beginning (function () integer))
     (region-end (function () integer))
@@ -376,7 +351,6 @@ those primitives unnecessary in case of function redefinition/advice."
     (upcase (function ((or fixnum string)) (or fixnum string)))
     (user-full-name (function (&optional integer) (or string null)))
     (user-login-name (function (&optional integer) (or string null)))
-    (user-original-login-name (function (&optional integer) (or string null)))
     (user-real-login-name (function () string))
     (user-real-uid (function () integer))
     (user-uid (function () integer))
@@ -389,13 +363,8 @@ those primitives unnecessary in case of function redefinition/advice."
     (window-live-p (function (t) boolean))
     (window-valid-p (function (t) boolean))
     (windowp (function (t) boolean))
-    (zerop (function (number) boolean))
-    ;; Type hints
-    (comp-hint-fixnum (function (t) fixnum))
-    (comp-hint-cons (function (t) cons))
     ;; Non returning functions
     (throw (function (t t) nil))
-    (error (function (string &rest t) nil))
     (signal (function (symbol t) nil)))
   "Alist used for type propagation.")
 
@@ -508,18 +477,22 @@ To be used by all entry points."
 (defun comp-function-type-spec (function)
   "Return the type specifier of FUNCTION.
 
-This function returns a cons cell whose car is the function
-specifier, and cdr is a symbol, either `inferred' or `know'.
-If the symbol is `inferred', the type specifier is automatically
-inferred from the code itself by the native compiler; if it is
-`know', the type specifier comes from `comp-known-type-specifiers'."
-  (let ((kind 'know)
+This function returns a cons cell whose car is the function specifier,
+and cdr is a symbol type specifier, either 'inferred (by the native
+compiler) or 'declared (by the function type itself or is one of
+`comp-primitive-type-specifiers')"
+  (let ((kind 'declared)
         (type-spec (when-let ((res (assoc function comp-known-type-specifiers)))
                      (cadr res)))
         (f (and (symbolp function) (symbol-function function))))
-    (when (and f (null type-spec) (subr-native-elisp-p f))
-      (setf kind 'inferred
-            type-spec (subr-type f)))
+    (when (and f (null type-spec))
+      (if-let ((decl-type (function-get function 'function-type)))
+          ;; Declared Lisp function
+          (setf type-spec (car decl-type))
+        (when (subr-native-elisp-p f)
+          ;; Native compiled inferred
+          (setf kind 'inferred
+                type-spec (subr-type f)))))
     (when type-spec
       (cons type-spec kind))))
 
