@@ -478,11 +478,11 @@ To be used by all entry points."
   "Return the type specifier of FUNCTION.
 
 This function returns a cons cell whose car is the function specifier,
-and cdr is a symbol type specifier, either 'inferred (by the native
-compiler) or 'declared (by the function type itself or is one of
+and cdr is a symbol type specifier, either \='inferred (by the native
+compiler) or \='declared (by the function type itself or is one of
 `comp-primitive-type-specifiers')"
   (let ((kind 'declared)
-        (type-spec (when-let ((res (assoc function comp-known-type-specifiers)))
+        (type-spec (when-let ((res (assoc function comp-primitive-type-specifiers)))
                      (cadr res)))
         (f (and (symbolp function) (symbol-function function))))
     (when (and f (null type-spec))
