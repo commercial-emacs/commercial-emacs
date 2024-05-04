@@ -2255,7 +2255,9 @@ all symbols are bound before any of the VALUEFORMs are evalled."
     (let ((nbody (if (null binders)
                      (macroexp-progn body)
                    `(let ,(mapcar #'car binders)
-                      ,@(mapcar (lambda (binder) `(setq ,@binder)) binders)
+                      ,@(mapcan (lambda (binder)
+                                  (and (cdr binder) (list `(setq ,@binder))))
+                                binders)
                       ,@body))))
       (cond
        ;; All bindings are recursive.
