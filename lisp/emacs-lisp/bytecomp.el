@@ -3518,7 +3518,7 @@ This assumes the function has the `important-return-value' property."
     (byte-compile-out-tag endtag)))
 
 (defun byte-compile-unfold-byte-code-function (form)
-  "Inline call to byte-code-functions."
+  "Inline call to byte-code function."
   (let* ((byte-compile-bound-variables byte-compile-bound-variables)
          (fun (car form))
          (fargs (aref fun 0))
@@ -5679,9 +5679,7 @@ and corresponding effects."
 ;; avoid "lisp nesting exceeds max-lisp-eval-depth" errors.
 (eval-when-compile
   (prog1 nil
-    (or (byte-code-function-p (symbol-function 'byte-compile-form))
-        (subr-native-elisp-p (symbol-function 'byte-compile-form))
-        (assq 'byte-code (symbol-function 'byte-compile-form))
+    (or (compiled-function-p (symbol-function 'byte-optimize-form))
         (let ((byte-optimize nil)        ; do it fast
 	      (byte-compile-warnings nil))
 	  (mapc (lambda (x)
