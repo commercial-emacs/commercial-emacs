@@ -1863,15 +1863,6 @@ handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
       stack_overflow (siginfo))
     siglongjmp (return_to_command_loop, 1);
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  /* Tombstones (crash reports with stack traces) won't be generated on
-     Android unless the original SIGSEGV handler is installed and the
-     signal is resent, such as by returning from the first signal
-     handler called.  */
-  sigaction (SIGSEGV, &old_sigsegv_handler, NULL);
-  return;
-#endif /* HAVE_ANDROID && ANDROID_STUBIFY */
-
   /* Otherwise we can't do anything with this.  */
   deliver_fatal_thread_signal (sig);
 }

@@ -31559,11 +31559,10 @@ note_fringe_highlight (struct frame *f, Lisp_Object window, int x, int y,
     return;
 
   /* When a menu is active, don't highlight because this looks odd.  */
-#if defined (HAVE_X_WINDOWS) || defined (HAVE_NS) || defined (MSDOS) \
-  || defined (HAVE_ANDROID)
+#if defined (HAVE_X_WINDOWS) || defined (HAVE_NS) || defined (MSDOS)
   if (popup_activated ())
     return;
-#endif /* HAVE_X_WINDOWS || HAVE_NS || MSDOS || HAVE_ANDROID */
+#endif /* HAVE_X_WINDOWS || HAVE_NS || MSDOS */
 
 #if defined HAVE_HAIKU
   if (popup_activated_p)
