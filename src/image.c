@@ -130,6 +130,12 @@ typedef struct w32_bitmap_record Bitmap_Record;
 #define PIX_MASK_RETAIN	0
 #define PIX_MASK_DRAW	1
 
+#define XBM_BIT_SHUFFLE(b) (~(b))
+
+#else
+
+#define XBM_BIT_SHUFFLE(b) (b)
+
 #endif /* HAVE_NTGUI */
 
 #ifdef HAVE_NS
@@ -184,6 +190,11 @@ static unsigned long lookup_rgb_color (struct frame *f, int r, int g, int b);
 #ifdef COLOR_TABLE_SUPPORT
 static void free_color_table (void);
 static unsigned long *colors_in_color_table (int *n);
+#endif
+
+#ifdef HAVE_NTGUI
+static HBITMAP w32_create_pixmap_from_bitmap_data (int, int, char *);
+
 #endif
 
 #if defined (HAVE_WEBP) || defined (HAVE_GIF)
@@ -556,13 +567,31 @@ image_create_bitmap_from_data (struct frame *f, char *bits,
 #endif /* HAVE_X_WINDOWS */
 
 #ifdef HAVE_NTGUI
-  Lisp_Object frame UNINIT;	/* The value is not used.  */
-  Emacs_Pixmap bitmap;
-  bitmap = CreateBitmap (width, height,
-			 FRAME_DISPLAY_INFO (XFRAME (frame))->n_planes,
-			 FRAME_DISPLAY_INFO (XFRAME (frame))->n_cbits,
-			 bits);
-  if (! bitmap)
+  Emacs_Pixmap stipple;
+  Emacs_Pixmap bitmap = CreateBitmap (width, height, dpyinfo->n_planes,
+				      dpyinfo->n_cbits, bits);
+
+  /* Convert X bitmap to W32 bitmap.  */
+  /* Windows mono bitmaps are reversed compared with X.  */
+  USE_SAFE_ALLOCA;
+
+  {
+    char *invertedBits;
+    int nbytes = (width + CHAR_BIT - 1) / CHAR_BIT * height, i;
+
+    invertedBits = bits;
+
+    SAFE_NALLOCA (bits, 1, nbytes);
+
+    for (i = 0; i < nbytes; i++)
+      bits[i] = XBM_BIT_SHUFFLE (invertedBits[i]);
+  }
+
+  stipple = w32_create_pixmap_from_bitmap_data (width, height, bits);
+
+  SAFE_FREE ();
+
+  if (!bitmap || !stipple)
     return -1;
 #endif /* HAVE_NTGUI */
 
@@ -639,6 +668,7 @@ image_create_bitmap_from_data (struct frame *f, char *bits,
 
 #ifdef HAVE_NTGUI
   dpyinfo->bitmaps[id - 1].pixmap = bitmap;
+  dpyinfo->bitmaps[id - 1].stipple = stipple;
   dpyinfo->bitmaps[id - 1].hinst = NULL;
   dpyinfo->bitmaps[id - 1].depth = 1;
 #endif /* HAVE_NTGUI */
@@ -646,7 +676,7 @@ image_create_bitmap_from_data (struct frame *f, char *bits,
   return id;
 }
 
-#if defined HAVE_HAIKU || defined HAVE_NS || defined HAVE_PGTK
+#if defined HAVE_HAIKU || defined HAVE_NS || defined HAVE_PGTK || defined HAVE_NTGUI
 static char *slurp_file (int, ptrdiff_t *);
 static Lisp_Object image_find_image_fd (Lisp_Object, int *);
 static bool xbm_read_bitmap_data (struct frame *, char *, char *,
@@ -658,10 +688,53 @@ static bool xbm_read_bitmap_data (struct frame *, char *, char *,
 ptrdiff_t
 image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
 {
-#if defined (HAVE_NTGUI)
-  return -1;  /* W32_TODO : bitmap support */
-#else
   Display_Info *dpyinfo = FRAME_DISPLAY_INFO (f);
+
+#ifdef HAVE_NTGUI
+  ptrdiff_t id, size;
+  int width, height, rc;
+  image_fd fd;
+  char *contents, *data;
+  Emacs_Pixmap bitmap;
+
+  if (!STRINGP (image_find_image_fd (file, &fd)))
+    return -1;
+
+  contents = slurp_file (fd, &size);
+
+  if (!contents)
+    return -1;
+
+  rc = xbm_read_bitmap_data (f, contents, contents + size,
+			     &width, &height, &data, 0);
+
+  if (!rc)
+    {
+      xfree (contents);
+      return -1;
+    }
+
+  {
+    /* Windows mono bitmaps are reversed compared with X.  */
+
+    int nbytes, i;
+    nbytes = (width + CHAR_BIT - 1) / CHAR_BIT * height;
+
+    for (i = 0; i < nbytes; i++)
+      data[i] = XBM_BIT_SHUFFLE (data[i]);
+  }
+
+  id = image_allocate_bitmap_record (f);
+  bitmap = w32_create_pixmap_from_bitmap_data (width, height, data);
+
+  dpyinfo->bitmaps[id - 1].height = width;
+  dpyinfo->bitmaps[id - 1].width = height;
+  dpyinfo->bitmaps[id - 1].stipple = bitmap;
+  dpyinfo->bitmaps[id - 1].file = xlispstrdup (file);
+
+  xfree (contents);
+  xfree (data);
+  return id;
 #endif
 
 #ifdef HAVE_NS
@@ -900,6 +973,7 @@ free_bitmap_record (Display_Info *dpyinfo, Bitmap_Record *bm)
 
 #ifdef HAVE_NTGUI
   DeleteObject (bm->pixmap);
+  DeleteObject (bm->stipple);
 #endif /* HAVE_NTGUI */
 
 #ifdef HAVE_NS
@@ -4275,12 +4349,6 @@ convert_mono_to_color_image (struct frame *f, struct image *img,
   else
     img->pixmap = new_pixmap;
 }
-
-#define XBM_BIT_SHUFFLE(b) (~(b))
-
-#else
-
-#define XBM_BIT_SHUFFLE(b) (b)
 
 #endif /* HAVE_NTGUI */
 
