@@ -44,6 +44,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <setjmp.h>
 #include <stdalign.h>
 #include <stdarg.h>
+#include <stdbit.h>
 #include <stdckdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -53,7 +54,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <attribute.h>
 #include <byteswap.h>
-#include <count-leading-zeros.h>
 #include <intprops.h>
 #include <verify.h>
 INLINE_HEADER_BEGIN
@@ -3758,11 +3758,12 @@ integer_to_uintmax (Lisp_Object num, uintmax_t *n)
     }
 }
 
-/* Return floor (log2 (N)) as an int, where 0 < N <= ULLONG_MAX.  */
+/* Return floor (log2 (N)) as an int.  If N is zero, return -1.  */
 INLINE int
 elogb (unsigned long long int n)
 {
-  return ULLONG_WIDTH - 1 - count_leading_zeros_ll (n);
+  int width = stdc_bit_width (n);
+  return width - 1;
 }
 
 /* A modification count.  These are wide enough, and incremented

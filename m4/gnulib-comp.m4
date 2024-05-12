@@ -69,9 +69,6 @@ AC_DEFUN([gl_EARLY],
   # Code from module close:
   # Code from module close-stream:
   # Code from module copy-file-range:
-  # Code from module count-leading-zeros:
-  # Code from module count-one-bits:
-  # Code from module count-trailing-zeros:
   # Code from module crypto/md5:
   # Code from module crypto/md5-buffer:
   # Code from module crypto/sha1-buffer:
@@ -197,7 +194,12 @@ AC_DEFUN([gl_EARLY],
   # Code from module ssize_t:
   # Code from module stat-time:
   # Code from module std-gnu11:
+  # Code from module stdbit-h:
   # Code from module stdbool:
+  # Code from module stdc_bit_width:
+  # Code from module stdc_count_ones:
+  # Code from module stdc_leading_zeros:
+  # Code from module stdc_trailing_zeros:
   # Code from module stdckdint:
   # Code from module stddef:
   # Code from module stdint:
@@ -639,7 +641,18 @@ AC_DEFUN([gl_INIT],
   gt_TYPE_SSIZE_T
   gl_STAT_TIME
   gl_STAT_BIRTHTIME
+  gl_STDBIT_H
+  gl_CONDITIONAL_HEADER([stdbit.h])
+  AC_PROG_MKDIR_P
   gl_C_BOOL
+  AC_REQUIRE([gl_STDBIT_H])
+  GL_STDC_BIT_WIDTH=1
+  AC_REQUIRE([gl_STDBIT_H])
+  GL_STDC_COUNT_ONES=1
+  AC_REQUIRE([gl_STDBIT_H])
+  GL_STDC_LEADING_ZEROS=1
+  AC_REQUIRE([gl_STDBIT_H])
+  GL_STDC_TRAILING_ZEROS=1
   AC_CHECK_HEADERS_ONCE([stdckdint.h])
   if test $ac_cv_header_stdckdint_h = yes; then
     GL_GENERATE_STDCKDINT_H=false
@@ -804,6 +817,7 @@ AC_DEFUN([gl_INIT],
   gl_gnulib_enabled_strings=false
   gl_gnulib_enabled_strtoll=false
   gl_gnulib_enabled_utimens=false
+  gl_gnulib_enabled_verify=false
   gl_gnulib_enabled_682e609604ccaac6be382e4ee3a4eaec=false
   func_gl_gnulib_m4code_alignof ()
   {
@@ -1079,6 +1093,12 @@ AC_DEFUN([gl_INIT],
       gl_gnulib_enabled_utimens=true
     fi
   }
+  func_gl_gnulib_m4code_verify ()
+  {
+    if $gl_gnulib_enabled_verify; then :; else
+      gl_gnulib_enabled_verify=true
+    fi
+  }
   func_gl_gnulib_m4code_682e609604ccaac6be382e4ee3a4eaec ()
   {
     if $gl_gnulib_enabled_682e609604ccaac6be382e4ee3a4eaec; then :; else
@@ -1178,6 +1198,9 @@ AC_DEFUN([gl_INIT],
   if test $HAVE_OBSTACK = 0 || test $REPLACE_OBSTACK = 1; then
     func_gl_gnulib_m4code_alignof
   fi
+  if test $REPLACE_MKTIME = 1; then
+    func_gl_gnulib_m4code_verify
+  fi
   if test $HAVE_READLINKAT = 0 || test $REPLACE_READLINKAT = 1; then
     func_gl_gnulib_m4code_260941c0e5dc67ec9e87d1fb321c300b
   fi
@@ -1192,6 +1215,9 @@ AC_DEFUN([gl_INIT],
   fi
   if test $ac_use_included_regex = yes; then
     func_gl_gnulib_m4code_fd38c7e463b54744b77b98aeafb4fa7c
+  fi
+  if test $ac_use_included_regex = yes; then
+    func_gl_gnulib_m4code_verify
   fi
   if { test $HAVE_DECL_STRTOIMAX = 0 || test $REPLACE_STRTOIMAX = 1; } && test $ac_cv_type_long_long_int = yes; then
     func_gl_gnulib_m4code_strtoll
@@ -1236,6 +1262,7 @@ AC_DEFUN([gl_INIT],
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strings], [$gl_gnulib_enabled_strings])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_strtoll], [$gl_gnulib_enabled_strtoll])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_utimens], [$gl_gnulib_enabled_utimens])
+  AM_CONDITIONAL([gl_GNULIB_ENABLED_verify], [$gl_gnulib_enabled_verify])
   AM_CONDITIONAL([gl_GNULIB_ENABLED_682e609604ccaac6be382e4ee3a4eaec], [$gl_gnulib_enabled_682e609604ccaac6be382e4ee3a4eaec])
   # End of code from modules
   m4_ifval(gl_LIBSOURCES_LIST, [
@@ -1464,12 +1491,6 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/close-stream.h
   lib/close.c
   lib/copy-file-range.c
-  lib/count-leading-zeros.c
-  lib/count-leading-zeros.h
-  lib/count-one-bits.c
-  lib/count-one-bits.h
-  lib/count-trailing-zeros.c
-  lib/count-trailing-zeros.h
   lib/diffseq.h
   lib/dirent-private.h
   lib/dirent.in.h
@@ -1629,6 +1650,12 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/signal.in.h
   lib/stat-time.c
   lib/stat-time.h
+  lib/stdbit.c
+  lib/stdbit.in.h
+  lib/stdc_bit_width.c
+  lib/stdc_count_ones.c
+  lib/stdc_leading_zeros.c
+  lib/stdc_trailing_zeros.c
   lib/stdckdint.in.h
   lib/stddef.in.h
   lib/stdint.in.h
@@ -1804,6 +1831,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/stat-time.m4
   m4/std-gnu11.m4
   m4/stdalign.m4
+  m4/stdbit_h.m4
   m4/stddef_h.m4
   m4/stdint.m4
   m4/stdio_h.m4
