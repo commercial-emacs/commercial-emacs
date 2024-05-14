@@ -1337,6 +1337,7 @@ This consults the entries in `eww-readable-urls' (which see)."
               outline-level 'shr-outline-level)
   (setq buffer-read-only t))
 
+(declare-function imagep "image.c")
 (defvar text-scale-mode)
 (defvar text-scale-mode-amount)
 (defun eww--rescale-images ()
