@@ -1888,6 +1888,9 @@ add things to `%s' instead."
          (buffer (erc-get-buffer chnl proc)))
     (pcase-let ((`(,nick ,login ,host)
                  (erc-parse-user (erc-response.sender parsed))))
+      ;; When `buffer' is nil, `erc-remove-channel-member' and
+      ;; `erc-remove-channel-users' do almost nothing, and the message
+      ;; is displayed in the server buffer.
       (erc-remove-channel-member buffer nick)
       (erc-display-message parsed 'notice buffer
                            'PART ?n nick ?u login
@@ -1901,8 +1904,10 @@ add things to `%s' instead."
           (erc-delete-default-channel chnl buffer))
         (erc-update-mode-line buffer)
         (defvar erc-kill-buffer-on-part)
-        (when erc-kill-buffer-on-part
-          (kill-buffer buffer))))))
+        (when (and erc-kill-buffer-on-part buffer)
+          (defvar erc-killing-buffer-on-part-p)
+          (let ((erc-killing-buffer-on-part-p t))
+            (kill-buffer buffer)))))))
 
 (define-erc-response-handler (PING)
   "Handle ping messages." nil
