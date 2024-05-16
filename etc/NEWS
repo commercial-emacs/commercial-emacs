@@ -446,6 +446,79 @@ confirmation.
 It controls the placement of point and the region after duplicating a
 region with 'duplicate-dwim'.
 
++++
+** New user option 'mouse-prefer-closest-glyph'.
+When enabled, clicking or dragging with the mouse will put the point
+or start the drag in front of the buffer position corresponding to the
+glyph with the closest X coordinate to the click or start of the drag.
+In other words, if the mouse pointer is in the right half of a glyph,
+point will be put after the buffer position corresponding to that glyph,
+whereas if the mouse pointer is in the left half of a glyph, point
+will be put in front the buffer position corresponding to that glyph.
+By default this is disabled.
+
+** Internationalization
+
+---
+*** Users in CJK locales can control width of some non-CJK characters.
+Some characters are considered by Unicode as "ambiguous" with respect
+to their display width: either "full-width" (i.e., taking 2 columns on
+display) or "narrow" (taking 1 column).  The actual width depends on
+the fonts used for these characters by Emacs or (for text-mode frames)
+by the terminal emulator.  Traditionally, font sets in CJK locales
+were set up so as to display these characters as full-width, and thus
+Emacs modified the char-width table in those locales to follow suit.
+Lately, the tendency is to display these characters as narrow.  The
+new user option 'cjk-ambiguous-chars-are-wide' allows users to control
+whether Emacs considers these characters as full-width (the default)
+or narrow (if the variable is customized to the nil value).
+
+This setting affects the results of 'string-width' and similar
+functions in CJK locales.
+
+---
+*** New input methods for the Urdu, Pashto, and Sindhi languages.
+These languages are spoken in Pakistan and Afghanistan.
+
+---
+*** New input method "english-colemak".
+This input method supports the Colemak keyboard layout.
+
+*** Additional 'C-x 8' key translations for "æ" and "Æ".
+These characters can now be input with 'C-x 8 a e' and 'C-x 8 A E',
+respectively, in addition to the existing translations 'C-x 8 / e' and
+'C-x 8 / E'.
+
+*** New 'C-x 8' key translations for "low" quotes "„", and "‚".
+These can now be entered with 'C-x , "' and 'C-x , ''.
+
+*** New German language 'C-x 8' key translations for quotation marks.
+The characters "„", "“", and "”" can now be entered with 'C-x 8 v',
+'C-x 8 b' and 'C-x 8 n'.  The single versions "‚", "‘", and "’" can now
+be entered with 'C-x 8 V', 'C-x 8 B' and 'C-x 8 N'.  These characters
+are used for the official German quoting style.  Using them requires
+activating German language support via 'iso-transl-set-language'.
+
+*** "latin-prefix" and "latin-postfix" quotation marks additions.
+These input methods can now produce single, double and "low" left and
+right quotation marks:
+
+    "‘", "’", "“", "”", "„", and "‚"
+
+by using "[", "]", and "," for "left", "right", and "low" respectively
+to modify "'" and """.
+
+*** "latin-prefix" and "latin-postfix" guillemets support.
+These input methods can now produce single guillemets "‹" and "›".  For
+"latin-prefix" use "~~<" and "~~>", for "latin-postfix" use "<~" and
+">~".  Double guillemets ("«" and "»") were already supported.
+
+*** New French language 'C-x 8' key translations for "‹" and "›".
+These characters can now be entered using 'C-x 8 ~ <' and 'C-x 8 ~ >'
+respectively, after activating French language support via
+'iso-transl-set-language'.  Double guillemets were already supported via
+'C-x 8 <' and 'C-x 8 >'
+
 
 * Changes in Specialized Modes and Packages in Emacs 30.1
 
