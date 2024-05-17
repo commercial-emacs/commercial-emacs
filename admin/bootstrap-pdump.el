@@ -423,31 +423,32 @@
 
 (let ((output-path (expand-file-name (pdumping-output) invocation-directory)))
   (condition-case nil
-      (let ((name (format "emacs-%s.%d" emacs-version emacs-build-number))
-            (exe (if (eq system-type 'windows-nt) ".exe" "")))
-        (let (lexical-binding)
-          (dump-emacs-portable output-path))
-        (while (string-match "[^-+_.a-zA-Z0-9]+" name)
-          (setq name (concat (downcase (substring name 0 (match-beginning 0)))
-                             "-"
-                             (substring name (match-end 0)))))
-        (unless (member "--pdump-overwrite" command-line-args)
-          (message "Adding name %s" (concat name exe))
-          ;; When this runs on Windows, invocation-directory is not
-          ;; necessarily the current directory.
-          (add-name-to-file (expand-file-name (concat "emacs" exe)
-                                              invocation-directory)
-                            (expand-file-name (concat name exe)
-                                              invocation-directory)
-                            t)
-          (when pdumper--pure-pool
-            (message "Adding name %s" (concat name ".pdmp"))
-            (add-name-to-file (expand-file-name "emacs.pdmp"
-                                                invocation-directory)
-                              (expand-file-name (concat name ".pdmp")
-                                                invocation-directory)
-                              t))))
+      (let (lexical-binding)
+        (dump-emacs-portable output-path))
     (error (ignore-errors (delete-file output-path)))))
+
+(unless (member "--pdump-overwrite" command-line-args)
+  (let ((name (format "emacs-%s.%d" emacs-version emacs-build-number))
+        (exe (if (eq system-type 'windows-nt) ".exe" "")))
+    (while (string-match "[^-+_.a-zA-Z0-9]+" name)
+      (setq name (concat (downcase (substring name 0 (match-beginning 0)))
+                         "-"
+                         (substring name (match-end 0)))))
+    (message "Adding name %s" (concat name exe))
+    ;; When this runs on Windows, invocation-directory is not
+    ;; necessarily the current directory.
+    (add-name-to-file (expand-file-name (concat "emacs" exe)
+                                        invocation-directory)
+                      (expand-file-name (concat name exe)
+                                        invocation-directory)
+                      t)
+    (when pdumper--pure-pool
+      (message "Adding name %s" (concat name ".pdmp"))
+      (add-name-to-file (expand-file-name "emacs.pdmp"
+                                          invocation-directory)
+                        (expand-file-name (concat name ".pdmp")
+                                          invocation-directory)
+                        t))))
 
 (kill-emacs) ;crude
 
