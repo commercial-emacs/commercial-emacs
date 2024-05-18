@@ -3547,6 +3547,12 @@ with_flushed_stack (void (*func) (void *arg), void *arg)
 
   func (arg);
   eassume (current_thread == self);
+  /* Work around GCC sibling call optimization making
+     '__builtin_unwind_init' ineffective (bug#65727).
+     See <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=115132>.  */
+#if defined __GNUC__ && !defined __clang__ && !defined __OBJC__
+  asm ("");
+#endif
 }
 
 /* Return 2 if OBJ is a killed or special buffer object, 1 if OBJ is a
