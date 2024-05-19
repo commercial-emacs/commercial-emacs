@@ -970,6 +970,14 @@ buffer must either visit a file, or it must run 'dired-mode'.  Another
 method but "sudo" can be configured with user option
 'tramp-file-name-with-method'.
 
++++
+*** Direct asynchronous processes are indicated by a connection-local variable.
+If direct asynchronous processes shall be used, set the connection-local
+variable 'tramp-direct-async-process' to a non-nil value.  This has been
+changed, in previous Emacs versions this was indicated by the now
+deprecated connection property "direct-async-process".  See the Tramp
+manual "(tramp) Improving performance of asynchronous remote processes".
+
 ---
 *** Direct asynchronous processes use 'tramp-remote-path'.
 When a direct asynchronous process is invoked, it uses 'tramp-remote-path'
@@ -1532,7 +1540,57 @@ options of GNU 'ls'.
 +++
 *** New user option 'widget-skip-inactive'.
 If non-nil, moving point forward or backward between widgets by typing
-TAB or S-TAB skips over inactive widgets.  The default value is nil.
+'TAB' or 'S-TAB' skips over inactive widgets.  The default value is nil.
+
+** Ruby mode
+
+*** New user option 'ruby-rubocop-use-bundler'.
+By default it retains the previous behavior: read the contents of
+Gemfile and act accordingly.  But you can also set it to t or nil to
+skip the check.
+
+** Miscellaneous
+
+---
+*** Webjump now assumes URIs are HTTPS instead of HTTP.
+For links in 'webjump-sites' without an explicit URI scheme, it was
+previously assumed that they should be prefixed with "http://".  Such
+URIs are now prefixed with "https://" instead.
+
+---
+*** 'bug-reference-mode' now supports 'thing-at-point'.
+Now, calling '(thing-at-point 'url)' when point is on a bug reference
+will return the URL for that bug.
+
++++
+*** New user option 'rcirc-log-time-format'.
+This allows for rcirc logs to use a custom timestamp format, than the
+chat buffers use by default.
+
+---
+*** New user option 'Buffer-menu-group-by'.
+It controls how buffers are divided into groups that are displayed with
+headings using Outline minor mode.
+
++++
+*** New command 'Buffer-menu-toggle-internal'.
+This command toggles the display of internal buffers in Buffer Menu mode;
+that is, buffers not visiting a file and whose names start with a space.
+Previously, such buffers were never shown.  This command is bound to 'I'
+in Buffer Menu mode.
+
+---
+*** nXML Mode now comes with schemas for Mono/.NET development.
+The following new XML schemas are now supported:
+- MSBuild project files
+- Dotnet package properties files
+- Dotnet resource extension files
+- Dotnet Application config files
+- Nuget config file
+- Nuget package specification file
+- Nuget packages config file
+
+** color.el now supports the Oklab color representation.
 
 
 * New Modes and Packages in Emacs 30.1
@@ -2391,15 +2449,14 @@ objects is still necessary.
 ** 'vtable-insert-object' can insert "before" or at an index.
 The signature of 'vtable-insert-object' has changed and is now:
 
-(vtable-insert-object table object &optional location before)
+    (vtable-insert-object TABLE OBJECT &optional LOCATION BEFORE)
 
-'location' corresponds to the old 'after-object' argument; if 'before'
-is non-nil, the new object is inserted before the 'location' object,
-making it possible to insert a new object at the top of the
-table. (Before, this was not possible.)  In addition, 'location' can be
-an integer, a (zero-based) index into the table at which the new object
-is inserted ('before' is ignored in this case).
-
+LOCATION corresponds to the old AFTER-OBJECT argument; if BEFORE is
+non-nil, the new object is inserted before the LOCATION object, making
+it possible to insert a new object at the top of the table.  (Before,
+this was not possible.)  In addition, LOCATION can be an integer, a
+(zero-based) index into the table at which the new object is inserted
+(BEFORE is ignored in this case).
 
 ** JSON
 
