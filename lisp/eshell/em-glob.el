@@ -53,7 +53,7 @@
 (require 'esh-module)
 (require 'esh-util)
 
-;;;###autoload
+;;;###esh-module-autoload
 (progn
 (defgroup eshell-glob nil
   "This module provides extended globbing syntax, similar what is used
@@ -409,9 +409,4 @@ directories and files."
         (eshell-glob-entries rdir globs only-dirs)))))
 
 (provide 'em-glob)
-
-;; Local Variables:
-;; generated-autoload-file: "esh-groups.el"
-;; End:
-
 ;;; em-glob.el ends here
