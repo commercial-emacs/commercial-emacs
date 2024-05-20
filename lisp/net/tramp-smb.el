@@ -1233,7 +1233,7 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	 ((car destination)
 	  (setq outbuf (current-buffer))))
 	;; stderr.
-	(tramp-message v 2 "%s" "STDERR not supported"))
+	(tramp-warning v "%s" "STDERR not supported"))
        ;; 't
        (destination
 	(setq outbuf (current-buffer))))
