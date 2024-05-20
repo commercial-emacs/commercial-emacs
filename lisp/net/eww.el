@@ -1358,9 +1358,9 @@ This consults the entries in `eww-readable-urls' (which see)."
   "`thing-at-point' provider function."
   (thing-at-point-for-text-property 'shr-url))
 
-(defun eww--forward-url (n)
+(defun eww--forward-url (backward)
   "`forward-thing' provider function."
-  (forward-thing-for-text-property 'shr-url n))
+  (forward-thing-for-text-property 'shr-url backward))
 
 (defun eww--bounds-of-url-at-point ()
   "`bounds-of-thing-at-point' provider function."
