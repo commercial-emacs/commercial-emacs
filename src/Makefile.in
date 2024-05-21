@@ -349,8 +349,6 @@ HAIKU_LIBS = @HAIKU_LIBS@
 HAIKU_CFLAGS = @HAIKU_CFLAGS@
 
 CHECK_STRUCTS = @CHECK_STRUCTS@
-# Whether loadup should overwrite existing artifacts.
-PDUMPER_OVERWRITE = @PDUMPER_OVERWRITE@
 
 HAVE_BE_APP = @HAVE_BE_APP@
 
@@ -498,8 +496,7 @@ bootstrap-emacs$(EXEEXT): | emacs$(EXEEXT)
 define pdump
 	$(AM_V_at)rm -f $(1)
 	LC_ALL=C ../src/$(1:.pdmp=)$(EXEEXT) --batch $(BUILD_DETAILS) \
-	  $(2) -l ../admin/$(1:emacs.pdmp=pdump) \
-	  --pdump-write=$(1)
+	  -l ../admin/$(1:emacs.pdmp=pdump) --pdump-write=$(1)
 endef
 
 define relative-lisp-files
@@ -522,10 +519,10 @@ emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el ../lisp/loaddefs.elc \
   ../lisp/international/charprop.el \
   $(patsubst %,../lisp/%.el,$(shell $(call relative-lisp-files,bootstrap-emacs$(EXEEXT),nil)))
 	-[ -e $@ ] && rm -f -- $(patsubst %.el,%.elc,$(filter %.el,$?))
-	$(call pdump,$@,--pdump-overwrite) # pdmp some interpreted elisp
+	$(call pdump,$@) # pdmp some interpreted elisp
 	@# if relative-lisp-files empty, .DEFAULT_GOAL=none
 	$(MAKE) .DEFAULT_GOAL=none -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\")`
-	$(call pdump,$@,$(PDUMPER_OVERWRITE)) # pdmp all native- and byte-compiled
+	$(call pdump,$@) # pdmp all native- and byte-compiled
 
 install-emacs.pdmp: emacs.pdmp
 	$(AM_V_at)rm -f install-emacs$(EXEEXT)
