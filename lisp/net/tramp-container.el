@@ -497,6 +497,24 @@ see its function help for a description of the format."
   tramp-kubernetes-method
   `((tramp-kubernetes--completion-function ,tramp-kubernetes-method)))
 
+ (defconst tramp-kubernetes-connection-local-default-variables
+   '((tramp-config-check . tramp-kubernetes--current-context-data)
+     ;; This variable will be eval'ed in `tramp-expand-args'.
+     (tramp-extra-expand-args
+      . (?a (tramp-kubernetes--container (car tramp-current-connection))
+	    ?h (tramp-kubernetes--pod (car tramp-current-connection))
+	    ?x (tramp-kubernetes--context-namespace
+		(car tramp-current-connection)))))
+   "Default connection-local variables for remote kubernetes connections.")
+
+ (connection-local-set-profile-variables
+  'tramp-kubernetes-connection-local-default-profile
+  tramp-kubernetes-connection-local-default-variables)
+
+ (connection-local-set-profiles
+  `(:application tramp :protocol ,tramp-kubernetes-method)
+  'tramp-kubernetes-connection-local-default-profile))
+
  (tramp-set-completion-function
   tramp-toolbox-method
   `((tramp-toolbox--completion-function ,tramp-toolbox-method)))
@@ -523,9 +541,21 @@ see its function help for a description of the format."
 	     (car tramp-current-connection)))))
    "Default connection-local variables for remote kubernetes connections.")
 
- (connection-local-set-profile-variables
-  'tramp-kubernetes-connection-local-default-profile
-  tramp-kubernetes-connection-local-default-variables)
+  (tramp-set-completion-function
+   tramp-flatpak-method
+   `((tramp-flatpak--completion-function ,tramp-flatpak-method)))
+
+  (defconst tramp-flatpak-connection-local-default-variables
+    `((tramp-remote-path  . ,(cons "/app/bin" tramp-remote-path)))
+    "Default connection-local variables for remote flatpak connections.")
+
+  (connection-local-set-profile-variables
+   'tramp-flatpak-connection-local-default-profile
+   tramp-flatpak-connection-local-default-variables)
+
+  (connection-local-set-profiles
+   `(:application tramp :protocol ,tramp-flatpak-method)
+   'tramp-flatpak-connection-local-default-profile))
 
  (connection-local-set-profiles
   `(:application tramp :protocol ,tramp-kubernetes-method)
@@ -539,9 +569,27 @@ see its function help for a description of the format."
   'tramp-flatpak-connection-local-default-profile
   tramp-flatpak-connection-local-default-variables)
 
- (connection-local-set-profiles
-  `(:application tramp :protocol ,tramp-flatpak-method)
-  'tramp-flatpak-connection-local-default-profile))
+;; todo: check tramp-async-args and tramp-direct-async
+;;;###tramp-autoload
+(defun tramp-enable-nspawn-method ()
+  "Enable connection to nspawn containers."
+  (add-to-list 'tramp-methods
+	       `(,tramp-nspawn-method
+		 (tramp-login-program ,tramp-nspawn-program)
+		 (tramp-login-args (("shell")
+				    ("-q")
+				    ("--uid" "%u")
+				    ("%h")))
+		 (tramp-remote-shell ,tramp-default-remote-shell)
+		 (tramp-remote-shell-login ("-l"))
+		 (tramp-remote-shell-args ("-i" "-c"))))
+
+  (add-to-list 'tramp-default-host-alist `(,tramp-nspawn-method nil ".host"))
+  (add-to-list 'tramp-completion-multi-hop-methods tramp-nspawn-method)
+
+  (tramp-set-completion-function
+   tramp-nspawn-method
+   `((tramp-nspawn--completion-function ,tramp-nspawn-method))))
 
 (add-hook 'tramp-unload-hook
 	  (lambda ()
