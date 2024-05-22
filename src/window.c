@@ -8318,7 +8318,7 @@ init_window_once (void)
   old_selected_window = Qnil;
   staticpro (&old_selected_window);
 
-  pdumper_do_now_and_after_late_load (init_window_once_for_pdumper);
+  pdumper_do_now_and_after_load (init_window_once_for_pdumper);
 }
 
 static void init_window_once_for_pdumper (void)
@@ -8334,25 +8334,10 @@ static void init_window_once_for_pdumper (void)
   PDUMPER_RESET_LV (Vwindow_list, Qnil);
   PDUMPER_RESET_LV (minibuf_selected_window, Qnil);
 
-  /* Hack: if mode_line_in_non_selected_windows is true (which it may
-     be, if we're restoring from a dump) the guts of
-     make_initial_frame will try to access selected_window, which is
-     invalid at this point, and lose.  For the purposes of creating
-     the initial frame and window, this variable must be false.  */
-  bool old_mode_line_in_non_selected_windows;
-
-  /* Snapshot to suppress compiler warning.  */
-  bool saved_dumped = was_dumped_p ();
-  if (saved_dumped)
-    {
-      old_mode_line_in_non_selected_windows
-        = mode_line_in_non_selected_windows;
-      mode_line_in_non_selected_windows = false;
-    }
+  bool restore = mode_line_in_non_selected_windows;
+  mode_line_in_non_selected_windows = false;
   struct frame *f = make_initial_frame ();
-  if (saved_dumped)
-    mode_line_in_non_selected_windows =
-      old_mode_line_in_non_selected_windows;
+  mode_line_in_non_selected_windows = restore;
   XSETFRAME (selected_frame, f);
   old_selected_frame = Vterminal_frame = selected_frame;
   minibuf_window = f->minibuffer_window;
