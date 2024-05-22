@@ -117,9 +117,6 @@ static const char dump_magic[16] = {
 static pdumper_hook dump_hooks[24];
 static int nr_dump_hooks = 0;
 
-static pdumper_hook dump_late_hooks[24];
-static int nr_dump_late_hooks = 0;
-
 static struct
 {
   void *mem;
@@ -2851,8 +2848,7 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
 #endif
   dump_off subr_off = dump_object_finish (ctx, &out, sizeof (out));
   if (non_primitive && ctx->flags.dump_object_contents)
-    /* We'll do the final addr relocation during VERY_LATE_RELOCS time
-       after the compilation units has been loaded. */
+    /* Final relocation after compilation units loaded. */
     dump_push (&ctx->dump_relocs[VERY_LATE_RELOCS],
 	       list2 (make_fixnum (RELOC_NATIVE_SUBR),
 		      dump_off_to_lisp (subr_off)));
@@ -3186,12 +3182,6 @@ dump_metadata_for_pdumper (struct dump_context *ctx)
     dump_emacs_reloc_to_emacs_ptr_raw (ctx, &dump_hooks[i],
 				       (void const *) dump_hooks[i]);
   dump_emacs_reloc_immediate_int (ctx, &nr_dump_hooks, nr_dump_hooks);
-
-  for (int i = 0; i < nr_dump_late_hooks; ++i)
-    dump_emacs_reloc_to_emacs_ptr_raw (ctx, &dump_late_hooks[i],
-				       (void const *) dump_late_hooks[i]);
-  dump_emacs_reloc_immediate_int (ctx, &nr_dump_late_hooks,
-				  nr_dump_late_hooks);
 
   for (int i = 0; i < nr_remembered_data; ++i)
     {
@@ -4237,15 +4227,6 @@ pdumper_do_now_and_after_load_impl (pdumper_hook hook)
   hook ();
 }
 
-void
-pdumper_do_now_and_after_late_load_impl (pdumper_hook hook)
-{
-  if (nr_dump_late_hooks == ARRAYELTS (dump_late_hooks))
-    fatal ("out of dump hooks: make dump_late_hooks[] bigger");
-  dump_late_hooks[nr_dump_late_hooks++] = hook;
-  hook ();
-}
-
 static void
 pdumper_remember_user_data_1 (void *mem, int nbytes)
 {
@@ -5245,7 +5226,7 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 }
 
 static void
-dump_do_all_dump_reloc_for_phase (const struct dump_header *const header,
+dump_do_dump_reloc_for_phase (const struct dump_header *const header,
 				  const uintptr_t dump_base,
 				  const enum reloc_phase phase)
 {
@@ -5302,7 +5283,7 @@ dump_do_emacs_relocation (const uintptr_t dump_base,
 }
 
 static void
-dump_do_all_emacs_relocations (const struct dump_header *const header,
+dump_do_emacs_relocations (const struct dump_header *const header,
 			       const uintptr_t dump_base)
 {
   const dump_off nr_entries = header->emacs_relocs.nr_entries;
@@ -5462,8 +5443,8 @@ pdumper_load (char *dump_filename)
   dump_public.start = dump_base;
   dump_public.end = dump_public.start + dump_size;
 
-  dump_do_all_dump_reloc_for_phase (header, dump_base, EARLY_RELOCS);
-  dump_do_all_emacs_relocations (header, dump_base);
+  dump_do_dump_reloc_for_phase (header, dump_base, EARLY_RELOCS);
+  dump_do_emacs_relocations (header, dump_base);
 
   dump_mmap_discard_contents (&sections[DS_DISCARDABLE]);
   for (int i = 0; i < ARRAYELTS (sections); ++i)
@@ -5478,18 +5459,12 @@ pdumper_load (char *dump_filename)
     }
 
   pdumper_hashes = &hashes;
-  /* Run the functions Emacs registered for doing post-dump-load
-     initialization.  */
+
+  dump_do_dump_reloc_for_phase (header, dump_base, LATE_RELOCS);
+  dump_do_dump_reloc_for_phase (header, dump_base, VERY_LATE_RELOCS);
+
   for (int i = 0; i < nr_dump_hooks; ++i)
     dump_hooks[i] ();
-
-  dump_do_all_dump_reloc_for_phase (header, dump_base, LATE_RELOCS);
-  dump_do_all_dump_reloc_for_phase (header, dump_base, VERY_LATE_RELOCS);
-
-  /* Run the functions Emacs registered for doing post-dump-load
-     initialization.  */
-  for (int i = 0; i < nr_dump_late_hooks; ++i)
-    dump_late_hooks[i] ();
 
   initialized = true;
 
