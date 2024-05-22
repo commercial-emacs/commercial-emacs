@@ -43,7 +43,7 @@
 (declare-function native-elisp-load "comp.c")
 
 (defconst comp-warn-primitives
-  '(null memq gethash and subrp not subr-native-elisp-p
+  '(null memq gethash and subrp not native-comp-function-p
          comp--install-trampoline concat if symbolp symbol-name make-string
          length aset aref length> mapcar expand-file-name
          file-name-as-directory file-exists-p native-elisp-load)

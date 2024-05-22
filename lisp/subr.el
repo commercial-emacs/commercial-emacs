@@ -323,14 +323,14 @@ value of last one, or nil if there are none."
 Such objects can be functions or special forms."
   (declare (side-effect-free error-free))
   (and (subrp object)
-       (not (subr-native-elisp-p object))))
+       (not (native-comp-function-p object))))
 
 (defsubst primitive-function-p (object)
   "Return t if OBJECT is a built-in primitive function.
 This excludes special forms, since they are not functions."
   (declare (side-effect-free error-free))
   (and (subrp object)
-       (not (or (subr-native-elisp-p object)
+       (not (or (native-comp-function-p object)
                 (eq (cdr (subr-arity object)) 'unevalled)))))
 
 (defsubst xor (cond1 cond2)
@@ -3004,7 +3004,7 @@ This is to `put' what `defalias' is to `fset'."
         (setcdr ps (cons symbol (cdr ps))))))
   (put symbol prop val))
 
-(declare-function subr-native-elisp-p "data.c")
+(declare-function native-comp-function-p "data.c")
 (declare-function native-comp-unit-file "data.c")
 (declare-function subr-native-comp-unit "data.c")
 

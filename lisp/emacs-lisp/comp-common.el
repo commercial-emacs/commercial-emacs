@@ -489,7 +489,7 @@ compiler) or \='declared (by the function type itself or is one of
       (if-let ((decl-type (function-get function 'function-type)))
           ;; Declared Lisp function
           (setf type-spec decl-type)
-        (when (subr-native-elisp-p f)
+        (when (native-comp-function-p f)
           ;; Native compiled inferred
           (setf kind 'inferred
                 type-spec (subr-type f)))))
