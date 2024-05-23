@@ -4030,16 +4030,16 @@ staticpro (Lisp_Object const *varaddress)
 }
 
 static void
-allow_garbage_collection (void)
+restore_gc_inhibited (int restore)
 {
-  gc_inhibited = false;
+  gc_inhibited = restore ? true : false;
 }
 
 specpdl_ref
 inhibit_garbage_collection (void)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-  record_unwind_protect_void (allow_garbage_collection);
+  record_unwind_protect_int (restore_gc_inhibited, gc_inhibited ? 1 : 0);
   gc_inhibited = true;
   return count;
 }
