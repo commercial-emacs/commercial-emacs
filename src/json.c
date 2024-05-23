@@ -677,9 +677,8 @@ usage: (json-insert OBJECT &rest ARGS)  */)
   return Qnil;
 }
 
-
-#define JSON_PARSER_INTERNAL_OBJECT_WORKSPACE_SIZE 64
-#define JSON_PARSER_INTERNAL_BYTE_WORKSPACE_SIZE 512
+#define OBJECT_WORKSPACE_SIZE (512 / sizeof (Lisp_Object))
+#define BYTE_WORKSPACE_SIZE (512 / sizeof (unsigned char))
 
 struct json_parser
 {
@@ -708,23 +707,14 @@ struct json_parser
 
   size_t additional_bytes_count;
 
-  /* Lisp_Objects are collected in this area during object/array
-     parsing.  To avoid allocations, initially
-     internal_object_workspace is used.  If it runs out of space then
-     we switch to allocated space.  Important note: with this design,
-     GC must not run during JSON parsing, otherwise Lisp_Objects in
-     the workspace may get incorrectly collected. */
-  Lisp_Object internal_object_workspace
-  [JSON_PARSER_INTERNAL_OBJECT_WORKSPACE_SIZE];
+  /* The clumsiness of the internal workspaces emerged from the desire
+     to avoid allocations for smaller corpora.  */
+  Lisp_Object internal_object_workspace[OBJECT_WORKSPACE_SIZE];
   Lisp_Object *object_workspace;
   size_t object_workspace_size;
   size_t object_workspace_current;
 
-  /* String and number parsing uses this workspace.  The idea behind
-     internal_byte_workspace is the same as the idea behind
-     internal_object_workspace */
-  unsigned char
-  internal_byte_workspace[JSON_PARSER_INTERNAL_BYTE_WORKSPACE_SIZE];
+  unsigned char internal_byte_workspace[BYTE_WORKSPACE_SIZE+1]; /* +1 string terminator */
   unsigned char *byte_workspace;
   unsigned char *byte_workspace_end;
   unsigned char *byte_workspace_current;
@@ -781,14 +771,15 @@ json_parser_init (struct json_parser *parser,
   parser->additional_bytes_count = 0;
 
   parser->object_workspace = parser->internal_object_workspace;
-  parser->object_workspace_size
-    = JSON_PARSER_INTERNAL_OBJECT_WORKSPACE_SIZE;
+  parser->object_workspace_size = OBJECT_WORKSPACE_SIZE;
   parser->object_workspace_current = 0;
 
   parser->byte_workspace = parser->internal_byte_workspace;
-  parser->byte_workspace_end = (parser->byte_workspace
-				+ JSON_PARSER_INTERNAL_BYTE_WORKSPACE_SIZE);
+  parser->byte_workspace_end = parser->byte_workspace + BYTE_WORKSPACE_SIZE;
 }
+
+#undef OBJECT_WORKSPACE_SIZE
+#undef BYTE_WORKSPACE_SIZE
 
 static void
 json_parser_done (void *parser)
@@ -800,53 +791,28 @@ json_parser_done (void *parser)
     xfree (p->byte_workspace);
 }
 
-/* Makes sure that the object_workspace has 'size' available space for
-   Lisp_Objects */
-NO_INLINE static void
-json_make_object_workspace_for_slow_path (struct json_parser *parser,
-					  size_t size)
-{
-  size_t needed_workspace_size
-    = (parser->object_workspace_current + size);
-  size_t new_workspace_size = parser->object_workspace_size;
-  while (new_workspace_size < needed_workspace_size)
-    {
-      if (ckd_mul (&new_workspace_size, new_workspace_size, 2))
-	{
-	  json_signal_error (parser, Qjson_out_of_memory);
-	}
-    }
-
-  Lisp_Object *new_workspace_ptr;
-  if (parser->object_workspace_size
-      == JSON_PARSER_INTERNAL_OBJECT_WORKSPACE_SIZE)
-    {
-      new_workspace_ptr
-	= xnmalloc (new_workspace_size, sizeof (Lisp_Object));
-      memcpy (new_workspace_ptr, parser->object_workspace,
-	      (sizeof (Lisp_Object)
-	       * parser->object_workspace_current));
-    }
-  else
-    {
-      new_workspace_ptr
-	= xnrealloc (parser->object_workspace, new_workspace_size,
-		     sizeof (Lisp_Object));
-    }
-
-  parser->object_workspace = new_workspace_ptr;
-  parser->object_workspace_size = new_workspace_size;
-}
-
 INLINE void
-json_make_object_workspace_for (struct json_parser *parser,
-				size_t size)
+json_object_workspace_put (struct json_parser *parser, const Lisp_Object element)
 {
-  if (parser->object_workspace_size - parser->object_workspace_current
-      < size)
+  if (parser->object_workspace_current >= parser->object_workspace_size)
     {
-      json_make_object_workspace_for_slow_path (parser, size);
+      if (ckd_mul (&parser->object_workspace_size,
+		   parser->object_workspace_size, 2))
+	json_signal_error (parser, Qoverflow_error);
+
+      if (parser->object_workspace == parser->internal_object_workspace)
+	{
+	  parser->object_workspace = xnmalloc (parser->object_workspace_size,
+					       sizeof (Lisp_Object));
+	  memcpy (parser->object_workspace, parser->internal_object_workspace,
+		  (sizeof (Lisp_Object) * parser->object_workspace_current));
+	}
+      else
+	parser->object_workspace = xnrealloc (parser->object_workspace,
+					      parser->object_workspace_size,
+					      sizeof (Lisp_Object));
     }
+  parser->object_workspace[parser->object_workspace_current++] = element;
 }
 
 static void
@@ -855,52 +821,28 @@ json_byte_workspace_reset (struct json_parser *parser)
   parser->byte_workspace_current = parser->byte_workspace;
 }
 
-/* Puts 'value' into the byte_workspace.  If there is no space
-   available, it allocates space */
-NO_INLINE static void
-json_byte_workspace_put_slow_path (struct json_parser *parser,
-				   unsigned char value)
-{
-  size_t new_workspace_size
-    = parser->byte_workspace_end - parser->byte_workspace;
-  if (ckd_mul (&new_workspace_size, new_workspace_size, 2))
-    {
-      json_signal_error (parser, Qjson_out_of_memory);
-    }
-
-  size_t offset
-    = parser->byte_workspace_current - parser->byte_workspace;
-
-  if (parser->byte_workspace == parser->internal_byte_workspace)
-    {
-      parser->byte_workspace = xmalloc (new_workspace_size);
-      memcpy (parser->byte_workspace, parser->internal_byte_workspace,
-	      offset);
-    }
-  else
-    {
-      parser->byte_workspace
-	= xrealloc (parser->byte_workspace, new_workspace_size);
-    }
-  parser->byte_workspace_end
-    = parser->byte_workspace + new_workspace_size;
-  parser->byte_workspace_current = parser->byte_workspace + offset;
-  *parser->byte_workspace_current++ = value;
-}
-
 INLINE void
-json_byte_workspace_put (struct json_parser *parser,
-			 unsigned char value)
+json_byte_workspace_put (struct json_parser *parser, const unsigned char value)
 {
-  if (parser->byte_workspace_current < parser->byte_workspace_end)
+  if (parser->byte_workspace_current >= parser->byte_workspace_end)
     {
-      *parser->byte_workspace_current++ = value;
+      size_t new_size;
+      if (ckd_mul (&new_size, parser->byte_workspace_end - parser->byte_workspace, 2))
+	json_signal_error (parser, Qoverflow_error);
+      if (parser->byte_workspace == parser->internal_byte_workspace)
+	{
+	  const size_t extant_size = (parser->byte_workspace_current -
+				      parser->internal_byte_workspace);
+	  parser->byte_workspace = xmalloc (new_size + 1); /* +1 string terminator */
+	  memcpy (parser->byte_workspace, parser->internal_byte_workspace, extant_size);
+	  parser->byte_workspace_current = parser->byte_workspace + extant_size;
+	}
+      else
+	parser->byte_workspace = xrealloc (parser->byte_workspace, new_size);
+      parser->byte_workspace_end = parser->byte_workspace + new_size;
     }
-  else
-    {
-      json_byte_workspace_put_slow_path (parser, value);
-    }
-  *parser->byte_workspace_current = '\0';
+  *parser->byte_workspace_current++ = value;
+  *parser->byte_workspace_current = '\0'; /* string terminator */
 }
 
 static bool
@@ -1426,10 +1368,7 @@ json_parse_array (struct json_parser *parser)
 	  switch (parser->conf.array_type)
 	    {
 	    case json_array_array:
-	      json_make_object_workspace_for (parser, 1);
-	      parser->object_workspace[parser->object_workspace_current]
-		= element;
-	      parser->object_workspace_current++;
+	      json_object_workspace_put (parser, element);
 	      break;
 	    case json_array_list:
 	      {
@@ -1529,9 +1468,8 @@ json_parse_object (struct json_parser *parser)
 	      break;
 	    }
 	  Lisp_Object value = json_parse_object_member_value (parser);
-	  json_make_object_workspace_for (parser, 2);
-	  parser->object_workspace[parser->object_workspace_current++] = key;
-	  parser->object_workspace[parser->object_workspace_current++] = value;
+	  json_object_workspace_put (parser, key);
+	  json_object_workspace_put (parser, value);
 	  c = json_skip_whitespace (parser);
 	  if (c == '}')
 	    {
