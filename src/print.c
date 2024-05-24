@@ -783,6 +783,16 @@ means "use default values for all the print-related settings".  */)
   return unbind_to (count, object);
 }
 
+void prin1_no_unbind (Lisp_Object object, Lisp_Object printcharfun, Lisp_Object overrides)
+{
+  if (NILP (printcharfun))
+    printcharfun = Vstandard_output;
+  if (!NILP (overrides))
+    print_bind_overrides (overrides);
+
+  print (object, printcharfun, 1);
+}
+
 /* A buffer which is used to hold output being built by prin1-to-string.  */
 Lisp_Object Vprin1_to_string_buffer;
 

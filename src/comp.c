@@ -2129,9 +2129,9 @@ emit_exception_stack_pop (void)
   /*
     struct handler *popped = thr->exception_stack_top;
     if (popped == thr->exception_stack_bottom)
-    thr->exception_stack_top = NULL;
+      thr->exception_stack_top = NULL;
     else if (popped > thr->exception_stack_bottom)
-    --thr->exception_stack_top;
+      --thr->exception_stack_top;
     return popped;
   */
   emit_cond_jump

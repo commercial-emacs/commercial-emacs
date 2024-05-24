@@ -1066,15 +1066,15 @@ Return value is the fall-through block name."
     (cl-assert (= (- label-sp 2) (comp--sp)))
     (setf (comp-func-has-non-local comp-func) t)
     (let* ((guarded-bb (comp--bb-maybe-add (1+ (comp-limplify-pc comp-pass))
-                                          (comp--sp)))
+                                           (comp--sp)))
            (handler-bb (comp--bb-maybe-add (comp--label-to-addr label-num)
-                                          (1+ (comp--sp))))
+                                           (1+ (comp--sp))))
            (pop-bb (make--comp-block-lap nil (comp--sp) (comp--new-block-sym))))
       (comp--emit (list 'push-exception
-                       handler-type
-                       (comp--slot+1)
-                       (comp-block-name pop-bb)
-                       (comp-block-name guarded-bb)))
+                        handler-type
+                        (comp--slot+1)
+                        (comp-block-name pop-bb)
+                        (comp-block-name guarded-bb)))
       (comp--mark-curr-bb-closed)
       ;; Emit the basic block to pop the handler if we got the non local.
       (puthash (comp-block-name pop-bb) pop-bb (comp-func-blocks comp-func))
