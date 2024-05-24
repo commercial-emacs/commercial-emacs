@@ -521,6 +521,16 @@ def f(x: CustomInt) -> CustomInt:
      (5 . font-lock-keyword-face) (7)
      (8 . font-lock-constant-face))))
 
+(ert-deftest python-font-lock-assignment-statement-20 ()
+  (python-tests-assert-faces
+   "a = b = c = 1"
+   '((1 . font-lock-variable-name-face) (2)
+     (3 . font-lock-operator-face) (4)
+     (5 . font-lock-variable-name-face) (6)
+     (7 . font-lock-operator-face) (8)
+     (9 . font-lock-variable-name-face) (10)
+     (11 . font-lock-operator-face) (12))))
+
 (ert-deftest python-font-lock-escape-sequence-string-newline ()
   (python-tests-assert-faces
    "'\\n'
