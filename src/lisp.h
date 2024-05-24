@@ -197,7 +197,6 @@ verify (BITS_WORD_MAX >> (BITS_PER_BITS_WORD - 1) == 1);
 #else /* ENABLE_CHECKING */
 
 extern AVOID die (const char *, const char *, int);
-
 extern bool suppress_checking EXTERNALLY_VISIBLE;
 
 # define eassert(cond)						\
@@ -5096,6 +5095,8 @@ extern void init_system_name (void);
    larger than MAX_ALLOCA, use xmalloc to avoid overflowing the stack.  */
 
 enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
+
+extern void prin1_no_unbind (Lisp_Object object, Lisp_Object printcharfun, Lisp_Object overrides);
 
 extern void *record_xmalloc (size_t)
   ATTRIBUTE_ALLOC_SIZE ((1)) ATTRIBUTE_RETURNS_NONNULL;
