@@ -1185,8 +1185,7 @@ internal_catch (Lisp_Object tag, Lisp_Object (*func) (Lisp_Object),
 		Lisp_Object arg)
 {
   struct handler *c = push_exception (tag, CATCHER);
-/* #ifdef ENABLE_CHECKING */
-#if 1
+#ifdef ENABLE_CHECKING
   size_t ocount = exception_stack_count (current_thread);
   Lisp_Object owhat = c->what;
 #else
@@ -1196,10 +1195,6 @@ internal_catch (Lisp_Object tag, Lisp_Object (*func) (Lisp_Object),
   if (sys_setjmp (c->jmp))
     {
       Lisp_Object val = current_thread->exception_stack_top->val;
-      if (ocount != exception_stack_count (current_thread))
-	emacs_abort ();
-      if (!EQ (owhat, current_thread->exception_stack_top->what))
-	emacs_abort ();
       eassert (ocount == exception_stack_count (current_thread));
       eassert (EQ (owhat, current_thread->exception_stack_top->what));
       exception_stack_pop (current_thread);
