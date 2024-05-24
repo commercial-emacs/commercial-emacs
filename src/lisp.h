@@ -5096,8 +5096,6 @@ extern void init_system_name (void);
 
 enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
 
-extern void prin1_no_unbind (Lisp_Object object, Lisp_Object printcharfun, Lisp_Object overrides);
-
 extern void *record_xmalloc (size_t)
   ATTRIBUTE_ALLOC_SIZE ((1)) ATTRIBUTE_RETURNS_NONNULL;
 
