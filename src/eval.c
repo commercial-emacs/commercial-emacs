@@ -1202,10 +1202,7 @@ internal_catch (Lisp_Object tag, Lisp_Object (*func) (Lisp_Object),
 	emacs_abort ();
       eassert (ocount == exception_stack_count (current_thread));
       eassert (EQ (owhat, current_thread->exception_stack_top->what));
-      struct handler *popped = exception_stack_pop (current_thread);
-      fprintf (stderr, "setjmp is %p %u ", popped, popped->type);
-      prin1_no_unbind (popped->what, Qexternal_debugging_output, Qnil);
-      fprintf (stderr, "\n");
+      exception_stack_pop (current_thread);
       return val;
     }
   else
@@ -1241,25 +1238,13 @@ unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
   do
     {
       /* Unwind to next recorded frame... */
-      fprintf (stderr, "catch is %p %d %u ", catch,
-	       current_thread->exception_stack_top == catch,
-	       catch->type);
-      prin1_no_unbind (catch->what, Qexternal_debugging_output, Qnil);
-      fprintf (stderr, "\n");
       unbind_to (current_thread->exception_stack_top->pdlcount, Qnil);
       if (current_thread->exception_stack_top == catch)
 	break;
       /* ... then restore corresponding handlers. */
-      fprintf (stderr, "got here\n");
       exception_stack_pop (current_thread);
     }
   while (true);
-
-  fprintf (stderr, "catch out %p %d %u ", catch,
-	   current_thread->exception_stack_top == catch,
-	   catch->type);
-  prin1_no_unbind (catch->what, Qexternal_debugging_output, Qnil);
-  fprintf (stderr, "\n");
 
   lisp_eval_depth = catch->f_lisp_eval_depth;
   set_act_rec (current_thread, catch->act_rec);
@@ -1627,10 +1612,6 @@ push_exception (Lisp_Object what, enum exception_type type)
 #ifdef HAVE_X_WINDOWS
   top->x_error_handler_depth = x_error_message_count;
 #endif
-  fprintf (stderr, "push is %p %u\n", top, top->type);
-  prin1_no_unbind (top->what, Qexternal_debugging_output, Qnil);
-  fprintf (stderr, "\n");
-  fprintf (stderr, "\n");
   return top;
 }
 
@@ -3405,11 +3386,6 @@ unbind_to (specpdl_ref count, Lisp_Object value)
   while (specpdl_ptr != specpdl_ref_to_ptr (count))
     {
       eassert (specpdl_ptr > specpdl_ref_to_ptr (count));
-      if (count.bytes) {
-	fprintf (stderr, "(%ld) s=%p >= t=%p -> ", count.bytes,
-		 specpdl_ptr,
-		 specpdl_ref_to_ptr (count));
-      }
       switch ((--specpdl_ptr)->kind)
 	{
 	case SPECPDL_UNWIND:
@@ -3479,14 +3455,6 @@ unbind_to (specpdl_ref count, Lisp_Object value)
 	  break;
 	default:
 	  break;
-	}
-      if (count.bytes)
-	{
-	  fprintf (stderr, "%p", specpdl_ptr);
-	  if (current_thread->exception_stack_top)
-	    fprintf (stderr, " (%p)",
-		     specpdl_ref_to_ptr (current_thread->exception_stack_top->pdlcount));
-	  fprintf (stderr, "\n");
 	}
     }
 
