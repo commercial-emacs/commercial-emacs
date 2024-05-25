@@ -2171,7 +2171,7 @@ emit_limple_insn (Lisp_Object insn)
 	? CATCHER
 	: EQ (handler_type, Qcondition_case)
 	? CONDITION_CASE
-	: (xsignal2 (Qnative_ice, build_string ("incoherent insn"), insn), UNINIT);
+	: (xsignal2 (Qnative_ice, build_string ("incoherent insn"), insn), OMNIBUS);
       emit_limple_push_exception (emit_mvar_rval (arg[1]), /* handler */
 				  gcc_jit_context_new_rvalue_from_int
 				  (comp.ctxt, comp.int_type, h_num), /* type */
