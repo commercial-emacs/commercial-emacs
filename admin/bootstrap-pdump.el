@@ -416,16 +416,14 @@
 (unless (garbage-collect)
   (setq pure-space-overflow t))
 
-(message "Dumping to %s" (pdumping-output))
-(condition-case nil
-    (delete-file (pdumping-output))
-  (file-error nil))
-
 (let ((output-path (expand-file-name (pdumping-output) invocation-directory)))
-  (condition-case nil
+  (message "Dumping to %s" output-path)
+  (ignore-errors (delete-file output-path))
+  (condition-case err
       (let (lexical-binding)
         (dump-emacs-portable output-path))
-    (error (ignore-errors (delete-file output-path)))))
+    (error (ignore-errors (delete-file output-path))
+           (apply #'signal err))))
 
 (kill-emacs) ;crude
 
