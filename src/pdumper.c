@@ -117,6 +117,9 @@ static const char dump_magic[16] = {
 static pdumper_hook dump_hooks[24];
 static int nr_dump_hooks = 0;
 
+static pdumper_hook dump_late_hooks[24];
+static int nr_dump_late_hooks = 0;
+
 static struct
 {
   void *mem;
@@ -2848,7 +2851,8 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
 #endif
   dump_off subr_off = dump_object_finish (ctx, &out, sizeof (out));
   if (non_primitive && ctx->flags.dump_object_contents)
-    /* Final relocation after compilation units loaded. */
+    /* We'll do the final addr relocation during VERY_LATE_RELOCS time
+       after the compilation units has been loaded. */
     dump_push (&ctx->dump_relocs[VERY_LATE_RELOCS],
 	       list2 (make_fixnum (RELOC_NATIVE_SUBR),
 		      dump_off_to_lisp (subr_off)));
@@ -3182,6 +3186,12 @@ dump_metadata_for_pdumper (struct dump_context *ctx)
     dump_emacs_reloc_to_emacs_ptr_raw (ctx, &dump_hooks[i],
 				       (void const *) dump_hooks[i]);
   dump_emacs_reloc_immediate_int (ctx, &nr_dump_hooks, nr_dump_hooks);
+
+  for (int i = 0; i < nr_dump_late_hooks; ++i)
+    dump_emacs_reloc_to_emacs_ptr_raw (ctx, &dump_late_hooks[i],
+				       (void const *) dump_late_hooks[i]);
+  dump_emacs_reloc_immediate_int (ctx, &nr_dump_late_hooks,
+				  nr_dump_late_hooks);
 
   for (int i = 0; i < nr_remembered_data; ++i)
     {
@@ -4227,6 +4237,15 @@ pdumper_do_now_and_after_load_impl (pdumper_hook hook)
   hook ();
 }
 
+void
+pdumper_do_now_and_after_late_load_impl (pdumper_hook hook)
+{
+  if (nr_dump_late_hooks == ARRAYELTS (dump_late_hooks))
+    fatal ("out of dump hooks: make dump_late_hooks[] bigger");
+  dump_late_hooks[nr_dump_late_hooks++] = hook;
+  hook ();
+}
+
 static void
 pdumper_remember_user_data_1 (void *mem, int nbytes)
 {
@@ -5161,34 +5180,34 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 #ifdef HAVE_NATIVE_COMP
     case RELOC_NATIVE_COMP_UNIT:
       {
-	struct Lisp_Native_Comp_Unit *comp_unit =
+	struct Lisp_Native_Comp_Unit *comp_u =
 	  dump_ptr (dump_base, reloc_offset);
-	comp_unit->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
-	if (!STRINGP (comp_unit->file))
+	comp_u->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
+	if (!STRINGP (comp_u->file))
 	  error ("bad compilation unit was dumped");
-	comp_unit->handle = dynlib_open_for_eln (SSDATA (comp_unit->file));
-	if (!comp_unit->handle)
-	  error ("%s: %s", SSDATA (comp_unit->file), dynlib_error ());
-	load_comp_unit (comp_unit, true, false);
+	comp_u->handle = dynlib_open_for_eln (SSDATA (comp_u->file));
+	if (!comp_u->handle)
+	  error ("%s: %s", SSDATA (comp_u->file), dynlib_error ());
+	load_comp_unit (comp_u, true, false);
 	break;
       }
     case RELOC_NATIVE_SUBR:
       {
 	/* Revive them one-by-one.  */
 	struct Lisp_Subr *subr = dump_ptr (dump_base, reloc_offset);
-	struct Lisp_Native_Comp_Unit *comp_unit =
+	struct Lisp_Native_Comp_Unit *comp_u =
 	  XNATIVE_COMP_UNIT (subr->native_comp_u);
-	if (!comp_unit->handle)
-	  error ("NULL handle in compilation unit %s", SSDATA (comp_unit->file));
+	if (!comp_u->handle)
+	  error ("NULL handle in compilation unit %s", SSDATA (comp_u->file));
 	const char *c_name = subr->native_c_name;
 	eassert (c_name);
-	void *func = dynlib_sym (comp_unit->handle, c_name);
+	void *func = dynlib_sym (comp_u->handle, c_name);
 	if (!func)
 	  error ("can't find function \"%s\" in compilation unit %s", c_name,
-		 SSDATA (comp_unit->file));
+		 SSDATA (comp_u->file));
 	subr->function.a0 = func;
 	Lisp_Object lambda_data_idx =
-	  Fgethash (build_string (c_name), comp_unit->lambda_c_name_idx_h, Qnil);
+	  Fgethash (build_string (c_name), comp_u->lambda_c_name_idx_h, Qnil);
 	if (!NILP (lambda_data_idx))
 	  {
 	    /* This is an anonymous lambda.  We must fixup d_reloc_imp
@@ -5196,10 +5215,10 @@ dump_do_dump_relocation (const uintptr_t dump_base,
 	    Lisp_Object tem;
 	    XSETSUBR (tem, subr);
 	    Lisp_Object *fixup =
-	      &(comp_unit->data_imp_relocs[XFIXNUM (lambda_data_idx)]);
+	      &(comp_u->data_imp_relocs[XFIXNUM (lambda_data_idx)]);
 	    eassert (EQ (*fixup, Qlambda_fixup));
 	    *fixup = tem;
-	    Fputhash (tem, Qt, comp_unit->lambda_gc_guard_h);
+	    Fputhash (tem, Qt, comp_u->lambda_gc_guard_h);
 	  }
 	break;
       }
@@ -5459,12 +5478,18 @@ pdumper_load (char *dump_filename)
     }
 
   pdumper_hashes = &hashes;
+  /* Run the functions Emacs registered for doing post-dump-load
+     initialization.  */
+  for (int i = 0; i < nr_dump_hooks; ++i)
+    dump_hooks[i] ();
 
   dump_do_dump_reloc_for_phase (header, dump_base, LATE_RELOCS);
   dump_do_dump_reloc_for_phase (header, dump_base, VERY_LATE_RELOCS);
 
-  for (int i = 0; i < nr_dump_hooks; ++i)
-    dump_hooks[i] ();
+  /* Run the functions Emacs registered for doing post-dump-load
+     initialization.  */
+  for (int i = 0; i < nr_dump_late_hooks; ++i)
+    dump_late_hooks[i] ();
 
   initialized = true;
 
