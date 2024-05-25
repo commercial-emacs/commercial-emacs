@@ -1584,6 +1584,12 @@ internal_catch_all (Lisp_Object (*function) (void *), void *argument,
     }
 }
 
+struct handler *
+pop_exception (void)
+{
+  return exception_stack_pop (current_thread);
+}
+
 /* WHAT is ridiculously overloaded.  It could be,
 
    1. a list of catch tags

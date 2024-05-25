@@ -696,6 +696,7 @@ static void *helper_link_table[] =
     helper_PSEUDOVECTOR_TYPEP_XUNTAG,
     pure_write_error,
     push_exception,
+    pop_exception,
     record_unwind_protect_excursion,
     helper_unbind_n,
     helper_save_restriction,
@@ -2068,105 +2069,38 @@ emit_setjmp (gcc_jit_rvalue *buf)
 
 static void
 emit_limple_push_exception (gcc_jit_rvalue *handler, gcc_jit_rvalue *handler_type,
-			    gcc_jit_block *handler_bb, gcc_jit_block *guarded_bb,
-			    Lisp_Object clobbered_mvar)
+			    gcc_jit_block *handler_bb, gcc_jit_block *guarded_bb)
 {
-  /* struct handler *c = push_exception (POP, type);  */
+  /* do the work of internal_catch() in eval.c */
 
   gcc_jit_rvalue *args[] = { handler, handler_type };
-  gcc_jit_block_add_assignment (
-    comp.block,
-    NULL,
-    comp.loc_handler,
-    emit_call (intern_c_string ("push_exception"),
-	       comp.handler_ptr_type, 2, args, false));
+  gcc_jit_block_add_assignment
+    (comp.block,
+     NULL,
+     comp.loc_handler,
+     emit_call (intern_c_string ("push_exception"),
+		comp.handler_ptr_type, 2, args, false));
 
-  args[0] =
-    gcc_jit_lvalue_get_address (
-	gcc_jit_rvalue_dereference_field (
-	  gcc_jit_lvalue_as_rvalue (comp.loc_handler),
-	  NULL,
-	  comp.handler_jmp_field),
-	NULL);
+  gcc_jit_rvalue *env = gcc_jit_lvalue_get_address
+    (gcc_jit_rvalue_dereference_field
+     (gcc_jit_lvalue_as_rvalue (comp.loc_handler),
+      NULL,
+      comp.handler_jmp_field),
+     NULL);
 
-  gcc_jit_rvalue *res = emit_setjmp (args[0]);
+  gcc_jit_rvalue *res = emit_setjmp (env);
   emit_cond_jump (res, handler_bb, guarded_bb);
 }
 
 static void
 emit_exception_stack_pop (void)
 {
-  /* C: exception_stack_pop (thr);  */
-  gcc_jit_block *bb_orig = comp.block;
-  gcc_jit_function *f_orig = comp.func;
-  gcc_jit_lvalue *exception_stack_top =
-    gcc_jit_rvalue_dereference_field
-    (gcc_jit_lvalue_as_rvalue (gcc_jit_rvalue_dereference
-			       (comp.current_thread_ref, NULL)),
+  gcc_jit_block_add_assignment
+    (comp.block,
      NULL,
-     comp.exception_stack_top);
-
-  gcc_jit_rvalue *exception_stack_bottom =
-    gcc_jit_lvalue_as_rvalue
-    (gcc_jit_rvalue_dereference_field
-     (gcc_jit_lvalue_as_rvalue (gcc_jit_rvalue_dereference
-				(comp.current_thread_ref, NULL)),
-      NULL,
-      comp.exception_stack_bottom));
-
-  gcc_jit_param *param[] = {};
-  comp.func = gcc_jit_context_new_function (comp.ctxt, NULL,
-					    GCC_JIT_FUNCTION_INTERNAL,
-					    comp.handler_ptr_type,
-					    "pop_exception",
-					    0, param, 0);
-  DECL_BLOCK (entry_block, comp.func);
-  DECL_BLOCK (terminal_block, comp.func);
-  DECL_BLOCK (decrement_block, comp.func);
-
-  comp.block = entry_block;
-
-  /*
-    struct handler *popped = thr->exception_stack_top;
-    if (popped == thr->exception_stack_bottom)
-      thr->exception_stack_top = NULL;
-    else if (popped > thr->exception_stack_bottom)
-      --thr->exception_stack_top;
-    return popped;
-  */
-  emit_cond_jump
-    (gcc_jit_context_new_comparison (comp.ctxt,
-				     NULL,
-				     GCC_JIT_COMPARISON_EQ,
-				     gcc_jit_lvalue_as_rvalue (exception_stack_top),
-				     exception_stack_bottom),
-     terminal_block,
-     decrement_block);
-
-  comp.block = terminal_block;
-  gcc_jit_block_add_assignment (terminal_block,
-				NULL,
-				exception_stack_top,
-				gcc_jit_context_null (comp.ctxt, comp.handler_ptr_type));
-  gcc_jit_block_end_with_return (terminal_block,
-				 NULL,
-				 gcc_jit_lvalue_as_rvalue (exception_stack_top));
-
-  comp.block = decrement_block;
-  gcc_jit_block_add_assignment (decrement_block,
-				NULL,
-				exception_stack_top,
-				emit_ptr_arithmetic
-				(gcc_jit_lvalue_as_rvalue (exception_stack_top),
-				 comp.handler_ptr_type,
-				 sizeof (struct handler),
-				 GCC_JIT_BINARY_OP_MINUS,
-				 comp.one));
-  gcc_jit_block_end_with_return (decrement_block,
-				 NULL,
-				 gcc_jit_lvalue_as_rvalue (exception_stack_top));
-  comp.block = bb_orig;
-  comp.func = f_orig;
+     comp.loc_handler,
+     emit_call (intern_c_string ("pop_exception"),
+		comp.handler_ptr_type, 0, NULL, false));
 }
 
 static void
@@ -2231,21 +2165,18 @@ emit_limple_insn (Lisp_Object insn)
     }
   else if (EQ (op, Qpush_exception))
     {
-      /* (push-handler condition-case #s(comp-mvar 0 3 t (arith-error) cons nil) 1 bb_2 bb_1) */
-      const Lisp_Object handler_spec = arg[0];
-      int h_num UNINIT;
-      if (EQ (handler_spec, Qcatcher))
-	h_num = CATCHER;
-      else if (EQ (handler_spec, Qcondition_case))
-	h_num = CONDITION_CASE;
-      else
-	xsignal2 (Qnative_ice, build_string ("incoherent insn"), insn);
+      /* (push-exception condition-case #s(comp-mvar 0 3 t (arith-error) cons nil) bb_2 bb_1) */
+      const Lisp_Object handler_type = arg[0];
+      const int h_num = EQ (handler_type, Qcatcher)
+	? CATCHER
+	: EQ (handler_type, Qcondition_case)
+	? CONDITION_CASE
+	: (xsignal2 (Qnative_ice, build_string ("incoherent insn"), insn), UNINIT);
       emit_limple_push_exception (emit_mvar_rval (arg[1]), /* handler */
 				  gcc_jit_context_new_rvalue_from_int
 				  (comp.ctxt, comp.int_type, h_num), /* type */
 				  retrieve_block (arg[2]), /* handler block */
-				  retrieve_block (arg[3]), /* guarded block */
-				  handler_spec);
+				  retrieve_block (arg[3]) /* guarded block */);
     }
   else if (EQ (op, Qpop_exception))
     {
@@ -2820,6 +2751,8 @@ declare_runtime_imported_funcs (void)
   args[0] = comp.lisp_obj_type;
   args[1] = comp.int_type;
   ADD_IMPORTED (push_exception, comp.handler_ptr_type, 2, args);
+
+  ADD_IMPORTED (pop_exception, comp.handler_ptr_type, 0, NULL);
 
   ADD_IMPORTED (record_unwind_protect_excursion, comp.void_type, 0, NULL);
 

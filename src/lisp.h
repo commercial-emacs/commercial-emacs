@@ -4365,6 +4365,8 @@ extern Lisp_Object internal_condition_case_n
 extern Lisp_Object internal_catch_all (Lisp_Object (*) (void *), void *, Lisp_Object (*) (enum nonlocal_exit, Lisp_Object));
 extern struct handler *push_exception (Lisp_Object, enum exception_type)
   ATTRIBUTE_RETURNS_NONNULL;
+extern struct handler *pop_exception (void)
+  ATTRIBUTE_RETURNS_NONNULL;
 extern void specbind (Lisp_Object, Lisp_Object);
 extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);
 extern void record_unwind_protect_array (Lisp_Object *, ptrdiff_t);

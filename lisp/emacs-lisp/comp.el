@@ -912,7 +912,7 @@ The basic block is returned regardless it was already declared or not."
                  for bb being the hash-value in (comp-func-blocks comp-func)
                  when (and (comp-block-lap-p bb)
                            (equal (comp-block-lap-addr bb) lap-addr))
-                   return bb)
+                 return bb)
                 (cl-find-if (lambda (bb) ; Look within the pendings blocks.
                               (and (comp-block-lap-p bb)
                                    (= (comp-block-lap-addr bb) lap-addr)))
@@ -1067,20 +1067,19 @@ Return value is the fall-through block name."
     (setf (comp-func-has-non-local comp-func) t)
     (let* ((guarded-bb (comp--bb-maybe-add (1+ (comp-limplify-pc comp-pass))
                                            (comp--sp)))
-           (handler-bb (comp--bb-maybe-add (comp--label-to-addr label-num)
-                                           (1+ (comp--sp))))
-           (pop-bb (make--comp-block-lap nil (comp--sp) (comp--new-block-sym))))
-      (comp--emit (list 'push-exception
-                        handler-type
-                        (comp--slot+1)
-                        (comp-block-name pop-bb)
-                        (comp-block-name guarded-bb)))
+           (after-bb (comp--bb-maybe-add (comp--label-to-addr label-num)
+                                         (1+ (comp--sp))))
+           (handler-bb (make--comp-block-lap nil (comp--sp) (comp--new-block-sym))))
+      (comp--emit `(push-exception ,handler-type
+                                   ,(comp--slot+1) ;handler
+                                   ,(comp-block-name handler-bb)
+                                   ,(comp-block-name guarded-bb)))
       (comp--mark-curr-bb-closed)
-      ;; Emit the basic block to pop the handler if we got the non local.
-      (puthash (comp-block-name pop-bb) pop-bb (comp-func-blocks comp-func))
-      (setf (comp-limplify-curr-block comp-pass) pop-bb)
+      (puthash (comp-block-name handler-bb) handler-bb (comp-func-blocks comp-func))
+      (setf (comp-limplify-curr-block comp-pass) handler-bb)
+      ;; Emit the block popping the pushed exception
       (comp--emit `(fetch-exception ,(comp--slot+1)))
-      (comp--emit `(jump ,(comp-block-name handler-bb)))
+      (comp--emit `(jump ,(comp-block-name after-bb)))
       (comp--mark-curr-bb-closed))))
 
 (defun comp--limplify-listn (n)
