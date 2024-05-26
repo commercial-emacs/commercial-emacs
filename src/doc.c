@@ -41,8 +41,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static char *get_doc_string_buffer;
 static ptrdiff_t get_doc_string_buffer_size;
 
-static unsigned char *read_bytecode_pointer;
-
 static char const sibling_etc[] = "../etc/";
 
 /* `readchar' in lread.c calls back here to fetch the next byte.
@@ -71,15 +69,10 @@ read_bytecode_char (bool unreadflag)
    (e.g. because the file has been modified and the location is stale),
    return nil.
 
-   If UNIBYTE, always make a unibyte string.
-
-   If DEFINITION, assume this is for reading
-   a dynamic function definition; convert the bytestring
-   and the constants vector with appropriate byte handling,
-   and return a cons cell.  */
+   If UNIBYTE, always make a unibyte string.  */
 
 Lisp_Object
-get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
+get_doc_string (Lisp_Object filepos, bool unibyte)
 {
   char *from, *to, *name, *p, *p1;
   Lisp_Object file, pos;
@@ -259,14 +252,6 @@ Invalid data in documentation file -- %c followed by code %03o",
 	*to++ = *from++;
     }
 
-  /* If DEFINITION, read from this buffer
-     the same way we would read bytes from a file.  */
-  if (definition)
-    {
-      read_bytecode_pointer = (unsigned char *) get_doc_string_buffer + offset;
-      return Fread (Qlambda);
-    }
-
   if (unibyte)
     return make_unibyte_string (get_doc_string_buffer + offset,
 				to - (get_doc_string_buffer + offset));
@@ -281,16 +266,6 @@ Invalid data in documentation file -- %c followed by code %03o",
 				    nchars,
 				    to - (get_doc_string_buffer + offset));
     }
-}
-
-/* Get a string from position FILEPOS and pass it through the Lisp reader.
-   We use this for fetching the bytecode string and constants vector
-   of a compiled function from the .elc file.  */
-
-Lisp_Object
-read_doc_string (Lisp_Object filepos)
-{
-  return get_doc_string (filepos, 0, 1);
 }
 
 static bool
@@ -352,7 +327,7 @@ string is passed through `substitute-command-keys'.  */)
     doc = Qnil;
   if (FIXNUMP (doc) || CONSP (doc))
     {
-      Lisp_Object tem = get_doc_string (doc, 0, 0);
+      Lisp_Object tem = get_doc_string (doc, 0);
       if (NILP (tem) && try_reload)
 	{
 	  /* The file is newer, we need to reset the pointers.  */
@@ -427,7 +402,7 @@ aren't strings.  */)
   if (FIXNUMP (tem) || (CONSP (tem) && FIXNUMP (XCDR (tem))))
     {
       Lisp_Object doc = tem;
-      tem = get_doc_string (tem, 0, 0);
+      tem = get_doc_string (tem, 0);
       if (NILP (tem) && try_reload)
 	{
 	  /* The file is newer, we need to reset the pointers.  */
