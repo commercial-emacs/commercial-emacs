@@ -2864,9 +2864,6 @@ static dump_off
 dump_native_comp_unit (struct dump_context *ctx,
 		       struct Lisp_Native_Comp_Unit *comp_u)
 {
-  if (!CONSP (comp_u->file))
-    error ("trying to dump non fixed-up eln file");
-
   /* Have function documentation always lazy loaded to optimize load-time.  */
   comp_u->data_fdoc_v = Qnil;
   START_DUMP_PVEC (ctx, &comp_u->header, struct Lisp_Native_Comp_Unit, out);
