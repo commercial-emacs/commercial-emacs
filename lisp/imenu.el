@@ -733,19 +733,29 @@ Return one of the entries in index-alist or nil."
                          (imenu--in-alist name prepared-index-alist)
                          ;; Default to `name' if it's in the alist.
                          name))))
-    (let ((minibuffer-setup-hook minibuffer-setup-hook))
-      ;; Display the completion buffer.
-      (if (not imenu-eager-completion-buffer)
-	  (add-hook 'minibuffer-setup-hook 'minibuffer-completion-help))
+    ;; Display the completion buffer.
+    (minibuffer-with-setup-hook
+        (lambda ()
+          (setq-local minibuffer-allow-text-properties t)
+          (setq-local completion-extra-properties
+                      `( :category imenu
+                         ,@(when (eq imenu-flatten 'annotation)
+                             `(:annotation-function
+                               ,(lambda (s) (get-text-property
+                                             0 'imenu-section s))))))
+          (unless imenu-eager-completion-buffer
+            (minibuffer-completion-help)))
       (setq name (completing-read prompt
 				  prepared-index-alist
 				  nil t nil 'imenu--history-list name)))
 
     (when (stringp name)
-      (setq choice (assoc name prepared-index-alist))
-      (if (imenu--subalist-p choice)
-	  (imenu--completion-buffer (cdr choice) prompt)
-	choice))))
+      (or (get-text-property 0 'imenu-choice name)
+	  (progn
+	    (setq choice (assoc name prepared-index-alist))
+	    (if (imenu--subalist-p choice)
+		(imenu--completion-buffer (cdr choice) prompt)
+	      choice))))))
 
 (defun imenu--mouse-menu (index-alist event &optional title)
   "Let the user select from a buffer index from a mouse menu.
@@ -762,6 +772,32 @@ Returns t for rescan and otherwise an element or subelement of INDEX-ALIST."
                                              (cadr menu)
                                            menu)))))
     (popup-menu map event)))
+
+(defun imenu--flatten-index-alist (index-alist &optional concat-names prefix)
+  ;; Takes a nested INDEX-ALIST and returns a flat index alist.
+  ;; If optional CONCAT-NAMES is non-nil, then a nested index has its
+  ;; name and a space concatenated to the names of the children.
+  ;; Third argument PREFIX is for internal use only.
+  (mapcan
+   (lambda (item)
+     (let* ((name (car item))
+	    (pos (cdr item))
+	    (new-prefix (and concat-names
+			     (if prefix
+				 (concat prefix imenu-level-separator name)
+			       (if (eq imenu-flatten 'annotation)
+                                   (propertize name 'imenu-choice item)
+                                 name)))))
+       (cond
+	((not (imenu--subalist-p item))
+	 (list (cons (if (and (eq imenu-flatten 'annotation) prefix)
+			 (propertize name 'imenu-section
+				     (format " (%s)" prefix))
+		       new-prefix)
+		     pos)))
+	(t
+	 (imenu--flatten-index-alist pos concat-names new-prefix)))))
+   index-alist))
 
 (defun imenu-choose-buffer-index (&optional prompt alist)
   "Let the user select from a buffer index and return the chosen index.
