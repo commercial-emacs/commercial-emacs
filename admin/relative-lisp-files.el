@@ -27,6 +27,7 @@
 
 ;;; Code:
 
+(setq native-comp-disable-subr-trampolines t)
 (require 'comp)
 
 (defconst relative-lisp-files-explicit '("ldefs-boot")

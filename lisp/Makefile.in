@@ -57,7 +57,7 @@ BYTE_COMPILE_FLAGS = \
 
 ifeq ($(HAVE_NATIVE_COMP),yes)
 BYTE_COMPILE_FLAGS += \
-  -l comp --eval "(setq native-comp-disable-subr-trampolines t)"
+  --eval "(setq native-comp-disable-subr-trampolines t)" -l comp
 endif
 
 BYTE_COMPILER_EL = \
@@ -159,6 +159,7 @@ define byte-compile
 endef
 
 define native-compile
+	$(AM_V_at)rm -f ./$@
 	$(AM_V_ELN)$(emacs) $(BYTE_COMPILE_FLAGS) \
 	    --eval "(native-compile \"./$<\" \"./$@\")"
 endef

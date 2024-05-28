@@ -127,8 +127,6 @@ Emacs Lisp file:
 
 (defvar comp-trampoline-dir (cond ((and init-file-user user-init-file) ;live
                                    (expand-file-name "trampolines" user-emacs-directory))
-                                  (installation-directory ;within repo
-                                   (expand-file-name "lisp/trampolines" installation-directory))
                                   (t ;batch or test mode
                                    (expand-file-name (make-temp-name "trampolines-")
                                                      temporary-file-directory)))
