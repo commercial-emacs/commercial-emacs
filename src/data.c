@@ -917,10 +917,7 @@ signal a `cyclic-function-indirection' error.  */)
   (register Lisp_Object symbol, Lisp_Object definition)
 {
   CHECK_SYMBOL (symbol);
-  /* Perhaps not quite the right error signal, but seems good enough.  */
   if (NILP (symbol) && !NILP (definition))
-    /* There are so many other ways to shoot oneself in the foot, I don't
-       think this one little sanity check is worth its cost, but anyway.  */
     xsignal1 (Qsetting_constant, symbol);
 
   eassert (valid_lisp_object_p (definition));

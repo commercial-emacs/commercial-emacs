@@ -4052,7 +4052,6 @@ DEFUN ("comp--install-trampoline", Fcomp__install_trampoline,
   Lisp_Object orig_subr = Fsymbol_function (subr_name);
   CHECK_SUBR (orig_subr);
 
-  // don't need to use tramps while native compiling
   if (will_dump_p ())
     signal_error ("Trying to advice during pdump", subr_name);
 

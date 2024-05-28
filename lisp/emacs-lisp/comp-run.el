@@ -59,6 +59,7 @@
              (not (memq subr-name native-comp-never-optimize-functions))
              (not (gethash subr-name comp-installed-trampolines-h)))
     (cl-assert (subr-primitive-p (symbol-function subr-name)))
+    (require 'comp)
     (when-let ((trampoline (or (comp-trampoline-search subr-name)
                                (comp-trampoline-compile subr-name))))
       (comp--install-trampoline subr-name trampoline))))
