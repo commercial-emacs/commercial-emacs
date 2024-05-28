@@ -309,10 +309,7 @@ information on Eshell, see Info node `(eshell)Top'."
     (minibuffer-with-setup-hook (lambda ()
                                   (eshell-mode)
                                   (eshell-command-mode +1))
-      (let ((command (read-from-minibuffer prompt)))
-        (when (eshell-using-module 'eshell-hist)
-          (eshell-add-input-to-history command))
-        command))))
+      (read-from-minibuffer prompt))))
 
 (defvar eshell-command-buffer-name-async "*Eshell Async Command Output*")
 (defvar eshell-command-buffer-name-sync "*Eshell Command Output*")
