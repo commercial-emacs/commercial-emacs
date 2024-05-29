@@ -4110,7 +4110,7 @@ by calling `format-decode', which see.  */)
      named pipes, and it's probably just not worth it.  So we should
      at least signal an error.  */
 
-  if (!S_ISREG (st.st_mode))
+  if (!(S_ISREG (st.st_mode) || S_ISDIR (st.st_mode)))
     {
       regular = false;
       seekable = lseek (fd, 0, SEEK_CUR) != (off_t) -1;
