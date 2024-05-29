@@ -127,6 +127,8 @@ Emacs Lisp file:
 
 (defvar comp-trampoline-dir (cond ((and init-file-user user-init-file) ;live
                                    (expand-file-name "trampolines" user-emacs-directory))
+                                  (installation-directory ;within repo
+                                   (expand-file-name "lisp/trampolines" installation-directory))
                                   (t ;batch or test mode
                                    (expand-file-name (make-temp-name "trampolines-")
                                                      temporary-file-directory)))
@@ -674,14 +676,27 @@ current instruction or its cell."
 A null SYM indicates anonymous lambda."
   (if (null sym)
       (make-temp-name "lambda_")
-    (mapconcat (lambda (c) (cond ((string-match-p (rx (any "0-9")) c)
-                                  (char-to-string (+ ?A (string-to-number c))))
-                                 ((string-match-p (rx (any "A-Za-z_")) c)
-                                  c)
-                                 (t
-                                  "_")))
-               (mapcar #'char-to-string (symbol-name sym))
-               "")))
+    (concat "F"
+            (cl-loop with orig-name = (symbol-name sym) ;Nassi's algorithm
+	             with str = (make-string (* 2 (length orig-name)) 0)
+	             for j from 0 by 2
+	             for i across orig-name
+	             for byte = (format "%x" i)
+	             do (aset str j (aref byte 0))
+	             do (aset str (1+ j) (if (length> byte 1)
+			                     (aref byte 1)
+			                   ?\_))
+	             finally return str)
+            "_"
+            (mapconcat (lambda (c)
+                         (cond ((string-match-p (rx (any "0-9")) c)
+                                (char-to-string (+ ?A (string-to-number c))))
+                               ((string-match-p (rx (any "A-Za-z_")) c)
+                                c)
+                               (t
+                                "_")))
+                       (mapcar #'char-to-string (symbol-name sym))
+                       ""))))
 
 (defun comp--decrypt-arg-list (x function-name)
   "Decrypt argument list X for FUNCTION-NAME."
