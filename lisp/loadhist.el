@@ -55,14 +55,14 @@ a buffer with no associated file, or an `eval-region', return nil."
 FILE can be a file name, or a library name.
 A library name is equivalent to the file name that `load-library' would load."
   ;; First look for FILE as given.
-  (let ((symbols (assoc file load-history)))
-    ;; Try converting a library name to an absolute file name.
-    (and (null symbols)
-	 (let ((absname
-		(locate-file file load-path (get-load-suffixes))))
-	   (and absname (not (equal absname file))
-		(setq symbols (cdr (assoc absname load-history))))))
-    symbols))
+  (or (cdr (assoc file load-history))
+      ;; See `load': workaround for native comp horseshit since
+      ;; `load-history' still keys off .elc, not .eln
+      (when-let ((located (locate-file file load-path (get-load-suffixes)))
+                 (not-eln (if (equal ".eln" (file-name-extension located 'period))
+                              (concat (file-name-sans-extension located) ".elc")
+                            located)))
+        (cdr (assoc not-eln load-history)))))
 
 (defun file-provides (file)
   "Return the list of features provided by FILE as it was loaded.

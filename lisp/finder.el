@@ -373,7 +373,7 @@ FILE should be in a form suitable for passing to `locate-library'."
   (interactive
    (list
     (completing-read "Library name: "
-		     (apply-partially 'locate-file-completion-table
+		     (apply-partially #'locate-file-completion-table
                                       (or find-library-source-path load-path)
                                       (find-library-suffixes)))))
   (let ((str (lm-commentary (find-library-name file))))

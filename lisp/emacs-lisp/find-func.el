@@ -214,9 +214,12 @@ for completion."
         (message "Showing result from %s" file)))))
 
 (defun find-library-suffixes ()
-  (let ((suffixes nil))
-    (dolist (suffix (get-load-suffixes) (nreverse suffixes))
-      (unless (string-match "elc" suffix) (push suffix suffixes)))))
+  (let ((load-suffixes (get-load-suffixes))
+        ret)
+    (dolist (suffix '(".so" ".el") (nreverse ret))
+      (when (member suffix load-suffixes)
+        (dolist (ext load-file-rep-suffixes)
+          (push (concat suffix ext) ret))))))
 
 (defun find-library--load-name (library)
   (let ((name library))
