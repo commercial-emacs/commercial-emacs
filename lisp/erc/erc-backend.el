@@ -1443,7 +1443,7 @@ PROCs `process-buffer' is `current-buffer' when this function is called."
                      0)))
 
         (setf (erc-response.sender msg)
-              (if (eq posn 0)
+              (if (zerop posn)
                   erc-session-server
                 (substring string 1 posn)))
 
@@ -1463,18 +1463,18 @@ PROCs `process-buffer' is `current-buffer' when this function is called."
                   (substring string bposn eposn))
                 (erc-response.command-args msg)))
         (when posn
-      (let ((str (substring string (1+ posn))))
-        (push str (erc-response.command-args msg))))
+          (let ((str (substring string (1+ posn))))
+            (push str (erc-response.command-args msg))))
 
-    (setf (erc-response.contents msg)
-          (car (erc-response.command-args msg)))
+        (setf (erc-response.contents msg)
+              (car (erc-response.command-args msg)))
 
-    (setf (erc-response.command-args msg)
-          (nreverse (erc-response.command-args msg)))
+        (setf (erc-response.command-args msg)
+              (nreverse (erc-response.command-args msg)))
 
-    (erc-decode-parsed-server-response msg)
+        (erc-decode-parsed-server-response msg)
 
-    (erc-handle-parsed-server-response proc msg)))))
+        (erc-handle-parsed-server-response proc msg)))))
 
 (defun erc-decode-parsed-server-response (parsed-response)
   "Decode a pre-parsed PARSED-RESPONSE before it can be handled.
