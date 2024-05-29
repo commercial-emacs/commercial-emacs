@@ -505,7 +505,7 @@ remember_object (struct dump_context *ctx, Lisp_Object object, dump_off offset)
 static void *
 emacs_ptr (Lisp_Object lv)
 {
-  if (SUBRP (lv) && !SUBR_NATIVE_COMPILEDP (lv))
+  if (SUBRP (lv) && !NATIVE_COMP_FUNCTIONP (lv))
     return XSUBR (lv);
   if (builtin_symbol_p (lv))
     return XSYMBOL (lv);
@@ -3193,7 +3193,7 @@ fixup (struct dump_context *ctx)
 	{
 	case FIXUP_LISP_OBJECT:
 	  /* Dump wants a Lisp_Object */
-	  if (SUBRP (arg) && !SUBR_NATIVE_COMPILEDP (arg))
+	  if (SUBRP (arg) && !NATIVE_COMP_FUNCTIONP (arg))
 	    {
 	      intptr_t dump_value = emacs_offset (XSUBR (arg));
 	      reloc_emacs_lv (ctx, ctx->offset, XTYPE (arg));
@@ -3216,7 +3216,7 @@ fixup (struct dump_context *ctx)
 	  break;
 	case FIXUP_LISP_OBJECT_RAW:
 	  /* Dump wants a C pointer */
-	  if (SUBRP (arg) && !SUBR_NATIVE_COMPILEDP (arg))
+	  if (SUBRP (arg) && !NATIVE_COMP_FUNCTIONP (arg))
 	    {
 	      intptr_t dump_value = emacs_offset (XSUBR (arg));
 	      reloc_emacs_ptr (ctx, ctx->offset);

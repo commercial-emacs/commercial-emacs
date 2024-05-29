@@ -2260,7 +2260,7 @@ eval_form (Lisp_Object form)
       else if (!NILP (fun) && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
 	fun = indirect_function (fun);
 
-      if (SUBRP (fun) && !SUBR_NATIVE_COMPILED_DYNP (fun))
+      if (SUBRP (fun) && !NATIVE_COMP_FUNCTION_DYNP (fun))
 	{
 	  const ptrdiff_t nargs = list_length (args);
 	  if (nargs < XSUBR (fun)->min_args
@@ -2336,7 +2336,7 @@ eval_form (Lisp_Object form)
 	    }
 	}
       else if (CLOSUREP (fun)
-	       || SUBR_NATIVE_COMPILED_DYNP (fun)
+	       || NATIVE_COMP_FUNCTION_DYNP (fun)
 	       || MODULE_FUNCTIONP (fun))
 	{
 	  const ptrdiff_t nargs = list_length (args);
@@ -2752,10 +2752,10 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
       && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
     fun = indirect_function (fun);
 
-  if (SUBRP (fun) && !SUBR_NATIVE_COMPILED_DYNP (fun))
+  if (SUBRP (fun) && !NATIVE_COMP_FUNCTION_DYNP (fun))
     return funcall_subr (XSUBR (fun), numargs, args);
   else if (CLOSUREP (fun)
-	   || SUBR_NATIVE_COMPILED_DYNP (fun)
+	   || NATIVE_COMP_FUNCTION_DYNP (fun)
 	   || MODULE_FUNCTIONP (fun))
     return funcall_lambda (fun, numargs, args);
   else
@@ -2941,7 +2941,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
     return funcall_module (fun, nargs, arg_vector);
 #endif
 #ifdef HAVE_NATIVE_COMP
-  else if (SUBR_NATIVE_COMPILED_DYNP (fun))
+  else if (NATIVE_COMP_FUNCTION_DYNP (fun))
     {
       args = XSUBR (fun)->lambda_list;
       lexenv = Qnil;
@@ -3008,13 +3008,13 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
       current_thread->lexical_environment = lexenv;
     }
 
-  eassert (!SUBR_NATIVE_COMPILEDP (fun)
-	   || SUBR_NATIVE_COMPILED_DYNP (fun));
+  eassert (!NATIVE_COMP_FUNCTIONP (fun)
+	   || NATIVE_COMP_FUNCTION_DYNP (fun));
   Lisp_Object retval;
  funcall_lambda_return:
   retval = CONSP (fun)
     ? Fprogn (XCDR (XCDR (fun)))
-    : SUBR_NATIVE_COMPILEDP (fun)
+    : NATIVE_COMP_FUNCTIONP (fun)
     /* save call to funcall_subr since 0 args by construction */
     ? XSUBR (fun)->function.a0 ()
     : args_template >= 0

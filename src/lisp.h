@@ -4998,15 +4998,15 @@ extern void report_selected_window_change (struct frame *);
 
 #ifdef HAVE_NATIVE_COMP
 INLINE bool
-SUBR_NATIVE_COMPILEDP (Lisp_Object a)
+NATIVE_COMP_FUNCTIONP (Lisp_Object a)
 {
   return SUBRP (a) && !NILP (XSUBR (a)->native_comp_u);
 }
 
 INLINE bool
-SUBR_NATIVE_COMPILED_DYNP (Lisp_Object a)
+NATIVE_COMP_FUNCTION_DYNP (Lisp_Object a)
 {
-  return SUBR_NATIVE_COMPILEDP (a) && !NILP (XSUBR (a)->lambda_list);
+  return NATIVE_COMP_FUNCTIONP (a) && !NILP (XSUBR (a)->lambda_list);
 }
 
 INLINE Lisp_Object
@@ -5023,13 +5023,13 @@ allocate_native_comp_unit (void)
 }
 #else
 INLINE bool
-SUBR_NATIVE_COMPILEDP (Lisp_Object a)
+NATIVE_COMP_FUNCTIONP (Lisp_Object a)
 {
   return false;
 }
 
 INLINE bool
-SUBR_NATIVE_COMPILED_DYNP (Lisp_Object a)
+NATIVE_COMP_FUNCTION_DYNP (Lisp_Object a)
 {
   return false;
 }
