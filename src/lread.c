@@ -4450,8 +4450,7 @@ it defaults to the value of `obarray'.  */)
 	  xfree (longhand);
 	}
       else
-	tem = intern_driver (!NILP (Vpdumper__pure_pool) ? Fpurecopy_maybe (string) : string,
-			     obarray, tem);
+	tem = intern_driver (Fpurecopy_maybe (string), obarray, tem);
     }
   return tem;
 }

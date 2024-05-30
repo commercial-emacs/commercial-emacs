@@ -735,8 +735,7 @@ value.  */)
   XSYMBOL (symbol)->u.s.declared_special = true;
   if (!NILP (doc))
     {
-      if (!NILP (Vpdumper__pure_pool))
-	doc = Fpurecopy_maybe (doc);
+      doc = Fpurecopy_maybe (doc);
       Fput (symbol, Qvariable_documentation, doc);
     }
   LOADHIST_ATTACH (symbol);
@@ -874,8 +873,7 @@ More specifically, behaves like (defconst SYM 'INITVALUE DOCSTRING).  */)
   CHECK_SYMBOL (sym);
   Lisp_Object tem = initvalue;
   Finternal__define_uninitialized_variable (sym, docstring);
-  if (!NILP (Vpdumper__pure_pool))
-    tem = Fpurecopy_maybe (tem);
+  tem = Fpurecopy_maybe (tem);
   Fset_default (sym, tem);      /* FIXME: set-default-toplevel-value? */
   Fput (sym, Qrisky_local_variable, Qt); /* FIXME: Why?  */
   return sym;
