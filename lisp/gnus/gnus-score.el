@@ -623,7 +623,7 @@ current score file."
 		       (mapcar (lambda (s)
 				 (if (member (nth 4 entry) (nthcdr 3 s))
 				     s nil))
-			       char-to-type))))
+			       char-to-types))))
 	    ;; We continue reading - the type.
 	    (while (not tchar)
 	      (if mimic
