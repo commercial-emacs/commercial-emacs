@@ -5405,7 +5405,8 @@ Runs `prefix-command-preserve-state-hook'."
 (add-hook 'prefix-command-preserve-state-hook
           #'universal-argument--preserve)
 (defun universal-argument--preserve ()
-  (setq prefix-arg current-prefix-arg))
+  (setq prefix-arg current-prefix-arg)
+  (setq current-prefix-arg last-prefix-arg))
 
 (defvar universal-argument-map
   (let ((map (make-sparse-keymap))
