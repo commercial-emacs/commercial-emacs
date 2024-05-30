@@ -43,8 +43,6 @@
 ;; Since we don't use byte-decompile-lapcode, let's try not loading byte-opt.
 (require 'byte-compile "bytecomp")
 
-(declare-function comp-c-func-name "comp.el")
-
 (defvar disassemble-column-1-indent 8 "*")
 (defvar disassemble-column-2-indent 10 "*")
 
@@ -88,27 +86,7 @@ redefine OBJECT if it is a symbol."
 	args)
     (setq obj (autoload-do-load obj name))
     (if (subrp obj)
-        (if (and (fboundp 'subr-native-elisp-p)
-                 (subr-native-elisp-p obj))
-            (progn
-              (require 'comp)
-              (let ((eln (native-comp-unit-file (subr-native-comp-unit obj))))
-                (if (file-exists-p eln)
-                    (call-process "objdump" nil (current-buffer) t "-S" eln)
-                  (error "Missing eln file for #<subr %s>" name)))
-              (goto-char (point-min))
-              (re-search-forward (concat "^.*<_?"
-                                         (regexp-quote
-                                          (comp-c-func-name (subr-name obj)))
-                                         ">:"))
-              (beginning-of-line)
-              (delete-region (point-min) (point))
-              (when (re-search-forward "^.*<.*>:" nil t 2)
-                (delete-region (match-beginning 0) (point-max)))
-              (asm-mode)
-              (setq buffer-read-only t)
-              (cl-return-from disassemble-internal))
-	  (error "Can't disassemble #<subr %s>" name)))
+        (error "Can't disassemble #<subr %s>" name))
     (if (eq (car-safe obj) 'macro)	;Handle macros.
 	(setq macro t
 	      obj (cdr obj)))

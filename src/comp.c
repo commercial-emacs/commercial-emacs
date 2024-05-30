@@ -962,7 +962,7 @@ declare_imported_func (Lisp_Object subr_sym, gcc_jit_type *ret_type,
 
   /* String containing the function ptr name.  */
   Lisp_Object f_ptr_name =
-    CALLN (Ffuncall, intern_c_string ("comp-c-func-name"), subr_sym);
+    CALLN (Ffuncall, intern_c_string ("comp-next-gccjit-name"), subr_sym);
 
   gcc_jit_type *f_ptr_type =
     gcc_jit_type_get_const (
