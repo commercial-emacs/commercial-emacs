@@ -4666,7 +4666,7 @@ REGEXP-GROUP is the regular expression group in REGEXP to use.
 ;;; Generated autoloads from emacs-lisp/comp.el
 
 (put 'no-native-compile 'safe-local-variable 'booleanp)
-(autoload 'comp-c-func-name "comp" "\
+(autoload 'comp-next-gccjit-name "comp" "\
 Return string suitable for gcc_jit_context_new_function.
 
 (fn SYM)")

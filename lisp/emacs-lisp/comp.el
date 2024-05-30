@@ -669,34 +669,42 @@ current instruction or its cell."
   (or (comp--spill-decl-spec function-name 'speed)
       (comp-ctxt-speed comp-ctxt)))
 
-;; Autoloaded as might be used by `disassemble-internal'.
-;;;###autoload
-(defun comp-c-func-name (sym)
-  "Return string suitable for gcc_jit_context_new_function.
-A null SYM indicates anonymous lambda."
+(defsubst comp--gccjit-stem (sym)
+  (concat
+   "F"
+   (cl-loop with orig-name = (symbol-name sym) ;Nassi's algorithm
+	    with str = (make-string (* 2 (length orig-name)) 0)
+	    for j from 0 by 2
+	    for i across orig-name
+	    for byte = (format "%x" i)
+	    do (aset str j (aref byte 0))
+	    do (aset str (1+ j) (if (length> byte 1)
+			            (aref byte 1)
+			          ?\_))
+	    finally return str)
+   "_"
+   (mapconcat (lambda (c)
+                (cond ((string-match-p (rx (any "0-9a-z_")) c) c)
+                      ((equal "-" c) "_")
+                      (t "")))
+              (mapcar #'char-to-string (symbol-name sym))
+              "")))
+
+(defun comp-next-gccjit-name (sym)
+  "Return SYM's gccjit function name not already added to comp-ctxt.
+A null SYM indicates an anonymous lambda.  Otherwise return catenation
+of hexified SYM, a human readable SYM munging, and a counter
+(to disambiguate from previous registrations)."
   (if (null sym)
       (make-temp-name "lambda_")
-    (concat "F"
-            (cl-loop with orig-name = (symbol-name sym) ;Nassi's algorithm
-	             with str = (make-string (* 2 (length orig-name)) 0)
-	             for j from 0 by 2
-	             for i across orig-name
-	             for byte = (format "%x" i)
-	             do (aset str j (aref byte 0))
-	             do (aset str (1+ j) (if (length> byte 1)
-			                     (aref byte 1)
-			                   ?\_))
-	             finally return str)
-            "_"
-            (mapconcat (lambda (c)
-                         (cond ((string-match-p (rx (any "0-9")) c)
-                                (char-to-string (+ ?A (string-to-number c))))
-                               ((string-match-p (rx (any "A-Za-z_")) c)
-                                c)
-                               (t
-                                "_")))
-                       (mapcar #'char-to-string (symbol-name sym))
-                       ""))))
+    (let ((stem (comp--gccjit-stem sym)))
+      (catch 'name
+        (dotimes (i most-positive-fixnum)
+          (let ((candidate (if (zerop i)
+                               stem
+                             (concat stem (number-to-string i)))))
+            (unless (gethash candidate (comp-ctxt-funcs-h comp-ctxt))
+              (throw 'name candidate))))))))
 
 (defun comp--decrypt-arg-list (x function-name)
   "Decrypt argument list X for FUNCTION-NAME."
@@ -729,31 +737,31 @@ A null SYM indicates anonymous lambda."
 
 (cl-defmethod comp--spill-lap-function ((function-name symbol))
   "Byte-compile FUNCTION-NAME, spilling data from the byte compiler."
-  (unless (comp-ctxt-output comp-ctxt)
-    (setf (comp-ctxt-output comp-ctxt)
-          (make-temp-file (comp-c-func-name function-name) nil ".eln")))
   (let ((f (symbol-function function-name))
         (byte-code (byte-compile function-name))
-        (c-name (comp-c-func-name function-name)))
+        (c-name (comp-next-gccjit-name function-name)))
+    (unless (comp-ctxt-output comp-ctxt)
+      (setf (comp-ctxt-output comp-ctxt)
+            (make-temp-file c-name nil ".eln")))
     (when (byte-code-function-p f)
-        (signal 'native-compiler-error
-                '("can't native compile an already byte-compiled function")))
-        (setf (comp-ctxt-top-level-forms comp-ctxt)
-              (list (make-byte-to-native-func-def :name function-name
-                                                  :c-name c-name
-                                                  :byte-func byte-code)))
-      (maphash #'comp--intern-func-in-ctxt byte-to-native-lambdas-h)))
+      (signal 'native-compiler-error
+              '("can't native compile an already byte-compiled function")))
+    (setf (comp-ctxt-top-level-forms comp-ctxt)
+          (list (make-byte-to-native-func-def :name function-name
+                                              :c-name c-name
+                                              :byte-func byte-code)))
+    (maphash #'comp--intern-func-in-ctxt byte-to-native-lambdas-h)))
 
 (cl-defmethod comp--spill-lap-function ((form list))
   "Byte-compile FORM, spilling data from the byte compiler."
   (unless (memq (car-safe form) '(lambda closure))
     (signal 'native-compiler-error
             '("Cannot native-compile, form is not a lambda or closure")))
-  (unless (comp-ctxt-output comp-ctxt)
-    (setf (comp-ctxt-output comp-ctxt)
-          (make-temp-file "comp-lambda-" nil ".eln")))
   (let* ((byte-code (byte-compile form))
-         (c-name (comp-c-func-name nil)))
+         (c-name (comp-next-gccjit-name nil)))
+    (unless (comp-ctxt-output comp-ctxt)
+      (setf (comp-ctxt-output comp-ctxt)
+            (make-temp-file "comp-lambda-" nil ".eln")))
     (setf (comp-ctxt-top-level-forms comp-ctxt)
           (list (make-byte-to-native-func-def :name 'anonymous-lambda
                                               :c-name c-name
@@ -772,7 +780,7 @@ A null SYM indicates anonymous lambda."
                         return form))
            (name (when top-l-form
                    (byte-to-native-func-def-name top-l-form)))
-           (c-name (comp-c-func-name name))
+           (c-name (comp-next-gccjit-name name))
            (func (if (comp--lex-byte-func-p byte-func)
                      (make-comp-func-l
                       :args (comp--decrypt-arg-list (aref byte-func 0)
@@ -3202,6 +3210,10 @@ Prepare every function for final compilation and drive the C back-end."
       (push (gensym "arg") lambda-list))
     (reverse lambda-list)))
 
+(defun comp-trampoline-filename (subr-name)
+  "Given SUBR-NAME return the filename containing the trampoline."
+  (concat (comp--gccjit-stem subr-name) ".eln"))
+
 (defun comp-trampoline-search (subr-name)
   "Return trampoline file for SUBR-NAME."
   (let ((filename (expand-file-name (comp-trampoline-filename subr-name)
@@ -3242,7 +3254,6 @@ Prepare every function for final compilation and drive the C back-end."
     (let* ((data function-or-file)
            (comp-native-compiling t)
            (byte-native-qualities nil)
-           (byte-compile-error-on-warn t)
            (comp-ctxt (make-comp-ctxt :output output)))
       (unwind-protect
           (progn
@@ -3272,8 +3283,7 @@ Prepare every function for final compilation and drive the C back-end."
                (let ((err-val (cdr err)))
                  (signal (car err) (if (consp err-val)
 			               (cons function-or-file err-val)
-			             ;; FIXME: `err-val' is supposed to be
-			             ;; a list, so it can only be nil here!
+                                     (cl-assert (null err-val))
 			             (list function-or-file err-val))))))
             (if (stringp function-or-file)
                 data
