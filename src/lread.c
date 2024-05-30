@@ -894,15 +894,6 @@ If `inhibit-interaction' is non-nil, this function will signal an
 	  : make_fixnum (char_resolve_modifier_mask (XFIXNUM (val))));
 }
 
-DEFUN ("get-file-char", Fget_file_char, Sget_file_char, 0, 0, 0,
-       doc: /* Don't use this yourself.  */)
-  (void)
-{
-  if (!infile)
-    error ("get-file-char misused");
-  return make_fixnum (readbyte_from_stdio ());
-}
-
 /* Return true if the lisp code read using READCHARFUN defines a non-nil
    `lexical-binding' file variable.  After returning, the stream is
    positioned following the first line, if it is a comment or #! line,
@@ -5176,7 +5167,6 @@ syms_of_lread (void)
   defsubr (&Sread_char);
   defsubr (&Sread_char_exclusive);
   defsubr (&Sread_event);
-  defsubr (&Sget_file_char);
   defsubr (&Smapatoms);
   defsubr (&Slocate_file_internal);
   defsubr (&Sinternal__obarray_buckets);
