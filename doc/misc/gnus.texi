@@ -20031,6 +20031,9 @@ Regexp matching.
 @item date
 @table @kbd
 
+@item r
+Regexp matching.
+
 @item b
 Before date.
 
@@ -20039,6 +20042,12 @@ After date.
 
 @item n
 This date.
+
+@item <
+Less than days.
+
+@item >
+Greater than days.
 @end table
 
 @item number
