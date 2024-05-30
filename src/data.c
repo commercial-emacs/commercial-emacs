@@ -1026,8 +1026,7 @@ The return value is undefined.  */)
 {
   CHECK_SYMBOL (symbol);
   if (!KEYMAPP (definition)) /* else immutable and non-copyable */
-    if (!NILP (Vpdumper__pure_pool))
-      definition = Fpurecopy_maybe (definition);
+    definition = Fpurecopy_maybe (definition);
 
   defalias (symbol, definition);
 

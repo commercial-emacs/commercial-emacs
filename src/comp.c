@@ -4716,10 +4716,7 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump,
 	  comp_u->data_vec = load_static_obj (comp_u, TEXT_DATA_RELOC_SYM);
 	  comp_u->data_impure_vec =
 	    load_static_obj (comp_u, TEXT_DATA_RELOC_IMPURE_SYM);
-
-	  if (!NILP (Vpdumper__pure_pool))
-	    /* Non impure can be copied into pure space.  */
-	    comp_u->data_vec = Fpurecopy_maybe (comp_u->data_vec);
+	  comp_u->data_vec = Fpurecopy_maybe (comp_u->data_vec);
 	}
 
       EMACS_INT d_vec_len = XFIXNUM (Flength (comp_u->data_vec));
