@@ -4039,12 +4039,11 @@ DEFUN ("comp--install-trampoline", Fcomp__install_trampoline,
   CHECK_SUBR (trampoline);
   orig_subr = Fsymbol_function (subr_name);
   CHECK_SUBR (orig_subr);
-
   if (will_dump_p ())
     signal_error ("Trying to advice during pdump", subr_name);
 
-  Lisp_Object tail = Vcomp_subr_list;
   ptrdiff_t i = ARRAYELTS (helper_link_table);
+  Lisp_Object tail = Vcomp_subr_list;
   FOR_EACH_TAIL (tail)
     {
       if (EQ (XCAR (tail), orig_subr))
@@ -4556,8 +4555,6 @@ register_native_comp_unit (Lisp_Object comp_u)
 /* Functions used to load eln files.  */
 /**************************************/
 
-typedef char *(*comp_lit_str_func) (void);
-
 /* Deserialize read and return static object.  */
 static Lisp_Object
 load_static_obj (struct Lisp_Native_Comp_Unit *comp_u, const char *name)
@@ -4615,7 +4612,7 @@ unset_cu_load_ongoing (Lisp_Object comp_u)
 }
 
 Lisp_Object
-load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump)
+load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u)
 {
   Lisp_Object res = Qnil;
   dynlib_handle_ptr handle = comp_u->handle;
@@ -4628,10 +4625,6 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump)
   comp_u->loaded_once = !NILP (*saved_cu);
   Lisp_Object *data_eph_relocs =
     dynlib_sym (handle, DATA_RELOC_EPHEMERAL_SYM);
-
-  /* While resurrecting from an image dump loading more than once the
-     same compilation unit does not make any sense.  */
-  eassert (!(loading_dump && comp_u->loaded_once));
 
   if (comp_u->loaded_once)
     /* 'dlopen' returns the same handle when trying to load two times
@@ -4692,7 +4685,7 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump)
       *freloc_link_table = freloc.link_table;
 
       /* Imported data.  */
-      if (!loading_dump)
+      if (initialized)
 	{
 	  comp_u->optimize_qualities =
 	    load_static_obj (comp_u, TEXT_OPTIM_QLY_SYM);
@@ -4711,7 +4704,7 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump)
 	data_imp_relocs[i] = AREF (comp_u->data_impure_vec, i);
     }
 
-  if (!loading_dump)
+  if (initialized)
     {
       /* Note: data_ephemeral_vec is not GC protected except by
 	 this function frame.  After this functions will be
@@ -4887,8 +4880,7 @@ This gets called by top_level_run during the load phase.  */)
 }
 
 DEFUN ("native-elisp-load", Fnative_elisp_load, Snative_elisp_load, 1, 1, 0,
-       doc: /* Load FILENAME.
-Set LATE-LOAD for deferred compilation.  */)
+       doc: /* Load FILENAME.  */)
   (Lisp_Object filename)
 {
   CHECK_STRING (filename);
@@ -4916,7 +4908,7 @@ Set LATE-LOAD for deferred compilation.  */)
   comp_unit->data_vec = Qnil;
   comp_unit->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
   comp_unit->lambda_c_name_idx_h = CALLN (Fmake_hash_table, QCtest, Qequal);
-  return load_comp_unit (comp_unit, false);
+  return load_comp_unit (comp_unit);
 }
 
 #endif /* HAVE_NATIVE_COMP */
@@ -5000,7 +4992,6 @@ syms_of_comp (void)
   DEFSYM (Qcomp, "comp");
   DEFSYM (Qfixnum, "fixnum");
   DEFSYM (Qscratch, "scratch");
-  DEFSYM (Qlate, "late");
   DEFSYM (Qlambda_fixup, "lambda-fixup");
   DEFSYM (Qgccjit, "gccjit");
   DEFSYM (Qcomp_subr_trampoline_install, "comp-subr-trampoline-install");
