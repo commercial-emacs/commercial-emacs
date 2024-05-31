@@ -1462,7 +1462,6 @@ Return t if on success.  */)
       Fnative_elisp_load (found);
       build_load_history (hist_file_name, true);
 #else
-      /* This cannot happen.  */
       emacs_abort ();
 #endif
 

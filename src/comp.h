@@ -72,9 +72,7 @@ XNATIVE_COMP_UNIT (Lisp_Object a)
 
 extern void hash_native_abi (void);
 
-extern Lisp_Object load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u,
-				   bool loading_dump);
-
+extern Lisp_Object load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u);
 extern void unload_comp_unit (struct Lisp_Native_Comp_Unit *);
 
 extern Lisp_Object native_function_doc (Lisp_Object function);
