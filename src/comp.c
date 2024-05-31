@@ -4627,6 +4627,7 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *xunit)
     }
   else
     {
+      xunit->loaded_once = true;
       xunit = XNATIVE_COMP_UNIT (unit);
       xunit->loaded_once = true;
     }
