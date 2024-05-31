@@ -1459,7 +1459,7 @@ Return t if on success.  */)
     {
 #ifdef HAVE_NATIVE_COMP
       loadhist_initialize (hist_file_name);
-      Fnative_elisp_load (found, Qnil);
+      Fnative_elisp_load (found);
       build_load_history (hist_file_name, true);
 #else
       /* This cannot happen.  */
