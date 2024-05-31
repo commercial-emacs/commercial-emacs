@@ -792,29 +792,21 @@ hash_native_abi (void)
 static void
 freloc_check_fill (void)
 {
-  if (freloc.size)
-    return;
-
-  eassert (!NILP (Vcomp_subr_list));
-
-  if (ARRAYELTS (helper_link_table) > F_RELOC_MAX_SIZE)
-    goto overflow;
-  memcpy (freloc.link_table, helper_link_table, sizeof (helper_link_table));
-  freloc.size = ARRAYELTS (helper_link_table);
-
-  Lisp_Object subr_l = Vcomp_subr_list;
-  FOR_EACH_TAIL (subr_l)
+  if (!freloc.size)
     {
-      if (freloc.size == F_RELOC_MAX_SIZE)
-	goto overflow;
-      struct Lisp_Subr *subr = XSUBR (XCAR (subr_l));
-      freloc.link_table[freloc.size] = subr->function.a0;
-      freloc.size++;
-    }
-  return;
+      verify (sizeof (helper_link_table) < sizeof (freloc.link_table));
+      memcpy (freloc.link_table, helper_link_table, sizeof (helper_link_table));
+      freloc.size = ARRAYELTS (helper_link_table);
 
- overflow:
-  fatal ("Overflowing function relocation table, increase F_RELOC_MAX_SIZE");
+      Lisp_Object tail = Vcomp_subr_list;
+      FOR_EACH_TAIL (tail)
+	{
+	  const struct Lisp_Subr *subr = XSUBR (XCAR (tail));
+	  freloc.link_table[freloc.size++] = subr->function.a0;
+	  if (freloc.size >= F_RELOC_MAX_SIZE)
+	    fatal ("Overflowing function relocation table, increase F_RELOC_MAX_SIZE");
+	}
+    }
 }
 
 static void
@@ -2845,10 +2837,10 @@ emit_ctxt_code (void)
   eassert (!NILP (Vcomp_abi_hash));
   emit_static_object (LINK_TABLE_HASH_SYM, Vcomp_abi_hash);
 
-  Lisp_Object subr_l = Vcomp_subr_list;
-  FOR_EACH_TAIL (subr_l)
+  Lisp_Object tail = Vcomp_subr_list;
+  FOR_EACH_TAIL (tail)
     {
-      struct Lisp_Subr *subr = XSUBR (XCAR (subr_l));
+      struct Lisp_Subr *subr = XSUBR (XCAR (tail));
       Lisp_Object subr_sym = intern_c_string (subr->symbol_name);
       eassert (n_frelocs < freloc.size);
       fields[n_frelocs++] = declare_imported_func (subr_sym, comp.lisp_obj_type,
@@ -4037,39 +4029,34 @@ compile_function (Lisp_Object func)
   SAFE_FREE ();
 }
 
-
-/**********************************/
-/* Entry points exposed to lisp.  */
-/**********************************/
-
 DEFUN ("comp--install-trampoline", Fcomp__install_trampoline,
        Scomp__install_trampoline, 2, 2, 0,
        doc: /* Install a TRAMPOLINE for primitive SUBR-NAME.  */)
   (Lisp_Object subr_name, Lisp_Object trampoline)
 {
+  Lisp_Object orig_subr;
   CHECK_SYMBOL (subr_name);
   CHECK_SUBR (trampoline);
-  Lisp_Object orig_subr = Fsymbol_function (subr_name);
+  orig_subr = Fsymbol_function (subr_name);
   CHECK_SUBR (orig_subr);
 
   if (will_dump_p ())
     signal_error ("Trying to advice during pdump", subr_name);
 
-  Lisp_Object subr_l = Vcomp_subr_list;
+  Lisp_Object tail = Vcomp_subr_list;
   ptrdiff_t i = ARRAYELTS (helper_link_table);
-  FOR_EACH_TAIL (subr_l)
+  FOR_EACH_TAIL (tail)
     {
-      Lisp_Object subr = XCAR (subr_l);
-      if (EQ (subr, orig_subr))
-	{
-	  freloc.link_table[i] = XSUBR (trampoline)->function.a0;
-	  Fputhash (subr_name, trampoline, Vcomp_installed_trampolines_h);
-	  return Qt;
-	}
-      ++i;
+      if (EQ (XCAR (tail), orig_subr))
+	break;
+      if (++i >= F_RELOC_MAX_SIZE)
+	fatal ("Overflowing function relocation table, increase F_RELOC_MAX_SIZE");
     }
-  signal_error ("Trying to advice unknown subr", subr_name);
-  return Qnil;
+  if (NILP (tail))
+    signal_error ("Trying to advice unknown subr", subr_name);
+  freloc.link_table[i] = XSUBR (trampoline)->function.a0;
+  Fputhash (subr_name, trampoline, Vcomp_installed_trampolines_h);
+  return Qt;
 }
 
 DEFUN ("comp--init-ctxt", Fcomp__init_ctxt, Scomp__init_ctxt,
@@ -4561,8 +4548,7 @@ helper_sanitizer_assert (Lisp_Object val, Lisp_Object type)
 static void
 register_native_comp_unit (Lisp_Object comp_u)
 {
-  Fputhash (
-    XNATIVE_COMP_UNIT (comp_u)->file, comp_u, Vcomp_loaded_comp_units_h);
+  Fputhash (XNATIVE_COMP_UNIT (comp_u)->file, comp_u, Vcomp_loaded_comp_units_h);
 }
 
 
@@ -4629,8 +4615,7 @@ unset_cu_load_ongoing (Lisp_Object comp_u)
 }
 
 Lisp_Object
-load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump,
-		bool late_load)
+load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump)
 {
   Lisp_Object res = Qnil;
   dynlib_handle_ptr handle = comp_u->handle;
@@ -4674,9 +4659,7 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u, bool loading_dump,
 
   freloc_check_fill ();
 
-  Lisp_Object (*top_level_run)(Lisp_Object)
-    = dynlib_sym (handle,
-		  late_load ? "late_top_level_run" : "top_level_run");
+  Lisp_Object (*top_level_run)(Lisp_Object) = dynlib_sym (handle, "top_level_run");
 
   /* Always set data_imp_relocs pointer in the compilation unit (it can be
      used in 'dump_do_dump_relocation').  */
@@ -4903,10 +4886,10 @@ This gets called by top_level_run during the load phase.  */)
   return tem;
 }
 
-DEFUN ("native-elisp-load", Fnative_elisp_load, Snative_elisp_load, 1, 2, 0,
+DEFUN ("native-elisp-load", Fnative_elisp_load, Snative_elisp_load, 1, 1, 0,
        doc: /* Load FILENAME.
 Set LATE-LOAD for deferred compilation.  */)
-  (Lisp_Object filename, Lisp_Object late_load)
+  (Lisp_Object filename)
 {
   CHECK_STRING (filename);
   if (NILP (Ffile_exists_p (filename)))
@@ -4933,7 +4916,7 @@ Set LATE-LOAD for deferred compilation.  */)
   comp_unit->data_vec = Qnil;
   comp_unit->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
   comp_unit->lambda_c_name_idx_h = CALLN (Fmake_hash_table, QCtest, Qequal);
-  return load_comp_unit (comp_unit, false, !NILP (late_load));
+  return load_comp_unit (comp_unit, false);
 }
 
 #endif /* HAVE_NATIVE_COMP */
