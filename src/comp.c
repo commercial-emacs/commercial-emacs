@@ -4612,138 +4612,107 @@ unset_cu_load_ongoing (Lisp_Object comp_u)
 }
 
 Lisp_Object
-load_comp_unit (struct Lisp_Native_Comp_Unit *comp_u)
+load_comp_unit (struct Lisp_Native_Comp_Unit *xunit)
 {
   Lisp_Object res = Qnil;
-  dynlib_handle_ptr handle = comp_u->handle;
-  Lisp_Object comp_u_lisp_obj;
-  XSETNATIVE_COMP_UNIT (comp_u_lisp_obj, comp_u);
-
-  Lisp_Object *saved_cu = dynlib_sym (handle, COMP_UNIT_SYM);
-  if (!saved_cu)
-    xsignal1 (Qnative_lisp_file_inconsistent, comp_u->file);
-  comp_u->loaded_once = !NILP (*saved_cu);
-  Lisp_Object *data_eph_relocs =
-    dynlib_sym (handle, DATA_RELOC_EPHEMERAL_SYM);
-
-  if (comp_u->loaded_once)
-    /* 'dlopen' returns the same handle when trying to load two times
-       the same shared.  In this case touching 'd_reloc' etc leads to
-       fails in case a frame with a reference to it in a live reg is
-       active (native-comp-speed > 0).
-
-       We must *never* mess with static pointers in an already loaded
-       eln.  */
+  const dynlib_handle_ptr handle = xunit->handle;
+  const Lisp_Object *punit = dynlib_sym (handle, COMP_UNIT_SYM);
+  if (!punit)
+    xsignal1 (Qnative_lisp_file_inconsistent, xunit->file);
+  Lisp_Object unit = *punit;
+  if (NILP (unit))
     {
-      comp_u_lisp_obj = *saved_cu;
-      comp_u = XNATIVE_COMP_UNIT (comp_u_lisp_obj);
-      comp_u->loaded_once = true;
+      XSETNATIVE_COMP_UNIT (unit, xunit);
+      xunit->loaded_once = false;
     }
   else
-    *saved_cu = comp_u_lisp_obj;
+    {
+      xunit = XNATIVE_COMP_UNIT (unit);
+      xunit->loaded_once = true;
+    }
 
-  /* Once we are sure to have the right compilation unit we want to
-     identify is we have at least another load active on it.  */
-  bool recursive_load = comp_u->load_ongoing;
-  comp_u->load_ongoing = true;
+  bool outer_load = !xunit->load_ongoing;
+  xunit->load_ongoing = true;
   specpdl_ref count = SPECPDL_INDEX ();
-  if (!recursive_load)
-    record_unwind_protect (unset_cu_load_ongoing, comp_u_lisp_obj);
-
+  if (outer_load)
+    record_unwind_protect (unset_cu_load_ongoing, unit);
   freloc_check_fill ();
 
-  Lisp_Object (*top_level_run)(Lisp_Object) = dynlib_sym (handle, "top_level_run");
-
-  /* Always set data_imp_relocs pointer in the compilation unit (it can be
-     used in 'dump_do_dump_relocation').  */
-  comp_u->data_imp_relocs = dynlib_sym (handle, DATA_RELOC_IMPURE_SYM);
-
-  if (!comp_u->loaded_once)
+  if (!xunit->loaded_once)
     {
       struct thread_state ***current_thread_reloc =
 	dynlib_sym (handle, CURRENT_THREAD_RELOC_SYM);
       void **pure_reloc = dynlib_sym (handle, PURE_RELOC_SYM);
-      Lisp_Object *data_relocs = dynlib_sym (handle, DATA_RELOC_SYM);
-      Lisp_Object *data_imp_relocs = comp_u->data_imp_relocs;
       void **freloc_link_table = dynlib_sym (handle, FUNC_LINK_TABLE_SYM);
+      Lisp_Object *data_impure_reloc = dynlib_sym (handle, DATA_RELOC_IMPURE_SYM);
+      Lisp_Object *data_reloc = dynlib_sym (handle, DATA_RELOC_SYM);
 
-      if (!(current_thread_reloc
-	    && pure_reloc
-	    && data_relocs
-	    && data_imp_relocs
-	    && data_eph_relocs
-	    && freloc_link_table
-	    && top_level_run)
-	  || NILP (Fstring_equal (load_static_obj (comp_u, LINK_TABLE_HASH_SYM),
+      if (!current_thread_reloc
+	  || !pure_reloc
+	  || !freloc_link_table
+	  || !data_impure_reloc
+	  || !data_reloc
+	  || NILP (Fstring_equal (load_static_obj (xunit, LINK_TABLE_HASH_SYM),
 				  Vcomp_abi_hash)))
-	xsignal1 (Qnative_lisp_file_inconsistent, comp_u->file);
+	xsignal1 (Qnative_lisp_file_inconsistent, xunit->file);
 
       *current_thread_reloc = &current_thread;
       *pure_reloc = pure;
 
-      /* Imported functions.  */
+      /* import functions... */
       *freloc_link_table = freloc.link_table;
-
-      /* Imported data.  */
       if (initialized)
 	{
-	  comp_u->optimize_qualities =
-	    load_static_obj (comp_u, TEXT_OPTIM_QLY_SYM);
-	  comp_u->data_vec = load_static_obj (comp_u, TEXT_DATA_RELOC_SYM);
-	  comp_u->data_impure_vec =
-	    load_static_obj (comp_u, TEXT_DATA_RELOC_IMPURE_SYM);
-	  comp_u->data_vec = Fpurecopy_maybe (comp_u->data_vec);
+	  /* ...and import data if not loading from pdump */
+	  xunit->optimize_qualities
+	    = load_static_obj (xunit, TEXT_OPTIM_QLY_SYM);
+	  xunit->data_vec = load_static_obj (xunit, TEXT_DATA_RELOC_SYM);
+	  xunit->data_vec = Fpurecopy_maybe (xunit->data_vec);
+	  xunit->data_impure_vec
+	    = load_static_obj (xunit, TEXT_DATA_RELOC_IMPURE_SYM);
 	}
 
-      EMACS_INT d_vec_len = XFIXNUM (Flength (comp_u->data_vec));
-      for (EMACS_INT i = 0; i < d_vec_len; i++)
-	data_relocs[i] = AREF (comp_u->data_vec, i);
+      for (EMACS_INT i = 0;
+	   i < XFIXNUM (Flength (xunit->data_vec));
+	   ++i)
+	data_reloc[i] = AREF (xunit->data_vec, i);
+      for (EMACS_INT i = 0;
+	   i < XFIXNUM (Flength (xunit->data_impure_vec));
+	   ++i)
+	data_impure_reloc[i] = AREF (xunit->data_impure_vec, i);
 
-      d_vec_len = XFIXNUM (Flength (comp_u->data_impure_vec));
-      for (EMACS_INT i = 0; i < d_vec_len; i++)
-	data_imp_relocs[i] = AREF (comp_u->data_impure_vec, i);
+      xunit->data_imp_relocs = data_impure_reloc;
     }
 
-  if (initialized)
-    {
-      /* Note: data_ephemeral_vec is not GC protected except by
-	 this function frame.  After this functions will be
-	 deactivated GC will be free to collect it, but it MUST
-	 survive till 'top_level_run' has finished his job.  We store
-	 into the ephemeral allocation class only objects that we know
-	 are necessary exclusively during the first load.  Once these
-	 are collected we don't have to maintain them in the heap
-	 forever.  */
-      Lisp_Object volatile data_ephemeral_vec = Qnil;
-      /* In case another load of the same CU is active on the stack
-	 all ephemeral data is hold by that frame.  Re-writing
-	 'data_ephemeral_vec' would be not only a waste of cycles but
-	 more importantly would lead to crashes if the contained data
-	 is not cons hashed.  */
-      if (!recursive_load)
-	{
-	  data_ephemeral_vec =
-	    load_static_obj (comp_u, TEXT_DATA_RELOC_EPHEMERAL_SYM);
+  eassert ((void *) xunit->data_imp_relocs
+	   == dynlib_sym (handle, DATA_RELOC_IMPURE_SYM));
 
-	  EMACS_INT d_vec_len = XFIXNUM (Flength (data_ephemeral_vec));
-	  for (EMACS_INT i = 0; i < d_vec_len; i++)
+  if (initialized) /* not loading from pdump */
+    {
+      /* data_ephemeral_vec is only ambiguously (mark_memory) gc
+	 protected but must survive through top_level_run.
+	 Ephemeral data is stored by the outer load.  */
+      Lisp_Object volatile data_ephemeral_vec = Qnil;
+      if (outer_load)
+	{
+	  data_ephemeral_vec = load_static_obj (xunit, TEXT_DATA_RELOC_EPHEMERAL_SYM);
+	  const EMACS_INT d_vec_len = XFIXNUM (Flength (data_ephemeral_vec));
+	  Lisp_Object *data_eph_relocs = dynlib_sym (handle, DATA_RELOC_EPHEMERAL_SYM);
+	  for (EMACS_INT i = 0; i < d_vec_len; ++i)
 	    data_eph_relocs[i] = AREF (data_ephemeral_vec, i);
 	}
-      /* Executing this will perform all the expected environment
-	 modifications.  */
-      res = top_level_run (comp_u_lisp_obj);
-      /* Make sure data_ephemeral_vec still exists after top_level_run has run.
-	 Guard against sibling call optimization (or any other).  */
+
+      Lisp_Object (*run)(Lisp_Object) = dynlib_sym (handle, "top_level_run");
+      res = run (unit);
+
+      /* Weird: guard against sibling call optimization.  */
       data_ephemeral_vec = data_ephemeral_vec;
-      eassert (check_comp_unit_relocs (comp_u));
+      eassert (check_comp_unit_relocs (xunit));
     }
 
-  if (!recursive_load)
-    /* Clean-up the load ongoing flag in case.  */
+  if (outer_load)
     unbind_to (count, Qnil);
-
-  register_native_comp_unit (comp_u_lisp_obj);
-
+  register_native_comp_unit (unit);
   return res;
 }
 
@@ -4908,6 +4877,7 @@ DEFUN ("native-elisp-load", Fnative_elisp_load, Snative_elisp_load, 1, 1, 0,
   comp_unit->data_vec = Qnil;
   comp_unit->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
   comp_unit->lambda_c_name_idx_h = CALLN (Fmake_hash_table, QCtest, Qequal);
+  eassume (!initialized);
   return load_comp_unit (comp_unit);
 }
 
