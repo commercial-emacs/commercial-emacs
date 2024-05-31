@@ -2763,7 +2763,6 @@ Return t if something was changed."
                  (comp--log-func comp-func 3))))
            (comp-ctxt-funcs-h comp-ctxt)))
 
-
 ;;; Type check optimizer pass specific code.
 
 ;; This pass optimize-out unnecessary type checks, that is calls to
@@ -2799,10 +2798,7 @@ Return t if something was changed."
                 (call memq ,(and (pred comp-mvar-p) mvar-1) ,(and (pred comp-mvar-p) mvar-2)))
            (cond-jump ,(and (pred comp-mvar-p) mvar-3) ,(pred comp-mvar-p) ,_bb1 ,bb2))
          (cl-assert (comp-cstr-imm-vld-p mvar-tag))
-         (when (and (length= (comp-mvar-typeset mvar-tested) 1)
-                    (member
-                     (car (comp-mvar-typeset mvar-tested))
-                     (symbol-value (comp-cstr-imm mvar-tag))))
+         (when (comp-cstr-type-p mvar-tested (comp-cstr-cl-tag mvar-tag))
            (comp-log (format "Optimizing conditional branch in function: %s"
                              (comp-func-name comp-func))
                      3)
@@ -2828,7 +2824,6 @@ Return t if something was changed."
            (comp--ssa-function f))
          (comp--log-func comp-func 3)))))
 
-
 ;;; Call optimizer pass specific code.
 ;; This pass is responsible for the following optimizations:
 ;; - Call to subrs that are in defined in the C source and are passing through
