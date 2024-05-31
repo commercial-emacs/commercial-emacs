@@ -3275,6 +3275,8 @@ Prepare every function for final compilation and drive the C back-end."
   "Compile FUNCTION-OR-FILE into native code.
 If a function, immediately load the native code.
 If a file, write native code to OUTPUT."
+  (declare (ftype (function ((or string symbol) &optional string)
+                            (or native-comp-function string))))
   (catch 'no-native-compile
     (unwind-protect
         (let ((data function-or-file)
