@@ -4614,22 +4614,23 @@ unset_cu_load_ongoing (Lisp_Object comp_u)
 Lisp_Object
 load_comp_unit (struct Lisp_Native_Comp_Unit *xunit)
 {
-  Lisp_Object res = Qnil;
+  Lisp_Object unit, res = Qnil;
   const dynlib_handle_ptr handle = xunit->handle;
-  const Lisp_Object *punit = dynlib_sym (handle, COMP_UNIT_SYM);
+  Lisp_Object *punit = dynlib_sym (handle, COMP_UNIT_SYM);
   if (!punit)
     xsignal1 (Qnative_lisp_file_inconsistent, xunit->file);
-  Lisp_Object unit = *punit;
-  if (NILP (unit))
+  xunit->loaded_once = !NILP (*punit);
+  if (xunit->loaded_once)
     {
-      XSETNATIVE_COMP_UNIT (unit, xunit);
-      xunit->loaded_once = false;
+      unit = *punit;
+      xunit = XNATIVE_COMP_UNIT (unit);
+      xunit->loaded_once = true; // effed up
     }
   else
     {
-      xunit->loaded_once = true;
-      xunit = XNATIVE_COMP_UNIT (unit);
-      xunit->loaded_once = true;
+      Lisp_Object tem;
+      XSETNATIVE_COMP_UNIT (tem, xunit);
+      unit = *punit = tem;
     }
 
   bool outer_load = !xunit->load_ongoing;
