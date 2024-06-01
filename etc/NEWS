@@ -1697,6 +1697,19 @@ forwards-compatibility Compat package from GNU ELPA.  This allows
 built-in packages to use the library more effectively, and helps
 preventing the installation of Compat if unnecessary.
 
++++
+** New package PEG.
+Emacs now includes a library for writing Parsing Expression
+Grammars (PEG), an approach to text parsing that provides more structure
+than regular expressions, but less complexity than context-free
+grammars.  The Info manual "(elisp) Parsing Expression Grammars" has
+documentation and examples.
+
+** New major mode 'shell-command-mode'.
+This mode is used by default for the output of 'async-shell-command'.
+To revert to the previous behavior, set the (also new) variable
+'async-shell-command-mode' to 'shell-mode'.  Any hooks or mode-specific
+variables used should be adapted appropriately.
 
 * Incompatible Lisp Changes in Emacs 30.1
 
