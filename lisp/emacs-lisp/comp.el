@@ -129,7 +129,7 @@ Emacs Lisp file:
                                    (expand-file-name "trampolines" user-emacs-directory))
                                   (installation-directory ;within repo
                                    (expand-file-name "lisp/trampolines" installation-directory))
-                                  (t ;batch or test mode
+                                  (t ;lack of a better place
                                    (expand-file-name (make-temp-name "trampolines-")
                                                      temporary-file-directory)))
   "User directory from which to save and load trampolines.")

@@ -1540,13 +1540,19 @@ of the tests (e.g. invalid SELECTOR or bug in the code that runs
 the tests)."
   (unless noninteractive
     (user-error "This function is only for use in batch mode"))
+  (when (featurep 'native-compile)
+    (require 'comp)
+    (cl-assert (special-variable-p 'comp-trampoline-dir)))
   (let ((load-path load-path)
+        (comp-trampoline-dir (expand-file-name (make-temp-name "trampolines-")
+                                               temporary-file-directory))
         stats
         ;; Crash, don't recover from undefined behavior.
         attempt-stack-overflow-recovery
         attempt-orderly-shutdown-on-fatal-signal)
     (unwind-protect
         (setq stats (ert-run-tests-batch selector))
+      (ignore-errors (delete-directory comp-trampoline-dir t))
       (if stats
           (kill-emacs (if (zerop (ert-stats-completed-unexpected stats)) 0 1))
         (message "Error running tests")
