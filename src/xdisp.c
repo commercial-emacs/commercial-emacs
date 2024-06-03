@@ -19044,6 +19044,13 @@ try_window_insdel (struct window *w)
       start_pos = it.current.pos;
     }
 
+  /* init_to_row_end and start_display above could have caused the
+     window's window_end_valid flag to be reset (e.g., if init_iterator
+     decides to free all realized faces).  We cannot continue if that
+     happens.  */
+  if (!w->window_end_valid)
+    GIVE_UP (108);
+
   after_gap = first_unchanged_row_after_gap (w, &delta, &delta_bytes);
 
   /* Set stop_pos to the buffer position up to which we display new
