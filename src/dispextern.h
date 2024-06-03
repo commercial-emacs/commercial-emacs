@@ -3453,6 +3453,7 @@ extern bool buffer_flipping_blocked_p (void);
 
 #ifdef HAVE_WINDOW_SYSTEM
 
+extern void clear_image_cache (struct frame *, Lisp_Object);
 extern ptrdiff_t image_bitmap_pixmap (struct frame *, ptrdiff_t);
 extern void image_reference_bitmap (struct frame *, ptrdiff_t);
 extern ptrdiff_t image_create_bitmap_from_data (struct frame *, char *,
