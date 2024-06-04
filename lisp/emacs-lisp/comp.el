@@ -3223,9 +3223,6 @@ Prepare every function for final compilation and drive the C back-end."
 
 (defun comp-trampoline-compile (subr-name)
   "Synthesize, compile, and return a trampoline for SUBR-NAME."
-  (princ (format "the fuq %S %S %S\n"
-                 (emacs-pid) subr-name native-comp-verbose)
-         #'external-debugging-output)
   (let* ((lambda-list (comp--make-lambda-list-from-subr
                        (symbol-function subr-name)))
          ;; The synthesized trampoline must expose the exact same ABI of
@@ -3292,7 +3289,7 @@ Prepare every function for final compilation and drive the C back-end."
                 data
               ;; So we return the compiled function.
               (native-elisp-load data)))
-        (process-reinitialize)
+        (process--sigaction-child)
         (when (and (not (stringp function-or-file))
                    (not output)
                    comp-ctxt
