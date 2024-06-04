@@ -25,7 +25,7 @@ src/emacs
 
 ### How often are you merging commits from GNU?
 
-Roughly every hour.
+Not that often.
 
 ### How has the code diverged thus far?
 
