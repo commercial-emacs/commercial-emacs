@@ -455,9 +455,9 @@ with `message'.  Otherwise, log with `comp-log-to-buffer'."
   (when (>= native-comp-verbose level)
     (if noninteractive
         (cl-typecase data
-          (atom (princ (format "%s\n" data) #'external-debugging-output))
+          (atom (message "%s" data))
           (t (dolist (elem data)
-               (princ (format "%s\n" elem) #'external-debugging-output))))
+               (message "%s" elem))))
       (comp-log-to-buffer data quoted))))
 
 (define-derived-mode native-comp-limple-mode fundamental-mode "LIMPLE"

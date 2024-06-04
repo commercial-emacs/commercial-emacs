@@ -5328,7 +5328,6 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		    {
 		      override_p = true;
 		      eassert (p->infd == channel);
-		      fprintf (stderr, "override %d\n", channel);
 		      FD_SET (p->infd, &Override);
 		      if (!wait_proc || wait_proc->infd == p->infd)
 			timeout = make_timespec (0, 0);
