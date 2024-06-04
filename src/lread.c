@@ -1464,7 +1464,6 @@ Return t if on success.  */)
 #else
       emacs_abort ();
 #endif
-
     }
   else
     {
