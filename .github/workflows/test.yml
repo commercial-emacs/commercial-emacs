@@ -20,13 +20,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest, macos-12, windows-latest]
-        gearing: [standard]
-        include:
-          - os: ubuntu-latest
-            gearing: alt-x
-          - os: ubuntu-latest
-            gearing: multithread
+        os: [ubuntu-latest]
+        gearing: [native-comp]
     steps:
     - run: |
         git config --global core.autocrlf false
@@ -61,26 +56,10 @@ jobs:
       with:
         repository: emacs-straight/elisp-benchmarks
         path: elisp-benchmarks
-    - uses: actions/cache@v3
-      id: cache-tree-sitter
-      with:
-        path: tree-sitter
-        key: cache-tree-sitter-${{ runner.os }}-004
-    - uses: actions/checkout@v3
-      if: steps.cache-tree-sitter.outputs.cache-hit != 'true' && matrix.gearing == 'standard' && startsWith(runner.os, 'windows') != true
-      with:
-        repository: commercial-emacs/tree-sitter
-        path: tree-sitter
-        ref: v0.20.10beta3
     - uses: actions-rs/toolchain@v1
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'windows') != true
       with:
           toolchain: stable
-    - name: make-tree-sitter
-      if: matrix.gearing == 'standard' && startsWith(runner.os, 'windows') != true
-      run: |
-        mkdir -p $HOME/.local
-        make -C tree-sitter install-ci
     - name: make-alt-xtoolkit
       if: matrix.gearing == 'alt-x'
       run: |
@@ -98,7 +77,7 @@ jobs:
       run: |
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-native-compilation
-        make -j4
+        make -j4 check
     - name: make-linux
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'Linux')
       run: |
