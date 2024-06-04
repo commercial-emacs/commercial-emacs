@@ -5215,7 +5215,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 
       /* We have to be informed when we receive a SIGCHLD signal for
 	 an asynchronous process.  Otherwise this might deadlock if we
-	 receive a SIGCHLD during `pselect'.  */
+	 receive a SIGCHLD during pselect.  */
       int child_fd = child_signal_read_fd;
       eassert (child_fd < FD_SETSIZE);
       if (0 <= child_fd)
@@ -5328,6 +5328,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 		    {
 		      override_p = true;
 		      eassert (p->infd == channel);
+		      fprintf (stderr, "override %d\n", channel);
 		      FD_SET (p->infd, &Override);
 		      if (!wait_proc || wait_proc->infd == p->infd)
 			timeout = make_timespec (0, 0);
@@ -5502,25 +5503,18 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 			redisplay_preserve_echo_area (12);
 		    }
 #ifdef HAVE_PTYS
-		  /* On some OSs with ptys, when the process on one end of
-		     a pty exits, the other end gets an error reading with
-		     errno = EIO instead of getting an EOF (0 bytes read).
-		     Therefore, if we get an error reading and errno =
-		     EIO, just continue, because the child process has
-		     exited and should clean itself up soon (e.g. when we
-		     get a SIGCHLD).  */
+		  /* On some OSs, when the process at one end of pty
+		     exits, the other end sees EIO instead of EOF --
+		     Blandy Initial Revision.  */
 		  else if (xerrno == EIO)
 		    {
-		      /* Clear the descriptor now, so we only raise the
-			 signal once.  */
+		      /* Delete to avoid signal recurrence.  */
 		      delete_read_fd (channel);
 		      FD_CLR (channel, &Available);
-
 		      if (p->pid == -2)
 			{
-			  /* If the EIO occurs on a pty, the SIGCHLD handler's
-			     waitpid call will not find the process object to
-			     delete.  Do it here.  */
+			  /* A pty disconnect, deal with manually as no
+			     SIGCHLD expected.  */
 			  p->tick = ++process_tick;
 			  pset_status (p, Qfailed);
 			}
@@ -6790,7 +6784,7 @@ child_signal_init (void)
 
 #ifndef WINDOWSNT
   if (0 <= child_signal_read_fd)
-    return; /* already done */
+    return;
 
   int fds[2];
   if (emacs_pipe (fds) < 0)
@@ -6805,8 +6799,7 @@ child_signal_init (void)
 			 EMFILE);
     }
 
-  /* We leave the file descriptors open until the Emacs process
-     exits.  */
+  /* File descriptors stay open for emacs lifetime.  */
   eassert (0 <= fds[0]);
   eassert (0 <= fds[1]);
   if (fcntl (fds[0], F_SETFL, O_NONBLOCK) != 0)
@@ -6881,9 +6874,6 @@ static void dummy_handler (int sig) {}
 static signal_handler_t volatile lib_child_handler;
 
 /* Record changed statuses of child processes.
-
-   To avoid timing issues, do not run sentinels or print notifications,
-   which are processed by subsequent keyboard input.
 
    As SIGCHLD could occur during gc, objects may have flagged mark bits.
 
@@ -7522,6 +7512,47 @@ DEFUN ("signal-names", Fsignal_names, Ssignal_names, 0, 0, 0,
 #endif
 }
 
+DEFUN ("process-reinitialize", Fprocess_reinitialize,
+       Sprocess_reinitialize, 0, 0, 0,
+       doc: /* libgccjit does something to sigaction CHLD.  */)
+  (void)
+{
+#if defined HAVE_GLIB && !defined WINDOWSNT
+  /* Tickle Glib's child-handling code.  Ask Glib to install a
+     watch source for Emacs itself which will initialize glib's
+     private SIGCHLD handler, allowing catch_child_signal to copy
+     it into lib_child_handler.  This is a hacky workaround to get
+     glib's g_unix_signal_handler into lib_child_handler.
+
+     In Glib 2.37.5 (2013), commit 2e471acf changed Glib to
+     always install a signal handler when g_child_watch_source_new
+     is called and not just the first time it's called, and to
+     reset signal handlers to SIG_DFL when it no longer has a
+     watcher on that signal.  Arrange for Emacs's signal handler
+     to be reinstalled even if this happens.
+
+     In Glib 2.73.2 (2022), commit f615eef4 changed Glib again,
+     to not install a signal handler if the system supports
+     pidfd_open and waitid (as in Linux kernel 5.3+).  The hacky
+     workaround is not needed in this case.  */
+  GSource *source = g_child_watch_source_new (getpid ());
+  catch_child_signal ();
+  g_source_unref (source);
+
+  if (lib_child_handler != dummy_handler)
+    {
+      /* The hacky workaround is needed on this platform.  */
+      signal_handler_t lib_child_handler_glib = lib_child_handler;
+      catch_child_signal ();
+      eassert (lib_child_handler == dummy_handler);
+      lib_child_handler = lib_child_handler_glib;
+    }
+#else /* !defined HAVE_GLIB || defined WINDOWSNT */
+  catch_child_signal ();
+#endif
+  return Qnil;
+}
+
 /* Arrange to catch SIGCHLD if this hasn't already been arranged.
    Invoke this after init_process_emacs, and after Glib and/or GNUstep
    futz with the SIGCHLD handler, but before Emacs forks any children.
@@ -7617,7 +7648,7 @@ init_process_emacs (int sockfd)
       eassert (lib_child_handler == dummy_handler);
       lib_child_handler = lib_child_handler_glib;
     }
-#else
+#else /* !defined HAVE_GLIB || defined WINDOWSNT */
   catch_child_signal ();
 #endif
 
@@ -7956,4 +7987,5 @@ sentinel or a process filter function has an error.  */);
   defsubr (&Sprocess_attributes);
   defsubr (&Snum_processors);
   defsubr (&Ssignal_names);
+  defsubr (&Sprocess_reinitialize);
 }

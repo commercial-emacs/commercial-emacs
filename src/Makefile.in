@@ -511,8 +511,12 @@ endef
 bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT) ../lisp/subdirs.el
 	$(MAKE) -C ../lisp bootstrap-clean EMACS=../src/$<
 	$(call pdump,$@) # pdmp all interpreted elisp
-	$(MAKE) -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\")` EMACS=../src/$<
+	$(MAKE) -C ../lisp `$(call relative-lisp-files,$<,\"elc\")` EMACS=../src/$<
 	$(call pdump,$@) # pdmp all byte-compiled
+ifneq ($(TARGET_EXT),elc)
+	$(MAKE) -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\")` EMACS=../src/$<
+	$(call pdump,$@) # pdmp all native-compiled
+endif
 
 .SECONDEXPANSION:
 emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el ../lisp/loaddefs.elc \
@@ -522,7 +526,7 @@ emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el ../lisp/loaddefs.elc \
 	$(call pdump,$@) # pdmp some interpreted elisp
 	@# if relative-lisp-files empty, .DEFAULT_GOAL=none
 	$(MAKE) .DEFAULT_GOAL=none -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\")`
-	$(call pdump,$@) # pdmp all native- and byte-compiled
+	$(call pdump,$@) # pdmp all native- or byte-compiled
 
 install-emacs.pdmp: emacs.pdmp
 	$(AM_V_at)rm -f install-emacs$(EXEEXT)

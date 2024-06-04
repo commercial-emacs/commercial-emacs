@@ -5014,8 +5014,6 @@ syms_of_comp (void)
   Fput (Qcomp_sanitizer_error, Qerror_message,
         build_pure_c_string ("Native code sanitizer runtime error"));
 
-  DEFSYM (Qnative__compile_async, "native--compile-async");
-
   defsubr (&Scomp__subr_signature);
   defsubr (&Scomp_native_driver_options_effective_p);
   defsubr (&Scomp_native_compiler_options_effective_p);
