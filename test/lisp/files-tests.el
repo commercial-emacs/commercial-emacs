@@ -27,6 +27,12 @@
 (require 'dired) ; `dired-uncache'.
 (require 'filenotify) ; `file-notify-add-watch'.
 
+(defvar native-comp-verbose)
+(defvar comp-log-time-report)
+(with-eval-after-load 'comp
+  (setq native-comp-verbose 1
+        comp-log-time-report t))
+
 ;; Set to t if the local variable was set, `query' if the query was
 ;; triggered.
 (defvar files-test-result nil)
@@ -386,25 +392,7 @@ let-bound to PRED and passing nil as second arg of
             (set-buffer-modified-p nil)
             (kill-buffer buf)))))))
 
-(defmacro files-tests--with-yes-or-no-p (reply &rest body)
-  "Execute BODY, providing replies to `yes-or-no-p' queries.
-REPLY should be a cons (PROMPT . VALUE), and during execution of
-BODY this macro provides VALUE as return value to all
-`yes-or-no-p' calls prompting for PROMPT and nil to all other
-`yes-or-no-p' calls.  After execution of BODY, this macro ensures
-that exactly one `yes-or-no-p' call prompting for PROMPT has been
-executed during execution of BODY."
-  (declare (indent 1) (debug (sexp body)))
-  `(cl-letf*
-       ((reply ,reply)
-        (prompts nil)
-        ((symbol-function 'yes-or-no-p)
-         (lambda (prompt)
-           (let ((reply (cdr (assoc prompt (list reply)))))
-             (push (cons prompt reply) prompts)
-             reply))))
-     ,@body
-     (should (equal prompts (list reply)))))
+
 
 
 
@@ -498,6 +486,9 @@ Check the behavior of `save-some-buffers' for non-file-visiting
 buffers under several values of `buffer-offer-save'.
 The value of `save-some-buffers-default-predicate' is ignored unless
 PRED is nil."
+  (princ (format "the fuq0 %S %S %S\n"
+                 (emacs-pid) (featurep 'comp) native-comp-verbose)
+         #'external-debugging-output)
   (let* ((buffers-offer-init '((buf-1 t) (buf-2 always) (buf-3 nil)))
          (nb-might-save
           (length
@@ -526,11 +517,18 @@ PRED is nil."
 
 (ert-deftest bfiles-tests-file-name-non-special-make-process ()
   (make-process :name "name" :command (list "false"))
-  (while (cl-some (lambda (proc)
-                    (when (memq (process-status proc) '(run stop open listen))
-                      (message "%S" (process-attributes (process-id proc)))))
-                  (process-list))
-    (accept-process-output nil 5)))
+  (let (;(cleanse (make-process :name "name" :command (list "false")))
+        (cleanse (start-process "name" nil "false")))
+    (while (cl-some (lambda (proc)
+                      (prog1 (eq (process-status proc) 'run)
+                        (delete-process proc)))
+                    (process-list))
+      (let ((proc (make-process :name "name" :command (list "false"))))
+        (message "%S %S"
+                 (process-status proc)
+                 (process-attributes (process-id proc))))
+      (accept-process-output nil 2)
+      )))
 
 (provide 'files-tests)
 ;;; files-tests.el ends here

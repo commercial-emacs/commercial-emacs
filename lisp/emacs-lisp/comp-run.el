@@ -62,7 +62,13 @@
     (require 'comp)
     (when-let ((trampoline (or (comp-trampoline-search subr-name)
                                (comp-trampoline-compile subr-name))))
-      (comp--install-trampoline subr-name trampoline))))
+      (comp--install-trampoline subr-name trampoline)
+        (call-process "false")
+        (call-process "false")
+        (call-process "false")
+        (while (process-list))
+
+)))
 
 (provide 'comp-run)
 
