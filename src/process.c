@@ -7512,8 +7512,8 @@ DEFUN ("signal-names", Fsignal_names, Ssignal_names, 0, 0, 0,
 #endif
 }
 
-DEFUN ("process-reinitialize", Fprocess_reinitialize,
-       Sprocess_reinitialize, 0, 0, 0,
+DEFUN ("process--sigaction-child", Fprocess__sigaction_child,
+       Sprocess__sigaction_child, 0, 0, 0,
        doc: /* libgccjit does something to sigaction CHLD.  */)
   (void)
 {
@@ -7618,40 +7618,7 @@ call_process_filter (Lisp_Object process, Lisp_Object string)
 void
 init_process_emacs (int sockfd)
 {
-#if defined HAVE_GLIB && !defined WINDOWSNT
-  /* Tickle Glib's child-handling code.  Ask Glib to install a
-     watch source for Emacs itself which will initialize glib's
-     private SIGCHLD handler, allowing catch_child_signal to copy
-     it into lib_child_handler.  This is a hacky workaround to get
-     glib's g_unix_signal_handler into lib_child_handler.
-
-     In Glib 2.37.5 (2013), commit 2e471acf changed Glib to
-     always install a signal handler when g_child_watch_source_new
-     is called and not just the first time it's called, and to
-     reset signal handlers to SIG_DFL when it no longer has a
-     watcher on that signal.  Arrange for Emacs's signal handler
-     to be reinstalled even if this happens.
-
-     In Glib 2.73.2 (2022), commit f615eef4 changed Glib again,
-     to not install a signal handler if the system supports
-     pidfd_open and waitid (as in Linux kernel 5.3+).  The hacky
-     workaround is not needed in this case.  */
-  GSource *source = g_child_watch_source_new (getpid ());
-  catch_child_signal ();
-  g_source_unref (source);
-
-  if (lib_child_handler != dummy_handler)
-    {
-      /* The hacky workaround is needed on this platform.  */
-      signal_handler_t lib_child_handler_glib = lib_child_handler;
-      catch_child_signal ();
-      eassert (lib_child_handler == dummy_handler);
-      lib_child_handler = lib_child_handler_glib;
-    }
-#else /* !defined HAVE_GLIB || defined WINDOWSNT */
-  catch_child_signal ();
-#endif
-
+  Fprocess__sigaction_child ();
 #ifdef HAVE_SETRLIMIT
   /* Don't allocate more than FD_SETSIZE file descriptors for Emacs itself.  */
   if (getrlimit (RLIMIT_NOFILE, &nofile_limit) != 0)
@@ -7987,5 +7954,5 @@ sentinel or a process filter function has an error.  */);
   defsubr (&Sprocess_attributes);
   defsubr (&Snum_processors);
   defsubr (&Ssignal_names);
-  defsubr (&Sprocess_reinitialize);
+  defsubr (&Sprocess__sigaction_child);
 }
