@@ -29530,7 +29530,7 @@ get_window_cursor_type (struct window *w, struct glyph *glyph, int *width,
   struct frame *f = XFRAME (w->frame);
   struct buffer *b = XBUFFER (w->contents);
   int cursor_type = DEFAULT_CURSOR;
-  Lisp_Object alt_cursor;
+  Lisp_Object alt_cursor, win_cursor;
   bool non_selected = false;
 
   *active_cursor = true;
@@ -29542,7 +29542,12 @@ get_window_cursor_type (struct window *w, struct glyph *glyph, int *width,
     {
       if (w == XWINDOW (echo_area_window))
 	{
-	  if (EQ (BVAR (b, cursor_type), Qt) || NILP (BVAR (b, cursor_type)))
+	  win_cursor = window_parameter (w, Qcursor_type);
+	  if (CONSP (win_cursor))
+	    {
+	      return get_specified_cursor_type (XCAR (win_cursor), width);
+	    }
+	  else if (EQ (BVAR (b, cursor_type), Qt) || NILP (BVAR (b, cursor_type)))
 	    {
 	      *width = FRAME_CURSOR_WIDTH (f);
 	      return FRAME_DESIRED_CURSOR (f);
@@ -29569,22 +29574,30 @@ get_window_cursor_type (struct window *w, struct glyph *glyph, int *width,
       non_selected = true;
     }
 
-  /* Never display a cursor in a window in which cursor-type is nil.  */
-  if (NILP (BVAR (b, cursor_type)))
-    return NO_CURSOR;
-
-  /* Get the normal cursor type for this window.  */
-  if (EQ (BVAR (b, cursor_type), Qt))
+  win_cursor = window_parameter (w, Qcursor_type);
+  if (CONSP (win_cursor))
     {
-      cursor_type = FRAME_DESIRED_CURSOR (f);
-      *width = FRAME_CURSOR_WIDTH (f);
+      cursor_type = get_specified_cursor_type (XCAR (win_cursor), width);
     }
   else
-    cursor_type = get_specified_cursor_type (BVAR (b, cursor_type), width);
+    {
+      /* Never display a cursor in a window in which cursor-type is nil.  */
+      if (NILP (BVAR (b, cursor_type)))
+	return NO_CURSOR;
+
+      /* Get the normal cursor type for this window.  */
+      if (EQ (BVAR (b, cursor_type), Qt))
+	{
+	  cursor_type = FRAME_DESIRED_CURSOR (f);
+	  *width = FRAME_CURSOR_WIDTH (f);
+	}
+      else
+	cursor_type = get_specified_cursor_type (BVAR (b, cursor_type), width);
+    }
 
   /* Use cursor-in-non-selected-windows instead
      for non-selected window or frame.  */
-  if (non_selected)
+  if (non_selected && !CONSP (win_cursor))
     {
       alt_cursor = BVAR (b, cursor_in_non_selected_windows);
       if (!EQ (Qt, alt_cursor))

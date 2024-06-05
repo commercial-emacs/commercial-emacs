@@ -6688,6 +6688,18 @@ applications that use large margins to center buffer text within a
 window and should be used, with due care, exclusively by those
 applications.  It might be replaced by an improved solution in future
 versions of Emacs.
+
+@item cursor-type
+@vindex cursor-type@r{, a window parameter}
+@anchor{Definition of cursor-type window parameter}
+If this parameter is set to a cons cell, its @sc{car} specifies the
+shape of the cursor in this window, using the same format as the
+buffer-local variable @code{cursor-type}.  @xref{Cursor Parameters}.
+Use this window parameter instead of the @code{cursor-type} variable or
+frame parameter when a buffer is displayed in multiple windows and you
+want to change the cursor for one window without affecting the others.
+This window parameter takes precedence over the @code{cursor-type}
+variable as well as @code{cursor-in-non-selected-windows}.
 @end table
 
 
