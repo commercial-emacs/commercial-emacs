@@ -3622,7 +3622,7 @@ valid_lisp_object_p (Lisp_Object obj)
   if (PURE_P (p) || mgc_xpntr_p (p))
     return 1;
 
-  if (SYMBOLP (obj) && c_symbol_p (p))
+  if (SYMBOLP (obj) && builtin_lisp_symbol_p (p))
     return ((char *) p - (char *) lispsym) % sizeof lispsym[0] == 0;
 
   if (p == &buffer_slot_defaults || p == &buffer_slot_symbols)
@@ -3708,17 +3708,6 @@ hash_table_free_bytes (void *p, ptrdiff_t nbytes)
   xfree (p);
 }
 
-/* Allocate room for SIZE bytes from pure Lisp storage and return a
-   pointer to it.  TYPE is the Lisp type for which the memory is
-   allocated.  TYPE < 0 means it's not used for a Lisp object,
-   and that the result should have an alignment of -TYPE.
-
-   The bytes are initially zero.
-
-   If pure space is exhausted, allocate space from the heap.  This is
-   merely an expedient to let Emacs warn that pure space was exhausted
-   and that Emacs should be rebuilt with a larger pure space.  */
-
 EMACS_INT pure[(PURESIZE + sizeof (EMACS_INT) - 1) / sizeof (EMACS_INT)] = {1,};
 
 static void *
@@ -3758,8 +3747,8 @@ pure_alloc (size_t size, int alignment)
    string; then the string is not protected from gc.  */
 
 Lisp_Object
-make_pure_string (const char *data,
-		  ptrdiff_t nchars, ptrdiff_t nbytes, bool multibyte)
+make_pure_string (const char *data, ptrdiff_t nchars,
+		  ptrdiff_t nbytes, bool multibyte)
 {
   static void *pure_nul = NULL;
   Lisp_Object string;
@@ -3905,53 +3894,35 @@ purecopy_hash_table (struct Lisp_Hash_Table *table)
   return pure;
 }
 
-DEFUN ("purify-if-dumping", Fpurecopy_maybe, Spurecopy_maybe, 1, 1, 0,
-       doc: /* Monnier's half-measure to reduce pdump footprint.  */)
-  (register Lisp_Object obj)
-{
-  if (NILP (Vpdumper__pure_pool)
-      || MARKERP (obj)
-      || OVERLAYP (obj)
-      || SYMBOLP (obj))
-    return obj; /* Can't purify OBJ.  */
-  return purecopy (obj);
-}
-
 static struct pinned_object
 {
   Lisp_Object object;
   struct pinned_object *next;
 } *pinned_objects;
 
-static struct symbol_block *first_block_pinned;
-
 static Lisp_Object
 purecopy (Lisp_Object obj)
 {
-  if (FIXNUMP (obj)
-      || (!SYMBOLP (obj) && PURE_P (XPNTR (obj)))
-      || SUBRP (obj))
-    return obj;    /* Already pure.  */
+  Lisp_Object pooled = !NILP (Vpdumper__pure_pool)
+    ? Fgethash (obj, Vpdumper__pure_pool, Qnil)
+    : Qnil;
 
-  if (STRINGP (obj) && XSTRING (obj)->u.s.intervals)
-    message_with_string ("Dropping text-properties while making string `%s' pure",
-			 obj, true);
-
-  if (!NILP (Vpdumper__pure_pool))
+  if (PURE_P (XPNTR (obj)))
     {
-      Lisp_Object pooled = Fgethash (obj, Vpdumper__pure_pool, Qnil);
-      if (!NILP (pooled))
-	return pooled;
+      eassert (!NILP (pooled));
+      eassert (PURE_P (XPNTR (pooled)));
+      return obj; /* !!! */
     }
-
-  if (CONSP (obj))
-    obj = pure_cons (XCAR (obj), XCDR (obj));
+  else if (!NILP (pooled))
+    return pooled;
+  else if (CONSP (obj))
+    pooled = pure_cons (XCAR (obj), XCDR (obj));
   else if (FLOATP (obj))
-    obj = make_pure_float (XFLOAT_DATA (obj));
+    pooled = make_pure_float (XFLOAT_DATA (obj));
   else if (STRINGP (obj))
-    obj = make_pure_string (SSDATA (obj), SCHARS (obj),
-			    SBYTES (obj),
-			    STRING_MULTIBYTE (obj));
+    pooled = make_pure_string (SSDATA (obj), SCHARS (obj),
+			       SBYTES (obj),
+			       STRING_MULTIBYTE (obj));
   else if (HASH_TABLE_P (obj))
     {
       struct Lisp_Hash_Table *table = XHASH_TABLE (obj);
@@ -3966,10 +3937,9 @@ purecopy (Lisp_Object obj)
           o->object = obj;
           o->next = pinned_objects;
           pinned_objects = o;
-          return obj; /* Don't hash cons it.  */
+          return obj; /* !!! */
         }
-
-      obj = make_lisp_hash_table (purecopy_hash_table (table));
+      pooled = make_lisp_hash_table (purecopy_hash_table (table));
     }
   else if (CLOSUREP (obj) || VECTORP (obj) || RECORDP (obj))
     {
@@ -3987,33 +3957,21 @@ purecopy (Lisp_Object obj)
       if (CLOSUREP (obj) && size >= 2 && STRINGP (vec->contents[1])
 	  && !STRING_MULTIBYTE (vec->contents[1]))
 	pin_string (vec->contents[1]);
-      XSETVECTOR (obj, vec);
-    }
-  else if (SYMBOLP (obj))
-    {
-      if (!XSYMBOL (obj)->u.s.pinned && !c_symbol_p (XSYMBOL (obj)))
-	{
-	  /* As of 2014, recording first block containing pinned
-	     symbols in FIRST_BLOCK_PINNED saves us scanning 15K
-	     symbols out of typically 30K.  */
-	  XSYMBOL (obj)->u.s.pinned = true;
-	  first_block_pinned = symbol_blocks;
-	}
-      /* Don't hash-cons it.  */
-      return obj;
+      XSETVECTOR (pooled, vec);
     }
   else if (BIGNUMP (obj))
-    obj = make_pure_bignum (obj);
-  else
-    {
-      AUTO_STRING (fmt, "Don't know how to purify: %S");
-      Fsignal (Qerror, list1 (CALLN (Fformat, fmt, obj)));
-    }
+    pooled = make_pure_bignum (obj);
 
   if (!NILP (Vpdumper__pure_pool))
-    Fputhash (obj, obj, Vpdumper__pure_pool);
+    Fputhash (pooled, pooled, Vpdumper__pure_pool);
+  return !NILP (pooled) ? pooled : obj;
+}
 
-  return obj;
+DEFUN ("purify-if-dumping", Fpurecopy_maybe, Spurecopy_maybe, 1, 1, 0,
+       doc: /* Monnier's half-measure to reduce pdump footprint.  */)
+  (Lisp_Object obj)
+{
+  return NILP (Vpdumper__pure_pool) ? obj : purecopy (obj);
 }
 
 /* Put an entry in staticvec, pointing at the variable with address
@@ -4167,23 +4125,6 @@ mark_pinned_objects (void)
        pobj != NULL;
        pobj = pobj->next)
     mark_object (&pobj->object);
-}
-
-static void
-mark_pinned_symbols (void)
-{
-  for (struct symbol_block *sblk = first_block_pinned;
-       sblk != NULL;
-       sblk = sblk->next)
-    {
-      for (struct Lisp_Symbol *sym = sblk->symbols,
-	     *end = sym + (first_block_pinned == symbol_blocks
-			   ? symbol_block_index : BLOCK_NSYMBOLS);
-	   sym < end;
-	   ++sym)
-	if (sym->u.s.pinned)
-	  mark_automatic_object (make_lisp_ptr (sym, Lisp_Symbol));
-    }
 }
 
 static void
@@ -4737,7 +4678,6 @@ garbage_collect (void)
   eassert (weak_hash_tables == NULL && mark_stack_empty_p ());
   mark_most_objects ();
   mark_pinned_objects ();
-  mark_pinned_symbols ();
   mark_lread ();
   mark_terminals ();
   mark_kboards ();
@@ -5069,7 +5009,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	      {
 		if (symbol_marked_p (ptr))
 		  break; /* !!! */
-		else if (!c_symbol_p (ptr))
+		else if (!builtin_lisp_symbol_p (ptr))
 		  eassert (check_live (xpntr, MEM_TYPE_SYMBOL));
 		eassert (valid_lisp_object_p (ptr->u.s.function));
 		set_symbol_marked (ptr);

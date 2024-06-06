@@ -23,31 +23,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 INLINE_HEADER_BEGIN
 
-/* Define PURESIZE, the number of bytes of pure Lisp code to leave space for.
+/* Number bytes of pure Lisp code to leave space for.  */
 
-   At one point, this was defined in config.h, meaning that changing
-   PURESIZE would make Make recompile all of Emacs.  But only a few
-   files actually use PURESIZE, so we split it out to its own .h file.
-
-   Make sure to include this file after config.h, since that tells us
-   whether we are running X windows, which tells us how much pure
-   storage to allocate.  */
-
-/* First define a measure of the amount of data we have.  */
-
-/* A system configuration file may set this to request a certain extra
-   amount of storage.  This is a lot more update-robust than defining
-   BASE_PURESIZE or even PURESIZE directly.  */
 #ifndef SYSTEM_PURESIZE_EXTRA
 #define SYSTEM_PURESIZE_EXTRA 0
 #endif
 
-#ifndef SITELOAD_PURESIZE_EXTRA
-#define SITELOAD_PURESIZE_EXTRA 0
-#endif
-
 #ifndef BASE_PURESIZE
-#define BASE_PURESIZE (3000000 + SYSTEM_PURESIZE_EXTRA + SITELOAD_PURESIZE_EXTRA)
+#define BASE_PURESIZE (3000000 + SYSTEM_PURESIZE_EXTRA)
 #endif
 
 /* Increase BASE_PURESIZE by a ratio depending on the machine's word size.  */

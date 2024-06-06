@@ -861,7 +861,7 @@ builtin_lisp_symbol (int index)
 }
 
 INLINE bool
-c_symbol_p (struct Lisp_Symbol *sym)
+builtin_lisp_symbol_p (struct Lisp_Symbol *sym)
 {
   char *bp = (char *) lispsym;
   char *sp = (char *) sym;
