@@ -3903,18 +3903,15 @@ static struct pinned_object
 static Lisp_Object
 purecopy (Lisp_Object obj)
 {
+  if (PURE_P (XPNTR (obj)))
+    return obj;
+
   Lisp_Object pooled = !NILP (Vpdumper__pure_pool)
     ? Fgethash (obj, Vpdumper__pure_pool, Qnil)
     : Qnil;
 
-  if (PURE_P (XPNTR (obj)))
-    {
-      eassert (!NILP (pooled));
-      eassert (PURE_P (XPNTR (pooled)));
-      return obj; /* !!! */
-    }
-  else if (!NILP (pooled))
-    return pooled;
+  if (!NILP (pooled))
+    (void) pooled;
   else if (CONSP (obj))
     pooled = pure_cons (XCAR (obj), XCDR (obj));
   else if (FLOATP (obj))
