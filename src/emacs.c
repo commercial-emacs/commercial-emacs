@@ -2176,7 +2176,9 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_fringe ();
       syms_of_image ();
 #ifdef HAVE_NTGUI
+# if HAVE_NATIVE_IMAGE_API
       syms_of_w32image ();
+# endif
 #endif	/* HAVE_NTGUI */
 #endif /* HAVE_WINDOW_SYSTEM */
 #ifdef HAVE_X_WINDOWS
@@ -2302,7 +2304,9 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       globals_of_w32font ();
       globals_of_w32fns ();
       globals_of_w32menu ();
+# if HAVE_NATIVE_IMAGE_API
       globals_of_w32image ();
+# endif
 #endif  /* HAVE_NTGUI */
 
 #if defined WINDOWSNT || defined HAVE_NTGUI
