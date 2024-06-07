@@ -4927,8 +4927,7 @@ of that nature."
        (unwind-protect
            (progn
              ,@body)
-         (when (or (not ,modified)
-                   (eq ,modified 'autosaved))
+         (when (memq ,modified '(nil autosaved))
            (restore-buffer-modified-p ,modified))))))
 
 (defmacro with-output-to-string (&rest body)
