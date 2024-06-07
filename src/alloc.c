@@ -805,38 +805,12 @@ mark_interval_tree_functor (INTERVAL *i, void *dummy)
   mark_object (&(*i)->plist);
 }
 
-static void
-mark_interval_tree_functor_mgc (INTERVAL *i, void *dummy)
-{
-  eassert (!interval_marked_p (*i));
-  if (mgc_xpntr_p (*i) && !mgc_fwd_xpntr (*i))
-    {
-      *i = mgc_flip_xpntr (*i, Space_Interval);
-      if (INTERVAL_HAS_OBJECT (*i))
-	mark_object (&(*i)->up.obj);
-      else if (INTERVAL_HAS_PARENT (*i))
-	mark_interval_tree (&(*i)->up.interval);
-      mark_object (&(*i)->plist);
-    }
-}
-
 /* Mark the interval tree rooted in I.  */
 
 static void
 mark_interval_tree (INTERVAL *i)
 {
-  if (!*i)
-    return;
-  if (mgc_xpntr_p (*i))
-    {
-      /* INTERVAL *root = i;
-	 for ( ; ! NULL_PARENT (*root); root = &(*root)->up.interval);
-	 eassert (mgc_xpntr_p (*root));
-	 traverse_intervals_noorder (i, mark_interval_tree_functor_mgc, NULL)
-      */
-      traverse_intervals_noorder (i, mark_interval_tree_functor_mgc, NULL);
-    }
-  else if (!interval_marked_p (*i))
+  if (*i && !interval_marked_p (*i))
     traverse_intervals_noorder (i, mark_interval_tree_functor, NULL);
 }
 
@@ -2903,7 +2877,6 @@ static bool
 vector_marked_p (const struct Lisp_Vector *v)
 {
   bool ret;
-  eassert (!mgc_xpntr_p (v));
   if (pdumper_object_p (v))
     {
       /* Checking "cold" saves faulting in vector header.  */
@@ -2967,7 +2940,6 @@ static bool
 string_marked_p (const struct Lisp_String *s)
 {
   bool ret;
-  eassert (!mgc_xpntr_p (s));
   if (pdumper_object_p (s))
     ret = pdumper_marked_p (s);
   else
@@ -3279,8 +3251,7 @@ mark_maybe_pointer (void *const *p)
   bool ret = false;
   uintptr_t mask = VALMASK & UINTPTR_MAX;
   struct mem_node *m;
-  enum Space_Type xpntr_type;
-  void *xpntr, *p_sym;
+  void *p_sym;
   struct thread_state *thr = NULL;
 
   /* Research Bug#41321.  If we didn't special-case Lisp_Symbol
@@ -3315,27 +3286,6 @@ mark_maybe_pointer (void *const *p)
 	     && (!USE_LSB_TAG || p_sym == po || cp - cpo == Lisp_Symbol));
       if (ret)
 	mark_automatic_object (make_lisp_ptr (po, Lisp_Symbol));
-    }
-  else if ((xpntr_type = mgc_find_xpntr (*p, &xpntr)) != Space_Type_Max
-	   || (xpntr_type = mgc_find_xpntr (p_sym, &xpntr)) != Space_Type_Max)
-    {
-      /* analogous logic to set_string_marked() */
-      ptrdiff_t offset;
-      void *forwarded = mgc_fwd_xpntr (xpntr);
-      if (!forwarded)
-	{
-	  ret = true;
-	  if ((enum Lisp_Type) xpntr_type < Lisp_Type_Max)
-	    mark_automatic_object (make_lisp_ptr (xpntr, (enum Lisp_Type) xpntr_type));
-	  else if (xpntr_type == Space_Interval)
-	    mark_interval_tree ((INTERVAL *) &xpntr);
-	  else
-	    emacs_abort ();
-	  forwarded = mgc_fwd_xpntr (xpntr);
-	}
-      eassert (forwarded);
-      INT_SUBTRACT_WRAPV ((uintptr_t) *p, (uintptr_t) xpntr, &offset);
-      INT_ADD_WRAPV ((uintptr_t) forwarded, offset, (uintptr_t *) p);
     }
   else if ((m = mem_find_which_thread (*p, &thr)) != mem_nil)
     {
@@ -3619,7 +3569,7 @@ valid_lisp_object_p (Lisp_Object obj)
     return 1;
 
   void *p = XPNTR (obj);
-  if (PURE_P (p) || mgc_xpntr_p (p))
+  if (PURE_P (p))
     return 1;
 
   if (SYMBOLP (obj) && builtin_lisp_symbol_p (p))
@@ -4724,8 +4674,6 @@ garbage_collect (void)
   mark_and_sweep_weak_table_contents ();
   eassert (weak_hash_tables == NULL && mark_stack_empty_p ());
 
-  mgc_flip_space ();
-
   gc_sweep ();
 
   unmark_main_thread ();
@@ -4771,24 +4719,7 @@ static void
 gc_process_string (Lisp_Object *objp)
 {
   struct Lisp_String *s = XSTRING (*objp);
-  void *forwarded = mgc_fwd_xpntr (s);
-  if (forwarded)
-    {
-      XSETSTRING (*objp, forwarded);
-      eassert (!XSTRING_MARKED_P (s));
-    }
-  else if (mgc_xpntr_p (s))
-    {
-      /* Do not use string_(set|get)_intervals here.  */
-      XSETSTRING (*objp, mgc_flip_xpntr (s, Space_String));
-      forwarded = mgc_fwd_xpntr (s);
-      struct Lisp_String *s1 = (struct Lisp_String *) forwarded;
-      eassert ((void *) XSTRING (*objp) == (void *) s1);
-      SDATA_OF_LISP_STRING (s1)->string = s1;
-      s1->u.s.intervals = balance_intervals (s1->u.s.intervals);
-      mark_interval_tree (&s1->u.s.intervals);
-    }
-  else if (!string_marked_p (s))
+  if (!string_marked_p (s))
     {
       set_string_marked (s);
       mark_interval_tree (&s->u.s.intervals);
@@ -4805,10 +4736,6 @@ check_live (void *xpntr, enum mem_type mtype)
   if (pdumper_object_p (xpntr))
     {
       eassume (pdumper_object_p_precise (xpntr));
-      return true;
-    }
-  else if (mgc_fwd_xpntr (xpntr) || mgc_xpntr_p (xpntr))
-    {
       return true;
     }
   else
@@ -4882,22 +4809,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_Vectorlike:
 	  {
 	    struct Lisp_Vector *ptr = XVECTOR (*objp);
-	    void *forwarded = mgc_fwd_xpntr (ptr);
-	    if (forwarded)
-	      {
-		XSETVECTOR (*objp, forwarded);
-		eassert (!XVECTOR_MARKED_P (ptr));
-	      }
-	    else if (mgc_xpntr_p (ptr))
-	      {
-		XSETVECTOR (*objp, mgc_flip_xpntr (ptr, Space_Vectorlike));
-		ptr = XVECTOR (*objp);
-		ptrdiff_t size = ptr->header.size;
-		if (size & PSEUDOVECTOR_FLAG)
-		  size &= PSEUDOVECTOR_SIZE_MASK;
-		mark_stack_push_n (ptr->contents, size);
-	      }
-	    else if (!vector_marked_p (ptr))
+	    if (!vector_marked_p (ptr))
 	      {
 		if (!PSEUDOVECTORP (*objp, PVEC_SUBR)
 		    && !PSEUDOVECTORP (*objp, PVEC_THREAD))
@@ -4990,27 +4902,12 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_Symbol:
 	  {
 	    struct Lisp_Symbol *ptr = XSYMBOL (*objp);
-	    if (mgc_xpntr_p (ptr))
-	      {
-		void *forwarded = mgc_fwd_xpntr (ptr);
-                if (forwarded)
-                  {
-                    XSETSYMBOL (*objp, forwarded);
-                    eassert (!symbol_marked_p (ptr));
-                    break; /* !!! */
-                  }
-                XSETSYMBOL (*objp, mgc_flip_xpntr (ptr, Space_Symbol));
-		ptr = XSYMBOL (*objp);
-	      }
-	    else
-	      {
-		if (symbol_marked_p (ptr))
-		  break; /* !!! */
-		else if (!builtin_lisp_symbol_p (ptr))
-		  eassert (check_live (xpntr, MEM_TYPE_SYMBOL));
-		eassert (valid_lisp_object_p (ptr->u.s.function));
-		set_symbol_marked (ptr);
-	      }
+	    if (symbol_marked_p (ptr))
+	      break; /* !!! */
+	    else if (!builtin_lisp_symbol_p (ptr))
+	      eassert (check_live (xpntr, MEM_TYPE_SYMBOL));
+	    eassert (valid_lisp_object_p (ptr->u.s.function));
+	    set_symbol_marked (ptr);
 	    mark_stack_push (&ptr->u.s.function);
 	    mark_stack_push (&ptr->u.s.plist);
 	    mark_stack_push (&ptr->u.s.buffer_local_default);
@@ -5046,26 +4943,10 @@ process_mark_stack (ptrdiff_t base_sp)
 	case Lisp_Cons:
 	  {
 	    struct Lisp_Cons *ptr = XCONS (*objp);
-
-	    if (mgc_xpntr_p (ptr))
-	      {
-		void *forwarded = mgc_fwd_xpntr (ptr);
-                if (forwarded)
-                  {
-                    XSETCONS (*objp, forwarded);
-                    eassert (!cons_marked_p (ptr));
-                    break; /* !!! */
-                  }
-                XSETCONS (*objp, mgc_flip_xpntr (ptr, Space_Cons));
-		ptr = XCONS (*objp);
-	      }
-	    else
-	      {
-		if (cons_marked_p (ptr))
-		  break; /* !!! */
-		eassert (check_live (xpntr, MEM_TYPE_CONS));
-		set_cons_marked (ptr);
-	      }
+	    if (cons_marked_p (ptr))
+	      break; /* !!! */
+	    eassert (check_live (xpntr, MEM_TYPE_CONS));
+	    set_cons_marked (ptr);
 
 	    /* Put cdr, then car onto stack.  */
 	    if (!NILP (ptr->u.s.u.cdr))
@@ -5081,18 +4962,6 @@ process_mark_stack (ptrdiff_t base_sp)
 		if (pdumper_object_p (ptr))
 		  /* pdumper floats are "cold" and lack mark bits.  */
 		  eassert (pdumper_cold_object_p (ptr));
-		else if (mgc_xpntr_p (ptr))
-		  {
-		    void *forwarded = mgc_fwd_xpntr (ptr);
-		    if (forwarded)
-		      {
-			XSETFLOAT (*objp, forwarded);
-			eassert (!XFLOAT_MARKED_P (ptr));
-			break; /* !!! */
-		      }
-		    XSETFLOAT (*objp, mgc_flip_xpntr (ptr, Space_Float));
-		    /* !!! reset ptr to XFLOAT (*objp) if more to do */
-		  }
 		else
 		  {
 		    eassert (check_live (xpntr, MEM_TYPE_FLOAT));
@@ -5967,7 +5836,6 @@ init_runtime (void)
   vector_free_lists = xzalloc (VBLOCK_NFREE_LISTS * sizeof (struct Lisp_Vector *));
   init_finalizer_list (&finalizers);
   init_finalizer_list (&doomed_finalizers);
-  mgc_initialize_spaces ();
 }
 
 void

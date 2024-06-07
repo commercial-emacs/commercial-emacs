@@ -4222,10 +4222,8 @@ extern struct Lisp_Vector *allocate_pseudovector (int, int, int, enum pvec_type)
 extern Lisp_Object make_float (double);
 extern specpdl_ref inhibit_garbage_collection (void);
 extern void free_cons (struct Lisp_Cons *);
-extern bool mgc_handle_sigsegv (void *);
 extern void init_alloc_once (void);
 extern void syms_of_alloc (void);
-extern void syms_of_mgc (void);
 extern struct buffer *allocate_buffer (void) ATTRIBUTE_RETURNS_NONNULL;
 extern int valid_lisp_object_p (Lisp_Object);
 

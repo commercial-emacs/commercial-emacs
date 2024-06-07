@@ -59,45 +59,4 @@
       (aset s 0 c)
       (should (equal s (make-string 1 c))))))
 
-(ert-deftest flood-mgc-strings ()
-  "Should error but not crash."
-  (should-error
-   (mgc-make-string 100 "not-a-numeric")))
-
-(ert-deftest flip-one-vector ()
-  (let* ((gc-cons-threshold most-positive-fixnum)
-         (ocount (alist-get 'vectors (mgc-counts)))
-         (bar (mgc-vector 1)))
-    (ignore bar)
-    (should (= (1+ ocount) (alist-get 'vectors (mgc-counts))))
-    (garbage-collect)
-    (should (= (1+ ocount) (alist-get 'vectors (mgc-counts))))))
-
-(ert-deftest flip-one-cons ()
-  (let* ((gc-cons-threshold most-positive-fixnum)
-         (ocount (alist-get 'conses (mgc-counts)))
-         (bar (mgc-cons 1 2)))
-    (ignore bar)
-    (should (= (1+ ocount) (alist-get 'conses (mgc-counts))))
-    (garbage-collect)
-    (should (= (1+ ocount) (alist-get 'conses (mgc-counts))))))
-
-(ert-deftest flip-one-symbol ()
-  (let* ((gc-cons-threshold most-positive-fixnum)
-         (ocount (alist-get 'symbols (mgc-counts)))
-         (bar (mgc-make-symbol "hisfooness")))
-    (ignore bar)
-    (should (= (1+ ocount) (alist-get 'symbols (mgc-counts))))
-    (garbage-collect)
-    (should (= (1+ ocount) (alist-get 'symbols (mgc-counts))))))
-
-(ert-deftest flip-one-float ()
-  (let* ((gc-cons-threshold most-positive-fixnum)
-         (ocount (alist-get 'floats (mgc-counts)))
-         (bar (mgc-float -0.618)))
-    (ignore bar)
-    (should (= (1+ ocount) (alist-get 'floats (mgc-counts))))
-    (garbage-collect)
-    (should (= (1+ ocount) (alist-get 'floats (mgc-counts))))))
-
 ;;; alloc-tests.el ends here

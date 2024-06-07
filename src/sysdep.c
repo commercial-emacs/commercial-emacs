@@ -1854,9 +1854,7 @@ static struct sigaction old_sigsegv_handler;
 static void
 handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
 {
-  if (mgc_handle_sigsegv (siginfo->si_addr))
-    return;
-  else if (
+  if (
 #ifdef HAVE_PTHREAD
       pthread_equal (pthread_self (), main_thread_id) &&
 #endif

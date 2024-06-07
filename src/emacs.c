@@ -1807,7 +1807,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_fileio ();
       /* Before syms_of_coding to initialize Vgc_cons_threshold.  */
       syms_of_alloc ();
-      syms_of_mgc ();
 
       /* May call Ffuncall and so GC, thus the latter should be initialized.  */
       init_print_once ();

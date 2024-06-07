@@ -196,20 +196,4 @@ typedef struct sdata
 
 enum { BLOCK_NOT_FOUND = EMACS_INT_MAX };
 
-/* Analogous to pdumper_object_p().  Return whether the OBJ points
-   into a copy-collector block for getting a reprieve from
-   ENABLE_CHECKING.  */
-_GL_ATTRIBUTE_CONST bool mgc_xpntr_p (const void *obj);
-_GL_ATTRIBUTE_CONST bool wrong_xpntr_p (const void *obj);
-
-void mgc_flip_space (void);
-
-void *mgc_flip_xpntr (void *xpntr, enum Space_Type objtype);
-
-void *mgc_fwd_xpntr (const void *addr);
-
-void mgc_initialize_spaces (void);
-
-enum Space_Type mgc_find_xpntr (void *p, void **xpntr);
-
 #endif  /* EMACS_ALLOC_H */
