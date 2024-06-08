@@ -4782,11 +4782,10 @@ check_live (void *xpntr, enum mem_type mtype)
 
 /* Mark the MARK_STK above BASE_SP.
 
-   Until commit 7a8798d, recursively calling mark_object() could
-   easily overwhelm the call stack, which MARK_STK deftly circumvents.
-   However, we still recursively mark_object() not-as-common Lisp types
-   like pseudovectors whose object depths presumably wouldn't trigger
-   our pre-7a8798d problems.  */
+   Avoid recursion by avoiding calls to mark_object() and any of its
+   many wrappers.  We knowingly break this guideline at least for
+   pseudovectors.
+*/
 
 static void
 process_mark_stack (ptrdiff_t base_sp)
@@ -4918,8 +4917,11 @@ process_mark_stack (ptrdiff_t base_sp)
 		mark_stack_push (&ptr->u.s.val.value);
 		break;
 	      case SYMBOL_VARALIAS:
-		mark_automatic_object (make_lisp_ptr (SYMBOL_ALIAS (ptr),
-						      Lisp_Symbol));
+		{
+		  Lisp_Object tem = make_lisp_ptr (SYMBOL_ALIAS (ptr),
+						   Lisp_Symbol);
+		  mark_stack_push (&tem);
+		}
 		break;
 	      case SYMBOL_LOCAL_SOMEWHERE:
 	      case SYMBOL_FORWARDED:
@@ -4937,7 +4939,10 @@ process_mark_stack (ptrdiff_t base_sp)
 	      gc_process_string (&ptr->u.s.name);
 
 	    if (ptr->u.s.next)
-	      mark_automatic_object (make_lisp_ptr (ptr->u.s.next, Lisp_Symbol));
+	      {
+		Lisp_Object tem = make_lisp_ptr (ptr->u.s.next, Lisp_Symbol);
+		mark_stack_push (&tem);
+	      }
 	  }
 	  break;
 	case Lisp_Cons:
