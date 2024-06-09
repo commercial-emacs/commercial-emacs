@@ -757,6 +757,8 @@ make_process (Lisp_Object name)
   eassert (NILP (p->gnutls_boot_parameters));
 #endif
 
+  p->readmax = clip_to_bounds (1, read_process_output_max, INT_MAX);
+
   /* If name is already in use, modify it until it is unused.  */
 
   Lisp_Object name1 = name;
