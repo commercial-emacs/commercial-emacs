@@ -1435,6 +1435,16 @@ displayed."
       (project-buffers pr*)))
    (or pr (project-most-recent-project))))
 
+(defcustom project-buffers-viewer 'project-list-buffers-buffer-menu
+  "Function to use in `project-list-buffers' to render the list.
+
+It should accept two arguments: PROJECT and FILES-ONLY.  The latter
+means that only file-visiting buffers should be displayed."
+  :group 'project
+  :version "30.1"
+  :type '(radio (function-item project-list-buffers-buffer-menu)
+                (function-item project-list-buffers-ibuffer)))
+
 ;;;###autoload
 (defun project-list-buffers (&optional arg)
   "Display a list of project buffers.
@@ -1445,6 +1455,44 @@ start with a space (which are for internal use).  With prefix argument
 ARG, show only buffers that are visiting files."
   (interactive "P")
   (display-buffer (list-buffers-noselect arg (project--list-buffers-closure))))
+
+(defun project-list-buffers-buffer-menu (project &optional files-only)
+  "Lists buffers of a project in Buffer-menu mode"
+  (let ((buffer-list-function
+         (lambda ()
+           (seq-filter
+            (lambda (buffer)
+              (let ((name (buffer-name buffer))
+                    (file (buffer-file-name buffer)))
+                (and (or Buffer-menu-show-internal
+                         (not (string= (substring name 0 1) " "))
+                         file)
+                     (not (eq buffer (current-buffer)))
+                     (or file (not Buffer-menu-files-only)))))
+            (project-buffers project)))))
+    (display-buffer
+     (if (version< emacs-version "29.0.50")
+         (let ((buf (list-buffers-noselect
+                     files-only (with-current-buffer
+                                    (get-buffer-create "*Buffer List*")
+                                  (setq-local Buffer-menu-show-internal nil)
+                                  (let ((Buffer-menu-files-only files-only))
+                                    (funcall buffer-list-function))))))
+           (with-current-buffer buf
+             (setq-local revert-buffer-function
+                         (lambda (&rest _ignored)
+                           (list-buffers--refresh
+                            (funcall buffer-list-function))
+                           (tabulated-list-print t))))
+           buf)
+       (list-buffers-noselect files-only buffer-list-function)))))
+
+(defun project-list-buffers-ibuffer (project &optional files-only)
+  "Lists buffers of a project with Ibuffer"
+  ;; TODO files-only
+  (ibuffer t (format "*Ibuffer-%s*" (project-name project))
+           `((predicate . (member (current-buffer)
+                                  (project-buffers ',project))))))
 
 (defcustom project-kill-buffer-conditions
   '(buffer-file-name    ; All file-visiting buffers are included.
