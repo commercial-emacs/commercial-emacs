@@ -8318,7 +8318,7 @@ init_window_once (void)
   old_selected_window = Qnil;
   staticpro (&old_selected_window);
 
-  pdumper_do_now_and_after_late_load (init_window_once_for_pdumper);
+  pdumper_do_now_and_after_load (init_window_once_for_pdumper);
 }
 
 static void init_window_once_for_pdumper (void)
