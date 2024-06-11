@@ -730,6 +730,12 @@ respectively, after activating French language support via
 This can now be entered using 'C-x 8 E' in addition to the existing
 'C-x 8 * E' translation.
 
+---
+** Whitespace
+'whitespace-cleanup' now adds missing newline at end of file If
+'whitespace-style' includes 'missing-newline-at-eof (which is the
+default), the 'whitespace-cleanup' function will fix this when run.
+
 
 * Changes in Specialized Modes and Packages in Emacs 30.1
 
