@@ -714,6 +714,27 @@ this keeps \"UUU\"."
   (smerge-keep-n 1)
   (smerge-auto-leave))
 
+(defun smerge-resolve-all-in-file-to (to-keep)
+  "Resolves all conflicts inside a file in preference of TO-KEEP.
+
+TO-KEEP decides which part to keep and is one of `upper', `base',
+`lower'".
+  (interactive
+   (list (completing-read "Keeping: " [upper base lower])))
+  (let ((resolve-func
+         (pcase to-keep
+           ("upper" 'smerge-keep-upper)
+           ("base"  'smerge-keep-base)
+           ("lower" 'smerge-keep-lower)
+           (_ (error "Unknown resolution argument!"))))
+        (num-chars-before (point-max)))
+    (save-excursion
+      (goto-char (point-min))
+      (while (ignore-errors (not (smerge-next)))
+        (funcall resolve-func)))
+    (when (= num-chars-before (point-max))
+      (message "No conflicts were found"))))
+
 (define-obsolete-function-alias 'smerge-keep-mine 'smerge-keep-upper "26.1")
 
 (defun smerge-get-current ()
