@@ -63,7 +63,7 @@ pdumper_remember_scalar (void *data, ptrdiff_t nbytes)
   pdumper_remember_scalar_impl (data, nbytes);
 }
 
-extern void pdumper_remember_lv_ptr_raw_impl (void *ptr, enum Lisp_Type type);
+extern void pdumper_remember_lv_ptr_impl (void *ptr, enum Lisp_Type type);
 
 /* Remember the pointer at *PTR.  *PTR must be null or point to a Lisp
    object.  TYPE is the rough type of Lisp object to which *PTR
@@ -71,7 +71,7 @@ extern void pdumper_remember_lv_ptr_raw_impl (void *ptr, enum Lisp_Type type);
 INLINE void
 pdumper_remember_lv_ptr_raw (void *ptr, enum Lisp_Type type)
 {
-  pdumper_remember_lv_ptr_raw_impl (ptr, type);
+  pdumper_remember_lv_ptr_impl (ptr, type);
 }
 
 typedef void (*pdumper_hook)(void);
@@ -128,9 +128,7 @@ struct pdumper_loaded_dump
 
 extern struct pdumper_loaded_dump dump_public;
 
-/* Return whether the OBJ points somewhere into the loaded dump file.
-   Works even when we have no dump loaded --- in this case, it just
-   returns false.  */
+/* Whether OBJ points somewhere into the loaded dump file. */
 INLINE _GL_ATTRIBUTE_CONST bool
 pdumper_object_p (const void *obj)
 {
@@ -150,12 +148,10 @@ pdumper_cold_object_p (const void *obj)
   return pdumper_cold_object_p_impl (obj);
 }
 
-
 extern int pdumper_find_object_type_impl (const void *obj);
 
-/* Return the type of the dumped object that starts at OBJ.  It is a
-   programming error to call this routine for an OBJ for which
-   pdumper_object_p would return false.  */
+/* Return the type of the dumped object that starts at OBJ.  OBJ
+   must be pdumper_object_p.  */
 INLINE _GL_ATTRIBUTE_CONST int
 pdumper_find_object_type (const void *obj)
 {

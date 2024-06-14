@@ -164,17 +164,6 @@ typedef union {
 
 enum { LISP_ALIGNMENT = alignof (Lisp_Aligned) };
 
-enum _GL_ATTRIBUTE_PACKED Space_Type
-  {
-    Space_Symbol = Lisp_Symbol,
-    Space_String = Lisp_String,
-    Space_Vectorlike = Lisp_Vectorlike,
-    Space_Cons = Lisp_Cons,
-    Space_Float = Lisp_Float,
-    Space_Interval,
-    Space_Type_Max,
-  };
-
 #define XMARK_VECTOR(V)		((V)->header.size |= ARRAY_MARK_FLAG)
 #define XUNMARK_VECTOR(V)	((V)->header.size &= ~ARRAY_MARK_FLAG)
 #define XVECTOR_MARKED_P(V)	(((V)->header.size & ARRAY_MARK_FLAG) != 0)
