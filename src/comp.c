@@ -4879,6 +4879,7 @@ DEFUN ("native-elisp-load", Fnative_elisp_load, Snative_elisp_load, 1, 1, 0,
   comp_unit->data_vec = Qnil;
   comp_unit->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
   comp_unit->lambda_c_name_idx_h = CALLN (Fmake_hash_table, QCtest, Qequal);
+  eassume (initialized);
   return load_comp_unit (comp_unit);
 }
 

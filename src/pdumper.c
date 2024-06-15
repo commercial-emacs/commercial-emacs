@@ -4751,7 +4751,7 @@ reloc_dump (const struct dump_header *const header,
 	    comp_u->handle = dynlib_open_for_eln (SSDATA (comp_u->file));
 	    if (!comp_u->handle)
 	      error ("%s: %s", SSDATA (comp_u->file), dynlib_error ());
-	    eassume (initialized);
+	    eassume (!initialized);
 	    load_comp_unit (comp_u);
 	    break;
 	  }
