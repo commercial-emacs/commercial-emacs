@@ -5680,7 +5680,9 @@ completion alternatives to currently visited manuals."
 			   (all-completions
 			    ""
 			    (apply-partially #'Info-read-node-name-2
-					     Info-directory-list
+					     (append
+                                              Info-directory-list
+                                              Info-additional-directory-list)
 					     (mapcar #'car Info-suffix-list))))))))
 
 (provide 'info)
