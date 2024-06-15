@@ -198,7 +198,7 @@ verify (DUMP_ALIGNMENT >= GCALIGNMENT);
 struct dump_reloc
 {
   ENUM_BF (reloc_t) type : RELOC_TYPE_BITS;
-  unsigned int offset : DUMP_OFF_WIDTH - RELOC_TYPE_BITS;
+  dump_off offset : DUMP_OFF_WIDTH - RELOC_TYPE_BITS;
 };
 
 /* dump_reloc's are just dump offsets */
@@ -3403,7 +3403,7 @@ dump_drain_user_remembered_data_cold (struct dump_context *ctx)
 }
 
 static void
-dump_unwind_cleanup (void *data)
+unwind_cleanup (void *data)
 {
   struct dump_context *ctx = data;
   if (ctx->fd >= 0)
@@ -3415,20 +3415,6 @@ dump_unwind_cleanup (void *data)
   Vpdumper__pure_pool = ctx->restore_pure_pool;
   Vpost_gc_hook = ctx->restore_post_gc_hook;
   Vprocess_environment = ctx->restore_process_environment;
-}
-
-/* Check that DUMP_OFFSET is within the heap.  */
-static void
-dump_check_dump_off (struct dump_context *ctx, dump_off dump_offset)
-{
-  eassert (dump_offset > 0);
-  eassert (!ctx || dump_offset < ctx->end_heap);
-}
-
-static void
-dump_check_emacs_off (dump_off emacs_off)
-{
-  eassert (labs (emacs_off) <= 60 * 1024 * 1024);
 }
 
 static struct dump_reloc
@@ -3449,7 +3435,6 @@ dump_emit_dump_reloc (struct dump_context *ctx, Lisp_Object lreloc)
   struct dump_reloc reloc;
   dump_object_start (ctx, &reloc, sizeof (reloc));
   reloc = dump_decode_dump_reloc (lreloc);
-  dump_check_dump_off (ctx, reloc.offset);
   dump_object_finish (ctx, &reloc, sizeof (reloc));
   if (reloc.offset < ctx->header.discardable_start)
     ++ctx->number_hot_relocations;
@@ -3459,7 +3444,7 @@ dump_emit_dump_reloc (struct dump_context *ctx, Lisp_Object lreloc)
 
 #ifdef ENABLE_CHECKING
 static Lisp_Object
-dump_check_overlap_dump_reloc (Lisp_Object lreloc_a, Lisp_Object lreloc_b)
+dump_check_overlap_dump_reloc (struct dump_context *ctx, Lisp_Object lreloc_a, Lisp_Object lreloc_b)
 {
   struct dump_reloc reloc_a = dump_decode_dump_reloc (lreloc_a);
   struct dump_reloc reloc_b = dump_decode_dump_reloc (lreloc_b);
@@ -3479,14 +3464,14 @@ decode_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
   struct emacs_reloc reloc = {0};
   int type = XFIXNUM (dump_pop (&lreloc));
   reloc.emacs_offset = dump_off_from_lisp (dump_pop (&lreloc));
-  dump_check_emacs_off (reloc.emacs_offset);
+  eassert (labs (reloc.emacs_offset) <= 60 * 1024 * 1024);
   switch (type)
     {
     case RELOC_COPY_FROM_DUMP:
       {
 	reloc.type = type;
         reloc.u.dump_offset = dump_off_from_lisp (dump_pop (&lreloc));
-        dump_check_dump_off (ctx, reloc.u.dump_offset);
+	eassert (reloc.u.dump_offset < ctx->end_heap);
         dump_off length = dump_off_from_lisp (dump_pop (&lreloc));
         reloc.length = length;
         if (reloc.length != length)
@@ -3506,12 +3491,12 @@ decode_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
     case RELOC_EMACS_PTR:
       reloc.type = type;
       reloc.u.emacs_offset2 = dump_off_from_lisp (dump_pop (&lreloc));
-      dump_check_emacs_off (reloc.u.emacs_offset2);
+      eassert (labs (reloc.u.emacs_offset2) <= 60 * 1024 * 1024);
       break;
     case RELOC_DUMP_PTR:
       reloc.type = type;
       reloc.u.dump_offset = dump_off_from_lisp (dump_pop (&lreloc));
-      dump_check_dump_off (ctx, reloc.u.dump_offset);
+      eassert (reloc.u.dump_offset < ctx->end_heap);
       break;
     case RELOC_DUMP_LV:
     case RELOC_EMACS_LV:
@@ -3543,17 +3528,17 @@ decode_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
                 Lisp_Object repr = Fprin1_to_string (target_value, Qnil, Qnil);
                 error ("relocation target was not dumped: %s", SDATA (repr));
               }
-            dump_check_dump_off (ctx, reloc.u.dump_offset);
+	    eassert (reloc.u.dump_offset < ctx->end_heap);
           }
       }
       break;
     default:
       emacs_abort ();
+      break;
     }
 
   /* We should have consumed the whole relocation descriptor.  */
   eassert (NILP (lreloc));
-
   return reloc;
 }
 
@@ -3568,7 +3553,7 @@ dump_emit_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
 }
 
 static Lisp_Object
-dump_merge_emacs_relocs (Lisp_Object lreloc_a, Lisp_Object lreloc_b)
+dump_merge_emacs_relocs (struct dump_context *ctx, Lisp_Object lreloc_a, Lisp_Object lreloc_b)
 {
   /* Combine copy relocations together if they're copying from
      adjacent chunks to adjacent chunks.  */
@@ -3585,8 +3570,8 @@ dump_merge_emacs_relocs (Lisp_Object lreloc_a, Lisp_Object lreloc_b)
       || XFIXNUM (XCAR (lreloc_b)) != RELOC_COPY_FROM_DUMP)
     return Qnil;
 
-  struct emacs_reloc reloc_a = decode_emacs_reloc (NULL, lreloc_a);
-  struct emacs_reloc reloc_b = decode_emacs_reloc (NULL, lreloc_b);
+  struct emacs_reloc reloc_a = decode_emacs_reloc (ctx, lreloc_a);
+  struct emacs_reloc reloc_b = decode_emacs_reloc (ctx, lreloc_b);
 
   eassert (reloc_a.type == RELOC_COPY_FROM_DUMP);
   eassert (reloc_b.type == RELOC_COPY_FROM_DUMP);
@@ -3609,7 +3594,7 @@ dump_merge_emacs_relocs (Lisp_Object lreloc_a, Lisp_Object lreloc_b)
 }
 
 typedef void (*drain_reloc_handler) (struct dump_context *, Lisp_Object);
-typedef Lisp_Object (*drain_reloc_merger) (Lisp_Object a, Lisp_Object b);
+typedef Lisp_Object (*drain_reloc_merger) (struct dump_context *, Lisp_Object a, Lisp_Object b);
 
 static void
 drain_reloc_list (struct dump_context *ctx,
@@ -3633,7 +3618,7 @@ drain_reloc_list (struct dump_context *ctx,
       Lisp_Object merged;
       while (merger != NULL
 	     && !NILP (relocs)
-	     && (merged = merger (reloc, XCAR (relocs)), !NILP (merged)))
+	     && (merged = merger (ctx, reloc, XCAR (relocs)), !NILP (merged)))
         {
           reloc = merged;
           relocs = XCDR (relocs);
@@ -3858,7 +3843,7 @@ DEFUN ("dump-emacs-portable",
 
   ctx->dump_filename = filename;
 
-  record_unwind_protect_ptr (dump_unwind_cleanup, ctx);
+  record_unwind_protect_ptr (unwind_cleanup, ctx);
   block_input ();
 
 #ifdef REL_ALLOC
