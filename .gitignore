@@ -166,7 +166,7 @@ GRTAGS
 GTAGS
 
 # auto-generated compilation database
-compile_commands.json
+compile_commands.*json
 
 # ccls, a LSP-compliant server for C
 /.ccls-cache
