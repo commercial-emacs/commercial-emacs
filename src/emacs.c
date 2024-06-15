@@ -1339,8 +1339,7 @@ main (int argc, char **argv)
     {
       if (initialized)
         {
-          dump_fingerprint (stdout, "",
-			    (unsigned char *) fingerprint);
+          pdumper_fingerprint (stdout, "", (unsigned char *) fingerprint);
           exit (0);
         }
       else

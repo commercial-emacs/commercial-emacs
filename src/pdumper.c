@@ -151,7 +151,7 @@ ptrdiff_t_to_dump_off (const ptrdiff_t value)
 /* Worst-case allocation granularity on any system that might load
    this dump.  */
 static int
-dump_get_max_page_size (void)
+max_page_size (void)
 {
   return 64 * 1024;
 }
@@ -224,8 +224,8 @@ struct dump_locator
 };
 
 void
-dump_fingerprint (FILE *output, char const *label,
-		  unsigned char const xfingerprint[sizeof fingerprint])
+pdumper_fingerprint (FILE *output, char const *label,
+		   unsigned char const xfingerprint[sizeof fingerprint])
 {
   enum { hexbuf_size = 2 * sizeof fingerprint };
   char hexbuf[hexbuf_size];
@@ -289,7 +289,7 @@ struct dump_header
 };
 
 /* Double-ended singly linked list.  */
-struct dump_tailq
+struct tailq
 {
   Lisp_Object head;
   Lisp_Object tail;
@@ -297,21 +297,21 @@ struct dump_tailq
 };
 
 /* Queue of objects to dump.  */
-struct dump_queue
+struct queue
 {
   /* Objects with no link weights at all.  Kept in dump order.  */
-  struct dump_tailq zero_weight_objects;
+  struct tailq zero_weight_objects;
   /* Objects with simple link weight: just one entry of type
      WEIGHT_NORMAL.  Score in this special case is non-decreasing as
      position increases, so we can avoid the need to rescan a big list
      for each object by storing these objects in order.  */
-  struct dump_tailq one_weight_normal_objects;
+  struct tailq one_weight_normal_objects;
   /* Likewise, for objects with one WEIGHT_STRONG weight.  */
-  struct dump_tailq one_weight_strong_objects;
+  struct tailq one_weight_strong_objects;
   /* List of objects with complex link weights --- i.e., not one of
      the above cases.  Order is irrelevant, since we scan the whole
      list every time.  Relatively few objects end up here.  */
-  struct dump_tailq fancy_weight_objects;
+  struct tailq fancy_weight_objects;
   /* Hash table of link weights: maps an object to a list of zero or
      more (BASIS . WEIGHT) pairs.  As a special case, an object with
      zero weight is marked by Qt in the hash table --- this way, we
@@ -408,7 +408,7 @@ struct dump_context
   Lisp_Object objects_dumped;
 
   /* Queue of objects to dump.  */
-  struct dump_queue dump_queue;
+  struct queue queue;
 
   /* Deferred object lists.  */
   Lisp_Object deferred_hash_tables;
@@ -452,8 +452,8 @@ struct dump_context
   dump_off number_discardable_relocations;
 };
 
-/* These special values for use as offsets in dump_remember_object and
-   dump_recall_object indicate that the corresponding object isn't in
+/* These special values for use as offsets in remember_object and
+   recall_object indicate that the corresponding object isn't in
    the dump yet (and so it has no valid offset), but that it's on one
    of our to-be-dumped-later object queues (or that we haven't seen it
    at all).  All values must be non-positive, since positive values
@@ -498,7 +498,7 @@ static dump_off dump_object_for_offset (struct dump_context *ctx,
 
 /* Like the Lisp function `push'.  Return NEWELT.  */
 static Lisp_Object
-dump_push (Lisp_Object *where, Lisp_Object newelt)
+push (Lisp_Object *where, Lisp_Object newelt)
 {
   *where = Fcons (newelt, *where);
   return newelt;
@@ -506,16 +506,16 @@ dump_push (Lisp_Object *where, Lisp_Object newelt)
 
 /* Like the Lisp function `pop'.  */
 static Lisp_Object
-dump_pop (Lisp_Object *where)
+pop (Lisp_Object *where)
 {
   Lisp_Object ret = XCAR (*where);
   *where = XCDR (*where);
   return ret;
 }
 
-static void dump_remember_cold_op (struct dump_context *ctx,
-                                   enum cold_op op,
-                                   Lisp_Object arg);
+static void remember_cold_op (struct dump_context *ctx,
+			      enum cold_op op,
+			      Lisp_Object arg);
 
 static AVOID
 error_unsupported_dump_object (struct dump_context *ctx,
@@ -549,7 +549,7 @@ emacs_offset (const void *emacs_ptr)
 /* Return whether OBJECT is a symbol stored within the image (and so is
    invariant across ASLR).  */
 static bool
-dump_builtin_symbol_p (Lisp_Object object)
+builtin_symbol_p (Lisp_Object object)
 {
   return SYMBOLP (object) && builtin_lisp_symbol_p (XSYMBOL (object));
 }
@@ -559,13 +559,14 @@ dump_builtin_symbol_p (Lisp_Object object)
    self-representing objects still need to be dumped!
 */
 static bool
-dump_object_self_representing_p (Lisp_Object object)
+self_representing_p (Lisp_Object object)
 {
-  return FIXNUMP (object) || dump_builtin_symbol_p (object);
+  return FIXNUMP (object) || builtin_symbol_p (object);
 }
 
+/* Inverse of INT_TO_INTEGER.  */
 static intmax_t
-intmax_t_from_lisp (Lisp_Object value)
+INTEGER_TO_INT (Lisp_Object value)
 {
   intmax_t n;
   bool ok = integer_to_intmax (value, &n);
@@ -573,28 +574,8 @@ intmax_t_from_lisp (Lisp_Object value)
   return n;
 }
 
-static Lisp_Object
-intmax_t_to_lisp (intmax_t value)
-{
-  return INT_TO_INTEGER (value);
-}
-
-static dump_off
-dump_off_from_lisp (Lisp_Object value)
-{
-  intmax_t n = intmax_t_from_lisp (value);
-  eassert (DUMP_OFF_MIN <= n && n <= DUMP_OFF_MAX);
-  return n;
-}
-
-static Lisp_Object
-dump_off_to_lisp (dump_off value)
-{
-  return INT_TO_INTEGER (value);
-}
-
 static void
-dump_write (struct dump_context *ctx, const void *buf, dump_off nbyte)
+write_bytes (struct dump_context *ctx, const void *buf, dump_off nbyte)
 {
   eassert (nbyte == 0 || buf != NULL);
   eassert (ctx->obj_offset == 0);
@@ -612,20 +593,20 @@ make_eq_hash_table (void)
 }
 
 static void
-dump_tailq_init (struct dump_tailq *tailq)
+tailq_init (struct tailq *tailq)
 {
   tailq->head = tailq->tail = Qnil;
   tailq->length = 0;
 }
 
 static intptr_t
-dump_tailq_length (const struct dump_tailq *tailq)
+tailq_length (const struct tailq *tailq)
 {
   return tailq->length;
 }
 
 static void
-dump_tailq_prepend (struct dump_tailq *tailq, Lisp_Object value)
+tailq_prepend (struct tailq *tailq, Lisp_Object value)
 {
   Lisp_Object link = Fcons (value, tailq->head);
   tailq->head = link;
@@ -635,22 +616,22 @@ dump_tailq_prepend (struct dump_tailq *tailq, Lisp_Object value)
 }
 
 static bool
-dump_tailq_empty_p (struct dump_tailq *tailq)
+tailq_empty_p (struct tailq *tailq)
 {
   return NILP (tailq->head);
 }
 
 static Lisp_Object
-dump_tailq_peek (struct dump_tailq *tailq)
+tailq_peek (struct tailq *tailq)
 {
-  eassert (!dump_tailq_empty_p (tailq));
+  eassert (!tailq_empty_p (tailq));
   return XCAR (tailq->head);
 }
 
 static Lisp_Object
-dump_tailq_pop (struct dump_tailq *tailq)
+tailq_pop (struct tailq *tailq)
 {
-  eassert (!dump_tailq_empty_p (tailq));
+  eassert (!tailq_empty_p (tailq));
   eassert (tailq->length > 0);
   tailq->length -= 1;
   Lisp_Object value = XCAR (tailq->head);
@@ -661,16 +642,15 @@ dump_tailq_pop (struct dump_tailq *tailq)
 }
 
 static void
-dump_seek (struct dump_context *ctx, dump_off offset)
+seek (struct dump_context *ctx, dump_off offset)
 {
-  if (ctx->max_offset < ctx->offset)
-    ctx->max_offset = ctx->offset;
+  ctx->max_offset = max (ctx->max_offset, ctx->offset);
   eassert (ctx->obj_offset == 0);
   ctx->offset = offset;
 }
 
 static void
-dump_write_zero (struct dump_context *ctx, dump_off nbytes)
+write_bytes_zero (struct dump_context *ctx, dump_off nbytes)
 {
   while (nbytes > 0)
     {
@@ -678,76 +658,68 @@ dump_write_zero (struct dump_context *ctx, dump_off nbytes)
       dump_off to_write = sizeof (zero);
       if (to_write > nbytes)
         to_write = nbytes;
-      dump_write (ctx, &zero, to_write);
+      write_bytes (ctx, &zero, to_write);
       nbytes -= to_write;
     }
 }
 
 static void
-dump_align_output (struct dump_context *ctx, int alignment)
+align_output (struct dump_context *ctx, int alignment)
 {
   if (ctx->offset % alignment != 0)
-    dump_write_zero (ctx, alignment - (ctx->offset % alignment));
+    write_bytes_zero (ctx, alignment - (ctx->offset % alignment));
 }
 
 static dump_off
-dump_object_start (struct dump_context *ctx,
-                   void *out,
-                   dump_off outsz)
+start_object (struct dump_context *ctx, void *out, dump_off outsz)
 {
   /* We dump only one object at a time, so obj_offset should be
      invalid on entry to this function.  */
   eassert (ctx->obj_offset == 0);
   int alignment = ctx->flags.pack_objects ? 1 : DUMP_ALIGNMENT;
   if (ctx->flags.dump_object_contents)
-    dump_align_output (ctx, alignment);
+    align_output (ctx, alignment);
   ctx->obj_offset = ctx->offset;
   memset (out, 0, outsz);
   return ctx->offset;
 }
 
 static dump_off
-dump_object_finish (struct dump_context *ctx,
-                    const void *out,
-                    dump_off sz)
+finish_object (struct dump_context *ctx, const void *out, dump_off sz)
 {
   dump_off offset = ctx->obj_offset;
   eassert (offset > 0);
   eassert (offset == ctx->offset); /* No intervening writes.  */
   ctx->obj_offset = 0;
   if (ctx->flags.dump_object_contents)
-    dump_write (ctx, out, sz);
+    write_bytes (ctx, out, sz);
   return offset;
 }
 
 /* Return offset at which OBJECT has been dumped, or one of the dump_object_special_offset
    negative values, or DUMP_OBJECT_NOT_SEEN.  */
 static dump_off
-dump_recall_object (struct dump_context *ctx, Lisp_Object object)
+recall_object (struct dump_context *ctx, Lisp_Object object)
 {
   Lisp_Object dumped = ctx->objects_dumped;
-  return dump_off_from_lisp (Fgethash (object, dumped,
+  return INTEGER_TO_INT (Fgethash (object, dumped,
                                        make_fixnum (DUMP_OBJECT_NOT_SEEN)));
 }
 
 static void
-dump_remember_object (struct dump_context *ctx,
-                      Lisp_Object object,
-                      dump_off offset)
+remember_object (struct dump_context *ctx, Lisp_Object object, dump_off offset)
 {
-  Fputhash (object,
-            dump_off_to_lisp (offset),
-            ctx->objects_dumped);
+  Fputhash (object, INT_TO_INTEGER (offset), ctx->objects_dumped);
 }
 
 /* If this object lives in the Emacs image and not on the heap, return
    a pointer to the object data.  Otherwise, return NULL.  */
 static void *
-dump_object_emacs_ptr (Lisp_Object lv)
+emacs_ptr (Lisp_Object lv)
 {
   if (SUBRP (lv) && !SUBR_NATIVE_COMPILEDP (lv))
     return XSUBR (lv);
-  if (dump_builtin_symbol_p (lv))
+  if (builtin_symbol_p (lv))
     return XSYMBOL (lv);
   if (XTYPE (lv) == Lisp_Vectorlike
       && PVTYPE (XVECTOR (lv)) == PVEC_THREAD
@@ -757,29 +729,29 @@ dump_object_emacs_ptr (Lisp_Object lv)
 }
 
 static void
-dump_queue_init (struct dump_queue *dump_queue)
+queue_init (struct queue *queue)
 {
-  dump_tailq_init (&dump_queue->zero_weight_objects);
-  dump_tailq_init (&dump_queue->one_weight_normal_objects);
-  dump_tailq_init (&dump_queue->one_weight_strong_objects);
-  dump_tailq_init (&dump_queue->fancy_weight_objects);
-  dump_queue->link_weights = make_eq_hash_table ();
-  dump_queue->sequence_numbers = make_eq_hash_table ();
-  dump_queue->next_sequence_number = 1;
+  tailq_init (&queue->zero_weight_objects);
+  tailq_init (&queue->one_weight_normal_objects);
+  tailq_init (&queue->one_weight_strong_objects);
+  tailq_init (&queue->fancy_weight_objects);
+  queue->link_weights = make_eq_hash_table ();
+  queue->sequence_numbers = make_eq_hash_table ();
+  queue->next_sequence_number = 1;
 }
 
 static bool
-dump_queue_empty_p (struct dump_queue *dump_queue)
+queue_empty_p (struct queue *queue)
 {
-  ptrdiff_t count = XHASH_TABLE (dump_queue->sequence_numbers)->count;
+  ptrdiff_t count = XHASH_TABLE (queue->sequence_numbers)->count;
   bool is_empty = count == 0;
-  eassert (count == XFIXNAT (Fhash_table_count (dump_queue->link_weights)));
+  eassert (count == XFIXNAT (Fhash_table_count (queue->link_weights)));
   if (!is_empty)
     {
-      eassert (!dump_tailq_empty_p (&dump_queue->zero_weight_objects)
-	       || !dump_tailq_empty_p (&dump_queue->one_weight_normal_objects)
-	       || !dump_tailq_empty_p (&dump_queue->one_weight_strong_objects)
-	       || !dump_tailq_empty_p (&dump_queue->fancy_weight_objects));
+      eassert (!tailq_empty_p (&queue->zero_weight_objects)
+	       || !tailq_empty_p (&queue->one_weight_normal_objects)
+	       || !tailq_empty_p (&queue->one_weight_strong_objects)
+	       || !tailq_empty_p (&queue->fancy_weight_objects));
     }
   else
     {
@@ -791,23 +763,23 @@ dump_queue_empty_p (struct dump_queue *dump_queue)
 }
 
 static void
-dump_queue_push_weight (Lisp_Object *weight_list,
-                        dump_off basis,
-                        struct link_weight weight)
+queue_push_weight (Lisp_Object *weight_list,
+		   dump_off basis,
+		   struct link_weight weight)
 {
   if (EQ (*weight_list, Qt))
     *weight_list = Qnil;
-  dump_push (weight_list, Fcons (dump_off_to_lisp (basis),
-                                 dump_off_to_lisp (weight.value)));
+  push (weight_list, Fcons (INT_TO_INTEGER (basis),
+			    INT_TO_INTEGER (weight.value)));
 }
 
 static void
-dump_queue_enqueue (struct dump_queue *dump_queue,
-                    Lisp_Object object,
-                    dump_off basis,
-                    struct link_weight weight)
+queue_enqueue (struct queue *queue,
+	       Lisp_Object object,
+	       dump_off basis,
+	       struct link_weight weight)
 {
-  Lisp_Object weights = Fgethash (object, dump_queue->link_weights, Qnil);
+  Lisp_Object weights = Fgethash (object, queue->link_weights, Qnil);
   Lisp_Object orig_weights = weights;
   /* N.B. want to find the last item of a given weight in each queue
      due to prepend use.  */
@@ -822,23 +794,23 @@ dump_queue_enqueue (struct dump_queue *dump_queue,
       if (weight.value == WEIGHT_NONE.value)
         {
           eassert (weight.value == 0);
-          dump_tailq_prepend (&dump_queue->zero_weight_objects, object);
+          tailq_prepend (&queue->zero_weight_objects, object);
           weights = Qt;
         }
       else if (!use_single_queues)
         {
-          dump_tailq_prepend (&dump_queue->fancy_weight_objects, object);
-          dump_queue_push_weight (&weights, basis, weight);
+          tailq_prepend (&queue->fancy_weight_objects, object);
+          queue_push_weight (&weights, basis, weight);
         }
       else if (weight.value == WEIGHT_NORMAL.value)
         {
-          dump_tailq_prepend (&dump_queue->one_weight_normal_objects, object);
-          dump_queue_push_weight (&weights, basis, weight);
+          tailq_prepend (&queue->one_weight_normal_objects, object);
+          queue_push_weight (&weights, basis, weight);
         }
       else if (weight.value == WEIGHT_STRONG.value)
         {
-          dump_tailq_prepend (&dump_queue->one_weight_strong_objects, object);
-          dump_queue_push_weight (&weights, basis, weight);
+          tailq_prepend (&queue->one_weight_strong_objects, object);
+          queue_push_weight (&weights, basis, weight);
         }
       else
         {
@@ -846,8 +818,8 @@ dump_queue_enqueue (struct dump_queue *dump_queue,
         }
 
       Fputhash (object,
-                dump_off_to_lisp(dump_queue->next_sequence_number++),
-                dump_queue->sequence_numbers);
+                INT_TO_INTEGER(queue->next_sequence_number++),
+                queue->sequence_numbers);
     }
   else
     {
@@ -865,29 +837,29 @@ dump_queue_enqueue (struct dump_queue *dump_queue,
                  the object will have a single weight.  Put the object
                  on the appropriate single-weight queue.  */
               weights = Qnil;
-	      struct dump_tailq *tailq;
+	      struct tailq *tailq;
               if (!use_single_queues)
-		tailq = &dump_queue->fancy_weight_objects;
+		tailq = &queue->fancy_weight_objects;
               else if (weight.value == WEIGHT_NORMAL.value)
-		tailq = &dump_queue->one_weight_normal_objects;
+		tailq = &queue->one_weight_normal_objects;
               else if (weight.value == WEIGHT_STRONG.value)
-		tailq = &dump_queue->one_weight_strong_objects;
+		tailq = &queue->one_weight_strong_objects;
               else
                 emacs_abort ();
-	      dump_tailq_prepend (tailq, object);
+	      tailq_prepend (tailq, object);
             }
           else if (use_single_queues && NILP (XCDR (weights)))
-            dump_tailq_prepend (&dump_queue->fancy_weight_objects, object);
-          dump_queue_push_weight (&weights, basis, weight);
+            tailq_prepend (&queue->fancy_weight_objects, object);
+          queue_push_weight (&weights, basis, weight);
         }
     }
 
   if (!EQ (weights, orig_weights))
-    Fputhash (object, weights, dump_queue->link_weights);
+    Fputhash (object, weights, queue->link_weights);
 }
 
 static float
-dump_calc_link_score (dump_off basis,
+calc_link_score (dump_off basis,
                       dump_off link_basis,
                       dump_off link_weight)
 {
@@ -906,21 +878,21 @@ dump_calc_link_score (dump_off basis,
    further an object is from its referrers, the greater the
    score.  */
 static float
-dump_queue_compute_score (struct dump_queue *dump_queue,
-                          Lisp_Object object,
-                          dump_off basis)
+queue_compute_score (struct queue *queue,
+		     Lisp_Object object,
+		     dump_off basis)
 {
   float score = 0;
   Lisp_Object object_link_weights =
-    Fgethash (object, dump_queue->link_weights, Qnil);
+    Fgethash (object, queue->link_weights, Qnil);
   if (EQ (object_link_weights, Qt))
     object_link_weights = Qnil;
   while (!NILP (object_link_weights))
     {
-      Lisp_Object basis_weight_pair = dump_pop (&object_link_weights);
-      dump_off link_basis = dump_off_from_lisp (XCAR (basis_weight_pair));
-      dump_off link_weight = dump_off_from_lisp (XCDR (basis_weight_pair));
-      score += dump_calc_link_score (basis, link_basis, link_weight);
+      Lisp_Object basis_weight_pair = pop (&object_link_weights);
+      dump_off link_basis = INTEGER_TO_INT (XCAR (basis_weight_pair));
+      dump_off link_weight = INTEGER_TO_INT (XCDR (basis_weight_pair));
+      score += calc_link_score (basis, link_basis, link_weight);
     }
   return score;
 }
@@ -937,11 +909,11 @@ dump_queue_compute_score (struct dump_queue *dump_queue,
    If the queue is empty, set *OUT_HIGHEST_SCORE_CONS_PTR to NULL
    and return negative infinity.  */
 static float
-dump_queue_scan_fancy (struct dump_queue *dump_queue,
-                       dump_off basis,
-                       Lisp_Object **out_highest_score_cons_ptr)
+queue_scan_fancy (struct queue *queue,
+		  dump_off basis,
+		  Lisp_Object **out_highest_score_cons_ptr)
 {
-  Lisp_Object *cons_ptr = &dump_queue->fancy_weight_objects.head;
+  Lisp_Object *cons_ptr = &queue->fancy_weight_objects.head;
   Lisp_Object *highest_score_cons_ptr = NULL;
   float highest_score = -INFINITY;
   bool first = true;
@@ -949,7 +921,7 @@ dump_queue_scan_fancy (struct dump_queue *dump_queue,
   while (!NILP (*cons_ptr))
     {
       Lisp_Object queued_object = XCAR (*cons_ptr);
-      float score = dump_queue_compute_score (dump_queue, queued_object, basis);
+      float score = queue_compute_score (queue, queued_object, basis);
       if (first || score >= highest_score)
         {
           highest_score_cons_ptr = cons_ptr;
@@ -970,11 +942,10 @@ dump_queue_scan_fancy (struct dump_queue *dump_queue,
    can occur when we've double-queued an object.  If this happens, we
    discard the errant object and try again.  */
 static dump_off
-dump_queue_sequence (struct dump_queue *dump_queue,
-                     Lisp_Object object)
+queue_sequence (struct queue *queue, Lisp_Object object)
 {
-  Lisp_Object n = Fgethash (object, dump_queue->sequence_numbers, Qnil);
-  return NILP (n) ? -1 : dump_off_from_lisp (n);
+  Lisp_Object n = Fgethash (object, queue->sequence_numbers, Qnil);
+  return NILP (n) ? -1 : INTEGER_TO_INT (n);
 }
 
 /* Find score and sequence at head of a one-weight object queue.
@@ -985,29 +956,29 @@ dump_queue_sequence (struct dump_queue *dump_queue,
    We organize these queues so that score is strictly decreasing, so
    examining the head is sufficient.  */
 static void
-dump_queue_find_score_of_one_weight_queue (struct dump_queue *dump_queue,
-					   dump_off basis,
-					   struct dump_tailq *one_weight_queue,
-					   float *out_score,
-					   int *out_sequence)
+queue_find_score_of_one_weight_queue (struct queue *queue,
+				      dump_off basis,
+				      struct tailq *one_weight_queue,
+				      float *out_score,
+				      int *out_sequence)
 {
   /* Transparently discard stale objects from the head of this queue.  */
   do
     {
-      if (dump_tailq_empty_p (one_weight_queue))
+      if (tailq_empty_p (one_weight_queue))
         {
           *out_score = -INFINITY;
           *out_sequence = 0;
         }
       else
         {
-          Lisp_Object head = dump_tailq_peek (one_weight_queue);
-          *out_sequence = dump_queue_sequence (dump_queue, head);
+          Lisp_Object head = tailq_peek (one_weight_queue);
+          *out_sequence = queue_sequence (queue, head);
           if (*out_sequence < 0)
-            dump_tailq_pop (one_weight_queue);
+            tailq_pop (one_weight_queue);
           else
             *out_score =
-              dump_queue_compute_score (dump_queue, head, basis);
+              queue_compute_score (queue, head, basis);
         }
     }
   while (*out_sequence < 0);
@@ -1021,26 +992,26 @@ dump_queue_find_score_of_one_weight_queue (struct dump_queue *dump_queue,
    by side effect, the object is removed from the dump queue.
    The dump queue must not be empty.  */
 static Lisp_Object
-dump_queue_dequeue (struct dump_queue *dump_queue, dump_off basis)
+queue_dequeue (struct queue *queue, dump_off basis)
 {
-  eassert (EQ (Fhash_table_count (dump_queue->sequence_numbers),
-               Fhash_table_count (dump_queue->link_weights)));
+  eassert (EQ (Fhash_table_count (queue->sequence_numbers),
+               Fhash_table_count (queue->link_weights)));
 
-  eassert (XFIXNUM (Fhash_table_count (dump_queue->sequence_numbers))
-	   <= (dump_tailq_length (&dump_queue->fancy_weight_objects)
-	       + dump_tailq_length (&dump_queue->zero_weight_objects)
-	       + dump_tailq_length (&dump_queue->one_weight_normal_objects)
-	       + dump_tailq_length (&dump_queue->one_weight_strong_objects)));
+  eassert (XFIXNUM (Fhash_table_count (queue->sequence_numbers))
+	   <= (tailq_length (&queue->fancy_weight_objects)
+	       + tailq_length (&queue->zero_weight_objects)
+	       + tailq_length (&queue->one_weight_normal_objects)
+	       + tailq_length (&queue->one_weight_strong_objects)));
 
   dump_trace
-    (("dump_queue_dequeue basis=%"PRIdDUMP_OFF" fancy=%"PRIdPTR
+    (("queue_dequeue basis=%"PRIdDUMP_OFF" fancy=%"PRIdPTR
       " zero=%"PRIdPTR" normal=%"PRIdPTR" strong=%"PRIdPTR" hash=%td\n"),
      basis,
-     dump_tailq_length (&dump_queue->fancy_weight_objects),
-     dump_tailq_length (&dump_queue->zero_weight_objects),
-     dump_tailq_length (&dump_queue->one_weight_normal_objects),
-     dump_tailq_length (&dump_queue->one_weight_strong_objects),
-     (ptrdiff_t) XHASH_TABLE (dump_queue->link_weights)->count);
+     tailq_length (&queue->fancy_weight_objects),
+     tailq_length (&queue->zero_weight_objects),
+     tailq_length (&queue->one_weight_normal_objects),
+     tailq_length (&queue->one_weight_strong_objects),
+     (ptrdiff_t) XHASH_TABLE (queue->link_weights)->count);
 
   static const int nr_candidates = 3;
   struct candidate
@@ -1055,24 +1026,24 @@ dump_queue_dequeue (struct dump_queue *dump_queue, dump_off basis)
     {
       if (candidates[0].sequence < 0)
         *fancy_cons = XCDR (*fancy_cons);  /* Discard stale object.  */
-      candidates[0].score = dump_queue_scan_fancy (dump_queue, basis,
+      candidates[0].score = queue_scan_fancy (queue, basis,
 						   &fancy_cons);
       candidates[0].sequence =
         candidates[0].score > -INFINITY
-        ? dump_queue_sequence (dump_queue, XCAR (*fancy_cons))
+        ? queue_sequence (queue, XCAR (*fancy_cons))
         : 0;
     }
   while (candidates[0].sequence < 0);
 
-  dump_queue_find_score_of_one_weight_queue
-    (dump_queue, basis,
-     &dump_queue->one_weight_normal_objects,
+  queue_find_score_of_one_weight_queue
+    (queue, basis,
+     &queue->one_weight_normal_objects,
      &candidates[1].score,
      &candidates[1].sequence);
 
-  dump_queue_find_score_of_one_weight_queue
-    (dump_queue, basis,
-     &dump_queue->one_weight_strong_objects,
+  queue_find_score_of_one_weight_queue
+    (queue, basis,
+     &queue->one_weight_strong_objects,
      &candidates[2].score,
      &candidates[2].sequence);
 
@@ -1093,22 +1064,22 @@ dump_queue_dequeue (struct dump_queue *dump_queue, dump_off basis)
   if (best < 0)
     {
       src = "zero";
-      result = dump_tailq_pop (&dump_queue->zero_weight_objects);
+      result = tailq_pop (&queue->zero_weight_objects);
     }
   else if (best == 0)
     {
       src = "fancy";
-      result = dump_tailq_pop (&dump_queue->fancy_weight_objects);
+      result = tailq_pop (&queue->fancy_weight_objects);
     }
   else if (best == 1)
     {
       src = "normal";
-      result = dump_tailq_pop (&dump_queue->one_weight_normal_objects);
+      result = tailq_pop (&queue->one_weight_normal_objects);
     }
   else if (best == 2)
     {
       src = "strong";
-      result = dump_tailq_pop (&dump_queue->one_weight_strong_objects);
+      result = tailq_pop (&queue->one_weight_strong_objects);
     }
   else
     emacs_abort ();
@@ -1119,37 +1090,37 @@ dump_queue_dequeue (struct dump_queue *dump_queue, dump_off basis)
 	      src, EMACS_INT_XDIGITS, uresult);
 
   {
-    Lisp_Object weights = Fgethash (result, dump_queue->link_weights, Qnil);
+    Lisp_Object weights = Fgethash (result, queue->link_weights, Qnil);
     while (!NILP (weights) && CONSP (weights))
       {
-        Lisp_Object basis_weight_pair = dump_pop (&weights);
+        Lisp_Object basis_weight_pair = pop (&weights);
         dump_off link_basis =
-          dump_off_from_lisp (XCAR (basis_weight_pair));
+          INTEGER_TO_INT (XCAR (basis_weight_pair));
         dump_off link_weight =
-          dump_off_from_lisp (XCDR (basis_weight_pair));
+          INTEGER_TO_INT (XCDR (basis_weight_pair));
 	dump_trace
 	  ("    link_basis=%d distance=%d weight=%d contrib=%f\n",
 	   link_basis,
 	   basis - link_basis,
 	   link_weight,
-	   (double) dump_calc_link_score (basis, link_basis, link_weight));
+	   (double) calc_link_score (basis, link_basis, link_weight));
       }
   }
 
-  Fremhash (result, dump_queue->link_weights);
-  Fremhash (result, dump_queue->sequence_numbers);
+  Fremhash (result, queue->link_weights);
+  Fremhash (result, queue->sequence_numbers);
   return result;
 }
 
 static void
-dump_enqueue_object (struct dump_context *ctx,
-                     Lisp_Object object,
-                     struct link_weight weight)
+enqueue_object (struct dump_context *ctx,
+		Lisp_Object object,
+		struct link_weight weight)
 {
   /* Fixnums are bit-invariant, and don't need dumping.  */
   if (!FIXNUMP (object))
     {
-      dump_off state = dump_recall_object (ctx, object);
+      dump_off state = recall_object (ctx, object);
       bool already_dumped_object = state > DUMP_OBJECT_NOT_SEEN;
       eassert (!ctx->flags.assert_already_seen || already_dumped_object);
       if (!already_dumped_object)
@@ -1157,27 +1128,25 @@ dump_enqueue_object (struct dump_context *ctx,
           if (state == DUMP_OBJECT_NOT_SEEN)
             {
               state = DUMP_OBJECT_ON_NORMAL_QUEUE;
-              dump_remember_object (ctx, object, state);
+              remember_object (ctx, object, state);
             }
-          /* Note that we call dump_queue_enqueue even if the object
+          /* Note that we call queue_enqueue even if the object
              is already on the normal queue: multiple enqueue calls
              can increase the object's weight.  */
           if (state == DUMP_OBJECT_ON_NORMAL_QUEUE)
-            dump_queue_enqueue (&ctx->dump_queue,
-                                object,
-                                ctx->offset,
-                                weight);
+            queue_enqueue (&ctx->queue,
+			   object,
+			   ctx->offset,
+			   weight);
         }
     }
 }
 
 static void
-dump_remember_cold_op (struct dump_context *ctx,
-                       enum cold_op op,
-                       Lisp_Object arg)
+remember_cold_op (struct dump_context *ctx, enum cold_op op, Lisp_Object arg)
 {
   if (ctx->flags.dump_object_contents)
-    dump_push (&ctx->cold_queue, Fcons (make_fixnum (op), arg));
+    push (&ctx->cold_queue, Fcons (make_fixnum (op), arg));
 }
 
 /* Add a dump (versus emacs) relocation that updates the pointer stored at
@@ -1186,13 +1155,12 @@ dump_remember_cold_op (struct dump_context *ctx,
    a number relative to emacs_basis().  */
 
 static void
-dump_reloc_emacs_ptr (struct dump_context *ctx,
-                                  dump_off dump_offset)
+reloc_emacs_ptr (struct dump_context *ctx, dump_off dump_offset)
 {
   if (ctx->flags.dump_object_contents)
-    dump_push (&ctx->dump_relocs[EARLY_RELOCS],
-               list2 (make_fixnum (RELOC_EMACS_PTR),
-                      dump_off_to_lisp (dump_offset)));
+    push (&ctx->dump_relocs[EARLY_RELOCS],
+	  list2 (make_fixnum (RELOC_EMACS_PTR),
+		 INT_TO_INTEGER (dump_offset)));
 }
 
 /* Add a dump (versus emacs) relocation that updates the Lisp_Object
@@ -1201,9 +1169,8 @@ dump_reloc_emacs_ptr (struct dump_context *ctx,
    contain the offset of the target object relative to the start of
    the dump.  */
 static void
-reloc_dump_lv (struct dump_context *ctx,
-                            dump_off dump_offset,
-                            enum Lisp_Type type)
+reloc_dump_lv (struct dump_context *ctx, dump_off dump_offset,
+	       enum Lisp_Type type)
 {
   if (!ctx->flags.dump_object_contents)
     return;
@@ -1222,9 +1189,9 @@ reloc_dump_lv (struct dump_context *ctx,
       emacs_abort ();
     }
 
-  dump_push (&ctx->dump_relocs[EARLY_RELOCS],
-             list2 (make_fixnum (reloc_type),
-                    dump_off_to_lisp (dump_offset)));
+  push (&ctx->dump_relocs[EARLY_RELOCS],
+	list2 (make_fixnum (reloc_type),
+	       INT_TO_INTEGER (dump_offset)));
 }
 
 /* Add a dump (versus emacs) relocation that updates the raw pointer
@@ -1233,22 +1200,20 @@ reloc_dump_lv (struct dump_context *ctx,
    contain the offset of the target object relative to the start of
    the dump.  */
 static void
-dump_reloc_dump_ptr (struct dump_context *ctx,
-		     dump_off dump_offset)
+reloc_dump_ptr (struct dump_context *ctx, dump_off dump_offset)
 {
   if (ctx->flags.dump_object_contents)
-    dump_push (&ctx->dump_relocs[EARLY_RELOCS],
-               list2 (make_fixnum (RELOC_DUMP_PTR),
-                      dump_off_to_lisp (dump_offset)));
+    push (&ctx->dump_relocs[EARLY_RELOCS],
+	  list2 (make_fixnum (RELOC_DUMP_PTR),
+		 INT_TO_INTEGER (dump_offset)));
 }
 
 /* Populate Lisp_Object-sized value at DUMP_OFFSET with
    offset of the target Lisp_Object relative to emacs_basis().
    TYPE is that of Lisp value.  */
 static void
-dump_reloc_emacs_lv (struct dump_context *ctx,
-		     dump_off dump_offset,
-		     enum Lisp_Type type)
+reloc_emacs_lv (struct dump_context *ctx, dump_off dump_offset,
+		enum Lisp_Type type)
 {
   if (!ctx->flags.dump_object_contents)
     return;
@@ -1266,9 +1231,9 @@ dump_reloc_emacs_lv (struct dump_context *ctx,
       emacs_abort ();
     }
 
-  dump_push (&ctx->dump_relocs[EARLY_RELOCS],
-             list2 (make_fixnum (reloc_type),
-                    dump_off_to_lisp (dump_offset)));
+  push (&ctx->dump_relocs[EARLY_RELOCS],
+	list2 (make_fixnum (reloc_type),
+	       INT_TO_INTEGER (dump_offset)));
 }
 
 /* Add an executable (versus dump) relocation that copies arbitrary bytes
@@ -1282,7 +1247,7 @@ dump_reloc_emacs_lv (struct dump_context *ctx,
    dump file).  */
 static void
 reloc_copy_from_dump (struct dump_context *ctx, dump_off dump_offset,
-				 void *emacs_ptr, dump_off size)
+		      void *emacs_ptr, dump_off size)
 {
   eassert (0 <= size);
   eassert (size < (1 << (DUMP_OFF_WIDTH - RELOC_TYPE_BITS)));
@@ -1294,11 +1259,11 @@ reloc_copy_from_dump (struct dump_context *ctx, dump_off dump_offset,
     return;
 
   eassert (dump_offset >= 0);
-  dump_push (&ctx->emacs_relocs,
-             list4 (make_fixnum (RELOC_COPY_FROM_DUMP),
-                    dump_off_to_lisp (emacs_offset (emacs_ptr)),
-                    dump_off_to_lisp (dump_offset),
-                    dump_off_to_lisp (size)));
+  push (&ctx->emacs_relocs,
+	list4 (make_fixnum (RELOC_COPY_FROM_DUMP),
+	       INT_TO_INTEGER (emacs_offset (emacs_ptr)),
+	       INT_TO_INTEGER (dump_offset),
+	       INT_TO_INTEGER (size)));
 }
 
 /* Add an executable (versus dump) relocation that sets values to arbitrary
@@ -1309,10 +1274,8 @@ reloc_copy_from_dump (struct dump_context *ctx, dump_off dump_offset,
    bytes to copy.
  */
 static void
-reloc_immediate (struct dump_context *ctx,
-                            const void *emacs_ptr,
-                            const void *value_ptr,
-                            dump_off size)
+reloc_immediate (struct dump_context *ctx, const void *emacs_ptr,
+		 const void *value_ptr, dump_off size)
 {
   if (!ctx->flags.dump_object_contents)
     return;
@@ -1320,11 +1283,11 @@ reloc_immediate (struct dump_context *ctx,
   intmax_t value = 0;
   eassert (size <= sizeof (value));
   memcpy (&value, value_ptr, size);
-  dump_push (&ctx->emacs_relocs,
-             list4 (make_fixnum (RELOC_IMMEDIATE),
-                    dump_off_to_lisp (emacs_offset (emacs_ptr)),
-                    intmax_t_to_lisp (value),
-                    dump_off_to_lisp (size)));
+  push (&ctx->emacs_relocs,
+	list4 (make_fixnum (RELOC_IMMEDIATE),
+	       INT_TO_INTEGER (emacs_offset (emacs_ptr)),
+	       INT_TO_INTEGER (value),
+	       INT_TO_INTEGER (size)));
 }
 
 #define DEFINE_EMACS_IMMEDIATE_FN(fnname, type)                         \
@@ -1347,36 +1310,35 @@ DEFINE_EMACS_IMMEDIATE_FN (reloc_immediate_bool, bool)
 
 static void
 reloc_to_dump_ptr (struct dump_context *ctx,
-				  const void *emacs_ptr, dump_off dump_offset)
+		   const void *emacs_ptr, dump_off dump_offset)
 {
   if (!ctx->flags.dump_object_contents)
     return;
 
-  dump_push (&ctx->emacs_relocs,
-             list3 (make_fixnum (RELOC_DUMP_PTR),
-                    dump_off_to_lisp (emacs_offset (emacs_ptr)),
-                    dump_off_to_lisp (dump_offset)));
+  push (&ctx->emacs_relocs,
+	list3 (make_fixnum (RELOC_DUMP_PTR),
+	       INT_TO_INTEGER (emacs_offset (emacs_ptr)),
+	       INT_TO_INTEGER (dump_offset)));
 }
 
 /* Add an executable (versus dump) relocation that points to a dumped
    Lisp_Object.  */
 
 static void
-reloc_to_lv (struct dump_context *ctx,
-			Lisp_Object const *emacs_ptr)
+reloc_to_lv (struct dump_context *ctx, Lisp_Object const *obj)
 {
-  if (dump_object_self_representing_p (*emacs_ptr))
-    reloc_immediate_lv (ctx, emacs_ptr, *emacs_ptr);
+  if (self_representing_p (*obj))
+    reloc_immediate_lv (ctx, obj, *obj);
   else
     {
       if (ctx->flags.dump_object_contents)
-	dump_push (&ctx->emacs_relocs,
-		   list3 (make_fixnum (dump_object_emacs_ptr (*emacs_ptr)
-				       ? RELOC_EMACS_LV
-				       : RELOC_DUMP_LV),
-			  dump_off_to_lisp (emacs_offset (emacs_ptr)),
-			  *emacs_ptr));
-      dump_enqueue_object (ctx, *emacs_ptr, WEIGHT_NONE);
+	push (&ctx->emacs_relocs,
+	      list3 (make_fixnum (emacs_ptr (*obj)
+				  ? RELOC_EMACS_LV
+				  : RELOC_DUMP_LV),
+		     INT_TO_INTEGER (emacs_offset (obj)),
+		     *obj));
+      enqueue_object (ctx, *obj, WEIGHT_NONE);
     }
 }
 
@@ -1385,15 +1347,15 @@ reloc_to_lv (struct dump_context *ctx,
 
 static void
 reloc_to_emacs_ptr (struct dump_context *ctx, void *emacs_ptr,
-				   void const *target_emacs_ptr)
+		    void const *target_emacs_ptr)
 {
   if (!ctx->flags.dump_object_contents)
     return;
 
-  dump_push (&ctx->emacs_relocs,
-             list3 (make_fixnum (RELOC_EMACS_PTR),
-                    dump_off_to_lisp (emacs_offset (emacs_ptr)),
-                    dump_off_to_lisp (emacs_offset (target_emacs_ptr))));
+  push (&ctx->emacs_relocs,
+	list3 (make_fixnum (RELOC_EMACS_PTR),
+	       INT_TO_INTEGER (emacs_offset (emacs_ptr)),
+	       INT_TO_INTEGER (emacs_offset (target_emacs_ptr))));
 }
 
 enum dump_fixup_type
@@ -1420,29 +1382,29 @@ enum dump_lv_fixup_type
    at DUMP_OFFSET.  If it's LV_FIXUP_RAW_POINTER, we expect a pointer.
  */
 static void
-dump_remember_fixup_lv (struct dump_context *ctx,
-                        dump_off dump_offset,
-                        Lisp_Object value,
-                        enum dump_lv_fixup_type fixup_subtype)
+remember_fixup_lv (struct dump_context *ctx,
+		   dump_off dump_offset,
+		   Lisp_Object value,
+		   enum dump_lv_fixup_type fixup_subtype)
 {
   if (!ctx->flags.dump_object_contents)
     return;
 
-  dump_push (&ctx->fixups,
-	     list3 (make_fixnum (fixup_subtype == LV_FIXUP_LISP_OBJECT
-				 ? DUMP_FIXUP_LISP_OBJECT
-				 : DUMP_FIXUP_LISP_OBJECT_RAW),
-		    dump_off_to_lisp (dump_offset),
-		    value));
+  push (&ctx->fixups,
+	list3 (make_fixnum (fixup_subtype == LV_FIXUP_LISP_OBJECT
+			    ? DUMP_FIXUP_LISP_OBJECT
+			    : DUMP_FIXUP_LISP_OBJECT_RAW),
+	       INT_TO_INTEGER (dump_offset),
+	       value));
 }
 
 /* Remember to fix up the dump file such that the pointer-sized value
    at DUMP_OFFSET points to NEW_DUMP_OFFSET in the dump file and to
    its absolute address at runtime.  */
 static void
-dump_remember_fixup_ptr (struct dump_context *ctx,
-                             dump_off dump_offset,
-                             dump_off new_dump_offset)
+remember_fixup_ptr (struct dump_context *ctx,
+		    dump_off dump_offset,
+		    dump_off new_dump_offset)
 {
   if (!ctx->flags.dump_object_contents)
     return;
@@ -1454,14 +1416,14 @@ dump_remember_fixup_ptr (struct dump_context *ctx,
 	   || (ctx->header.cold_start != 0
 	       && new_dump_offset >= ctx->header.cold_start));
 
-  dump_push (&ctx->fixups,
-	     list3 (make_fixnum (DUMP_FIXUP_PTR_DUMP_RAW),
-		    dump_off_to_lisp (dump_offset),
-		    dump_off_to_lisp (new_dump_offset)));
+  push (&ctx->fixups,
+	list3 (make_fixnum (DUMP_FIXUP_PTR_DUMP_RAW),
+	       INT_TO_INTEGER (dump_offset),
+	       INT_TO_INTEGER (new_dump_offset)));
 }
 
 static void
-dump_roots (struct dump_context *ctx)
+reloc_roots (struct dump_context *ctx)
 {
   const struct Lisp_Vector *vbuffer_slot_defaults =
     (struct Lisp_Vector *) &buffer_slot_defaults;
@@ -1475,11 +1437,11 @@ dump_roots (struct dump_context *ctx)
     }
 
   for (int i = 0; i < ARRAYELTS (lispsym); ++i)
-    dump_enqueue_object (ctx, builtin_lisp_symbol (i), WEIGHT_NONE);
+    enqueue_object (ctx, builtin_lisp_symbol (i), WEIGHT_NONE);
 
   for (int i = 0; i < staticidx; ++i)
     {
-      Fputhash (dump_off_to_lisp (emacs_offset (staticvec[i])),
+      Fputhash (INT_TO_INTEGER (emacs_offset (staticvec[i])),
 		Qt, ctx->staticpro_table);
       reloc_to_lv (ctx, staticvec[i]);
     }
@@ -1516,19 +1478,27 @@ cpyptr (void *out, const void *in)
 #define DUMP_FIELD_COPY(out, in, name) \
   ((out)->name = (in)->name)
 
+/* Write a Lisp_Object to the field of *OUT corresponding to the same
+   notional *IN_FIELD.
+
+   CTX is the dump context.  OUT points to the dumped object.  IN_START
+   and IN_FIELD are the starting address and target field of the current
+   Emacs object.  TYPE is the output Lisp type.  If IN_FIELD already
+   points to a Lisp_Object, TYPE is not applicable and set to NULL.
+*/
 static void
-dump_field_lv_or_rawptr (struct dump_context *ctx,
-                         void *out,
-                         const void *in_start,
-                         const void *in_field,
-                         /* opt */ const enum Lisp_Type *ptr_type,
-                         struct link_weight weight)
+write_field (struct dump_context *ctx,
+	     void *out,
+	     const void *in_start,
+	     const void *in_field,
+	     const enum Lisp_Type ptr_type,
+	     struct link_weight weight)
 {
   eassert (ctx->obj_offset > 0);
   Lisp_Object value;
   dump_off relpos = field_relpos (in_start, in_field);
   void *out_field = (char *) out + relpos;
-  bool is_ptr = (ptr_type != NULL);
+  bool is_ptr = (ptr_type != Lisp_Type_Max);
 
   if (is_ptr)
     {
@@ -1536,14 +1506,14 @@ dump_field_lv_or_rawptr (struct dump_context *ctx,
       cpyptr (&ptrval, in_field);
       if (ptrval == NULL)
         return; /* !!! */
-      switch (*ptr_type)
+      switch (ptr_type)
         {
         case Lisp_Symbol:
         case Lisp_String:
         case Lisp_Vectorlike:
         case Lisp_Cons:
         case Lisp_Float:
-          value = make_lisp_ptr (ptrval, *ptr_type);
+          value = make_lisp_ptr (ptrval, ptr_type);
           break;
         default:
           emacs_abort ();
@@ -1553,7 +1523,7 @@ dump_field_lv_or_rawptr (struct dump_context *ctx,
   else
     {
       memcpy (&value, in_field, sizeof (value));
-      if (dump_object_self_representing_p (value))
+      if (self_representing_p (value))
         {
           memcpy (out_field, &value, sizeof (value));
           return; /* !!! */
@@ -1570,51 +1540,11 @@ dump_field_lv_or_rawptr (struct dump_context *ctx,
   /* We don't know about the target object yet, so add a fixup.
      When we process the fixup, we'll have dumped the target
      object.  */
-  dump_remember_fixup_lv (ctx, out_field_offset, value,
-			  is_ptr ? LV_FIXUP_RAW_POINTER : LV_FIXUP_LISP_OBJECT);
-  dump_enqueue_object (ctx, value, weight);
+  remember_fixup_lv (ctx, out_field_offset, value,
+		     is_ptr ? LV_FIXUP_RAW_POINTER : LV_FIXUP_LISP_OBJECT);
+  enqueue_object (ctx, value, weight);
 
   memcpy (out_field, &out_value, sizeof (out_value));
-}
-
-/* Set a pointer field on an output object during dump.
-
-   CTX is the dump context.  OUT is a pointer to the dump output
-   object.  IN_START is the start of the current Emacs object.
-   IN_FIELD is a pointer to the field in that object.  TYPE is the
-   type of pointer to which IN_FIELD points.
- */
-static void
-dump_field_lv_rawptr (struct dump_context *ctx,
-                      void *out,
-                      const void *in_start,
-                      const void *in_field,
-                      enum Lisp_Type type,
-                      struct link_weight weight)
-{
-  dump_field_lv_or_rawptr (ctx, out, in_start, in_field, &type, weight);
-}
-
-/* Set a Lisp_Object field on an output object during dump.
-
-   CTX is a dump context.  OUT is a pointer to the dump output object.
-   IN_START is the start of the current Emacs object.  IN_FIELD is a
-   pointer to a Lisp_Object field in that object.
-
-   Arrange for the dump to contain fixups and relocations such that,
-   at load time, the given field of the output object contains a valid
-   Lisp_Object pointing to the same notional object that *IN_FIELD
-   contains now.
-
-   See idomatic usage below.  */
-static void
-dump_field_lv (struct dump_context *ctx,
-               void *out,
-               const void *in_start,
-               const Lisp_Object *in_field,
-               struct link_weight weight)
-{
-  dump_field_lv_or_rawptr (ctx, out, in_start, in_field, NULL, weight);
 }
 
 /* Note that we're going to add a manual fixup for the given field
@@ -1643,7 +1573,7 @@ dump_field_ptr_to_dump_offset (struct dump_context *ctx,
     return;
 
   dump_off relpos = field_relpos (in_start, in_field);
-  dump_reloc_dump_ptr (ctx, ctx->obj_offset + relpos);
+  reloc_dump_ptr (ctx, ctx->obj_offset + relpos);
   intptr_t outval = target_dump_offset;
   memcpy ((char *) out + relpos, &outval, sizeof (outval));
 }
@@ -1673,20 +1603,20 @@ dump_field_emacs_ptr (struct dump_context *ctx,
   intptr_t rel_emacs_ptr = 0;
   if (abs_emacs_ptr)
     {
-      rel_emacs_ptr = emacs_offset ((void *)abs_emacs_ptr);
-      dump_reloc_emacs_ptr (ctx, ctx->obj_offset + relpos);
+      rel_emacs_ptr = emacs_offset ((void *) abs_emacs_ptr);
+      reloc_emacs_ptr (ctx, ctx->obj_offset + relpos);
     }
   cpyptr ((char *) out + relpos, &rel_emacs_ptr);
 }
 
 static void
-_dump_object_start_pseudovector (struct dump_context *ctx,
-				 union vectorlike_header *out_hdr,
-				 const union vectorlike_header *in_hdr)
+start_object_pseudovector (struct dump_context *ctx,
+			    union vectorlike_header *out_hdr,
+			    const union vectorlike_header *in_hdr)
 {
   eassert (in_hdr->size & PSEUDOVECTOR_FLAG);
   ptrdiff_t vec_size = vectorlike_nbytes (in_hdr);
-  dump_object_start (ctx, out_hdr, (dump_off) vec_size);
+  start_object (ctx, out_hdr, (dump_off) vec_size);
   *out_hdr = *in_hdr;
 }
 
@@ -1694,13 +1624,13 @@ _dump_object_start_pseudovector (struct dump_context *ctx,
 #define START_DUMP_PVEC(ctx, hdr, type, out)                  \
   const union vectorlike_header *_in_hdr = (hdr);             \
   type *out = alloca (vectorlike_nbytes (_in_hdr));           \
-  _dump_object_start_pseudovector (ctx, &out->header, _in_hdr)
+  start_object_pseudovector (ctx, &out->header, _in_hdr)
 
 static dump_off
 finish_dump_pvec (struct dump_context *ctx,
                   union vectorlike_header *out_hdr)
 {
-  return dump_object_finish (ctx, out_hdr, vectorlike_nbytes (out_hdr));
+  return finish_object (ctx, out_hdr, vectorlike_nbytes (out_hdr));
 }
 
 static void
@@ -1714,7 +1644,7 @@ dump_pseudovector_lisp_fields (struct dump_context *ctx,
   eassert (size & PSEUDOVECTOR_FLAG);
   size &= PSEUDOVECTOR_SIZE_MASK;
   for (ptrdiff_t i = 0; i < size; ++i)
-    dump_field_lv (ctx, out, in, &in->contents[i], WEIGHT_STRONG);
+    write_field (ctx, out, in, &in->contents[i], Lisp_Type_Max, WEIGHT_STRONG);
 }
 
 static dump_off
@@ -1724,10 +1654,10 @@ dump_cons (struct dump_context *ctx, const struct Lisp_Cons *cons)
 # error "Lisp_Cons changed. See CHECK_STRUCTS comment in config.h."
 #endif
   struct Lisp_Cons out;
-  dump_object_start (ctx, &out, sizeof (out));
-  dump_field_lv (ctx, &out, cons, &cons->u.s.car, WEIGHT_STRONG);
-  dump_field_lv (ctx, &out, cons, &cons->u.s.u.cdr, WEIGHT_NORMAL);
-  return dump_object_finish (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
+  write_field (ctx, &out, cons, &cons->u.s.car, Lisp_Type_Max, WEIGHT_STRONG);
+  write_field (ctx, &out, cons, &cons->u.s.u.cdr, Lisp_Type_Max, WEIGHT_NORMAL);
+  return finish_object (ctx, &out, sizeof (out));
 }
 
 static dump_off
@@ -1740,7 +1670,7 @@ dump_interval_tree (struct dump_context *ctx,
 #endif
   /* TODO: output tree breadth-first?  */
   struct interval out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, tree, total_length);
   DUMP_FIELD_COPY (&out, tree, position);
   if (tree->left)
@@ -1754,25 +1684,21 @@ dump_interval_tree (struct dump_context *ctx,
 				     parent_offset);
     }
   else
-    dump_field_lv (ctx, &out, tree, &tree->up.obj, WEIGHT_STRONG);
+    write_field (ctx, &out, tree, &tree->up.obj, Lisp_Type_Max, WEIGHT_STRONG);
   DUMP_FIELD_COPY (&out, tree, up_obj);
   eassert (tree->gcmarkbit == 0);
   DUMP_FIELD_COPY (&out, tree, write_protect);
   DUMP_FIELD_COPY (&out, tree, visible);
   DUMP_FIELD_COPY (&out, tree, front_sticky);
   DUMP_FIELD_COPY (&out, tree, rear_sticky);
-  dump_field_lv (ctx, &out, tree, &tree->plist, WEIGHT_STRONG);
-  dump_off offset = dump_object_finish (ctx, &out, sizeof (out));
+  write_field (ctx, &out, tree, &tree->plist, Lisp_Type_Max, WEIGHT_STRONG);
+  dump_off offset = finish_object (ctx, &out, sizeof (out));
   if (tree->left)
-      dump_remember_fixup_ptr
-	(ctx,
-	 offset + dump_offsetof (struct interval, left),
-	 dump_interval_tree (ctx, tree->left, offset));
+      remember_fixup_ptr (ctx, offset + dump_offsetof (struct interval, left),
+			  dump_interval_tree (ctx, tree->left, offset));
   if (tree->right)
-      dump_remember_fixup_ptr
-	(ctx,
-	 offset + dump_offsetof (struct interval, right),
-	 dump_interval_tree (ctx, tree->right, offset));
+      remember_fixup_ptr (ctx, offset + dump_offsetof (struct interval, right),
+			  dump_interval_tree (ctx, tree->right, offset));
   return offset;
 }
 
@@ -1795,7 +1721,7 @@ dump_string (struct dump_context *ctx, const struct Lisp_String *string)
      better by emitting a relocation instead of bothering to copy the
      string data.  */
   struct Lisp_String out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, string, u.s.size);
   DUMP_FIELD_COPY (&out, string, u.s.size_byte);
   if (string->u.s.intervals)
@@ -1807,17 +1733,14 @@ dump_string (struct dump_context *ctx, const struct Lisp_String *string)
   else
     {
       dump_field_fixup_later (ctx, &out, string, &string->u.s.data);
-      dump_remember_cold_op (ctx,
-                             COLD_OP_STRING,
-			     make_lisp_ptr ((void *) string, Lisp_String));
+      remember_cold_op (ctx, COLD_OP_STRING,
+			make_lisp_ptr ((void *) string, Lisp_String));
     }
 
-  dump_off offset = dump_object_finish (ctx, &out, sizeof (out));
+  dump_off offset = finish_object (ctx, &out, sizeof (out));
   if (string->u.s.intervals)
-    dump_remember_fixup_ptr
-      (ctx,
-       offset + dump_offsetof (struct Lisp_String, u.s.intervals),
-       dump_interval_tree (ctx, string->u.s.intervals, 0));
+    remember_fixup_ptr (ctx, offset + dump_offsetof (struct Lisp_String, u.s.intervals),
+			dump_interval_tree (ctx, string->u.s.intervals, 0));
 
   return offset;
 }
@@ -1835,10 +1758,8 @@ dump_marker (struct dump_context *ctx, const struct Lisp_Marker *marker)
   DUMP_FIELD_COPY (out, marker, insertion_type);
   if (marker->buffer)
     {
-      dump_field_lv_rawptr (ctx, out, marker, &marker->buffer,
-			    Lisp_Vectorlike, WEIGHT_NORMAL);
-      dump_field_lv_rawptr (ctx, out, marker, &marker->next,
-			    Lisp_Vectorlike, WEIGHT_STRONG);
+      write_field (ctx, out, marker, &marker->buffer, Lisp_Vectorlike, WEIGHT_NORMAL);
+      write_field (ctx, out, marker, &marker->next, Lisp_Vectorlike, WEIGHT_STRONG);
       DUMP_FIELD_COPY (out, marker, charpos);
       DUMP_FIELD_COPY (out, marker, bytepos);
     }
@@ -1853,7 +1774,7 @@ dump_interval_node (struct dump_context *ctx, struct itree_node *node,
 # error "itree_node changed. See CHECK_STRUCTS comment in config.h."
 #endif
   struct itree_node out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   if (node->parent)
     dump_field_fixup_later (ctx, &out, node, &node->parent);
   if (node->left)
@@ -1865,26 +1786,20 @@ dump_interval_node (struct dump_context *ctx, struct itree_node *node,
   DUMP_FIELD_COPY (&out, node, limit);
   DUMP_FIELD_COPY (&out, node, offset);
   DUMP_FIELD_COPY (&out, node, otick);
-  dump_field_lv (ctx, &out, node, &node->data, WEIGHT_STRONG);
+  write_field (ctx, &out, node, &node->data, Lisp_Type_Max, WEIGHT_STRONG);
   DUMP_FIELD_COPY (&out, node, red);
   DUMP_FIELD_COPY (&out, node, rear_advance);
   DUMP_FIELD_COPY (&out, node, front_advance);
-  dump_off offset = dump_object_finish (ctx, &out, sizeof (out));
+  dump_off offset = finish_object (ctx, &out, sizeof (out));
   if (node->parent)
-      dump_remember_fixup_ptr
-	(ctx,
-	 offset + dump_offsetof (struct itree_node, parent),
-	 dump_interval_node (ctx, node->parent, offset));
+    remember_fixup_ptr (ctx, offset + dump_offsetof (struct itree_node, parent),
+			dump_interval_node (ctx, node->parent, offset));
   if (node->left)
-      dump_remember_fixup_ptr
-	(ctx,
-	 offset + dump_offsetof (struct itree_node, left),
-	 dump_interval_node (ctx, node->left, offset));
+    remember_fixup_ptr (ctx, offset + dump_offsetof (struct itree_node, left),
+			dump_interval_node (ctx, node->left, offset));
   if (node->right)
-      dump_remember_fixup_ptr
-	(ctx,
-	 offset + dump_offsetof (struct itree_node, right),
-	 dump_interval_node (ctx, node->right, offset));
+    remember_fixup_ptr (ctx, offset + dump_offsetof (struct itree_node, right),
+			dump_interval_node (ctx, node->right, offset));
   return offset;
 }
 
@@ -1898,10 +1813,8 @@ dump_overlay (struct dump_context *ctx, const struct Lisp_Overlay *overlay)
   dump_pseudovector_lisp_fields (ctx, &out->header, &overlay->header);
   dump_field_fixup_later (ctx, &out, overlay, &overlay->interval);
   dump_off offset = finish_dump_pvec (ctx, &out->header);
-  dump_remember_fixup_ptr
-    (ctx,
-     offset + dump_offsetof (struct Lisp_Overlay, interval),
-     dump_interval_node (ctx, overlay->interval, offset));
+  remember_fixup_ptr (ctx, offset + dump_offsetof (struct Lisp_Overlay, interval),
+		      dump_interval_node (ctx, overlay->interval, offset));
   return offset;
 }
 
@@ -1914,9 +1827,7 @@ dump_field_finalizer_ref (struct dump_context *ctx,
   if (*field == &finalizers || *field == &doomed_finalizers)
     dump_field_emacs_ptr (ctx, out, finalizer, field);
   else
-    dump_field_lv_rawptr (ctx, out, finalizer, field,
-                          Lisp_Vectorlike,
-                          WEIGHT_NORMAL);
+    write_field (ctx, out, finalizer, field, Lisp_Vectorlike, WEIGHT_NORMAL);
 }
 
 static dump_off
@@ -1930,7 +1841,7 @@ dump_finalizer (struct dump_context *ctx,
   /* Do _not_ call dump_pseudovector_lisp_fields here: we dump the
      only Lisp field, finalizer->function, manually, so we can give it
      a low weight.  */
-  dump_field_lv (ctx, &out, finalizer, &finalizer->function, WEIGHT_NONE);
+  write_field (ctx, &out, finalizer, &finalizer->function, Lisp_Type_Max, WEIGHT_NONE);
   dump_field_finalizer_ref (ctx, &out, finalizer, &finalizer->prev);
   dump_field_finalizer_ref (ctx, &out, finalizer, &finalizer->next);
   return finish_dump_pvec (ctx, &out->header);
@@ -1956,25 +1867,25 @@ dump_bignum (struct dump_context *ctx, Lisp_Object object)
   if (ctx->flags.dump_object_contents)
     {
       /* Export the bignum into a blob in the cold section.  */
-      dump_remember_cold_op (ctx, COLD_OP_BIGNUM, object);
+      remember_cold_op (ctx, COLD_OP_BIGNUM, object);
 
       /* Write the offset of that exported blob here.  */
       dump_off value_offset
 	= (bignum_offset
 	   + (dump_off) offsetof (struct Lisp_Bignum, value));
-      dump_push (&ctx->fixups,
-		 list3 (make_fixnum (DUMP_FIXUP_BIGNUM_DATA),
-			dump_off_to_lisp (value_offset),
-			object));
+      push (&ctx->fixups,
+	    list3 (make_fixnum (DUMP_FIXUP_BIGNUM_DATA),
+		   INT_TO_INTEGER (value_offset),
+		   object));
 
       /* When we load the dump, slurp the data blob and turn it into a
          real bignum.  Attach the relocation to the start of the
          Lisp_Bignum instead of the actual mpz field so that the
          relocation offset is aligned.  The relocation-application
          code knows to actually advance past the header.  */
-      dump_push (&ctx->dump_relocs[EARLY_RELOCS],
-                 list2 (make_fixnum (RELOC_BIGNUM),
-                        dump_off_to_lisp (bignum_offset)));
+      push (&ctx->dump_relocs[EARLY_RELOCS],
+	    list2 (make_fixnum (RELOC_BIGNUM),
+		   INT_TO_INTEGER (bignum_offset)));
     }
 
   return bignum_offset;
@@ -1988,9 +1899,9 @@ dump_float (struct dump_context *ctx, const struct Lisp_Float *lfloat)
 #endif
   eassert (ctx->header.cold_start);
   struct Lisp_Float out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, lfloat, u.data);
-  return dump_object_finish (ctx, &out, sizeof (out));
+  return finish_object (ctx, &out, sizeof (out));
 }
 
 static dump_off
@@ -2001,10 +1912,10 @@ dump_fwd_int (struct dump_context *ctx, const struct Lisp_Intfwd *intfwd)
 #endif
   reloc_immediate_intmax_t (ctx, intfwd->intvar, *intfwd->intvar);
   struct Lisp_Intfwd out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, intfwd, type);
   dump_field_emacs_ptr (ctx, &out, intfwd, &intfwd->intvar);
-  return dump_object_finish (ctx, &out, sizeof (out));
+  return finish_object (ctx, &out, sizeof (out));
 }
 
 static dump_off
@@ -2015,10 +1926,10 @@ dump_fwd_bool (struct dump_context *ctx, const struct Lisp_Boolfwd *boolfwd)
 #endif
   reloc_immediate_bool (ctx, boolfwd->boolvar, *boolfwd->boolvar);
   struct Lisp_Boolfwd out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, boolfwd, type);
   dump_field_emacs_ptr (ctx, &out, boolfwd, &boolfwd->boolvar);
-  return dump_object_finish (ctx, &out, sizeof (out));
+  return finish_object (ctx, &out, sizeof (out));
 }
 
 static dump_off
@@ -2027,15 +1938,15 @@ dump_fwd_obj (struct dump_context *ctx, const struct Lisp_Objfwd *objfwd)
 #if CHECK_STRUCTS && !defined (HASH_Lisp_Objfwd_45D3E513DC)
 # error "Lisp_Objfwd changed. See CHECK_STRUCTS comment in config.h."
 #endif
-  if (NILP (Fgethash (dump_off_to_lisp (emacs_offset (objfwd->objvar)),
+  if (NILP (Fgethash (INT_TO_INTEGER (emacs_offset (objfwd->objvar)),
                       ctx->staticpro_table,
                       Qnil)))
     reloc_to_lv (ctx, objfwd->objvar);
   struct Lisp_Objfwd out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, objfwd, type);
   dump_field_emacs_ptr (ctx, &out, objfwd, &objfwd->objvar);
-  return dump_object_finish (ctx, &out, sizeof (out));
+  return finish_object (ctx, &out, sizeof (out));
 }
 
 static dump_off
@@ -2046,12 +1957,12 @@ dump_fwd_buffer_obj (struct dump_context *ctx,
 # error "Lisp_Buffer_Objfwd changed. See CHECK_STRUCTS comment in config.h."
 #endif
   struct Lisp_Buffer_Objfwd out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, buffer_objfwd, type);
   DUMP_FIELD_COPY (&out, buffer_objfwd, offset);
-  dump_field_lv (ctx, &out, buffer_objfwd, &buffer_objfwd->predicate,
-                 WEIGHT_NORMAL);
-  return dump_object_finish (ctx, &out, sizeof (out));
+  write_field (ctx, &out, buffer_objfwd, &buffer_objfwd->predicate,
+	       Lisp_Type_Max, WEIGHT_NORMAL);
+  return finish_object (ctx, &out, sizeof (out));
 }
 
 static dump_off
@@ -2062,10 +1973,10 @@ dump_fwd_kboard_obj (struct dump_context *ctx,
 # error "Lisp_Intfwd changed. See CHECK_STRUCTS comment in config.h."
 #endif
   struct Lisp_Kboard_Objfwd out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, kboard_objfwd, type);
   DUMP_FIELD_COPY (&out, kboard_objfwd, offset);
-  return dump_object_finish (ctx, &out, sizeof (out));
+  return finish_object (ctx, &out, sizeof (out));
 }
 
 static dump_off
@@ -2102,60 +2013,58 @@ dump_fwd (struct dump_context *ctx, lispfwd fwd)
 }
 
 static dump_off
-dump_recall_symbol_aux (struct dump_context *ctx, Lisp_Object symbol)
+recall_symbol_aux (struct dump_context *ctx, Lisp_Object symbol)
 {
   Lisp_Object symbol_aux = ctx->symbol_aux;
   if (NILP (symbol_aux))
     return 0;
-  return dump_off_from_lisp (Fgethash (symbol, symbol_aux, make_fixnum (0)));
+  return INTEGER_TO_INT (Fgethash (symbol, symbol_aux, make_fixnum (0)));
 }
 
 static dump_off
-dump_recall_symbol_cvar (struct dump_context *ctx, Lisp_Object symbol)
+recall_symbol_cvar (struct dump_context *ctx, Lisp_Object symbol)
 {
   Lisp_Object symbol_cvar = ctx->symbol_cvar;
   if (NILP (symbol_cvar))
     return 0;
-  return dump_off_from_lisp (Fgethash (symbol, symbol_cvar, make_fixnum (0)));
+  return INTEGER_TO_INT (Fgethash (symbol, symbol_cvar, make_fixnum (0)));
 }
 
 static void
-dump_remember_symbol_aux (struct dump_context *ctx,
-                          Lisp_Object symbol,
-                          dump_off offset)
+remember_symbol_aux (struct dump_context *ctx,
+		     Lisp_Object symbol,
+		     dump_off offset)
 {
-  Fputhash (symbol, dump_off_to_lisp (offset), ctx->symbol_aux);
+  Fputhash (symbol, INT_TO_INTEGER (offset), ctx->symbol_aux);
 }
 
 static void
-dump_remember_symbol_cvar (struct dump_context *ctx,
-			   Lisp_Object symbol,
-			   dump_off offset)
+remember_symbol_cvar (struct dump_context *ctx,
+		      Lisp_Object symbol,
+		      dump_off offset)
 {
-  Fputhash (symbol, dump_off_to_lisp (offset), ctx->symbol_cvar);
+  Fputhash (symbol, INT_TO_INTEGER (offset), ctx->symbol_cvar);
 }
 
 static void
 dump_pre_dump_symbol (struct dump_context *ctx, struct Lisp_Symbol *symbol)
 {
   Lisp_Object symbol_lv = make_lisp_ptr (symbol, Lisp_Symbol);
-  eassert (!dump_recall_symbol_aux (ctx, symbol_lv));
-  eassert (!dump_recall_symbol_cvar (ctx, symbol_lv));
+  eassert (!recall_symbol_aux (ctx, symbol_lv));
+  eassert (!recall_symbol_cvar (ctx, symbol_lv));
   switch (symbol->u.s.type)
     {
     case SYMBOL_KBOARD:
     case SYMBOL_PER_BUFFER:
     case SYMBOL_FORWARDED:
-      dump_remember_symbol_aux (ctx, symbol_lv,
-				dump_fwd (ctx, symbol->u.s.val.fwd));
+      remember_symbol_aux (ctx, symbol_lv, dump_fwd (ctx, symbol->u.s.val.fwd));
       break;
     default:
       break;
     }
 
   if (symbol->u.s.c_variable.fwdptr)
-    dump_remember_symbol_cvar (ctx, symbol_lv,
-			       dump_fwd (ctx, symbol->u.s.c_variable));
+    remember_symbol_cvar (ctx, symbol_lv, dump_fwd (ctx, symbol->u.s.c_variable));
 }
 
 static dump_off
@@ -2182,15 +2091,15 @@ dump_symbol (struct dump_context *ctx,
           dump_object (ctx, object);
           ctx->flags = old_flags;
           offset = DUMP_OBJECT_ON_SYMBOL_QUEUE;
-          dump_remember_object (ctx, object, offset);
-          dump_push (&ctx->deferred_symbols, object);
+          remember_object (ctx, object, offset);
+          push (&ctx->deferred_symbols, object);
         }
       return offset;
     }
 
   struct Lisp_Symbol *symbol = XSYMBOL (object);
   struct Lisp_Symbol out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   eassert (symbol->u.s.gcmarkbit == 0);
   DUMP_FIELD_COPY (&out, symbol, u.s.type);
   DUMP_FIELD_COPY (&out, symbol, u.s.trapped_write);
@@ -2198,17 +2107,16 @@ dump_symbol (struct dump_context *ctx,
   DUMP_FIELD_COPY (&out, symbol, u.s.declared_special);
   DUMP_FIELD_COPY (&out, symbol, u.s.pinned);
   DUMP_FIELD_COPY (&out, symbol, u.s.buffer_local_only);
-  dump_field_lv (ctx, &out, symbol, &symbol->u.s.name, WEIGHT_STRONG);
+  write_field (ctx, &out, symbol, &symbol->u.s.name, Lisp_Type_Max, WEIGHT_STRONG);
   switch (symbol->u.s.type)
     {
     case SYMBOL_PLAINVAL:
-      dump_field_lv (ctx, &out, symbol, &symbol->u.s.val.value,
-                     WEIGHT_NORMAL);
+      write_field (ctx, &out, symbol, &symbol->u.s.val.value, Lisp_Type_Max,
+		   WEIGHT_NORMAL);
       break;
     case SYMBOL_VARALIAS:
-      dump_field_lv_rawptr (ctx, &out, symbol,
-                            &symbol->u.s.val.alias, Lisp_Symbol,
-                            WEIGHT_NORMAL);
+      write_field (ctx, &out, symbol, &symbol->u.s.val.alias, Lisp_Symbol,
+		   WEIGHT_NORMAL);
       break;
     case SYMBOL_KBOARD:
     case SYMBOL_PER_BUFFER:
@@ -2222,15 +2130,17 @@ dump_symbol (struct dump_context *ctx,
       break;
     }
 
-  dump_field_lv (ctx, &out, symbol, &symbol->u.s.function, WEIGHT_NORMAL);
-  dump_field_lv (ctx, &out, symbol, &symbol->u.s.plist, WEIGHT_NORMAL);
-  dump_field_lv (ctx, &out, symbol, &symbol->u.s.buffer_local_default, WEIGHT_NORMAL);
-  dump_field_lv (ctx, &out, symbol, &symbol->u.s.buffer_local_buffer, WEIGHT_NORMAL);
-  dump_field_lv_rawptr (ctx, &out, symbol, &symbol->u.s.next, Lisp_Symbol, WEIGHT_STRONG);
+  write_field (ctx, &out, symbol, &symbol->u.s.function, Lisp_Type_Max, WEIGHT_NORMAL);
+  write_field (ctx, &out, symbol, &symbol->u.s.plist, Lisp_Type_Max, WEIGHT_NORMAL);
+  write_field (ctx, &out, symbol, &symbol->u.s.buffer_local_default,
+	       Lisp_Type_Max, WEIGHT_NORMAL);
+  write_field (ctx, &out, symbol, &symbol->u.s.buffer_local_buffer,
+	       Lisp_Type_Max, WEIGHT_NORMAL);
+  write_field (ctx, &out, symbol, &symbol->u.s.next, Lisp_Symbol, WEIGHT_STRONG);
   if (symbol->u.s.c_variable.fwdptr)
     dump_field_fixup_later (ctx, &out, symbol, &symbol->u.s.c_variable);
 
-  offset = dump_object_finish (ctx, &out, sizeof (out));
+  offset = finish_object (ctx, &out, sizeof (out));
 
   switch (symbol->u.s.type)
     {
@@ -2238,13 +2148,11 @@ dump_symbol (struct dump_context *ctx,
     case SYMBOL_PER_BUFFER:
     case SYMBOL_FORWARDED:
       {
-	dump_off aux_offset = dump_recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
-	dump_remember_fixup_ptr
-	  (ctx,
-	   offset + dump_offsetof (struct Lisp_Symbol, u.s.val.fwd),
-	   (aux_offset
-	    ? aux_offset
-	    : dump_fwd (ctx, symbol->u.s.val.fwd)));
+	dump_off aux_offset = recall_symbol_aux (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
+	remember_fixup_ptr (ctx, offset + dump_offsetof (struct Lisp_Symbol, u.s.val.fwd),
+			    aux_offset
+			    ? aux_offset
+			    : dump_fwd (ctx, symbol->u.s.val.fwd));
       }
       break;
     default:
@@ -2253,13 +2161,11 @@ dump_symbol (struct dump_context *ctx,
 
   if (symbol->u.s.c_variable.fwdptr)
     {
-      dump_off cvar_offset = dump_recall_symbol_cvar (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
-      dump_remember_fixup_ptr
-	(ctx,
-	 offset + dump_offsetof (struct Lisp_Symbol, u.s.c_variable),
-	 (cvar_offset
-	  ? cvar_offset
-	  : dump_fwd (ctx, symbol->u.s.c_variable)));
+      dump_off cvar_offset = recall_symbol_cvar (ctx, make_lisp_ptr (symbol, Lisp_Symbol));
+      remember_fixup_ptr (ctx, offset + dump_offsetof (struct Lisp_Symbol, u.s.c_variable),
+			  cvar_offset
+			  ? cvar_offset
+			  : dump_fwd (ctx, symbol->u.s.c_variable));
     }
 
   return offset;
@@ -2293,7 +2199,7 @@ dump_vectorlike_generic (struct dump_context *ctx,
       size &= PSEUDOVECTOR_SIZE_MASK;
     }
 
-  dump_align_output (ctx, DUMP_ALIGNMENT);
+  align_output (ctx, DUMP_ALIGNMENT);
   dump_off prefix_start_offset = ctx->offset;
 
   dump_off skip;
@@ -2311,19 +2217,19 @@ dump_vectorlike_generic (struct dump_context *ctx,
          field.  */
       size_t sz = (char *)&out.min_char + sizeof (out.min_char) - (char *)&out;
       eassert (sz < DUMP_OFF_MAX);
-      dump_object_start (ctx, &out, (dump_off) sz);
+      start_object (ctx, &out, (dump_off) sz);
       DUMP_FIELD_COPY (&out, sct, header.size);
       DUMP_FIELD_COPY (&out, sct, depth);
       DUMP_FIELD_COPY (&out, sct, min_char);
-      offset = dump_object_finish (ctx, &out, (dump_off) sz);
+      offset = finish_object (ctx, &out, (dump_off) sz);
       skip = SUB_CHAR_TABLE_OFFSET;
     }
   else
     {
       union vectorlike_header out;
-      dump_object_start (ctx, &out, sizeof (out));
+      start_object (ctx, &out, sizeof (out));
       DUMP_FIELD_COPY (&out, header, size);
-      offset = dump_object_finish (ctx, &out, sizeof (out));
+      offset = finish_object (ctx, &out, sizeof (out));
       skip = 0;
     }
 
@@ -2335,11 +2241,11 @@ dump_vectorlike_generic (struct dump_context *ctx,
   dump_off skip_start = ptrdiff_t_to_dump_off ((char *) &v->contents[skip]
 					       - (char *) v);
   eassert (skip_start >= prefix_size);
-  dump_write_zero (ctx, skip_start - prefix_size);
+  write_bytes_zero (ctx, skip_start - prefix_size);
 
-  /* dump_object_start isn't what records conservative-GC object
+  /* start_object isn't what records conservative-GC object
      starts --- dump_object_1 does --- so the hack below of using
-     dump_object_start for each vector word doesn't cause GC problems
+     start_object for each vector word doesn't cause GC problems
      at runtime.  */
   struct dump_flags old_flags = ctx->flags;
   ctx->flags.pack_objects = true;
@@ -2351,12 +2257,12 @@ dump_vectorlike_generic (struct dump_context *ctx,
 #if INTPTR_MAX == EMACS_INT_MAX
       eassert (ctx->offset % sizeof (out) == 0);
 #endif
-      dump_object_start (ctx, &out, sizeof (out));
-      dump_field_lv (ctx, &out, vslot, vslot, WEIGHT_STRONG);
-      dump_object_finish (ctx, &out, sizeof (out));
+      start_object (ctx, &out, sizeof (out));
+      write_field (ctx, &out, vslot, vslot, Lisp_Type_Max, WEIGHT_STRONG);
+      finish_object (ctx, &out, sizeof (out));
     }
   ctx->flags = old_flags;
-  dump_align_output (ctx, DUMP_ALIGNMENT);
+  align_output (ctx, DUMP_ALIGNMENT);
   return offset;
 }
 
@@ -2420,7 +2326,7 @@ hash_table_freeze (struct Lisp_Hash_Table *h)
 static dump_off
 dump_hash_table_contents (struct dump_context *ctx, struct Lisp_Hash_Table *h)
 {
-  dump_align_output (ctx, DUMP_ALIGNMENT);
+  align_output (ctx, DUMP_ALIGNMENT);
   dump_off start_offset = ctx->offset;
   ptrdiff_t n = 2 * h->count;
 
@@ -2431,9 +2337,9 @@ dump_hash_table_contents (struct dump_context *ctx, struct Lisp_Hash_Table *h)
     {
       Lisp_Object out;
       const Lisp_Object *slot = &h->key_and_value[i];
-      dump_object_start (ctx, &out, sizeof out);
-      dump_field_lv (ctx, &out, slot, slot, WEIGHT_STRONG);
-      dump_object_finish (ctx, &out, sizeof out);
+      start_object (ctx, &out, sizeof out);
+      write_field (ctx, &out, slot, slot, Lisp_Type_Max, WEIGHT_STRONG);
+      finish_object (ctx, &out, sizeof out);
     }
 
   ctx->flags = old_flags;
@@ -2451,7 +2357,7 @@ dump_hash_table (struct dump_context *ctx, Lisp_Object object)
   struct Lisp_Hash_Table *hash = &hash_munged;
 
   hash_table_freeze (hash);
-  dump_push (&ctx->hash_tables, object);
+  push (&ctx->hash_tables, object);
 
   START_DUMP_PVEC (ctx, &hash->header, struct Lisp_Hash_Table, out);
   dump_pseudovector_lisp_fields (ctx, &out->header, &hash->header);
@@ -2465,17 +2371,15 @@ dump_hash_table (struct dump_context *ctx, Lisp_Object object)
   eassert (hash->next_weak == NULL);
   dump_off offset = finish_dump_pvec (ctx, &out->header);
   if (hash->key_and_value)
-    dump_remember_fixup_ptr
-      (ctx,
-       offset + dump_offsetof (struct Lisp_Hash_Table, key_and_value),
-       dump_hash_table_contents (ctx, hash));
+    remember_fixup_ptr (ctx, offset + dump_offsetof (struct Lisp_Hash_Table, key_and_value),
+			dump_hash_table_contents (ctx, hash));
   return offset;
 }
 
 static dump_off
 dump_obarray_buckets (struct dump_context *ctx, const struct Lisp_Obarray *o)
 {
-  dump_align_output (ctx, DUMP_ALIGNMENT);
+  align_output (ctx, DUMP_ALIGNMENT);
   dump_off start_offset = ctx->offset;
   ptrdiff_t n = obarray_size (o);
 
@@ -2486,9 +2390,9 @@ dump_obarray_buckets (struct dump_context *ctx, const struct Lisp_Obarray *o)
     {
       Lisp_Object out;
       const Lisp_Object *slot = &o->buckets[i];
-      dump_object_start (ctx, &out, sizeof out);
-      dump_field_lv (ctx, &out, slot, slot, WEIGHT_STRONG);
-      dump_object_finish (ctx, &out, sizeof out);
+      start_object (ctx, &out, sizeof out);
+      write_field (ctx, &out, slot, slot, Lisp_Type_Max, WEIGHT_STRONG);
+      finish_object (ctx, &out, sizeof out);
     }
 
   ctx->flags = old_flags;
@@ -2510,10 +2414,8 @@ dump_obarray (struct dump_context *ctx, Lisp_Object object)
   DUMP_FIELD_COPY (out, oa, size_bits);
   dump_field_fixup_later (ctx, out, oa, &oa->buckets);
   dump_off offset = finish_dump_pvec (ctx, &out->header);
-  dump_remember_fixup_ptr
-    (ctx,
-     offset + dump_offsetof (struct Lisp_Obarray, buckets),
-     dump_obarray_buckets (ctx, oa));
+  remember_fixup_ptr (ctx, offset + dump_offsetof (struct Lisp_Obarray, buckets),
+		      dump_obarray_buckets (ctx, oa));
   return offset;
 }
 
@@ -2563,9 +2465,8 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
       if (BUFFER_LIVE_P (buffer))
         {
           dump_field_fixup_later (ctx, out, buffer, &buffer->own_text.beg);
-	  dump_remember_cold_op (ctx, COLD_OP_BUFFER,
-				 make_lisp_ptr ((void *) in_buffer,
-						Lisp_Vectorlike));
+	  remember_cold_op (ctx, COLD_OP_BUFFER,
+			    make_lisp_ptr ((void *) in_buffer, Lisp_Vectorlike));
         }
       else
         eassert (buffer->own_text.beg == NULL);
@@ -2586,18 +2487,16 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
       DUMP_FIELD_COPY (out, buffer, own_text.overlay_unchanged_modified);
       if (buffer->own_text.intervals)
         dump_field_fixup_later (ctx, out, buffer, &buffer->own_text.intervals);
-      dump_field_lv_rawptr (ctx, out, buffer, &buffer->own_text.markers,
-                            Lisp_Vectorlike, WEIGHT_NORMAL);
+      write_field (ctx, out, buffer, &buffer->own_text.markers,
+		   Lisp_Vectorlike, WEIGHT_NORMAL);
       DUMP_FIELD_COPY (out, buffer, own_text.inhibit_shrinking);
       DUMP_FIELD_COPY (out, buffer, own_text.redisplay);
       DUMP_FIELD_COPY (out, buffer, own_text.monospace);
     }
 
   eassert (ctx->obj_offset > 0);
-  dump_remember_fixup_ptr
-    (ctx,
-     ctx->obj_offset + dump_offsetof (struct buffer, text),
-     base_offset + dump_offsetof (struct buffer, own_text));
+  remember_fixup_ptr (ctx, ctx->obj_offset + dump_offsetof (struct buffer, text),
+		      base_offset + dump_offsetof (struct buffer, own_text));
 
   DUMP_FIELD_COPY (out, buffer, pt);
   DUMP_FIELD_COPY (out, buffer, pt_byte);
@@ -2643,14 +2542,11 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
   else
     out->overlays = NULL;
 
-  dump_field_lv (ctx, out, buffer, &buffer->undo_list_,
-                 WEIGHT_STRONG);
+  write_field (ctx, out, buffer, &buffer->undo_list_, Lisp_Type_Max, WEIGHT_STRONG);
   dump_off offset = finish_dump_pvec (ctx, &out->header);
   if (!buffer->base_buffer && buffer->own_text.intervals)
-    dump_remember_fixup_ptr
-      (ctx,
-       offset + dump_offsetof (struct buffer, own_text.intervals),
-       dump_interval_tree (ctx, buffer->own_text.intervals, 0));
+    remember_fixup_ptr (ctx, offset + dump_offsetof (struct buffer, own_text.intervals),
+			dump_interval_tree (ctx, buffer->own_text.intervals, 0));
 
   return offset;
 }
@@ -2661,14 +2557,14 @@ dump_bool_vector (struct dump_context *ctx, const struct Lisp_Vector *v)
 #if CHECK_STRUCTS && !defined (HASH_Lisp_Vector_3091289B35)
 # error "Lisp_Vector changed. See CHECK_STRUCTS comment in config.h."
 #endif
-  /* No relocation needed, so we don't need dump_object_start.  */
-  dump_align_output (ctx, DUMP_ALIGNMENT);
+  /* No relocation needed, so we don't need start_object.  */
+  align_output (ctx, DUMP_ALIGNMENT);
   eassert (ctx->offset >= ctx->header.cold_start);
   dump_off offset = ctx->offset;
   ptrdiff_t nbytes = vector_nbytes ((struct Lisp_Vector *) v);
   if (nbytes > DUMP_OFF_MAX)
     error ("vector too large");
-  dump_write (ctx, v, ptrdiff_t_to_dump_off (nbytes));
+  write_bytes (ctx, v, ptrdiff_t_to_dump_off (nbytes));
   return offset;
 }
 
@@ -2679,7 +2575,7 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
 # error "Lisp_Subr changed. See CHECK_STRUCTS comment in config.h."
 #endif
   struct Lisp_Subr out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, subr, header.size);
 #ifdef HAVE_NATIVE_COMP
   bool non_primitive = !NILP (subr->native_comp_u);
@@ -2695,11 +2591,10 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
   if (non_primitive)
     {
       dump_field_fixup_later (ctx, &out, subr, &subr->symbol_name);
-      dump_remember_cold_op (ctx,
-                             COLD_OP_NATIVE_SUBR,
-			     make_lisp_ptr ((void *) subr, Lisp_Vectorlike));
-      dump_field_lv (ctx, &out, subr, &subr->intspec.native, WEIGHT_NORMAL);
-      dump_field_lv (ctx, &out, subr, &subr->command_modes, WEIGHT_NORMAL);
+      remember_cold_op (ctx, COLD_OP_NATIVE_SUBR,
+			make_lisp_ptr ((void *) subr, Lisp_Vectorlike));
+      write_field (ctx, &out, subr, &subr->intspec.native, Lisp_Type_Max, WEIGHT_NORMAL);
+      write_field (ctx, &out, subr, &subr->command_modes, Lisp_Type_Max, WEIGHT_NORMAL);
     }
   else
     {
@@ -2709,19 +2604,19 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
     }
   DUMP_FIELD_COPY (&out, subr, doc);
 #ifdef HAVE_NATIVE_COMP
-  dump_field_lv (ctx, &out, subr, &subr->native_comp_u, WEIGHT_NORMAL);
-  if (! NILP (subr->native_comp_u))
+  write_field (ctx, &out, subr, &subr->native_comp_u, Lisp_Type_Max, WEIGHT_NORMAL);
+  if (!NILP (subr->native_comp_u))
     dump_field_fixup_later (ctx, &out, subr, &subr->native_c_name);
 
-  dump_field_lv (ctx, &out, subr, &subr->lambda_list, WEIGHT_NORMAL);
-  dump_field_lv (ctx, &out, subr, &subr->type, WEIGHT_NORMAL);
+  write_field (ctx, &out, subr, &subr->lambda_list, Lisp_Type_Max, WEIGHT_NORMAL);
+  write_field (ctx, &out, subr, &subr->type, Lisp_Type_Max, WEIGHT_NORMAL);
 #endif
-  dump_off subr_off = dump_object_finish (ctx, &out, sizeof (out));
+  dump_off subr_off = finish_object (ctx, &out, sizeof (out));
   if (non_primitive && ctx->flags.dump_object_contents)
     /* Must follow compilation units in NATIVE_COMP_RELOCS. */
-    dump_push (&ctx->dump_relocs[LATE_RELOCS],
-	       list2 (make_fixnum (RELOC_NATIVE_SUBR),
-		      dump_off_to_lisp (subr_off)));
+    push (&ctx->dump_relocs[LATE_RELOCS],
+	  list2 (make_fixnum (RELOC_NATIVE_SUBR),
+		 INT_TO_INTEGER (subr_off)));
   return subr_off;
 }
 
@@ -2739,9 +2634,9 @@ dump_native_comp_unit (struct dump_context *ctx,
   dump_off comp_u_off = finish_dump_pvec (ctx, &out->header);
   if (ctx->flags.dump_object_contents)
     /* Do real elf after EARLY_RELOCS. */
-    dump_push (&ctx->dump_relocs[NATIVE_COMP_RELOCS],
-	       list2 (make_fixnum (RELOC_NATIVE_COMP_UNIT),
-		      dump_off_to_lisp (comp_u_off)));
+    push (&ctx->dump_relocs[NATIVE_COMP_RELOCS],
+	  list2 (make_fixnum (RELOC_NATIVE_COMP_UNIT),
+		 INT_TO_INTEGER (comp_u_off)));
   return comp_u_off;
 }
 #endif
@@ -2824,7 +2719,7 @@ dump_vectorlike (struct dump_context *ctx,
     case PVEC_THREAD:
       if (main_thread_p (v))
         {
-          eassert (dump_object_emacs_ptr (lv));
+          eassert (emacs_ptr (lv));
           return DUMP_OBJECT_IS_RUNTIME_MAGIC;
         }
       break;
@@ -2878,7 +2773,7 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
 #endif
   eassert (!EQ (object, dead_object ()));
 
-  dump_off offset = dump_recall_object (ctx, object);
+  dump_off offset = recall_object (ctx, object);
   if (offset > 0)
     return offset;  /* Object already dumped.  */
 
@@ -2890,13 +2785,13 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
 	  eassert (offset == DUMP_OBJECT_ON_NORMAL_QUEUE
 		   || offset == DUMP_OBJECT_NOT_SEEN);
           offset = DUMP_OBJECT_ON_COLD_QUEUE;
-          dump_remember_object (ctx, object, offset);
-          dump_remember_cold_op (ctx, COLD_OP_OBJECT, object);
+          remember_object (ctx, object, offset);
+          remember_cold_op (ctx, COLD_OP_OBJECT, object);
         }
       return offset;
     }
 
-  void *obj_in_emacs = dump_object_emacs_ptr (object);
+  void *obj_in_emacs = emacs_ptr (object);
   if (obj_in_emacs && ctx->flags.defer_copied_objects)
     {
       if (offset != DUMP_OBJECT_ON_COPIED_QUEUE)
@@ -2913,8 +2808,8 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
           ctx->flags = old_flags;
 
           offset = DUMP_OBJECT_ON_COPIED_QUEUE;
-          dump_remember_object (ctx, object, offset);
-          dump_push (&ctx->copied_queue, object);
+          remember_object (ctx, object, offset);
+          push (&ctx->copied_queue, object);
         }
       return offset;
     }
@@ -2948,13 +2843,13 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
   if (ctx->flags.dump_object_contents && offset > DUMP_OBJECT_NOT_SEEN)
     {
       eassert (offset % DUMP_ALIGNMENT == 0);
-      dump_remember_object (ctx, object, offset);
+      remember_object (ctx, object, offset);
       if (ctx->flags.record_object_starts)
         {
           eassert (!ctx->flags.pack_objects);
-          dump_push (&ctx->object_starts,
-                     list2 (dump_off_to_lisp (XTYPE (object)),
-                            dump_off_to_lisp (offset)));
+          push (&ctx->object_starts,
+		list2 (INT_TO_INTEGER (XTYPE (object)),
+		       INT_TO_INTEGER (offset)));
         }
     }
 
@@ -2976,12 +2871,12 @@ dump_charset (struct dump_context *ctx, int cs_i)
 #if CHECK_STRUCTS && !defined (HASH_charset_E31F4B5D96)
 # error "charset changed. See CHECK_STRUCTS comment in config.h."
 #endif
-  dump_align_output (ctx, alignof (struct charset));
+  align_output (ctx, alignof (struct charset));
   const struct charset *cs = charset_table + cs_i;
   struct charset out;
-  dump_object_start (ctx, &out, sizeof (out));
+  start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, cs, id);
-  dump_field_lv (ctx, &out, cs, &cs->attributes, WEIGHT_NORMAL);
+  write_field (ctx, &out, cs, &cs->attributes, Lisp_Type_Max, WEIGHT_NORMAL);
   DUMP_FIELD_COPY (&out, cs, dimension);
   memcpy (out.code_space, &cs->code_space, sizeof (cs->code_space));
   if (cs_i < charset_table_used && cs->code_space_mask)
@@ -3004,11 +2899,10 @@ dump_charset (struct dump_context *ctx, int cs_i)
   DUMP_FIELD_COPY (&out, cs, invalid_code);
   memcpy (out.fast_map, &cs->fast_map, sizeof (cs->fast_map));
   DUMP_FIELD_COPY (&out, cs, code_offset);
-  dump_off offset = dump_object_finish (ctx, &out, sizeof (out));
+  dump_off offset = finish_object (ctx, &out, sizeof (out));
   if (cs_i < charset_table_used && cs->code_space_mask)
-    dump_remember_cold_op (ctx, COLD_OP_CHARSET,
-                           Fcons (dump_off_to_lisp (cs_i),
-                                  dump_off_to_lisp (offset)));
+    remember_cold_op (ctx, COLD_OP_CHARSET,
+		      Fcons (INT_TO_INTEGER (cs_i), INT_TO_INTEGER (offset)));
   return offset;
 }
 
@@ -3017,7 +2911,7 @@ dump_charset_table (struct dump_context *ctx)
 {
   struct dump_flags old_flags = ctx->flags;
   ctx->flags.pack_objects = true;
-  dump_align_output (ctx, DUMP_ALIGNMENT);
+  align_output (ctx, DUMP_ALIGNMENT);
   dump_off offset = ctx->offset;
   /* We are dumping the entire table, not just the used slots, because
      otherwise when we restore from the pdump file, the actual size of
@@ -3075,10 +2969,10 @@ dump_hot_parts_of_discardable_objects (struct dump_context *ctx)
   Lisp_Object copied_queue = ctx->copied_queue;
   while (!NILP (copied_queue))
     {
-      Lisp_Object copied = dump_pop (&copied_queue);
+      Lisp_Object copied = pop (&copied_queue);
       if (SYMBOLP (copied))
         {
-          eassert (dump_builtin_symbol_p (copied));
+          eassert (builtin_symbol_p (copied));
           dump_pre_dump_symbol (ctx, XSYMBOL (copied));
         }
     }
@@ -3115,8 +3009,8 @@ dump_drain_copied_objects (struct dump_context *ctx)
      in nice big chunks.  */
   while (!NILP (copied_queue))
     {
-      Lisp_Object copied = dump_pop (&copied_queue);
-      void *optr = dump_object_emacs_ptr (copied);
+      Lisp_Object copied = pop (&copied_queue);
+      void *optr = emacs_ptr (copied);
       eassert (optr != NULL);
       /* N.B. start_offset is beyond any padding we insert.  */
       dump_off start_offset = dump_object (ctx, copied);
@@ -3134,17 +3028,15 @@ static void
 dump_cold_string (struct dump_context *ctx, Lisp_Object string)
 {
   /* Dump string contents.  */
-  dump_off string_offset = dump_recall_object (ctx, string);
+  dump_off string_offset = recall_object (ctx, string);
   eassert (string_offset > 0);
   if (SBYTES (string) > DUMP_OFF_MAX - 1)
     error ("string too large");
   dump_off total_size = ptrdiff_t_to_dump_off (SBYTES (string) + 1);
   eassert (total_size > 0);
-  dump_remember_fixup_ptr
-    (ctx,
-     string_offset + dump_offsetof (struct Lisp_String, u.s.data),
-     ctx->offset);
-  dump_write (ctx, XSTRING (string)->u.s.data, total_size);
+  remember_fixup_ptr (ctx, string_offset + dump_offsetof (struct Lisp_String, u.s.data),
+		      ctx->offset);
+  write_bytes (ctx, XSTRING (string)->u.s.data, total_size);
 }
 
 static void
@@ -3152,20 +3044,18 @@ dump_cold_charset (struct dump_context *ctx, Lisp_Object data)
 {
   /* Dump charset lookup tables.  */
   int cs_i = XFIXNUM (XCAR (data));
-  dump_off cs_dump_offset = dump_off_from_lisp (XCDR (data));
-  dump_remember_fixup_ptr
-    (ctx,
-     cs_dump_offset + dump_offsetof (struct charset, code_space_mask),
-     ctx->offset);
+  dump_off cs_dump_offset = INTEGER_TO_INT (XCDR (data));
+  remember_fixup_ptr (ctx, cs_dump_offset + dump_offsetof (struct charset, code_space_mask),
+		      ctx->offset);
   struct charset *cs = charset_table + cs_i;
-  dump_write (ctx, cs->code_space_mask, 256);
+  write_bytes (ctx, cs->code_space_mask, 256);
 }
 
 static void
 dump_cold_buffer (struct dump_context *ctx, Lisp_Object data)
 {
   /* Dump buffer text.  */
-  dump_off buffer_offset = dump_recall_object (ctx, data);
+  dump_off buffer_offset = recall_object (ctx, data);
   eassert (buffer_offset > 0);
   struct buffer *b = XBUFFER (data);
   eassert (b->text == &b->own_text);
@@ -3179,11 +3069,9 @@ dump_cold_buffer (struct dump_context *ctx, Lisp_Object data)
     + 1;
   if (nbytes > DUMP_OFF_MAX)
     error ("buffer too large");
-  dump_remember_fixup_ptr
-    (ctx,
-     buffer_offset + dump_offsetof (struct buffer, own_text.beg),
-     ctx->offset);
-  dump_write (ctx, b->own_text.beg, ptrdiff_t_to_dump_off (nbytes));
+  remember_fixup_ptr (ctx, buffer_offset + dump_offsetof (struct buffer, own_text.beg),
+		      ctx->offset);
+  write_bytes (ctx, b->own_text.beg, ptrdiff_t_to_dump_off (nbytes));
 }
 
 static void
@@ -3192,16 +3080,16 @@ dump_cold_bignum (struct dump_context *ctx, Lisp_Object object)
   mpz_t const *n = xbignum_val (object);
   size_t sz_nlimbs = mpz_size (*n);
   eassert (sz_nlimbs < DUMP_OFF_MAX);
-  dump_align_output (ctx, alignof (mp_limb_t));
+  align_output (ctx, alignof (mp_limb_t));
   dump_off nlimbs = (dump_off) sz_nlimbs;
   Lisp_Object descriptor
-    = list2 (dump_off_to_lisp (ctx->offset),
-	     dump_off_to_lisp (mpz_sgn (*n) < 0 ? -nlimbs : nlimbs));
+    = list2 (INT_TO_INTEGER (ctx->offset),
+	     INT_TO_INTEGER (mpz_sgn (*n) < 0 ? -nlimbs : nlimbs));
   Fputhash (object, descriptor, ctx->bignum_data);
   for (mp_size_t i = 0; i < nlimbs; ++i)
     {
       mp_limb_t limb = mpz_getlimbn (*n, i);
-      dump_write (ctx, &limb, sizeof (limb));
+      write_bytes (ctx, &limb, sizeof (limb));
     }
 }
 
@@ -3210,21 +3098,17 @@ static void
 dump_cold_native_subr (struct dump_context *ctx, Lisp_Object subr)
 {
   /* Dump subr contents.  */
-  dump_off subr_offset = dump_recall_object (ctx, subr);
+  dump_off subr_offset = recall_object (ctx, subr);
   eassert (subr_offset > 0);
-  dump_remember_fixup_ptr
-    (ctx,
-     subr_offset + dump_offsetof (struct Lisp_Subr, symbol_name),
-     ctx->offset);
+  remember_fixup_ptr (ctx, subr_offset + dump_offsetof (struct Lisp_Subr, symbol_name),
+		      ctx->offset);
   const char *symbol_name = XSUBR (subr)->symbol_name;
-  dump_write (ctx, symbol_name, 1 + strlen (symbol_name));
+  write_bytes (ctx, symbol_name, 1 + strlen (symbol_name));
 
-  dump_remember_fixup_ptr
-    (ctx,
-     subr_offset + dump_offsetof (struct Lisp_Subr, native_c_name),
-     ctx->offset);
+  remember_fixup_ptr (ctx, subr_offset + dump_offsetof (struct Lisp_Subr, native_c_name),
+		      ctx->offset);
   const char *c_name = XSUBR (subr)->native_c_name;
-  dump_write (ctx, c_name, 1 + strlen (c_name));
+  write_bytes (ctx, c_name, 1 + strlen (c_name));
 }
 #endif
 
@@ -3246,7 +3130,7 @@ dump_drain_cold_data (struct dump_context *ctx)
 
   while (!NILP (cold_queue))
     {
-      Lisp_Object item = dump_pop (&cold_queue);
+      Lisp_Object item = pop (&cold_queue);
       enum cold_op op = (enum cold_op) XFIXNUM (XCAR (item));
       Lisp_Object data = XCDR (item);
       switch (op)
@@ -3263,10 +3147,10 @@ dump_drain_cold_data (struct dump_context *ctx)
         case COLD_OP_OBJECT:
           /* Objects that we can put in the cold section
              must not refer to other objects.  */
-          eassert (dump_queue_empty_p (&ctx->dump_queue));
+          eassert (queue_empty_p (&ctx->queue));
           eassert (ctx->flags.dump_object_contents);
           dump_object (ctx, data);
-          eassert (dump_queue_empty_p (&ctx->dump_queue));
+          eassert (queue_empty_p (&ctx->queue));
           break;
         case COLD_OP_BIGNUM:
           dump_cold_bignum (ctx, data);
@@ -3324,7 +3208,7 @@ dump_drain_user_remembered_data_hot (struct dump_context *ctx)
           Lisp_Object lv;
           read_ptr_and_lv (mem, type, &value, &lv);
           if (value != NULL)
-	    dump_enqueue_object (ctx, lv, WEIGHT_NONE);
+	    enqueue_object (ctx, lv, WEIGHT_NONE);
         }
     }
 }
@@ -3348,7 +3232,7 @@ dump_drain_user_remembered_data_cold (struct dump_context *ctx)
           else
             {
               reloc_copy_from_dump (ctx, ctx->offset, mem, sz);
-              dump_write (ctx, mem, sz);
+              write_bytes (ctx, mem, sz);
             }
         }
       else
@@ -3367,7 +3251,7 @@ dump_drain_user_remembered_data_cold (struct dump_context *ctx)
             reloc_immediate_ptrdiff_t (ctx, mem, 0);
           else
             {
-              if (dump_object_emacs_ptr (lv) != NULL)
+              if (emacs_ptr (lv) != NULL)
                 {
                   /* We have situation like this:
 
@@ -3387,12 +3271,12 @@ dump_drain_user_remembered_data_cold (struct dump_context *ctx)
                      Lisp_Subr structures always live in Emacs, not
                      the dump.
                   */
-		  reloc_to_emacs_ptr (ctx, mem, dump_object_emacs_ptr (lv));
+		  reloc_to_emacs_ptr (ctx, mem, emacs_ptr (lv));
                 }
               else
                 {
-                  eassert (!dump_object_self_representing_p (lv));
-                  dump_off dump_offset = dump_recall_object (ctx, lv);
+                  eassert (!self_representing_p (lv));
+                  dump_off dump_offset = recall_object (ctx, lv);
                   if (dump_offset <= 0)
                     error ("raw-pointer object not dumped?!");
                   reloc_to_dump_ptr (ctx, mem, dump_offset);
@@ -3421,9 +3305,9 @@ static struct dump_reloc
 dump_decode_dump_reloc (Lisp_Object lreloc)
 {
   struct dump_reloc reloc;
-  reloc.type = (enum reloc_t) XFIXNUM (dump_pop (&lreloc));
+  reloc.type = (enum reloc_t) XFIXNUM (pop (&lreloc));
   eassert (reloc.type < RELOC_EMACS_LV + Lisp_Type_Max);
-  reloc.offset = dump_off_from_lisp (dump_pop (&lreloc));
+  reloc.offset = INTEGER_TO_INT (pop (&lreloc));
   eassert (NILP (lreloc));
   return reloc;
 }
@@ -3433,9 +3317,9 @@ dump_emit_dump_reloc (struct dump_context *ctx, Lisp_Object lreloc)
 {
   eassert (ctx->flags.pack_objects);
   struct dump_reloc reloc;
-  dump_object_start (ctx, &reloc, sizeof (reloc));
+  start_object (ctx, &reloc, sizeof (reloc));
   reloc = dump_decode_dump_reloc (lreloc);
-  dump_object_finish (ctx, &reloc, sizeof (reloc));
+  finish_object (ctx, &reloc, sizeof (reloc));
   if (reloc.offset < ctx->header.discardable_start)
     ++ctx->number_hot_relocations;
   else
@@ -3462,17 +3346,17 @@ static struct emacs_reloc
 decode_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
 {
   struct emacs_reloc reloc = {0};
-  int type = XFIXNUM (dump_pop (&lreloc));
-  reloc.emacs_offset = dump_off_from_lisp (dump_pop (&lreloc));
+  int type = XFIXNUM (pop (&lreloc));
+  reloc.emacs_offset = INTEGER_TO_INT (pop (&lreloc));
   eassert (labs (reloc.emacs_offset) <= 60 * 1024 * 1024);
   switch (type)
     {
     case RELOC_COPY_FROM_DUMP:
       {
 	reloc.type = type;
-        reloc.u.dump_offset = dump_off_from_lisp (dump_pop (&lreloc));
+        reloc.u.dump_offset = INTEGER_TO_INT (pop (&lreloc));
 	eassert (reloc.u.dump_offset < ctx->end_heap);
-        dump_off length = dump_off_from_lisp (dump_pop (&lreloc));
+        dump_off length = INTEGER_TO_INT (pop (&lreloc));
         reloc.length = length;
         if (reloc.length != length)
           error ("relocation copy length too large");
@@ -3481,8 +3365,8 @@ decode_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
     case RELOC_IMMEDIATE:
       {
 	reloc.type = type;
-        intmax_t value = intmax_t_from_lisp (dump_pop (&lreloc));
-        dump_off size = dump_off_from_lisp (dump_pop (&lreloc));
+        intmax_t value = INTEGER_TO_INT (pop (&lreloc));
+        dump_off size = INTEGER_TO_INT (pop (&lreloc));
         reloc.u.immediate = value;
         reloc.length = size;
         eassert (reloc.length == size);
@@ -3490,39 +3374,39 @@ decode_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
       break;
     case RELOC_EMACS_PTR:
       reloc.type = type;
-      reloc.u.emacs_offset2 = dump_off_from_lisp (dump_pop (&lreloc));
+      reloc.u.emacs_offset2 = INTEGER_TO_INT (pop (&lreloc));
       eassert (labs (reloc.u.emacs_offset2) <= 60 * 1024 * 1024);
       break;
     case RELOC_DUMP_PTR:
       reloc.type = type;
-      reloc.u.dump_offset = dump_off_from_lisp (dump_pop (&lreloc));
+      reloc.u.dump_offset = INTEGER_TO_INT (pop (&lreloc));
       eassert (reloc.u.dump_offset < ctx->end_heap);
       break;
     case RELOC_DUMP_LV:
     case RELOC_EMACS_LV:
       {
 	reloc.type = type;
-        Lisp_Object target_value = dump_pop (&lreloc);
+        Lisp_Object target_value = pop (&lreloc);
         /* If the object is self-representing,
            reloc_to_lv didn't do its job.
            reloc_to_lv should have added a
            RELOC_IMMEDIATE relocation instead.  */
-        eassert (!dump_object_self_representing_p (target_value));
+        eassert (!self_representing_p (target_value));
         int tag_type = XTYPE (target_value);
         reloc.length = tag_type;
         eassert (reloc.length == tag_type);
 
         if (type == RELOC_EMACS_LV)
           {
-            void *obj_in_emacs = dump_object_emacs_ptr (target_value);
+            void *obj_in_emacs = emacs_ptr (target_value);
             eassert (obj_in_emacs);
             reloc.u.emacs_offset2 = emacs_offset (obj_in_emacs);
           }
         else
           {
 	    eassume (ctx); /* Pacify GCC 9.2.1 -O3 -Wnull-dereference.  */
-            eassert (!dump_object_emacs_ptr (target_value));
-            reloc.u.dump_offset = dump_recall_object (ctx, target_value);
+            eassert (!emacs_ptr (target_value));
+            reloc.u.dump_offset = recall_object (ctx, target_value);
             if (reloc.u.dump_offset <= 0)
               {
                 Lisp_Object repr = Fprin1_to_string (target_value, Qnil, Qnil);
@@ -3547,9 +3431,9 @@ dump_emit_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
 {
   eassert (ctx->flags.pack_objects);
   struct emacs_reloc reloc;
-  dump_object_start (ctx, &reloc, sizeof (reloc));
+  start_object (ctx, &reloc, sizeof (reloc));
   reloc = decode_emacs_reloc (ctx, lreloc);
-  dump_object_finish (ctx, &reloc, sizeof (reloc));
+  finish_object (ctx, &reloc, sizeof (reloc));
 }
 
 static Lisp_Object
@@ -3560,8 +3444,8 @@ dump_merge_emacs_relocs (struct dump_context *ctx, Lisp_Object lreloc_a, Lisp_Ob
 
 #ifdef ENABLE_CHECKING
   {
-    dump_off off_a = dump_off_from_lisp (XCAR (XCDR (lreloc_a)));
-    dump_off off_b = dump_off_from_lisp (XCAR (XCDR (lreloc_b)));
+    dump_off off_a = INTEGER_TO_INT (XCAR (XCDR (lreloc_a)));
+    dump_off off_b = INTEGER_TO_INT (XCAR (XCDR (lreloc_b)));
     eassert (off_a <= off_b);  /* Catch sort errors.  */
   }
 #endif
@@ -3588,9 +3472,9 @@ dump_merge_emacs_relocs (struct dump_context *ctx, Lisp_Object lreloc_a, Lisp_Ob
     return Qnil; /* Overflow */
 
   return list4 (make_fixnum (RELOC_COPY_FROM_DUMP),
-                dump_off_to_lisp (reloc_a.emacs_offset),
-                dump_off_to_lisp (reloc_a.u.dump_offset),
-                dump_off_to_lisp (reloc_a.length));
+                INT_TO_INTEGER (reloc_a.emacs_offset),
+                INT_TO_INTEGER (reloc_a.u.dump_offset),
+                INT_TO_INTEGER (reloc_a.length));
 }
 
 typedef void (*drain_reloc_handler) (struct dump_context *, Lisp_Object);
@@ -3608,13 +3492,13 @@ drain_reloc_list (struct dump_context *ctx,
   Lisp_Object relocs = CALLN (Fsort, Fnreverse (*reloc_list),
                               Qdump_emacs_portable__sort_predicate);
   *reloc_list = Qnil;
-  dump_align_output (ctx, max (alignof (struct dump_reloc),
+  align_output (ctx, max (alignof (struct dump_reloc),
 			       alignof (struct emacs_reloc)));
   struct dump_locator locator = {0};
   locator.offset = ctx->offset;
   for (; !NILP (relocs); ++locator.nr_entries)
     {
-      Lisp_Object reloc = dump_pop (&relocs);
+      Lisp_Object reloc = pop (&relocs);
       Lisp_Object merged;
       while (merger != NULL
 	     && !NILP (relocs)
@@ -3647,22 +3531,19 @@ fixup (struct dump_context *ctx)
 #endif
 )
     {
-      fixup = dump_pop (&fixups);
-      enum dump_fixup_type type =
-	(enum dump_fixup_type) XFIXNUM (dump_pop (&fixup));
-      dump_off dump_fixup_offset = dump_off_from_lisp (dump_pop (&fixup));
+      fixup = pop (&fixups);
+      enum dump_fixup_type type = (enum dump_fixup_type) XFIXNUM (pop (&fixup));
+      dump_off dump_fixup_offset = INTEGER_TO_INT (pop (&fixup));
 #ifdef ENABLE_CHECKING
-      if (! NILP (prev_fixup))
+      if (!NILP (prev_fixup))
 	{
-	  dump_off prev_dump_fixup_offset =
-	    dump_off_from_lisp (XCAR (XCDR (prev_fixup)));
-	  eassert (dump_fixup_offset - prev_dump_fixup_offset
-		   >= sizeof (void *));
+	  dump_off prev_dump_fixup_offset = INTEGER_TO_INT (XCAR (XCDR (prev_fixup)));
+	  eassert (dump_fixup_offset - prev_dump_fixup_offset >= sizeof (void *));
 	}
 #endif
-      Lisp_Object arg = dump_pop (&fixup);
+      Lisp_Object arg = pop (&fixup);
       eassert (NILP (fixup));
-      dump_seek (ctx, dump_fixup_offset);
+      seek (ctx, dump_fixup_offset);
       intptr_t dump_value;
       bool do_write = true;
       switch (type)
@@ -3676,45 +3557,45 @@ fixup (struct dump_context *ctx)
 	    {
 	      dump_value = emacs_offset (XSUBR (arg));
 	      if (type == DUMP_FIXUP_LISP_OBJECT)
-		dump_reloc_emacs_lv (ctx, ctx->offset, XTYPE (arg));
+		reloc_emacs_lv (ctx, ctx->offset, XTYPE (arg));
 	      else
-		dump_reloc_emacs_ptr (ctx, ctx->offset);
+		reloc_emacs_ptr (ctx, ctx->offset);
 	    }
-	  else if (dump_builtin_symbol_p (arg))
+	  else if (builtin_symbol_p (arg))
 	    {
-	      eassert (dump_object_self_representing_p (arg));
+	      eassert (self_representing_p (arg));
 	      /* These symbols are part of Emacs, so point there.  If we
 		 want a Lisp_Object, we're set.  If we want a raw pointer,
 		 we need to emit a relocation.  */
 	      if (type == DUMP_FIXUP_LISP_OBJECT)
 		{
 		  do_write = false;
-		  dump_write (ctx, &arg, sizeof (arg));
+		  write_bytes (ctx, &arg, sizeof (arg));
 		}
 	      else
 		{
 		  dump_value = emacs_offset (XSYMBOL (arg));
-		  dump_reloc_emacs_ptr (ctx, ctx->offset);
+		  reloc_emacs_ptr (ctx, ctx->offset);
 		}
 	    }
 	  else
 	    {
-	      eassert (dump_object_emacs_ptr (arg) == NULL);
-	      dump_value = dump_recall_object (ctx, arg);
+	      eassert (emacs_ptr (arg) == NULL);
+	      dump_value = recall_object (ctx, arg);
 	      if (dump_value <= 0)
 		error ("fixup object not dumped");
 	      if (type == DUMP_FIXUP_LISP_OBJECT)
 		reloc_dump_lv (ctx, ctx->offset, XTYPE (arg));
 	      else
-		dump_reloc_dump_ptr (ctx, ctx->offset);
+		reloc_dump_ptr (ctx, ctx->offset);
 	    }
 	  break;
 	case DUMP_FIXUP_PTR_DUMP_RAW:
 	  /* Dump wants a raw pointer to something that's not a lisp
 	     object.  It knows the exact location it wants, so just
 	     believe it.  */
-	  dump_value = dump_off_from_lisp (arg);
-	  dump_reloc_dump_ptr (ctx, ctx->offset);
+	  dump_value = INTEGER_TO_INT (arg);
+	  reloc_dump_ptr (ctx, ctx->offset);
 	  break;
 	case DUMP_FIXUP_BIGNUM_DATA:
 	  {
@@ -3723,10 +3604,10 @@ fixup (struct dump_context *ctx)
 	    if (NILP (arg))
 	      error ("bignum not dumped");
 	    struct bignum_reload_info reload_info = { 0 };
-	    reload_info.data_location = dump_off_from_lisp (dump_pop (&arg));
-	    reload_info.nlimbs = dump_off_from_lisp (dump_pop (&arg));
+	    reload_info.data_location = INTEGER_TO_INT (pop (&arg));
+	    reload_info.nlimbs = INTEGER_TO_INT (pop (&arg));
 	    eassert (NILP (arg));
-	    dump_write (ctx, &reload_info, sizeof (reload_info));
+	    write_bytes (ctx, &reload_info, sizeof (reload_info));
 	    do_write = false;
 	    break;
 	  }
@@ -3735,16 +3616,16 @@ fixup (struct dump_context *ctx)
 	  break;
 	}
       if (do_write)
-	dump_write (ctx, &dump_value, sizeof (dump_value));
+	write_bytes (ctx, &dump_value, sizeof (dump_value));
     }
-  dump_seek (ctx, saved_offset);
+  seek (ctx, saved_offset);
 }
 
 static void
 dump_drain_normal_queue (struct dump_context *ctx)
 {
-  while (!dump_queue_empty_p (&ctx->dump_queue))
-    dump_object (ctx, dump_queue_dequeue (&ctx->dump_queue, ctx->offset));
+  while (!queue_empty_p (&ctx->queue))
+    dump_object (ctx, queue_dequeue (&ctx->queue, ctx->offset));
 }
 
 static void
@@ -3758,7 +3639,7 @@ dump_drain_deferred_hash_tables (struct dump_context *ctx)
   Lisp_Object deferred_hash_tables = Fnreverse (ctx->deferred_hash_tables);
   ctx->deferred_hash_tables = Qnil;
   while (!NILP (deferred_hash_tables))
-    dump_object (ctx, dump_pop (&deferred_hash_tables));
+    dump_object (ctx, pop (&deferred_hash_tables));
   ctx->flags = old_flags;
 }
 
@@ -3773,7 +3654,7 @@ dump_drain_deferred_symbols (struct dump_context *ctx)
   Lisp_Object deferred_symbols = Fnreverse (ctx->deferred_symbols);
   ctx->deferred_symbols = Qnil;
   while (!NILP (deferred_symbols))
-    dump_object (ctx, dump_pop (&deferred_symbols));
+    dump_object (ctx, pop (&deferred_symbols));
   ctx->flags = old_flags;
 }
 
@@ -3781,7 +3662,7 @@ DEFUN ("dump-emacs-portable",
        Fdump_emacs_portable, Sdump_emacs_portable,
        1, 2, 0,
        doc: /* Dump current state of Emacs into dump file FILENAME.  */)
-     (Lisp_Object filename, Lisp_Object unused)
+  (Lisp_Object filename, Lisp_Object unused)
 {
   eassert (initialized);
   (void) unused;
@@ -3809,7 +3690,7 @@ DEFUN ("dump-emacs-portable",
   ctx->fd = -1;
 
   ctx->objects_dumped = make_eq_hash_table ();
-  dump_queue_init (&ctx->dump_queue);
+  queue_init (&ctx->queue);
   ctx->deferred_hash_tables = Qnil;
   ctx->deferred_symbols = Qnil;
 
@@ -3877,14 +3758,14 @@ DEFUN ("dump-emacs-portable",
     ctx->header.fingerprint[i] = fingerprint[i];
 
   const dump_off header_start = ctx->offset;
-  dump_fingerprint (stderr, "Dumping fingerprint", ctx->header.fingerprint);
-  dump_write (ctx, &ctx->header, sizeof (ctx->header));
+  pdumper_fingerprint (stderr, "Dumping fingerprint", ctx->header.fingerprint);
+  write_bytes (ctx, &ctx->header, sizeof (ctx->header));
   const dump_off header_end = ctx->offset;
 
   const dump_off hot_start = ctx->offset;
   /* Start the dump process by processing the static roots and
      queuing up the objects to which they refer.   */
-  dump_roots (ctx);
+  reloc_roots (ctx);
 
   dump_charset_table (ctx);
   dump_finalizer_list_head_ptr (ctx, &finalizers.prev);
@@ -3910,9 +3791,9 @@ DEFUN ("dump-emacs-portable",
       dump_drain_deferred_symbols (ctx);
       dump_drain_normal_queue (ctx);
     }
-  while (!(dump_queue_empty_p (&ctx->dump_queue)
-	   && NILP (ctx->deferred_hash_tables)
-	   && NILP (ctx->deferred_symbols)));
+  while (!queue_empty_p (&ctx->queue)
+	 || !NILP (ctx->deferred_hash_tables)
+	 || !NILP (ctx->deferred_symbols));
 
   ctx->header.hash_list = ctx->offset;
   dump_hash_table_list (ctx);
@@ -3920,7 +3801,7 @@ DEFUN ("dump-emacs-portable",
   /* dump_hash_table_list just adds a new vector to the dump but all
      its content should already have been in the dump, so it doesn't
      add anything to any queue.  */
-  eassert (dump_queue_empty_p (&ctx->dump_queue)
+  eassert (queue_empty_p (&ctx->queue)
 	   && NILP (ctx->deferred_hash_tables)
 	   && NILP (ctx->deferred_symbols));
 
@@ -3948,10 +3829,10 @@ DEFUN ("dump-emacs-portable",
   ctx->header.discardable_start = hot_end;
 
   dump_drain_copied_objects (ctx);
-  eassert (dump_queue_empty_p (&ctx->dump_queue));
+  eassert (queue_empty_p (&ctx->queue));
 
   dump_off discardable_end = ctx->offset;
-  dump_align_output (ctx, dump_get_max_page_size ());
+  align_output (ctx, max_page_size ());
   ctx->header.cold_start = ctx->offset;
 
   /* Start the cold section.  This section contains bytes that should
@@ -3997,7 +3878,7 @@ DEFUN ("dump-emacs-portable",
 
   const dump_off cold_end = ctx->offset;
 
-  eassert (dump_queue_empty_p (&ctx->dump_queue));
+  eassert (queue_empty_p (&ctx->queue));
   eassert (NILP (ctx->copied_queue));
   eassert (NILP (ctx->cold_queue));
   eassert (NILP (ctx->deferred_symbols));
@@ -4010,8 +3891,8 @@ DEFUN ("dump-emacs-portable",
   /* Dump is complete.  Go back to the header and write the magic
      indicating that the dump is complete and can be loaded.  */
   ctx->header.magic[0] = dump_magic[0];
-  dump_seek (ctx, 0);
-  dump_write (ctx, &ctx->header, sizeof (ctx->header));
+  seek (ctx, 0);
+  write_bytes (ctx, &ctx->header, sizeof (ctx->header));
   if (emacs_write (ctx->fd, ctx->buf, ctx->max_offset) < ctx->max_offset)
     report_file_error ("Could not write to dump file", ctx->dump_filename);
   xfree (ctx->buf);
@@ -4044,8 +3925,8 @@ DEFUN ("dump-emacs-portable--sort-predicate",
        doc: /* Internal relocation sorting function.  */)
      (Lisp_Object a, Lisp_Object b)
 {
-  dump_off a_offset = dump_off_from_lisp (XCAR (XCDR (a)));
-  dump_off b_offset = dump_off_from_lisp (XCAR (XCDR (b)));
+  dump_off a_offset = INTEGER_TO_INT (XCAR (XCDR (a)));
+  dump_off b_offset = INTEGER_TO_INT (XCAR (XCDR (b)));
   return a_offset < b_offset ? Qt : Qnil;
 }
 
@@ -4056,9 +3937,9 @@ DEFUN ("dump-emacs-portable--sort-predicate-copied",
        doc: /* Internal relocation sorting function.  */)
      (Lisp_Object a, Lisp_Object b)
 {
-  eassert (dump_object_emacs_ptr (a));
-  eassert (dump_object_emacs_ptr (b));
-  return dump_object_emacs_ptr (a) < dump_object_emacs_ptr (b) ? Qt : Qnil;
+  eassert (emacs_ptr (a));
+  eassert (emacs_ptr (b));
+  return emacs_ptr (a) < emacs_ptr (b) ? Qt : Qnil;
 }
 
 void
@@ -4649,7 +4530,7 @@ dump_mmap_contiguous (struct dump_memory_map *maps, int nr_maps)
     return true;
 
   size_t total_size = 0;
-  int worst_case_page_size = dump_get_max_page_size ();
+  int worst_case_page_size = max_page_size ();
 
   for (int i = 0; i < nr_maps; ++i)
     {
@@ -4783,9 +4664,7 @@ dump_read_word_from_dump (uintptr_t dump_base, dump_off offset)
    dump_read_word_from_dump; VALUE is the word to write at the given
    offset.  */
 static void
-dump_write_word_to_dump (uintptr_t dump_base,
-                         dump_off offset,
-                         uintptr_t value)
+write_word (uintptr_t dump_base, dump_off offset, uintptr_t value)
 {
   memcpy (dump_ptr (dump_base, offset), &value, sizeof (value));
 }
@@ -4794,9 +4673,7 @@ dump_write_word_to_dump (uintptr_t dump_base,
    dump_read_word_from_dump; VALUE is the Lisp_Object to write at the
    given offset.  */
 static void
-dump_write_lv_to_dump (uintptr_t dump_base,
-                       dump_off offset,
-                       Lisp_Object value)
+write_lv (uintptr_t dump_base, dump_off offset, Lisp_Object value)
 {
   memcpy (dump_ptr (dump_base, offset), &value, sizeof (value));
 }
@@ -4979,7 +4856,7 @@ reloc_dump (const struct dump_header *const header,
 	    uintptr_t value = dump_read_word_from_dump (dump_base, reloc.offset);
 	    eassert (dump_reloc_size (reloc) == sizeof (value));
 	    value += emacs_basis ();
-	    dump_write_word_to_dump (dump_base, reloc.offset, value);
+	    write_word (dump_base, reloc.offset, value);
 	    break;
 	  }
 	case RELOC_DUMP_PTR:
@@ -4987,7 +4864,7 @@ reloc_dump (const struct dump_header *const header,
 	    uintptr_t value = dump_read_word_from_dump (dump_base, reloc.offset);
 	    eassert (dump_reloc_size (reloc) == sizeof (value));
 	    value += dump_base;
-	    dump_write_word_to_dump (dump_base, reloc.offset, value);
+	    write_word (dump_base, reloc.offset, value);
 	    break;
 	  }
 #ifdef HAVE_NATIVE_COMP
@@ -5052,7 +4929,7 @@ reloc_dump (const struct dump_header *const header,
 	  {
 	    Lisp_Object lv = dump_make_lv_from_reloc (dump_base, reloc);
 	    eassert (dump_reloc_size (reloc) == sizeof (lv));
-	    dump_write_lv_to_dump (dump_base, reloc.offset, lv);
+	    write_lv (dump_base, reloc.offset, lv);
 	    break;
 	  }
 	}
@@ -5200,8 +5077,8 @@ pdumper_load (char *dump_filename)
     desired[i] = fingerprint[i];
   if (memcmp (header->fingerprint, desired, sizeof desired) != 0)
     {
-      dump_fingerprint (stderr, "desired fingerprint", desired);
-      dump_fingerprint (stderr, "found fingerprint", header->fingerprint);
+      pdumper_fingerprint (stderr, "desired fingerprint", desired);
+      pdumper_fingerprint (stderr, "found fingerprint", header->fingerprint);
       goto out;
     }
 
@@ -5209,7 +5086,7 @@ pdumper_load (char *dump_filename)
   err = PDUMPER_LOAD_OOM;
 
   adj_discardable_start = header->discardable_start;
-  dump_page_size = dump_get_max_page_size ();
+  dump_page_size = max_page_size ();
   /* Snap to next page boundary.  */
   adj_discardable_start = ROUNDUP (adj_discardable_start, dump_page_size);
   eassert (adj_discardable_start % dump_page_size == 0);

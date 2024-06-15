@@ -52,8 +52,8 @@ enum { PDUMPER_NO_OBJECT = -1 };
 #define PDUMPER_REMEMBER_SCALAR(thing)                  \
   pdumper_remember_scalar (&(thing), sizeof (thing))
 
-extern void dump_fingerprint (FILE *output, const char *label,
-                              unsigned char const fingerp[sizeof fingerprint]);
+extern void pdumper_fingerprint (FILE *output, const char *label,
+				 unsigned char const fingerp[sizeof fingerprint]);
 
 extern void pdumper_remember_scalar_impl (void *data, ptrdiff_t nbytes);
 
