@@ -186,7 +186,7 @@ inserting the command."
 (defun eshell-command-result--equal (_command actual expected)
   "Compare the ACTUAL result of a COMMAND with its EXPECTED value."
   (or (equal actual expected)
-      (when (and (memq system-type '(windows-nt ms-dos darwin))
+      (when (and (memq system-type '(darwin))
 		 (stringp expected))
         (equal actual (concat expected "\n")))
       (not (zerop (1+ (cl-decf eshell-tests-max-errors))))))
