@@ -1581,9 +1581,9 @@ finish_dump_pvec (struct dump_context *ctx,
 }
 
 static void
-write_pseudovector (struct dump_context *ctx,
-		    union vectorlike_header *out_hdr,
-		    const union vectorlike_header *in_hdr)
+dump_pseudovector (struct dump_context *ctx,
+		   union vectorlike_header *out_hdr,
+		   const union vectorlike_header *in_hdr)
 {
   const struct Lisp_Vector *in = (const struct Lisp_Vector *) in_hdr;
   struct Lisp_Vector *out = (struct Lisp_Vector *) out_hdr;
@@ -1689,7 +1689,7 @@ dump_marker (struct dump_context *ctx, const struct Lisp_Marker *marker)
 #endif
 
   START_DUMP_PVEC (ctx, &marker->header, struct Lisp_Marker, out);
-  write_pseudovector (ctx, &out->header, &marker->header);
+  dump_pseudovector (ctx, &out->header, &marker->header);
   DUMP_FIELD_COPY (out, marker, need_adjustment);
   DUMP_FIELD_COPY (out, marker, insertion_type);
   if (marker->buffer)
@@ -1742,7 +1742,7 @@ dump_overlay (struct dump_context *ctx, const struct Lisp_Overlay *overlay)
 # error "Lisp_Overlay changed. See CHECK_STRUCTS comment in config.h."
 #endif
   START_DUMP_PVEC (ctx, &overlay->header, struct Lisp_Overlay, out);
-  write_pseudovector (ctx, &out->header, &overlay->header);
+  dump_pseudovector (ctx, &out->header, &overlay->header);
   dump_off offset = finish_dump_pvec (ctx, &out->header);
   remember_fixup_ptr (ctx, offset + DUMP_OFFSETOF (struct Lisp_Overlay, interval),
 		      dump_interval_node (ctx, overlay->interval, offset));
@@ -1769,7 +1769,7 @@ dump_finalizer (struct dump_context *ctx,
 # error "Lisp_Finalizer changed. See CHECK_STRUCTS comment in config.h."
 #endif
   START_DUMP_PVEC (ctx, &finalizer->header, struct Lisp_Finalizer, out);
-  /* Do _not_ call write_pseudovector here: we dump the
+  /* Do _not_ call dump_pseudovector here: we dump the
      only Lisp field, finalizer->function, manually, so we can give it
      a low weight.  */
   write_field_lisp_object (ctx, &out, finalizer, &finalizer->function, WEIGHT_NONE);
@@ -2284,7 +2284,7 @@ dump_hash_table (struct dump_context *ctx, Lisp_Object object)
   push (&ctx->hash_tables, object);
 
   START_DUMP_PVEC (ctx, &hash->header, struct Lisp_Hash_Table, out);
-  write_pseudovector (ctx, &out->header, &hash->header);
+  dump_pseudovector (ctx, &out->header, &hash->header);
   DUMP_FIELD_COPY (out, hash, count);
   DUMP_FIELD_COPY (out, hash, weakness);
   DUMP_FIELD_COPY (out, hash, purecopy);
@@ -2331,7 +2331,7 @@ dump_obarray (struct dump_context *ctx, Lisp_Object object)
   struct Lisp_Obarray munged_oa = *in_oa;
   struct Lisp_Obarray *oa = &munged_oa;
   START_DUMP_PVEC (ctx, &oa->header, struct Lisp_Obarray, out);
-  write_pseudovector (ctx, &out->header, &oa->header);
+  dump_pseudovector (ctx, &out->header, &oa->header);
   DUMP_FIELD_COPY (out, oa, count);
   DUMP_FIELD_COPY (out, oa, size_bits);
   dump_off offset = finish_dump_pvec (ctx, &out->header);
@@ -2375,7 +2375,7 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
 	   || (base_offset > 0 && buffer->text != &in_buffer->own_text));
 
   START_DUMP_PVEC (ctx, &buffer->header, struct buffer, out);
-  write_pseudovector (ctx, &out->header, &buffer->header);
+  dump_pseudovector (ctx, &out->header, &buffer->header);
   if (base_offset == 0)
     base_offset = ctx->obj_offset;
   eassert (base_offset > 0);
@@ -2541,7 +2541,7 @@ dump_native_comp_unit (struct dump_context *ctx,
   /* Have function documentation always lazy loaded to optimize load-time.  */
   comp_u->data_fdoc_v = Qnil;
   START_DUMP_PVEC (ctx, &comp_u->header, struct Lisp_Native_Comp_Unit, out);
-  write_pseudovector (ctx, &out->header, &comp_u->header);
+  dump_pseudovector (ctx, &out->header, &comp_u->header);
   out->handle = NULL;
 
   dump_off comp_u_off = finish_dump_pvec (ctx, &out->header);
@@ -4742,8 +4742,9 @@ reloc_dump (const struct dump_header *const header,
 #ifdef HAVE_NATIVE_COMP
 	case RELOC_NATIVE_COMP_UNIT:
 	  {
-	    struct Lisp_Native_Comp_Unit *comp_u =
-	      (char *) dump_public.start + reloc.offset;
+	    struct Lisp_Native_Comp_Unit *comp_u
+	      = (struct Lisp_Native_Comp_Unit *) ((char *) dump_public.start
+						  + reloc.offset);
 	    comp_u->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
 	    if (!STRINGP (comp_u->file))
 	      error ("bad compilation unit was dumped");
@@ -4757,7 +4758,8 @@ reloc_dump (const struct dump_header *const header,
 	case RELOC_NATIVE_SUBR:
 	  {
 	    /* Revive them one-by-one.  */
-	    struct Lisp_Subr *subr = (char *) dump_public.start + reloc.offset;
+	    struct Lisp_Subr *subr
+	      = (struct Lisp_Subr *) ((char *) dump_public.start + reloc.offset);
 	    struct Lisp_Native_Comp_Unit *comp_u =
 	      XNATIVE_COMP_UNIT (subr->native_comp_u);
 	    if (!comp_u->handle)
