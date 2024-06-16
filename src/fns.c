@@ -6219,7 +6219,7 @@ secure_hash (Lisp_Object algorithm, Lisp_Object object, Lisp_Object start,
   else
     error ("Invalid algorithm arg: %s", SDATA (Fsymbol_name (algorithm)));
 
-  /* allocate 2 x digest_size so that it can be re-used to hold the
+  /* allocate 2 x digest_size so that it can be reused to hold the
      hexified value */
   digest = make_unibyte_string (NULL, digest_size * 2);
 
