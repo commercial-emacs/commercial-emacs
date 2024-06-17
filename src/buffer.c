@@ -4386,7 +4386,7 @@ enlarge_buffer_text (struct buffer *b, ptrdiff_t delta)
     BUF_Z_BYTE (b) - BUF_BEG_BYTE (b) + BUF_GAP_SIZE (b) + 1;
   ptrdiff_t new_nbytes = old_nbytes + delta;
 
-  if (pdumper_object_p (old_beg))
+  if (pdumper_address_p (old_beg))
     b->text->beg = NULL;
   else
     old_beg = NULL;
@@ -4420,7 +4420,7 @@ free_buffer_text (struct buffer *b)
 {
   block_input ();
 
-  if (!pdumper_object_p (b->text->beg))
+  if (!pdumper_address_p (b->text->beg))
     {
 #if defined USE_MMAP_FOR_BUFFERS
       mmap_free ((void **) &b->text->beg);
@@ -4629,7 +4629,7 @@ init_buffer_once (void)
 
   Vbuffer_alist = Qnil;
   current_buffer = 0;
-  pdumper_remember_lv_ptr_raw (&current_buffer, Lisp_Vectorlike);
+  pdumper_remember (&current_buffer, Lisp_Vectorlike);
 
   QSFundamental = build_pure_c_string ("Fundamental");
 

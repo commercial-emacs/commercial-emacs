@@ -187,7 +187,8 @@ struct dump_reloc
   dump_off offset : RELOC_OFFS_NBITS;
 };
 
-/* dump_reloc's are just dump_off's */
+/* Colascione irritatingly conflated object starts and relocations so
+   dump_reloc's and dump_off's are the same type.  */
 verify (sizeof (struct dump_reloc) == sizeof (dump_off));
 
 struct emacs_reloc
@@ -241,37 +242,40 @@ struct dump_header
   /* Where to find dump relocations.  */
   struct dump_locator dump_relocs[RELOC_NUM_PHASES];
 
-  /* Where to find lisp object types.  */
+  /* Where to find lisp object types. See "irritating".  */
   struct dump_locator object_starts;
 
   /* Where to find executable relocations.  */
   struct dump_locator emacs_relocs;
 
-  /* Start of sub-region of hot region that we can discard after load
-     completes.  The discardable region ends at cold_start.
-
-     This region contains objects that we copy into the Emacs image at
-     dump-load time.  */
+  /* Marks end of hot region.  Discardable objects are copied into the
+     emacs executable when loading dump.  */
   dump_off discardable_start;
 
-  /* Start of the region that does not require relocations and that we
-     expect never to be modified.  This region can be memory-mapped
-     directly from the backing dump file with the reasonable
-     expectation of taking few copy-on-write faults.
+  /* Marks end of discardable region.  Cold objects do not require
+     relocations and are memory-mapped directly (possibly incurring
+     modest copy-on-write faults).
 
-     For correctness, however, this region must be modifible, since in
-     rare cases it is possible to see modifications to these bytes.
-     For example, this region contains string data, and it's
-     technically possible for someone to ASET a string character
-     (although nobody tends to do that).
-
-     The start of the cold region is always aligned on a page
-     boundary.  */
+     While cold objects are intended to be immutable, this region
+     remains modifiable for string data that could be (ill-advisedly)
+     ASET.  */
   dump_off cold_start;
 
   /* Offset of a vector of the dumped hash tables.  */
   dump_off hash_list;
 };
+
+struct pdumper_info
+{
+  struct dump_header header;
+  bitset mark_bits;
+  double load_time;
+  char *filename;
+  uintptr_t addr_beg;
+  uintptr_t addr_end;
+};
+
+static struct pdumper_info pdumper_info;
 
 /* Double-ended singly linked list.  */
 struct tailq
@@ -377,7 +381,7 @@ struct dump_context
   /* File descriptor for dumpfile; < 0 if closed.  */
   int fd;
   /* Name of dump file --- used for error reporting.  */
-  Lisp_Object dump_filename;
+  Lisp_Object filename;
   /* Current offset in dump file.  */
   dump_off offset;
 
@@ -3170,7 +3174,7 @@ drain_user_remembered_data_cold (struct dump_context *ctx)
                      ...
                      foo = XSYMBOL(Qt);
                      ...
-                     pdumper_remember_lv_ptr (&foo, Lisp_Symbol);
+                     pdumper_remember (&foo, Lisp_Symbol);
 
                      Built-in symbols like Qt aren't in the dump!
                      They're actually in Emacs proper.  We need a
@@ -3213,7 +3217,7 @@ unwind_cleanup (void *data)
 }
 
 static struct dump_reloc
-decode_dump_reloc (Lisp_Object lreloc)
+destructure_lreloc (Lisp_Object lreloc)
 {
   struct dump_reloc reloc;
   reloc.type = (enum reloc_type) XFIXNUM (pop (&lreloc));
@@ -3229,7 +3233,7 @@ emit_dump_reloc (struct dump_context *ctx, Lisp_Object lreloc)
   eassert (ctx->flags.pack_objects);
   struct dump_reloc reloc;
   start_object (ctx, &reloc, sizeof (reloc));
-  reloc = decode_dump_reloc (lreloc);
+  reloc = destructure_lreloc (lreloc);
   finish_object (ctx, &reloc, sizeof (reloc));
   if (reloc.offset < ctx->header.discardable_start)
     ++ctx->nr_hot_relocations;
@@ -3242,8 +3246,8 @@ merge_dump_relocs (struct dump_context *ctx, Lisp_Object lreloc_a, Lisp_Object l
 {
 #ifdef ENABLE_CHECKING
   /* merely check overlap */
-  struct dump_reloc reloc_a = decode_dump_reloc (lreloc_a);
-  struct dump_reloc reloc_b = decode_dump_reloc (lreloc_b);
+  struct dump_reloc reloc_a = destructure_lreloc (lreloc_a);
+  struct dump_reloc reloc_b = destructure_lreloc (lreloc_b);
   eassert (reloc_a.offset < reloc_b.offset);
 #else
   (void) ctx;
@@ -3620,7 +3624,7 @@ DEFUN ("dump-emacs-portable",
   ctx->flags.defer_cold_objects = true;
   ctx->flags.defer_copied_objects = true;
 
-  ctx->dump_filename = filename;
+  ctx->filename = filename;
 
   record_unwind_protect_ptr (unwind_cleanup, ctx);
   block_input ();
@@ -3778,7 +3782,7 @@ DEFUN ("dump-emacs-portable",
   seek (ctx, 0);
   write_bytes (ctx, &ctx->header, sizeof (ctx->header));
   if (emacs_write (ctx->fd, ctx->buf, ctx->max_offset) < ctx->max_offset)
-    report_file_error ("Could not write to dump file", ctx->dump_filename);
+    report_file_error ("Could not write to dump file", ctx->filename);
   xfree (ctx->buf);
   ctx->buf = NULL;
   ctx->buf_size = 0;
@@ -3827,7 +3831,7 @@ DEFUN ("dump-emacs-portable--sort-predicate-copied",
 }
 
 void
-pdumper_do_now_and_after_load_impl (pdumper_hook hook)
+pdumper_do_now_and_after_load (pdumper_hook hook)
 {
   if (nr_dump_hooks == ARRAYELTS (dump_hooks))
     fatal ("out of dump hooks: make dump_hooks[] bigger");
@@ -3836,27 +3840,30 @@ pdumper_do_now_and_after_load_impl (pdumper_hook hook)
 }
 
 static void
-pdumper_remember_user_data_1 (void *mem, int nbytes)
+pdumper_remember_user_data (void *mem, int nbytes)
 {
-  if (nr_remembered_data == ARRAYELTS (remembered_data))
-    fatal ("out of remembered data slots: make remembered_data[] bigger");
+  if (nr_remembered_data >= ARRAYELTS (remembered_data))
+    fatal ("make remembered_data[] bigger");
   remembered_data[nr_remembered_data].mem = mem;
   remembered_data[nr_remembered_data].sz = nbytes;
   ++nr_remembered_data;
 }
 
 void
-pdumper_remember_scalar_impl (void *mem, ptrdiff_t nbytes)
+pdumper_remember_scalar (void *mem, ptrdiff_t nbytes)
 {
   eassert (0 <= nbytes && nbytes <= INT_MAX);
   if (nbytes > 0)
-    pdumper_remember_user_data_1 (mem, (int) nbytes);
+    pdumper_remember_user_data (mem, (int) nbytes);
 }
 
+/* Remember the pointer at *PTR.  *PTR must be null or point to a Lisp
+   object.  TYPE is the rough type of Lisp object to which *PTR
+   points.  */
 void
-pdumper_remember_lv_ptr_impl (void *ptr, enum Lisp_Type type)
+pdumper_remember (void *ptr, enum Lisp_Type type)
 {
-  pdumper_remember_user_data_1 (ptr, -type);
+  pdumper_remember_user_data (ptr, -type);
 }
 
 /* Dump runtime */
@@ -4419,93 +4426,12 @@ mmap_contiguous (struct dump_memory_map *maps, int nr_maps)
     (maps, nr_maps, total_size);
 }
 
-typedef uint_fast32_t bitset_word;
-#define BITSET_WORD_WIDTH UINT_FAST32_WIDTH
-
-struct bitset
-{
-  bitset_word *restrict bits;
-  ptrdiff_t number_words;
-};
-
-static bool
-bitsets_init (struct bitset bitset[2], size_t number_bits)
-{
-  int xword_size = sizeof (bitset_word);
-  ptrdiff_t words_needed = divide_round_up (number_bits,
-					    BITSET_WORD_WIDTH);
-  bitset_word *bits = calloc (words_needed, 2 * xword_size);
-  if (!bits)
-    return false;
-  bitset[0].bits = bits;
-  bitset[0].number_words = bitset[1].number_words = words_needed;
-  bitset[1].bits = memset (bits + words_needed, UCHAR_MAX,
-			   words_needed * xword_size);
-  return true;
-}
-
-static bitset_word *
-bitset__bit_slot (const struct bitset *bitset, size_t bit_number)
-{
-  ptrdiff_t word_number = bit_number / BITSET_WORD_WIDTH;
-  eassert (word_number < bitset->number_words);
-  return &bitset->bits[word_number];
-}
-
-static bool
-bitset_set_p (const struct bitset *bitset, size_t bit_number)
-{
-  bitset_word bit = 1;
-  bit <<= bit_number % BITSET_WORD_WIDTH;
-  return *bitset__bit_slot (bitset, bit_number) & bit;
-}
-
-static void
-bitset__set_bit_value (struct bitset *bitset, size_t bit_number, bool bit_is_set)
-{
-  bitset_word *slot = bitset__bit_slot (bitset, bit_number);
-  bitset_word bit = 1;
-  bit <<= bit_number % BITSET_WORD_WIDTH;
-  if (bit_is_set)
-    *slot = *slot | bit;
-  else
-    *slot = *slot & ~bit;
-}
-
-static void
-bitset_set_bit (struct bitset *bitset, size_t bit_number)
-{
-  bitset__set_bit_value (bitset, bit_number, true);
-}
-
-static void
-bitset_clear (struct bitset *bitset)
-{
-  if (bitset->number_words)
-    memset (bitset->bits, 0, bitset->number_words * sizeof bitset->bits[0]);
-}
-
-struct pdumper_loaded_dump_private
-{
-  /* Copied from the dump.  */
-  struct dump_header header;
-  /* Mark bits for objects in the dump; used during GC.  */
-  struct bitset current, previous;
-  /* Time taken to load the dump.  */
-  double load_time;
-  /* Dump file name.  */
-  char *dump_filename;
-};
-
-struct pdumper_loaded_dump dump_public;
-static struct pdumper_loaded_dump_private dump_private;
-
 /* Read a pointer-sized word of memory at OFFSET within the dump.  */
 static uintptr_t
 read_word (dump_off offset)
 {
   uintptr_t value;
-  memcpy (&value, (char *) dump_public.start + offset, sizeof (value));
+  memcpy (&value, (char *) pdumper_info.addr_beg + offset, sizeof (value));
   return value;
 }
 
@@ -4514,7 +4440,7 @@ read_word (dump_off offset)
 static void
 write_word (dump_off offset, uintptr_t value)
 {
-  memcpy ((char *) dump_public.start + offset, &value, sizeof (value));
+  memcpy ((char *) pdumper_info.addr_beg + offset, &value, sizeof (value));
 }
 
 /* Write a Lisp_Object to the dump. OFFSET is as for
@@ -4523,98 +4449,111 @@ write_word (dump_off offset, uintptr_t value)
 static void
 write_lv (dump_off offset, Lisp_Object value)
 {
-  memcpy ((char *) dump_public.start + offset, &value, sizeof (value));
+  memcpy ((char *) pdumper_info.addr_beg + offset, &value, sizeof (value));
 }
 
-/* Return the relocation whose offset is at or after KEY.  */
+/* Return the object qua relocation (see "irritating") whose offset is
+   at or after OFF.  */
 static const struct dump_reloc *
-find_relocation (const struct dump_locator *const locator, const dump_off key)
+find_object (const dump_off off)
 {
-  const struct dump_reloc *const relocs
-    = (struct dump_reloc *) ((char *) dump_public.start + locator->offset);
+  struct dump_locator locator = pdumper_info.header.object_starts;
+  struct dump_reloc *relocs
+    = (struct dump_reloc *) ((char *) pdumper_info.addr_beg + locator.offset);
   const struct dump_reloc *found = NULL;
-  ptrdiff_t idx_left = 0, idx_right = locator->nr_entries;
+  ptrdiff_t idx_left = 0, idx_right = locator.nr_entries;
 
-  while (idx_left < idx_right)
+  while (idx_left < idx_right) /* binary search */
     {
       const ptrdiff_t idx_mid = idx_left + (idx_right - idx_left) / 2;
       const struct dump_reloc *mid = &relocs[idx_mid];
-      if (key > mid->offset)
+      if (off > mid->offset)
         idx_left = idx_mid + 1;
       else
         {
           found = mid;
           idx_right = idx_mid;
 	  if (idx_right <= idx_left
-	      || key > relocs[idx_right - 1].offset)
+	      || off > relocs[idx_right - 1].offset)
             break;
         }
    }
   return found;
 }
 
-static bool
-loaded_p (void)
+bool pdumper_address_p (const void *obj)
 {
-  return dump_public.start != 0;
+  uintptr_t obj_addr = (uintptr_t) obj;
+  return pdumper_info.addr_beg <= obj_addr && obj_addr < pdumper_info.addr_end;
 }
 
+/* Return whether the OBJ is in the cold section of the dump.
+   Only bool-vectors and floats should end up there.  */
 bool
-pdumper_cold_object_p_impl (const void *obj)
+pdumper_cold_p (const void *obj)
 {
-  eassert (pdumper_object_p (obj));
-  eassert (pdumper_object_p_precise (obj));
-  dump_off offset = DUMP_OFF ((uintptr_t) obj - dump_public.start);
-  return offset >= dump_private.header.cold_start;
+  bool ret = false;
+  if (pdumper_address_p (obj))
+    {
+      dump_off offset = DUMP_OFF ((uintptr_t) obj - pdumper_info.addr_beg);
+      ret = (offset >= pdumper_info.header.cold_start);
+    }
+  return ret;
 }
 
+/* Return the type of the dumped object that starts at OBJ.  */
 int
-pdumper_find_object_type_impl (const void *obj)
+pdumper_precise_type (const void *obj)
 {
-  eassert (pdumper_object_p (obj));
-  dump_off offset = DUMP_OFF ((uintptr_t) obj - dump_public.start);
-  if (offset % DUMP_ALIGNMENT != 0)
-    return PDUMPER_NO_OBJECT;
-  ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
-  if (offset < dump_private.header.discardable_start
-      && !bitset_set_p (&dump_private.previous, bitno))
-    return PDUMPER_NO_OBJECT;
-  const struct dump_reloc *reloc =
-    find_relocation (&dump_private.header.object_starts, offset);
-  return (reloc != NULL && reloc->offset == offset)
-    ? reloc->type
-    : PDUMPER_NO_OBJECT;
+  int ret = PDUMPER_NO_OBJECT;
+  if (pdumper_address_p (obj))
+    {
+      const dump_off offset = DUMP_OFF ((uintptr_t) obj - pdumper_info.addr_beg);
+      if (offset % DUMP_ALIGNMENT == 0)
+	{
+	  const struct dump_reloc *reloc = find_object (offset);
+	  if (reloc != NULL
+	      /* checks overflow */
+	      && reloc->offset == offset)
+	    ret = reloc->type;
+	}
+    }
+  return ret;
 }
 
+/* Return whether OBJ is marked according to the portable dumper.  */
 bool
-pdumper_marked_p_impl (const void *obj)
+pdumper_marked_p (const void *obj)
 {
-  eassert (pdumper_object_p (obj));
-  ptrdiff_t offset = (uintptr_t) obj - dump_public.start;
-  eassert (offset % DUMP_ALIGNMENT == 0);
-  eassert (offset < dump_private.header.cold_start);
-  eassert (offset < dump_private.header.discardable_start);
-  ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
-  return bitset_set_p (&dump_private.current, bitno);
+  bool ret = false;
+  if (pdumper_address_p (obj))
+    {
+      ptrdiff_t offset = (uintptr_t) obj - pdumper_info.addr_beg;
+      eassert (offset % DUMP_ALIGNMENT == 0);
+      eassert (offset < pdumper_info.header.cold_start);
+      eassert (offset < pdumper_info.header.discardable_start);
+      ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
+      ret = bitset_test (pdumper_info.mark_bits, (bitset_bindex) bitno);
+    }
+  return ret;
 }
 
 void
-pdumper_set_marked_impl (const void *obj)
+pdumper_set_marked (const void *obj)
 {
-  eassert (pdumper_object_p (obj));
-  ptrdiff_t offset = (uintptr_t) obj - dump_public.start;
+  eassert (pdumper_address_p (obj));
+  ptrdiff_t offset = (uintptr_t) obj - pdumper_info.addr_beg;
   eassert (offset % DUMP_ALIGNMENT == 0);
-  eassert (offset < dump_private.header.cold_start);
-  eassert (offset < dump_private.header.discardable_start);
+  eassert (offset < pdumper_info.header.cold_start);
+  eassert (offset < pdumper_info.header.discardable_start);
   ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
-  bitset_set_bit (&dump_private.current, bitno);
+  bitset_set (pdumper_info.mark_bits, (bitset_bindex) bitno);
 }
 
 void
-pdumper_clear_marks_impl (void)
+pdumper_clear_marks (void)
 {
-  dump_private.previous.bits = dump_private.current.bits;
-  bitset_clear (&dump_private.current);
+  bitset_zero (pdumper_info.mark_bits);
 }
 
 static ssize_t
@@ -4665,8 +4604,8 @@ make_lv_from_reloc (const struct dump_reloc reloc)
       && reloc.type < RELOC_EMACS_LV)
     {
       lisp_type = reloc.type - RELOC_DUMP_LV;
-      value += dump_public.start;
-      eassert (pdumper_object_p ((void *) value));
+      value += pdumper_info.addr_beg;
+      eassert (pdumper_address_p ((void *) value));
     }
   else
     {
@@ -4685,14 +4624,14 @@ reloc_dump (const struct dump_header *const header,
 	    const enum reloc_phase phase)
 {
   const struct dump_reloc *r
-    = (struct dump_reloc *) ((char *) dump_public.start + header->dump_relocs[phase].offset);
+    = (struct dump_reloc *) ((char *) pdumper_info.addr_beg + header->dump_relocs[phase].offset);
   const dump_off nr = header->dump_relocs[phase].nr_entries;
   for (dump_off i = 0; i < nr; ++i)
     {
       const struct dump_reloc reloc = r[i];
 
       /* Never relocate in the cold section.  */
-      eassert (reloc.offset < dump_private.header.cold_start);
+      eassert (reloc.offset < pdumper_info.header.cold_start);
 
       switch (reloc.type)
 	{
@@ -4708,7 +4647,7 @@ reloc_dump (const struct dump_header *const header,
 	  {
 	    uintptr_t value = read_word (reloc.offset);
 	    eassert (reloc_size (reloc) == sizeof (value));
-	    value += dump_public.start;
+	    value += pdumper_info.addr_beg;
 	    write_word (reloc.offset, value);
 	    break;
 	  }
@@ -4716,7 +4655,7 @@ reloc_dump (const struct dump_header *const header,
 	case RELOC_NATIVE_COMP_UNIT:
 	  {
 	    struct Lisp_Native_Comp_Unit *comp_u
-	      = (struct Lisp_Native_Comp_Unit *) ((char *) dump_public.start
+	      = (struct Lisp_Native_Comp_Unit *) ((char *) pdumper_info.addr_beg
 						  + reloc.offset);
 	    comp_u->lambda_gc_guard_h = CALLN (Fmake_hash_table, QCtest, Qeq);
 	    if (!STRINGP (comp_u->file))
@@ -4732,7 +4671,7 @@ reloc_dump (const struct dump_header *const header,
 	  {
 	    /* Revive them one-by-one.  */
 	    struct Lisp_Subr *subr
-	      = (struct Lisp_Subr *) ((char *) dump_public.start + reloc.offset);
+	      = (struct Lisp_Subr *) ((char *) pdumper_info.addr_beg + reloc.offset);
 	    struct Lisp_Native_Comp_Unit *comp_u =
 	      XNATIVE_COMP_UNIT (subr->native_comp_u);
 	    if (!comp_u->handle)
@@ -4764,12 +4703,12 @@ reloc_dump (const struct dump_header *const header,
 	case RELOC_BIGNUM:
 	  {
 	    struct Lisp_Bignum *bignum = (struct Lisp_Bignum *)
-	      ((char *) dump_public.start + reloc.offset);
+	      ((char *) pdumper_info.addr_beg + reloc.offset);
 	    struct bignum_reload_info reload_info;
 	    verify (sizeof (reload_info) <= sizeof (*bignum_val (bignum)));
 	    memcpy (&reload_info, bignum_val (bignum), sizeof (reload_info));
 	    const mp_limb_t *limbs =
-	      (mp_limb_t *) ((char *) dump_public.start + reload_info.data_location);
+	      (mp_limb_t *) ((char *) pdumper_info.addr_beg + reload_info.data_location);
 	    mpz_roinit_n (bignum->value, limbs, reload_info.nlimbs);
 	    break;
 	  }
@@ -4789,7 +4728,7 @@ reloc_emacs (const struct dump_header *const header)
 {
   const dump_off nr = header->emacs_relocs.nr_entries;
   struct emacs_reloc *r
-    = (struct emacs_reloc *) ((char *) dump_public.start + header->emacs_relocs.offset);
+    = (struct emacs_reloc *) ((char *) pdumper_info.addr_beg + header->emacs_relocs.offset);
   for (dump_off i = 0; i < nr; ++i)
     {
       ptrdiff_t pval;
@@ -4800,7 +4739,7 @@ reloc_emacs (const struct dump_header *const header)
 	case RELOC_COPY_FROM_DUMP:
 	  eassume (reloc.length > 0);
 	  memcpy (emacs_ptr_at (reloc.offset),
-		  (char *) dump_public.start + reloc.ptr.offset,
+		  (char *) pdumper_info.addr_beg + reloc.ptr.offset,
 		  reloc.length);
 	  break;
 	case RELOC_IMMEDIATE:
@@ -4809,7 +4748,7 @@ reloc_emacs (const struct dump_header *const header)
 	  memcpy (emacs_ptr_at (reloc.offset), &reloc.ptr.immediate, reloc.length);
 	  break;
 	case RELOC_DUMP_PTR:
-	  pval = reloc.ptr.offset + dump_public.start;
+	  pval = reloc.ptr.offset + pdumper_info.addr_beg;
 	  memcpy (emacs_ptr_at (reloc.offset), &pval, sizeof (pval));
 	  break;
 	case RELOC_EMACS_PTR:
@@ -4821,7 +4760,7 @@ reloc_emacs (const struct dump_header *const header)
 	  {
 	    eassume (reloc.length < Lisp_Type_Max);
 	    void *obj_ptr = reloc.type == RELOC_DUMP_LV
-	      ? (char *) dump_public.start + reloc.ptr.offset
+	      ? (char *) pdumper_info.addr_beg + reloc.ptr.offset
 	      : emacs_ptr_at (reloc.ptr.offset);
 	    lv = make_lisp_ptr (obj_ptr, reloc.length);
 	    memcpy (emacs_ptr_at (reloc.offset), &lv, sizeof (lv));
@@ -4850,14 +4789,11 @@ static Lisp_Object *pdumper_hashes = &zero_vector;
    N.B. We run very early in initialization, so we can't use lisp,
    unwinding, and so on.  */
 int
-pdumper_load (char *dump_filename)
+pdumper_load (char *filename)
 {
   intptr_t dump_size;
   struct stat stat;
   dump_off adj_discardable_start;
-
-  struct bitset mark_bits[2];
-  size_t nr_mark_bits;
 
   struct dump_header header_buf = { 0 };
   struct dump_header *header = &header_buf;
@@ -4868,11 +4804,8 @@ pdumper_load (char *dump_filename)
   /* Overwriting an initialized Lisp universe will not go well.  */
   eassert (!initialized);
 
-  /* We can load only one dump.  */
-  eassert (!loaded_p ());
-
   int err;
-  int dump_fd = emacs_open_noquit (dump_filename, O_RDONLY, 0);
+  int dump_fd = emacs_open_noquit (filename, O_RDONLY, 0);
   if (dump_fd < 0)
     {
       err = (errno == ENOENT || errno == ENOTDIR
@@ -4958,19 +4891,15 @@ pdumper_load (char *dump_filename)
   if (!mmap_contiguous (sections, ARRAYELTS (sections)))
     goto out;
 
-  err = PDUMPER_LOAD_ERROR;
-  nr_mark_bits = divide_round_up (header->discardable_start, DUMP_ALIGNMENT);
-  if (!bitsets_init (mark_bits, nr_mark_bits))
-    goto out;
-
   /* Point of no return.  */
   err = PDUMPER_LOAD_SUCCESS;
   gflags.was_dumped_ = true;
-  dump_private.header = *header;
-  dump_private.current = mark_bits[0];
-  dump_private.previous = mark_bits[1];
-  dump_public.start = (uintptr_t) sections[0].mapping;
-  dump_public.end = (uintptr_t) ((char *) dump_public.start + dump_size);
+  pdumper_info.header = *header;
+  pdumper_info.mark_bits = bitset_create
+    (divide_round_up (header->discardable_start, DUMP_ALIGNMENT),
+     BITSET_FIXED);
+  pdumper_info.addr_beg = (uintptr_t) sections[0].mapping;
+  pdumper_info.addr_end = (uintptr_t) ((char *) pdumper_info.addr_beg + dump_size);
 
   reloc_dump (header, EARLY_RELOCS);
   reloc_emacs (header);
@@ -4983,7 +4912,7 @@ pdumper_load (char *dump_filename)
   if (header->hash_list)
     {
       struct Lisp_Vector *hash_tables
-	= (struct Lisp_Vector *) ((char *) dump_public.start + header->hash_list);
+	= (struct Lisp_Vector *) ((char *) pdumper_info.addr_beg + header->hash_list);
       hashes = make_lisp_ptr (hash_tables, Lisp_Vectorlike);
     }
 
@@ -4999,8 +4928,8 @@ pdumper_load (char *dump_filename)
   initialized = true;
 
   struct timespec load_timespec = timespec_sub (current_timespec (), start_time);
-  dump_private.load_time = timespectod (load_timespec);
-  dump_private.dump_filename = xstrdup (dump_filename);
+  pdumper_info.load_time = timespectod (load_timespec);
+  pdumper_info.filename = xstrdup (filename);
 
  out:
   for (int i = 0; i < ARRAYELTS (sections); ++i)
@@ -5011,18 +4940,18 @@ pdumper_load (char *dump_filename)
   return err;
 }
 
-/* Prepend the Emacs startup directory to dump_filename, if that is
+/* Prepend the Emacs startup directory to filename, if that is
    relative, so that we could later make it absolute correctly.  */
 void
 pdumper_record_wd (const char *wd)
 {
-  if (wd && !file_name_absolute_p (dump_private.dump_filename))
+  if (wd && !file_name_absolute_p (pdumper_info.filename))
     {
       char *dfn = xmalloc (strlen (wd) + 1
-			   + strlen (dump_private.dump_filename) + 1);
-      splice_dir_file (dfn, wd, dump_private.dump_filename);
-      xfree (dump_private.dump_filename);
-      dump_private.dump_filename = dfn;
+			   + strlen (pdumper_info.filename) + 1);
+      splice_dir_file (dfn, wd, pdumper_info.filename);
+      xfree (pdumper_info.filename);
+      pdumper_info.filename = dfn;
     }
 }
 
@@ -5044,18 +4973,18 @@ Value is nil if this session was not started using a dump file.*/)
   Lisp_Object dump_fn;
 #ifdef WINDOWSNT
   char dump_fn_utf8[MAX_UTF8_PATH];
-  if (filename_from_ansi (dump_private.dump_filename, dump_fn_utf8) == 0)
+  if (filename_from_ansi (pdumper_info.filename, dump_fn_utf8) == 0)
     dump_fn = DECODE_FILE (build_unibyte_string (dump_fn_utf8));
   else
-    dump_fn = build_unibyte_string (dump_private.dump_filename);
+    dump_fn = build_unibyte_string (pdumper_info.filename);
 #else
-  dump_fn = DECODE_FILE (build_unibyte_string (dump_private.dump_filename));
+  dump_fn = DECODE_FILE (build_unibyte_string (pdumper_info.filename));
 #endif
 
   dump_fn = Fexpand_file_name (dump_fn, Qnil);
 
   return list3 (Fcons (Qdumped_with_pdumper, Qt),
-		Fcons (Qload_time, make_float (dump_private.load_time)),
+		Fcons (Qload_time, make_float (pdumper_info.load_time)),
 		Fcons (Qdump_file_name, dump_fn));
 }
 

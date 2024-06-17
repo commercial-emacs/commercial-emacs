@@ -345,12 +345,12 @@ xrealloc (void *block, size_t size)
   return val;
 }
 
-/* Like free() but check pdumper_object_p().  */
+/* Like free() but check pdumper_address_p().  */
 
 void
 xfree (void *block)
 {
-  if (block && !pdumper_object_p (block))
+  if (block && !pdumper_address_p (block))
     free (block);
 }
 
@@ -528,7 +528,7 @@ lisp_malloc (size_t nbytes, bool q_clear, enum mem_type mtype)
 static void
 lisp_free (struct thread_state *thr, void *block)
 {
-  if (block && !pdumper_object_p (block))
+  if (block && !pdumper_address_p (block))
     {
       free (block);
       mem_delete (mem_find (thr, block), &THREAD_FIELD (thr, m_mem_root));
@@ -920,7 +920,7 @@ PER_THREAD_STATIC int check_string_bytes_count;
 void
 check_string_bytes (struct Lisp_String *s, ptrdiff_t nbytes)
 {
-  eassume (PURE_P (s) || pdumper_object_p (s) || ! s->u.s.data
+  eassume (PURE_P (s) || pdumper_address_p (s) || ! s->u.s.data
 	   || nbytes == SDATA_OF_LISP_STRING (s)->nbytes);
 }
 
@@ -1544,7 +1544,7 @@ pin_string (Lisp_Object string)
   unsigned char *data = s->u.s.data;
 
   if (size <= LARGE_STRING_THRESH
-      && !PURE_P (data) && !pdumper_object_p (data)
+      && !PURE_P (data) && !pdumper_address_p (data)
       && s->u.s.size_byte != Sdata_Pinned)
     {
       eassert (s->u.s.size_byte == Sdata_Unibyte);
@@ -1573,7 +1573,7 @@ pin_string (Lisp_Object string)
    &= ~((bits_word) 1 << ((n) % BITS_PER_BITS_WORD)))
 
 #define FLOAT_BLOCK(fptr) \
-  (eassert (!pdumper_object_p (fptr)),                                  \
+  (eassert (!pdumper_address_p (fptr)),                                  \
    ((struct float_block *) (((uintptr_t) (fptr)) & ~(BLOCK_ALIGN - 1))))
 
 #define FLOAT_INDEX(fptr) \
@@ -1649,7 +1649,7 @@ make_float (double float_value)
 }
 
 #define CONS_BLOCK(fptr) \
-  (eassert (!pdumper_object_p (fptr)),                                  \
+  (eassert (!pdumper_address_p (fptr)),                                  \
    ((struct cons_block *) ((uintptr_t) (fptr) & ~(BLOCK_ALIGN - 1))))
 
 #define CONS_INDEX(fptr) \
@@ -2877,10 +2877,9 @@ static bool
 vector_marked_p (const struct Lisp_Vector *v)
 {
   bool ret;
-  if (pdumper_object_p (v))
+  if (pdumper_address_p (v))
     {
-      /* Checking "cold" saves faulting in vector header.  */
-      if (pdumper_cold_object_p (v))
+      if (pdumper_cold_p (v))
         {
           eassert (PVTYPE (v) == PVEC_BOOL_VECTOR);
           ret = true;
@@ -2897,7 +2896,7 @@ static void
 set_vector_marked (struct Lisp_Vector *v)
 {
   eassert (!vector_marked_p (v));
-  if (pdumper_object_p (v))
+  if (pdumper_address_p (v))
     {
       eassert (PVTYPE (v) != PVEC_BOOL_VECTOR);
       pdumper_set_marked (v);
@@ -2922,7 +2921,7 @@ set_vectorlike_marked (union vectorlike_header *header)
 static bool
 cons_marked_p (const struct Lisp_Cons *c)
 {
-  return pdumper_object_p (c)
+  return pdumper_address_p (c)
     ? pdumper_marked_p (c)
     : XCONS_MARKED_P (c);
 }
@@ -2930,7 +2929,7 @@ cons_marked_p (const struct Lisp_Cons *c)
 static void
 set_cons_marked (struct Lisp_Cons *c)
 {
-  if (pdumper_object_p (c))
+  if (pdumper_address_p (c))
     pdumper_set_marked (c);
   else
     XMARK_CONS (c);
@@ -2940,7 +2939,7 @@ static bool
 string_marked_p (const struct Lisp_String *s)
 {
   bool ret;
-  if (pdumper_object_p (s))
+  if (pdumper_address_p (s))
     ret = pdumper_marked_p (s);
   else
     ret = XSTRING_MARKED_P (s);
@@ -2951,7 +2950,7 @@ static void
 set_string_marked (struct Lisp_String *s)
 {
   eassert (!string_marked_p (s));
-  if (pdumper_object_p (s))
+  if (pdumper_address_p (s))
     pdumper_set_marked (s);
   else
     XMARK_STRING (s);
@@ -2960,7 +2959,7 @@ set_string_marked (struct Lisp_String *s)
 static bool
 symbol_marked_p (const struct Lisp_Symbol *s)
 {
-  return pdumper_object_p (s)
+  return pdumper_address_p (s)
     ? pdumper_marked_p (s)
     : s->u.s.gcmarkbit;
 }
@@ -2968,7 +2967,7 @@ symbol_marked_p (const struct Lisp_Symbol *s)
 static void
 set_symbol_marked (struct Lisp_Symbol *s)
 {
-  if (pdumper_object_p (s))
+  if (pdumper_address_p (s))
     pdumper_set_marked (s);
   else
     s->u.s.gcmarkbit = true;
@@ -2977,7 +2976,7 @@ set_symbol_marked (struct Lisp_Symbol *s)
 static bool
 interval_marked_p (INTERVAL i)
 {
-  return pdumper_object_p (i)
+  return pdumper_address_p (i)
     ? pdumper_marked_p (i)
     : i->gcmarkbit;
 }
@@ -2985,7 +2984,7 @@ interval_marked_p (INTERVAL i)
 static void
 set_interval_marked (INTERVAL i)
 {
-  if (pdumper_object_p (i))
+  if (pdumper_address_p (i))
     pdumper_set_marked (i);
   else
     i->gcmarkbit = true;
@@ -3262,26 +3261,26 @@ mark_maybe_pointer (void *const *p)
 #if USE_VALGRIND
   VALGRIND_MAKE_MEM_DEFINED (p, sizeof (*p));
 #endif
-  if (pdumper_object_p (*p))
+  if (pdumper_address_p (*p))
     {
       uintptr_t masked_p = (uintptr_t) *p & mask;
       void *po = (void *) masked_p;
       char *cp = *p;
       char *cpo = po;
-      int type = pdumper_find_object_type (po);
-      ret = (pdumper_valid_object_type_p (type)
+      int type = pdumper_precise_type (po);
+      ret = (type != PDUMPER_NO_OBJECT
 	     // Verify P’s tag, if any, matches pdumper-reported type.
 	     && (!USE_LSB_TAG || *p == po || cp - cpo == type));
       if (ret)
 	mark_automatic_object (make_lisp_ptr (po, type));
     }
-  else if (pdumper_object_p (p_sym))
+  else if (pdumper_address_p (p_sym))
     {
       uintptr_t masked_p = (uintptr_t) p_sym & mask;
       void *po = (void *) masked_p;
       char *cp = p_sym;
       char *cpo = po;
-      ret = (pdumper_find_object_type (po) == Lisp_Symbol
+      ret = (pdumper_precise_type (po) == Lisp_Symbol
 	     // Verify P’s tag, if any, matches pdumper-reported type.
 	     && (!USE_LSB_TAG || p_sym == po || cp - cpo == Lisp_Symbol));
       if (ret)
@@ -3578,8 +3577,8 @@ valid_lisp_object_p (Lisp_Object obj)
   if (p == &buffer_slot_defaults || p == &buffer_slot_symbols)
     return 2;
 
-  if (pdumper_object_p (p))
-    return pdumper_object_p_precise (p) ? 1 : 0;
+  if (pdumper_address_p (p))
+    return pdumper_precise_p (p) ? 1 : 0;
 
   struct thread_state *thr = NULL;
   struct mem_node *m = mem_find_which_thread (p, &thr);
@@ -4733,9 +4732,9 @@ static inline bool
 check_live (void *xpntr, enum mem_type mtype)
 {
 #ifdef ENABLE_CHECKING
-  if (pdumper_object_p (xpntr))
+  if (pdumper_address_p (xpntr))
     {
-      eassume (pdumper_object_p_precise (xpntr));
+      eassume (pdumper_precise_p (xpntr));
       return true;
     }
   else
@@ -4860,7 +4859,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		       and don't have mark bits), and we're in a
 		       ! vector_marked_p() block */
 		    eassert (!vector_marked_p (ptr)
-			     && !pdumper_object_p (ptr));
+			     && !pdumper_address_p (ptr));
 		    set_vector_marked (ptr);
 		    break;
 		  case PVEC_OVERLAY:
@@ -4964,9 +4963,9 @@ process_mark_stack (ptrdiff_t base_sp)
 	    struct Lisp_Float *ptr = XFLOAT (*objp);
 	    if (ptr) /* else HASH_UNUSED_ENTRY_KEY */
 	      {
-		if (pdumper_object_p (ptr))
+		if (pdumper_address_p (ptr))
 		  /* pdumper floats are "cold" and lack mark bits.  */
-		  eassert (pdumper_cold_object_p (ptr));
+		  eassert (pdumper_cold_p (ptr));
 		else
 		  {
 		    eassert (check_live (xpntr, MEM_TYPE_FLOAT));
@@ -5041,7 +5040,7 @@ survives_gc_p (Lisp_Object obj)
     case Lisp_Float:
       survives_p =
         XFLOAT_MARKED_P (XFLOAT (obj)) ||
-        pdumper_object_p (XFLOAT (obj));
+        pdumper_address_p (XFLOAT (obj));
       break;
     default:
       emacs_abort ();
@@ -5413,7 +5412,8 @@ gc_sweep (void)
     sweep_buffers (thr);
     sweep_vectors (thr);
   }
-  pdumper_clear_marks ();
+  if (was_dumped_p())
+    pdumper_clear_marks ();
 }
 
 #ifdef HAVE_GCC_TLS

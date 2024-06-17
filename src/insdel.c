@@ -1904,9 +1904,9 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
      a dump file, copy the contents to private storage first so we
      don't take a COW fault on the buffer text and keep it around
      forever.  */
-  if (pdumper_object_p (BEG_ADDR))
+  if (pdumper_address_p (BEG_ADDR))
     enlarge_buffer_text (current_buffer, 0);
-  eassert (!pdumper_object_p (BEG_ADDR));
+  eassert (!pdumper_address_p (BEG_ADDR));
 
   run_undoable_change();
 
