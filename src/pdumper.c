@@ -136,7 +136,7 @@ dump_trace (const char *fmt, ...)
     }
 }
 
-static ssize_t read_all (int fd, void *buf, size_t bytes_to_read);
+static ssize_t read_bytes (int fd, void *buf, size_t bytes_to_read);
 
 /* Worst-case allocation granularity.  */
 #define MAX_PAGE_SIZE (64 * 1024)
@@ -4235,13 +4235,11 @@ mmap_release_heap (struct dump_memory_map *map)
 /* Implement mmap using malloc and read.  */
 static bool
 mmap_contiguous_heap (struct dump_memory_map *maps, int nr_maps,
-			   size_t total_size)
+		      size_t total_size)
 {
   bool ret = false;
 
-  /* FIXME: This storage sometimes is never freed.
-     Beware: the simple patch 2019-03-11T15:20:54Z!eggert@cs.ucla.edu
-     is worse, as it sometimes frees this storage twice.  */
+  /* Sometimes never freed.  */
   struct dump_memory_map_heap_control_block *cb = calloc (1, sizeof (*cb));
   if (!cb)
     goto out;
@@ -4254,26 +4252,27 @@ mmap_contiguous_heap (struct dump_memory_map *maps, int nr_maps,
   char *mem = cb->mem;
   for (int i = 0; i < nr_maps; ++i)
     {
-      struct dump_memory_map *map = &maps[i];
-      const struct dump_memory_map_spec spec = map->spec;
+      const struct dump_memory_map_spec spec = maps[i].spec;
       if (!spec.size)
         continue;
-      map->mapping = mem;
+      maps[i].mapping = mem;
       mem += spec.size;
-      map->release = mmap_release_heap;
-      map->private = cb;
+      maps[i].release = mmap_release_heap;
+      maps[i].private = cb;
       ++cb->refcount;
       if (spec.fd < 0)
-        memset (map->mapping, 0, spec.size);
+        memset (maps[i].mapping, 0, spec.size);
       else
         {
           if (lseek (spec.fd, spec.offset, SEEK_SET) < 0)
             goto out;
-          ssize_t nb = read_all (spec.fd, map->mapping, spec.size);
-          if (nb >= 0 && nb != spec.size)
-            errno = EIO;
+          ssize_t nb = read_bytes (spec.fd, maps[i].mapping, spec.size);
           if (nb != spec.size)
-            goto out;
+	    {
+	      if (nb >= 0)
+		errno = EIO;
+	      goto out;
+	    }
         }
     }
 
@@ -4307,7 +4306,7 @@ needs_mmap_retry_p (void)
 
 static bool
 mmap_contiguous_vm (struct dump_memory_map *maps, int nr_maps,
-			 size_t total_size)
+		    size_t total_size)
 {
   bool ret = false;
   void *resv = NULL;
@@ -4325,9 +4324,7 @@ mmap_contiguous_vm (struct dump_memory_map *maps, int nr_maps,
         }
 
       eassert (resv == NULL);
-      resv = anonymous_allocate (NULL,
-				 total_size,
-				 DUMP_MEMORY_ACCESS_NONE);
+      resv = anonymous_allocate (NULL, total_size, DUMP_MEMORY_ACCESS_NONE);
       if (!resv)
         goto out;
 
@@ -4346,19 +4343,17 @@ mmap_contiguous_vm (struct dump_memory_map *maps, int nr_maps,
 
       for (int i = 0; i < nr_maps; ++i)
         {
-          struct dump_memory_map *map = &maps[i];
-          const struct dump_memory_map_spec spec = map->spec;
+          const struct dump_memory_map_spec spec = maps[i].spec;
           if (!spec.size)
             continue;
-
-          if (spec.fd < 0)
-	    map->mapping = anonymous_allocate (mem, spec.size,
-					       spec.protection);
+          else if (spec.fd < 0)
+	    maps[i].mapping = anonymous_allocate (mem, spec.size,
+						 spec.protection);
           else
-	    map->mapping = map_file (mem, spec.fd, spec.offset,
-				     spec.size, spec.protection);
+	    maps[i].mapping = map_file (mem, spec.fd, spec.offset,
+				       spec.size, spec.protection);
           mem += spec.size;
-	  if (need_retry && map->mapping == NULL
+	  if (need_retry && maps[i].mapping == NULL
 	      && (errno == EBUSY
 #ifdef CYGWIN
 		  || errno == EINVAL
@@ -4368,9 +4363,9 @@ mmap_contiguous_vm (struct dump_memory_map *maps, int nr_maps,
               retry = true;
               continue;
             }
-          if (map->mapping == NULL)
+          if (maps[i].mapping == NULL)
             goto out;
-          map->release = mmap_release_vm;
+          maps[i].release = mmap_release_vm;
         }
     }
   while (retry);
@@ -4401,9 +4396,6 @@ mmap_contiguous_vm (struct dump_memory_map *maps, int nr_maps,
    chunk of memory. The MAPPING for MAPS[N] is MAPS[N-1].mapping +
    MAPS[N-1].size.
 
-   Each mapping SIZE must be a multiple of the system page size except
-   for the last mapping.
-
    Return true on success or false on failure with errno set.  */
 static bool
 mmap_contiguous (struct dump_memory_map *maps, int nr_maps)
@@ -4412,15 +4404,14 @@ mmap_contiguous (struct dump_memory_map *maps, int nr_maps)
     return true;
 
   size_t total_size = 0;
-  int worst_case_page_size = MAX_PAGE_SIZE;
-
   for (int i = 0; i < nr_maps; ++i)
     {
       eassert (maps[i].mapping == NULL);
       eassert (maps[i].release == NULL);
       eassert (maps[i].private == NULL);
-      if (i != nr_maps - 1)
-        eassert (maps[i].spec.size % worst_case_page_size == 0);
+      /* Maps except last must be a multiple of pagesize.  */
+      eassert (i == nr_maps - 1
+	       || 0 == maps[i].spec.size % MAX_PAGE_SIZE);
       total_size += maps[i].spec.size;
     }
 
@@ -4438,7 +4429,7 @@ struct bitset
 };
 
 static bool
-bitset_init (struct bitset bitset[2], size_t number_bits)
+bitsets_init (struct bitset bitset[2], size_t number_bits)
 {
   int xword_size = sizeof (bitset_word);
   ptrdiff_t words_needed = divide_round_up (number_bits,
@@ -4462,7 +4453,7 @@ bitset__bit_slot (const struct bitset *bitset, size_t bit_number)
 }
 
 static bool
-bitset_bit_set_p (const struct bitset *bitset, size_t bit_number)
+bitset_set_p (const struct bitset *bitset, size_t bit_number)
 {
   bitset_word bit = 1;
   bit <<= bit_number % BITSET_WORD_WIDTH;
@@ -4490,18 +4481,16 @@ bitset_set_bit (struct bitset *bitset, size_t bit_number)
 static void
 bitset_clear (struct bitset *bitset)
 {
-  /* Skip the memset if bitset->number_words == 0, because then bitset->bits
-     might be NULL and the memset would have undefined behavior.  */
   if (bitset->number_words)
     memset (bitset->bits, 0, bitset->number_words * sizeof bitset->bits[0]);
 }
 
 struct pdumper_loaded_dump_private
 {
-  /* Copy of the header we read from the dump.  */
+  /* Copied from the dump.  */
   struct dump_header header;
   /* Mark bits for objects in the dump; used during GC.  */
-  struct bitset mark_bits, last_mark_bits;
+  struct bitset current, previous;
   /* Time taken to load the dump.  */
   double load_time;
   /* Dump file name.  */
@@ -4513,14 +4502,14 @@ static struct pdumper_loaded_dump_private dump_private;
 
 /* Read a pointer-sized word of memory at OFFSET within the dump.  */
 static uintptr_t
-read_word_from_dump (dump_off offset)
+read_word (dump_off offset)
 {
   uintptr_t value;
   memcpy (&value, (char *) dump_public.start + offset, sizeof (value));
   return value;
 }
 
-/* Write a word to the dump. OFFSET is as for read_word_from_dump; VALUE
+/* Write a word to the dump. OFFSET is as for read_word; VALUE
    is the word to write at the given offset.  */
 static void
 write_word (dump_off offset, uintptr_t value)
@@ -4529,7 +4518,7 @@ write_word (dump_off offset, uintptr_t value)
 }
 
 /* Write a Lisp_Object to the dump. OFFSET is as for
-   read_word_from_dump; VALUE is the Lisp_Object to write at the given
+   read_word; VALUE is the Lisp_Object to write at the given
    offset.  */
 static void
 write_lv (dump_off offset, Lisp_Object value)
@@ -4588,7 +4577,7 @@ pdumper_find_object_type_impl (const void *obj)
     return PDUMPER_NO_OBJECT;
   ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
   if (offset < dump_private.header.discardable_start
-      && !bitset_bit_set_p (&dump_private.last_mark_bits, bitno))
+      && !bitset_set_p (&dump_private.previous, bitno))
     return PDUMPER_NO_OBJECT;
   const struct dump_reloc *reloc =
     find_relocation (&dump_private.header.object_starts, offset);
@@ -4606,7 +4595,7 @@ pdumper_marked_p_impl (const void *obj)
   eassert (offset < dump_private.header.cold_start);
   eassert (offset < dump_private.header.discardable_start);
   ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
-  return bitset_bit_set_p (&dump_private.mark_bits, bitno);
+  return bitset_set_p (&dump_private.current, bitno);
 }
 
 void
@@ -4618,24 +4607,20 @@ pdumper_set_marked_impl (const void *obj)
   eassert (offset < dump_private.header.cold_start);
   eassert (offset < dump_private.header.discardable_start);
   ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
-  eassert (bitset_bit_set_p (&dump_private.last_mark_bits, bitno));
-  bitset_set_bit (&dump_private.mark_bits, bitno);
+  bitset_set_bit (&dump_private.current, bitno);
 }
 
 void
 pdumper_clear_marks_impl (void)
 {
-  bitset_word *swap = dump_private.last_mark_bits.bits;
-  dump_private.last_mark_bits.bits = dump_private.mark_bits.bits;
-  dump_private.mark_bits.bits = swap;
-  bitset_clear (&dump_private.mark_bits);
+  dump_private.previous.bits = dump_private.current.bits;
+  bitset_clear (&dump_private.current);
 }
 
 static ssize_t
-read_all (int fd, void *buf, size_t bytes_to_read)
+read_bytes (int fd, void *buf, size_t bytes_to_read)
 {
-  /* We don't want to use emacs_read, since that relies on the lisp
-     world, and we're not in the lisp world yet.  */
+  /* Cannot use emacs_read since no lisp yet.  */
   size_t bytes_read = 0;
   while (bytes_read < bytes_to_read)
     {
@@ -4645,8 +4630,11 @@ read_all (int fd, void *buf, size_t bytes_to_read)
       int chunk_to_read = min (bytes_to_read - bytes_read, max_rw_count);
       ssize_t chunk = read (fd, (char *) buf + bytes_read, chunk_to_read);
       if (chunk < 0)
-        return chunk;
-      if (chunk == 0)
+	{
+	  bytes_read = chunk;
+	  break;
+	}
+      else if (chunk == 0)
         break;
       bytes_read += chunk;
     }
@@ -4670,7 +4658,7 @@ reloc_size (const struct dump_reloc reloc)
 static Lisp_Object
 make_lv_from_reloc (const struct dump_reloc reloc)
 {
-  uintptr_t value = read_word_from_dump (reloc.offset);
+  uintptr_t value = read_word (reloc.offset);
   enum Lisp_Type lisp_type;
 
   if (RELOC_DUMP_LV <= reloc.type
@@ -4710,7 +4698,7 @@ reloc_dump (const struct dump_header *const header,
 	{
 	case RELOC_EMACS_PTR:
 	  {
-	    uintptr_t value = read_word_from_dump (reloc.offset);
+	    uintptr_t value = read_word (reloc.offset);
 	    eassert (reloc_size (reloc) == sizeof (value));
 	    value += emacs_basis ();
 	    write_word (reloc.offset, value);
@@ -4718,7 +4706,7 @@ reloc_dump (const struct dump_header *const header,
 	  }
 	case RELOC_DUMP_PTR:
 	  {
-	    uintptr_t value = read_word_from_dump (reloc.offset);
+	    uintptr_t value = read_word (reloc.offset);
 	    eassert (reloc_size (reloc) == sizeof (value));
 	    value += dump_public.start;
 	    write_word (reloc.offset, value);
@@ -4866,18 +4854,16 @@ pdumper_load (char *dump_filename)
 {
   intptr_t dump_size;
   struct stat stat;
-  int dump_page_size;
   dump_off adj_discardable_start;
 
   struct bitset mark_bits[2];
-  size_t mark_bits_needed;
+  size_t nr_mark_bits;
 
   struct dump_header header_buf = { 0 };
   struct dump_header *header = &header_buf;
   struct dump_memory_map sections[NUMBER_DUMP_SECTIONS] = { 0 };
 
   const struct timespec start_time = current_timespec ();
-  char *dump_filename_copy;
 
   /* Overwriting an initialized Lisp universe will not go well.  */
   eassert (!initialized);
@@ -4909,7 +4895,7 @@ pdumper_load (char *dump_filename)
     goto out;
 
   err = PDUMPER_LOAD_BAD_FILE_TYPE;
-  if (read_all (dump_fd, header, sizeof (*header)) < sizeof (*header))
+  if (read_bytes (dump_fd, header, sizeof (*header)) < sizeof (*header))
     goto out;
 
   if (memcmp (header->magic, dump_magic, sizeof (dump_magic)) != 0)
@@ -4937,14 +4923,12 @@ pdumper_load (char *dump_filename)
       goto out;
     }
 
-  dump_filename_copy = xstrdup (dump_filename);
   err = PDUMPER_LOAD_OOM;
 
   adj_discardable_start = header->discardable_start;
-  dump_page_size = MAX_PAGE_SIZE;
   /* Snap to next page boundary.  */
-  adj_discardable_start = ROUNDUP (adj_discardable_start, dump_page_size);
-  eassert (adj_discardable_start % dump_page_size == 0);
+  adj_discardable_start = ROUNDUP (adj_discardable_start, MAX_PAGE_SIZE);
+  eassert (adj_discardable_start % MAX_PAGE_SIZE == 0);
   eassert (adj_discardable_start <= header->cold_start);
 
   sections[DS_HOT].spec = (struct dump_memory_map_spec)
@@ -4975,18 +4959,17 @@ pdumper_load (char *dump_filename)
     goto out;
 
   err = PDUMPER_LOAD_ERROR;
-  mark_bits_needed =
-    divide_round_up (header->discardable_start, DUMP_ALIGNMENT);
-  if (!bitset_init (mark_bits, mark_bits_needed))
+  nr_mark_bits = divide_round_up (header->discardable_start, DUMP_ALIGNMENT);
+  if (!bitsets_init (mark_bits, nr_mark_bits))
     goto out;
 
   /* Point of no return.  */
   err = PDUMPER_LOAD_SUCCESS;
   gflags.was_dumped_ = true;
   dump_private.header = *header;
-  dump_private.mark_bits = mark_bits[0];
-  dump_private.last_mark_bits = mark_bits[1];
-  dump_public.start = (uintptr_t) sections[DS_HOT].mapping;
+  dump_private.current = mark_bits[0];
+  dump_private.previous = mark_bits[1];
+  dump_public.start = (uintptr_t) sections[0].mapping;
   dump_public.end = (uintptr_t) ((char *) dump_public.start + dump_size);
 
   reloc_dump (header, EARLY_RELOCS);
@@ -4999,8 +4982,8 @@ pdumper_load (char *dump_filename)
   Lisp_Object hashes = zero_vector;
   if (header->hash_list)
     {
-      struct Lisp_Vector *hash_tables =
-	(struct Lisp_Vector *) ((char *) dump_public.start + header->hash_list);
+      struct Lisp_Vector *hash_tables
+	= (struct Lisp_Vector *) ((char *) dump_public.start + header->hash_list);
       hashes = make_lisp_ptr (hash_tables, Lisp_Vectorlike);
     }
 
@@ -5015,10 +4998,9 @@ pdumper_load (char *dump_filename)
 
   initialized = true;
 
-  struct timespec load_timespec =
-    timespec_sub (current_timespec (), start_time);
+  struct timespec load_timespec = timespec_sub (current_timespec (), start_time);
   dump_private.load_time = timespectod (load_timespec);
-  dump_private.dump_filename = dump_filename_copy;
+  dump_private.dump_filename = xstrdup (dump_filename);
 
  out:
   for (int i = 0; i < ARRAYELTS (sections); ++i)

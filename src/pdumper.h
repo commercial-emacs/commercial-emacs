@@ -189,9 +189,8 @@ pdumper_marked_p (const void *obj)
 
 extern void pdumper_set_marked_impl (const void *obj);
 
-/* Set the pdumper mark bit for OBJ.  It is a programming error to
-   call this function with an OBJ for which pdumper_object_p_precise
-   would return false.  */
+/* Set the mark bit corresponding to OBJ, which must be
+   pdumper_object_p_precise.  */
 INLINE void
 pdumper_set_marked (const void *obj)
 {
