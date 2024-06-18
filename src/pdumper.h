@@ -29,6 +29,8 @@ INLINE_HEADER_BEGIN
 
 enum { PDUMPER_NO_OBJECT = -1 };
 
+extern uintptr_t emacs_basis (void);
+
 /* "Remember" functions preserve auxiliary C variables not pointed to by
    Lisp heap (as one does in staticpro).  */
 
@@ -77,12 +79,9 @@ enum pdumper_load_result
     PDUMPER_LOAD_ERROR /* Must be last, as errno may be added.  */
   };
 
-int pdumper_load (char *dump_filename);
-
-/* Whether OBJ points somewhere into the loaded dump file. */
-bool pdumper_address_p (const void *obj);
-bool pdumper_cold_p (const void *obj);
-int pdumper_precise_type (const void *obj);
+extern int pdumper_load (char *dump_filename);
+extern bool pdumper_cold_p (const void *obj);
+extern int pdumper_precise_type (const void *obj);
 
 INLINE _GL_ATTRIBUTE_CONST bool
 pdumper_precise_p (const void *obj)
@@ -90,17 +89,223 @@ pdumper_precise_p (const void *obj)
   return pdumper_precise_type (obj) != PDUMPER_NO_OBJECT;
 }
 
-bool pdumper_marked_p (const void *obj);
-void pdumper_set_marked (const void *obj);
-void pdumper_clear_marks (void);
+extern void pdumper_fingerprint (FILE *output, char const *label,
+				 unsigned char const xfingerprint[sizeof fingerprint]);
+extern bool pdumper_marked_p (const void *obj);
+extern void pdumper_set_marked (const void *obj);
+extern void pdumper_clear_marks (void);
 
 /* Record directory where dump was loaded.  */
-void pdumper_record_wd (const char *);
-void pdumper_fingerprint (FILE *output, const char *label,
-			  unsigned char const fingerp[sizeof fingerprint]);
+extern void pdumper_record_wd (const char *);
 
-void init_pdumper_once (void);
-void syms_of_pdumper (void);
+extern void init_pdumper_once (void);
+extern void syms_of_pdumper (void);
+
+#define VM_POSIX 1
+#define VM_MS_WINDOWS 2
+
+#if defined (HAVE_MMAP) && defined (MAP_FIXED)
+# define VM_SUPPORTED VM_POSIX
+# if !defined (MAP_POPULATE) && defined (MAP_PREFAULT_READ)
+#  define MAP_POPULATE MAP_PREFAULT_READ
+# elif !defined (MAP_POPULATE)
+#  define MAP_POPULATE 0
+# endif
+#elif defined (WINDOWSNT)
+  /* Use a float infinity, to avoid compiler warnings in comparing vs
+     candidates' score.  */
+# undef INFINITY
+# define INFINITY __builtin_inff ()
+# include <windows.h>
+# define VM_SUPPORTED VM_MS_WINDOWS
+#else
+# define VM_SUPPORTED 0
+#endif
+
+typedef int_least32_t dump_off;
+
+/* Some relocations must occur before others. */
+enum reloc_phase
+  {
+    EARLY_RELOCS,
+#ifdef HAVE_NATIVE_COMP
+    NATIVE_COMP_RELOCS,
+#endif
+    LATE_RELOCS, /* lisp can be called */
+    RELOC_NUM_PHASES
+  };
+
+struct dump_locator
+{
+  dump_off offset;
+  dump_off nr_entries;
+};
+
+extern const char dump_magic[16];
+
+struct dump_header
+{
+  /* File type magic.  */
+  char magic[sizeof (dump_magic)];
+
+  /* Associated Emacs binary.  */
+  unsigned char fingerprint[sizeof fingerprint];
+
+  /* Where to find dump relocations.  */
+  struct dump_locator dump_relocs[RELOC_NUM_PHASES];
+
+  /* Where to find lisp object types. See "irritating".  */
+  struct dump_locator object_starts;
+
+  /* Where to find executable relocations.  */
+  struct dump_locator emacs_relocs;
+
+  /* Marks end of hot region.  Discardable objects are copied into the
+     emacs executable when loading dump.  */
+  dump_off discardable_start;
+
+  /* Marks end of discardable region.  Cold objects do not require
+     relocations and are memory-mapped directly (possibly incurring
+     modest copy-on-write faults).
+
+     While cold objects are intended to be immutable, this region
+     remains modifiable for string data that might be ill-advisedly
+     ASET.  */
+  dump_off cold_start;
+
+  /* Offset of a vector of the dumped hash tables.  */
+  dump_off hash_list;
+};
+
+extern ssize_t read_bytes (int fd, void *buf, size_t bytes_to_read);
+
+/* Worst-case allocation granularity.  */
+#define MAX_PAGE_SIZE (64 * 1024)
+
+/* Dump runtime */
+enum dump_memory_protection
+{
+  DUMP_MEMORY_ACCESS_NONE = 1,
+  DUMP_MEMORY_ACCESS_READ = 2,
+  DUMP_MEMORY_ACCESS_READWRITE = 3,
+};
+
+struct dump_memory_map_spec
+{
+  int fd;  /* File to map; anon zero if negative.  */
+  size_t size;  /* Number of bytes to map.  */
+  off_t offset;  /* Offset within fd.  */
+  enum dump_memory_protection protection;
+};
+
+struct dump_memory_map
+{
+  struct dump_memory_map_spec spec;
+  void *mapping;  /* Actual mapped memory.  */
+  void (*release) (struct dump_memory_map *);
+  void *private;
+};
+
+extern bool mmap_contiguous_vm (struct dump_memory_map *maps, int nr_maps,
+				size_t total_size);
+extern bool mmap_contiguous_heap (struct dump_memory_map *maps, int nr_maps,
+				  size_t total_size);
+
+enum dump_section
+  {
+    DS_HOT,
+    DS_DISCARDABLE,
+    DS_COLD,
+    NUMBER_DUMP_SECTIONS,
+  };
+
+struct pdumper_info
+{
+  struct dump_header header;
+  bitset mark_bits;
+  double load_time;
+  char *filename;
+  uintptr_t addr_beg;
+  uintptr_t addr_end;
+};
+
+extern struct pdumper_info pdumper_info;
+
+/* Whether OBJ points somewhere into the loaded dump file.
+   Gets called a lot so inline.  */
+INLINE _GL_ATTRIBUTE_CONST bool
+pdumper_address_p (const void *obj)
+{
+  uintptr_t obj_addr = (uintptr_t) obj;
+  return pdumper_info.addr_beg <= obj_addr && obj_addr < pdumper_info.addr_end;
+}
+
+typedef int_least32_t dump_off;
+#define DUMP_OFF_MIN INT_LEAST32_MIN
+#define DUMP_OFF_MAX INT_LEAST32_MAX
+#define DUMP_OFF_NBITS INT_LEAST32_WIDTH
+#define PRIdDUMP_OFF PRIdLEAST32
+
+enum
+  {
+    RELOC_TYPE_NBITS = 5,
+    RELOC_OFFS_NBITS = DUMP_OFF_NBITS - RELOC_TYPE_NBITS,
+    DUMP_ALIGNMENT = max (GCALIGNMENT, 4),
+  };
+
+enum reloc_type
+  {
+    /* dump_ptr = dump_ptr + emacs_basis() */
+    RELOC_EMACS_PTR,
+    /* dump_ptr = dump_ptr + dump_basis */
+    RELOC_DUMP_PTR,
+    /* dump_mpz = [rebuild bignum] */
+    RELOC_NATIVE_COMP_UNIT,
+    RELOC_NATIVE_SUBR,
+    RELOC_BIGNUM,
+    /* Copy raw bytes from the dump into executable */
+    RELOC_COPY_FROM_DUMP,
+    /* Set a memory location to the verbatim value */
+    RELOC_IMMEDIATE,
+    /* dump_lv = make_lisp_ptr (dump_lv + dump_basis, type - RELOC_DUMP_LV) */
+    RELOC_DUMP_LV,
+    /* dump_lv = make_lisp_ptr (dump_lv + emacs_basis(), type - RELOC_DUMP_LV) */
+    RELOC_EMACS_LV = RELOC_DUMP_LV + 8,
+  };
+
+verify (RELOC_EMACS_LV + 8 < (1 << RELOC_TYPE_NBITS));
+verify (DUMP_ALIGNMENT >= GCALIGNMENT);
+
+struct dump_reloc
+{
+  ENUM_BF (reloc_type) type : RELOC_TYPE_NBITS;
+  dump_off offset : RELOC_OFFS_NBITS;
+};
+
+/* Colascione irritatingly conflated object starts and relocations so
+   dump_reloc's and dump_off's are the same type.  */
+verify (sizeof (struct dump_reloc) == sizeof (dump_off));
+
+struct emacs_reloc
+{
+  ENUM_BF (reloc_type) type;
+  dump_off length;
+  dump_off offset;
+  union
+  {
+    dump_off offset;    /* RELOC_DUMP_PTR, RELOC_EMACS_PTR */
+    intmax_t immediate; /* RELOC_IMMEDIATE */
+  } ptr;
+};
+
+struct bignum_reload_info
+{
+  dump_off data_location;
+  dump_off nlimbs;
+};
+
+extern pdumper_hook dump_hooks[24];
+extern int nr_dump_hooks;
 
 INLINE_HEADER_END
 #endif
