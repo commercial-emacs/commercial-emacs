@@ -737,8 +737,27 @@ This can now be entered using 'C-x 8 E' in addition to the existing
 If 'whitespace-style' includes 'missing-newline-at-eof (which is the
 default), the 'whitespace-cleanup' function will now add the newline.
 
-
-* Changes in Specialized Modes and Packages in Emacs 30.1
+** Eshell
+
+---
+*** New option 'eshell-command-async-buffer'.
+This option lets you tell 'eshell-command' how to respond if its output
+buffer is already in use by another invocation of 'eshell-command', much
+like 'async-shell-command-buffer' does for 'shell-command'.  By default,
+this will prompt for confirmation before creating a new buffer when
+necessary.  To restore the previous behavior, set this option to
+'confirm-kill-process'.
+
+** SHR
+
++++
+*** SHR now slices large images into rows.
+Sliced images allow for more intuitive scrolling up/down by letting you
+scroll past each slice, instead of jumping past the entire image.
+Previously, SHR sliced images when zoomed to their original size, no
+matter how large or small that was).  Now, SHR slices any images taller
+than 'shr-sliced-image-height'.  For more information, see the "(eww)
+Advanced" node in the EWW manual.
 
 ---
 ** Trace
