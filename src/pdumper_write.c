@@ -270,21 +270,17 @@ struct dump_context
   dump_off nr_discardable_relocations;
 };
 
-/* These special values for use as offsets in remember_object and
-   recall_object indicate that the corresponding object isn't in
-   the dump yet (and so it has no valid offset), but that it's on one
-   of our to-be-dumped-later object queues (or that we haven't seen it
-   at all).  All values must be non-positive, since positive values
-   are physical dump offsets.  */
-enum dump_object_special_offset
+/* Fictitious, non-positive offsets indicate an object is still
+   queued and hasn't been dumped.  */
+enum special_dump_offset
   {
-   DUMP_OBJECT_IS_RUNTIME_MAGIC = -6,
-   DUMP_OBJECT_ON_COPIED_QUEUE = -5,
-   DUMP_OBJECT_ON_HASH_TABLE_QUEUE = -4,
-   DUMP_OBJECT_ON_SYMBOL_QUEUE = -3,
-   DUMP_OBJECT_ON_COLD_QUEUE = -2,
-   DUMP_OBJECT_ON_NORMAL_QUEUE = -1,
-   DUMP_OBJECT_NOT_SEEN = 0,
+   IS_RUNTIME_MAGIC = -6,
+   ON_COPIED_QUEUE = -5,
+   ON_HASH_TABLE_QUEUE = -4,
+   ON_SYMBOL_QUEUE = -3,
+   ON_COLD_QUEUE = -2,
+   ON_NORMAL_QUEUE = -1,
+   NOT_SEEN = 0,
   };
 
 /* Weights for score scores for object non-locality.  */
@@ -311,8 +307,6 @@ static void dump_grow_buffer (struct dump_context *ctx)
 }
 
 static dump_off dump_object (struct dump_context *ctx, Lisp_Object object);
-static dump_off dump_object_for_offset (struct dump_context *ctx,
-					Lisp_Object object);
 
 /* Like the Lisp function `push'.  Return NEWELT.  */
 static Lisp_Object
@@ -349,8 +343,7 @@ builtin_symbol_p (Lisp_Object object)
   return SYMBOLP (object) && builtin_lisp_symbol_p (XSYMBOL (object));
 }
 
-/* Return whether OBJECT has the same bit pattern in all Emacs
-   invocations, i.e., is invariant across a dump.  Note that some
+/* Return whether OBJECT is bit-invariant across a dump.  Note that some
    self-representing objects still need to be dumped!
 */
 static bool
@@ -489,14 +482,12 @@ finish_object (struct dump_context *ctx, const void *out, dump_off sz)
   return offset;
 }
 
-/* Return offset at which OBJECT has been dumped, or one of the dump_object_special_offset
-   negative values, or DUMP_OBJECT_NOT_SEEN.  */
+/* Return OBJECT's offset, or one of special_dump_offset.  */
 static dump_off
 recall_object (struct dump_context *ctx, Lisp_Object object)
 {
   Lisp_Object dumped = ctx->objects_dumped;
-  return INTEGER_TO_INT (Fgethash (object, dumped,
-                                       make_fixnum (DUMP_OBJECT_NOT_SEEN)));
+  return INTEGER_TO_INT (Fgethash (object, dumped, make_fixnum (NOT_SEEN)));
 }
 
 static void
@@ -909,19 +900,19 @@ enqueue_object (struct dump_context *ctx,
   if (!FIXNUMP (object))
     {
       dump_off state = recall_object (ctx, object);
-      bool already_dumped_object = state > DUMP_OBJECT_NOT_SEEN;
+      bool already_dumped_object = state > NOT_SEEN;
       eassert (!ctx->flags.assert_already_seen || already_dumped_object);
       if (!already_dumped_object)
         {
-          if (state == DUMP_OBJECT_NOT_SEEN)
+          if (state == NOT_SEEN)
             {
-              state = DUMP_OBJECT_ON_NORMAL_QUEUE;
+              state = ON_NORMAL_QUEUE;
               remember_object (ctx, object, state);
             }
           /* Note that we call queue_enqueue even if the object
              is already on the normal queue: multiple enqueue calls
              can increase the object's weight.  */
-          if (state == DUMP_OBJECT_ON_NORMAL_QUEUE)
+          if (state == ON_NORMAL_QUEUE)
             queue_enqueue (&ctx->queue, object, ctx->offset, weight);
         }
     }
@@ -979,11 +970,6 @@ reloc_dump_lv (struct dump_context *ctx, dump_off dump_offset,
     }
 }
 
-/* Add a dump (versus emacs) relocation that updates the raw pointer
-   at DUMP_OFFSET in the dump to point to another object in the dump.
-   The pointer-sized value at DUMP_OFFSET in the dump file should
-   contain the offset of the target object relative to the start of
-   the dump.  */
 static void
 reloc_dump_ptr (struct dump_context *ctx, dump_off dump_offset)
 {
@@ -1057,13 +1043,7 @@ reloc_copy_from_dump (struct dump_context *ctx, dump_off dump_offset,
     }
 }
 
-/* Add an executable (versus dump) relocation that sets values to arbitrary
-   bytes.
-
-   When the dump is loaded, Emacs copies SIZE bytes from the
-   relocation itself to an offset of EMACS_PTR.  SIZE is the number of
-   bytes to copy.
- */
+/* Modify executable at EMACS_PTR to arbitrary bytes at VALUE_PTR.  */
 static void
 reloc_immediate (struct dump_context *ctx, const void *emacs_ptr,
 		 const void *value_ptr, dump_off size)
@@ -1095,24 +1075,21 @@ DEFINE_EMACS_IMMEDIATE_FN (reloc_immediate_ptrdiff_t, ptrdiff_t)
 DEFINE_EMACS_IMMEDIATE_FN (reloc_immediate_intmax_t, intmax_t)
 DEFINE_EMACS_IMMEDIATE_FN (reloc_immediate_int, int)
 DEFINE_EMACS_IMMEDIATE_FN (reloc_immediate_bool, bool)
+  ;
 
-/* Add an executable (versus dump) relocation that points into the
-   dump.  */
-
+/* Add an executable (versus dump) relocation that points into the dump.  */
 static void
 reloc_to_dump_ptr (struct dump_context *ctx,
 		   const void *emacs_ptr, dump_off dump_offset)
 {
   if (ctx->flags.dump_object_contents)
-    {
-      push (&ctx->emacs_relocs,
-	    list3 (make_fixnum (RELOC_DUMP_PTR),
-		   INT_TO_INTEGER (emacs_offset (emacs_ptr)),
-		   INT_TO_INTEGER (dump_offset)));
-    }
+    push (&ctx->emacs_relocs,
+	  list3 (make_fixnum (RELOC_DUMP_PTR),
+		 INT_TO_INTEGER (emacs_offset (emacs_ptr)),
+		 INT_TO_INTEGER (dump_offset)));
 }
 
-/* Add executable (versus dump) relocation to point to a dumped
+/* Add executable (versus dump) relocation to point to a
    Lisp_Object.  */
 
 static void
@@ -1179,7 +1156,7 @@ remember_fixup_ptr (struct dump_context *ctx,
 }
 
 static void
-reloc_roots (struct dump_context *ctx)
+dump_roots (struct dump_context *ctx)
 {
   const struct Lisp_Vector *vbuffer_slot_defaults =
     (struct Lisp_Vector *) &buffer_slot_defaults;
@@ -1590,9 +1567,8 @@ dump_finalizer (struct dump_context *ctx,
 # error "Lisp_Finalizer changed. See CHECK_STRUCTS comment in config.h."
 #endif
   START_DUMP_PVEC (ctx, &finalizer->header, struct Lisp_Finalizer, out);
-  /* Do _not_ call dump_pseudovector here: we dump the
-     only Lisp field, finalizer->function, manually, so we can give it
-     a low weight.  */
+  /* Manually dump finalizer->function instead of using
+     dump_pseudovector, so we can give it a low weight.  */
   write_field_lisp_object (ctx, &out, finalizer, &finalizer->function, WEIGHT_NONE);
   dump_field_finalizer_ref (ctx, &out, finalizer, &finalizer->prev);
   dump_field_finalizer_ref (ctx, &out, finalizer, &finalizer->next);
@@ -1825,16 +1801,16 @@ dump_symbol (struct dump_context *ctx,
 
   if (ctx->flags.defer_symbols)
     {
-      if (offset != DUMP_OBJECT_ON_SYMBOL_QUEUE)
+      if (offset != ON_SYMBOL_QUEUE)
         {
-	  eassert (offset == DUMP_OBJECT_ON_NORMAL_QUEUE
-		   || offset == DUMP_OBJECT_NOT_SEEN);
+	  eassert (offset == ON_NORMAL_QUEUE
+		   || offset == NOT_SEEN);
           struct dump_flags old_flags = ctx->flags;
           ctx->flags.dump_object_contents = false;
           ctx->flags.defer_symbols = false;
           dump_object (ctx, object);
           ctx->flags = old_flags;
-          offset = DUMP_OBJECT_ON_SYMBOL_QUEUE;
+          offset = ON_SYMBOL_QUEUE;
           remember_object (ctx, object, offset);
           push (&ctx->deferred_symbols, object);
         }
@@ -2027,10 +2003,9 @@ hash_table_contents (struct Lisp_Hash_Table *h)
 static dump_off
 dump_hash_table_list (struct dump_context *ctx)
 {
-  if (!NILP (ctx->hash_tables))
-    return dump_object (ctx, CALLN (Fapply, Qvector, ctx->hash_tables));
-  else
-    return 0;
+  return !NILP (ctx->hash_tables)
+    ? dump_object (ctx, CALLN (Fapply, Qvector, ctx->hash_tables))
+    : 0;
 }
 
 static hash_table_std_test_t
@@ -2181,9 +2156,7 @@ dump_buffer (struct dump_context *ctx, const struct buffer *in_buffer)
   if (buffer->base_buffer)
     {
       eassert (buffer->base_buffer->base_buffer == NULL);
-      base_offset = dump_object_for_offset
-	(ctx,
-	 make_lisp_ptr (buffer->base_buffer, Lisp_Vectorlike));
+      base_offset = dump_object	(ctx, make_lisp_ptr (buffer->base_buffer, Lisp_Vectorlike));
     }
 
   eassert ((base_offset == 0 && buffer->text == &in_buffer->own_text)
@@ -2448,7 +2421,7 @@ dump_vectorlike (struct dump_context *ctx,
       if (main_thread_p (v))
         {
           eassert (emacs_ptr (lv));
-          return DUMP_OBJECT_IS_RUNTIME_MAGIC;
+          return IS_RUNTIME_MAGIC;
         }
       break;
     case PVEC_WINDOW_CONFIGURATION:
@@ -2475,24 +2448,13 @@ dump_vectorlike (struct dump_context *ctx,
 /* Add an object to the dump.
 
    CTX is the dump context; OBJECT is the object to add.  Normally,
-   return OFFSET, the location (in bytes, from the start of the dump
-   file) where we wrote the object.  Valid OFFSETs are always greater
-   than zero.
+   return a positive OFFSET, in bytes from the start of the dump, where
+   we wrote the object.  If deferring, return one of
+   special_dump_offset.
 
-   If we've already dumped an object, return the location where we put
-   it: dump_object is idempotent.
-
-   The object must refer to an actual pointer-ish object of some sort.
    Some self-representing objects are immediate values rather than
-   tagged pointers to Lisp heap structures and so have no individual
-   representation in the Lisp heap dump.
-
-   May also return one of the DUMP_OBJECT_ON_*_QUEUE constants if we
-   "dumped" the object by remembering to process it specially later.
-   In this case, we don't have a valid offset.
-   Call dump_object_for_offset if you need a valid offset for
-   an object.
- */
+   tagged Lisp_Objects and are not dumped.
+*/
 static dump_off
 dump_object (struct dump_context *ctx, Lisp_Object object)
 {
@@ -2508,34 +2470,31 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
   bool cold = BOOL_VECTOR_P (object) || FLOATP (object);
   if (cold && ctx->flags.defer_cold_objects)
     {
-      if (offset != DUMP_OBJECT_ON_COLD_QUEUE)
+      if (offset != ON_COLD_QUEUE)
         {
-	  eassert (offset == DUMP_OBJECT_ON_NORMAL_QUEUE
-		   || offset == DUMP_OBJECT_NOT_SEEN);
-          offset = DUMP_OBJECT_ON_COLD_QUEUE;
+	  eassert (offset == ON_NORMAL_QUEUE
+		   || offset == NOT_SEEN);
+          offset = ON_COLD_QUEUE;
           remember_object (ctx, object, offset);
           remember_cold_op (ctx, COLD_OP_OBJECT, object);
         }
       return offset;
     }
 
-  void *obj_in_emacs = emacs_ptr (object);
-  if (obj_in_emacs && ctx->flags.defer_copied_objects)
+  void *in_emacs = emacs_ptr (object);
+  if (in_emacs && ctx->flags.defer_copied_objects)
     {
-      if (offset != DUMP_OBJECT_ON_COPIED_QUEUE)
+      if (offset != ON_COPIED_QUEUE)
         {
-	  eassert (offset == DUMP_OBJECT_ON_NORMAL_QUEUE
-		   || offset == DUMP_OBJECT_NOT_SEEN);
-          /* Even though we're not going to dump this object right
-             away, we still want to scan and enqueue its
-             referents.  */
+	  eassert (offset == ON_NORMAL_QUEUE || offset == NOT_SEEN);
+          /* Recursively enqueue object's referents.  */
           struct dump_flags old_flags = ctx->flags;
           ctx->flags.dump_object_contents = false;
           ctx->flags.defer_copied_objects = false;
           dump_object (ctx, object);
           ctx->flags = old_flags;
 
-          offset = DUMP_OBJECT_ON_COPIED_QUEUE;
+          offset = ON_COPIED_QUEUE;
           remember_object (ctx, object, offset);
           push (&ctx->copied_queue, object);
         }
@@ -2560,38 +2519,25 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
     case Lisp_Float:
       offset = dump_float (ctx, XFLOAT (object));
       break;
-    case_Lisp_Int:
-      eassert ("should not be dumping int: is self-representing" && 0);
-      abort ();
-      break;
+    case_Lisp_Int: /* self representing ought not be dumped */
     default:
       emacs_abort ();
       break;
     }
 
-  /* offset can be < 0 if we've deferred an object.  */
-  if (ctx->flags.dump_object_contents && offset > DUMP_OBJECT_NOT_SEEN)
+  /* offset can be < 0 if deferred.  */
+  if (ctx->flags.dump_object_contents && offset > 0)
     {
       eassert (offset % DUMP_ALIGNMENT == 0);
       remember_object (ctx, object, offset);
       if (ctx->flags.record_object_starts)
         {
           eassert (!ctx->flags.pack_objects);
-          push (&ctx->object_starts,
-		list2 (INT_TO_INTEGER (XTYPE (object)),
-		       INT_TO_INTEGER (offset)));
+          push (&ctx->object_starts, list2 (INT_TO_INTEGER (XTYPE (object)),
+					    INT_TO_INTEGER (offset)));
         }
     }
 
-  return offset;
-}
-
-/* Like dump_object(), but assert that we get a valid offset.  */
-static dump_off
-dump_object_for_offset (struct dump_context *ctx, Lisp_Object object)
-{
-  dump_off offset = dump_object (ctx, object);
-  eassert (offset > 0);
   return offset;
 }
 
@@ -2640,16 +2586,14 @@ dump_charset_table (struct dump_context *ctx)
   struct dump_flags old_flags = ctx->flags;
   ctx->flags.pack_objects = true;
   align_output (ctx, DUMP_ALIGNMENT);
-  dump_off offset = ctx->offset;
-  /* We are dumping the entire table, not just the used slots, because
-     otherwise when we restore from the pdump file, the actual size of
-     the table will be smaller than charset_table_size, and we will
-     crash if/when a new charset is defined.  */
+  const dump_off ret = ctx->offset;
+  /* Dump entire table, not just the used slots, otherwise table will be
+     smaller than charset_table_size upon load.  */
   for (int i = 0; i < charset_table_size; ++i)
     dump_charset (ctx, i);
-  reloc_to_dump_ptr (ctx, &charset_table, offset);
+  reloc_to_dump_ptr (ctx, &charset_table, ret);
   ctx->flags = old_flags;
-  return offset;
+  return ret;
 }
 
 static void
@@ -2658,8 +2602,8 @@ dump_finalizer_list_head_ptr (struct dump_context *ctx,
 {
   struct Lisp_Finalizer *value = *ptr;
   if (value != &finalizers && value != &doomed_finalizers)
-    reloc_to_dump_ptr
-      (ctx, ptr, dump_object_for_offset (ctx, make_lisp_ptr (value, Lisp_Vectorlike)));
+    reloc_to_dump_ptr (ctx, ptr, dump_object
+		       (ctx, make_lisp_ptr (value, Lisp_Vectorlike)));
 }
 
 static void
@@ -2742,7 +2686,7 @@ drain_copied_objects (struct dump_context *ctx)
       eassert (optr != NULL);
       /* N.B. start_offset is beyond any padding we insert.  */
       dump_off start_offset = dump_object (ctx, copied);
-      if (start_offset != DUMP_OBJECT_IS_RUNTIME_MAGIC)
+      if (start_offset != IS_RUNTIME_MAGIC)
         {
           dump_off size = ctx->offset - start_offset;
           reloc_copy_from_dump (ctx, start_offset, optr, size);
@@ -3110,18 +3054,15 @@ destructure_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
       {
 	reloc.type = type;
         Lisp_Object target_value = pop (&lreloc);
-        /* If the object is self-representing,
-           reloc_to_lv didn't do its job.
-           reloc_to_lv should have added a
-           RELOC_IMMEDIATE relocation instead.  */
-        eassert (!self_representing_p (target_value));
+        eassert (!self_representing_p (target_value)); /* reloc_to_lv fail */
+
         int tag_type = XTYPE (target_value);
         reloc.length = tag_type;
 
         if (type == RELOC_EMACS_LV)
           {
-            void *obj_in_emacs = emacs_ptr (target_value);
-            reloc.ptr.offset = emacs_offset (obj_in_emacs);
+            void *in_emacs = emacs_ptr (target_value);
+            reloc.ptr.offset = emacs_offset (in_emacs);
           }
         else
           {
@@ -3390,7 +3331,7 @@ DEFUN ("dump-emacs-portable",
     error ("dump-emacs-portable is a batch operation.");
 
   /* Clear detritus in memory.  */
-  while (garbage_collect ()); // while a finalizer was run
+  while (garbage_collect ()); /* while a finalizer was run */
 
   specpdl_ref count = SPECPDL_INDEX ();
 
@@ -3440,23 +3381,18 @@ DEFUN ("dump-emacs-portable",
   ctx->filename = filename;
 
   record_unwind_protect_ptr (unwind_cleanup, ctx);
-  block_input ();
 
 #ifdef REL_ALLOC
   r_alloc_inhibit_buffer_relocation (1);
   ctx->blocked_ralloc = true;
 #endif
 
+  /* Reduce chaos.  */
+  block_input ();
   ctx->restore_pure_pool = Vpdumper__pure_pool;
   Vpdumper__pure_pool = Qnil;
-
-  /* Make sure various weird things are less likely to happen.  */
   ctx->restore_post_gc_hook = Vpost_gc_hook;
   Vpost_gc_hook = Qnil;
-
-  /* Reset process-environment -- this is for when they re-dump a
-     pdump-restored emacs, since set_initial_environment wants always
-     to cons it from scratch.  */
   ctx->restore_process_environment = Vprocess_environment;
   Vprocess_environment = Qnil;
 
@@ -3466,7 +3402,7 @@ DEFUN ("dump-emacs-portable",
     report_file_error ("Opening dump output", filename);
   verify (sizeof (ctx->header.magic) == sizeof (dump_magic));
   memcpy (&ctx->header.magic, dump_magic, sizeof (dump_magic));
-  ctx->header.magic[0] = '!'; /* Note that dump is incomplete.  */
+  ctx->header.magic[0] = '!'; /* Sophomoric hack indicates in-process */
 
   verify (sizeof (fingerprint) == sizeof (ctx->header.fingerprint));
   for (int i = 0; i < sizeof fingerprint; ++i)
@@ -3476,11 +3412,9 @@ DEFUN ("dump-emacs-portable",
   pdumper_fingerprint (stderr, "Dumping fingerprint", ctx->header.fingerprint);
   write_bytes (ctx, &ctx->header, sizeof (ctx->header));
   const dump_off header_end = ctx->offset;
+  const dump_off hot_start = header_end;
 
-  const dump_off hot_start = ctx->offset;
-  /* Start the dump with the static roots.  */
-  reloc_roots (ctx);
-
+  dump_roots (ctx);
   dump_charset_table (ctx);
   dump_finalizer_list_head_ptr (ctx, &finalizers.prev);
   dump_finalizer_list_head_ptr (ctx, &finalizers.next);
@@ -3531,26 +3465,21 @@ DEFUN ("dump-emacs-portable",
 
   dump_hot_parts_of_discardable_objects (ctx);
 
-  /* Emacs, after initial dump loading, can forget about the portion
-     of the dump that runs from here to the start of the cold section.
-     This section consists of objects that need to be memcpy()ed into
-     the Emacs data section instead of just used directly.
-
-     We don't need to align hot_end: the loader knows to actually
-     start discarding only at the next page boundary if the loader
-     implements discarding using page manipulation.  */
+  /* We don't need to align hot_end: pdumper_load() starts discarding at
+     the next page boundary.  */
   const dump_off hot_end = ctx->offset;
-  ctx->header.discardable_start = hot_end;
 
+  /* The discardable section is memcpy()ed into the executable data
+     segment upon load (and discarded afterwards).  */
+  ctx->header.discardable_start = hot_end;
   drain_copied_objects (ctx);
   eassert (queue_empty_p (&ctx->queue));
 
-  dump_off discardable_end = ctx->offset;
+  const dump_off discardable_end = ctx->offset;
   align_output (ctx, MAX_PAGE_SIZE);
   ctx->header.cold_start = ctx->offset;
 
-  /* Start the cold section whose contents should never change and so
-     can be direct-mapped without special processing.  */
+  /* The immutable cold section is direct-mapped upon load.  */
   drain_cold_data (ctx);
 
   /* All lisp objects need to be dumped before this.  */
@@ -3562,8 +3491,7 @@ DEFUN ("dump-emacs-portable",
   /* Make remembered modifications.  */
   fixup (ctx);
 
-  /* Emit loading instructions for dump-borne emacs.  Note relocations
-     end up in the cold section of the dump.  */
+  /* Emit relocations in the cold section.  */
   for (int i = 0; i < RELOC_NUM_PHASES; ++i)
     drain_reloc_list (ctx, emit_dump_reloc, merge_dump_relocs,
 		      &ctx->dump_relocs[i], &ctx->header.dump_relocs[i]);
@@ -3588,9 +3516,7 @@ DEFUN ("dump-emacs-portable",
     eassert (NILP (ctx->dump_relocs[i]));
   eassert (NILP (ctx->emacs_relocs));
 
-  /* Dump is complete.  Go back to the header and write the magic
-     indicating that the dump is complete and can be loaded.  */
-  ctx->header.magic[0] = dump_magic[0];
+  ctx->header.magic[0] = dump_magic[0]; /* Sophomoric hack indicates done */
   seek (ctx, 0);
   write_bytes (ctx, &ctx->header, sizeof (ctx->header));
   if (emacs_write (ctx->fd, ctx->buf, ctx->max_offset) < ctx->max_offset)
