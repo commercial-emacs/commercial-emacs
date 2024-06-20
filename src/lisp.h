@@ -394,7 +394,7 @@ typedef EMACS_INT Lisp_Word;
 #define ENUM_BF(TYPE) enum TYPE
 #endif
 
-enum _GL_ATTRIBUTE_PACKED Lisp_Type
+enum Lisp_Type
   {
     /* bc78ff2 First so that Qnil can be zero.  Bug#15880. */
     Lisp_Symbol = 0,
