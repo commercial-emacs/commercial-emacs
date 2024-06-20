@@ -213,6 +213,8 @@ enum
   {
     RELOC_TYPE_NBITS = 5,
     RELOC_OFFS_NBITS = DUMP_OFF_NBITS - RELOC_TYPE_NBITS,
+    START_TYPE_NBITS = CHAR_BIT * sizeof (enum Lisp_Type),
+    START_OFFS_NBITS = DUMP_OFF_NBITS - START_TYPE_NBITS,
     DUMP_ALIGNMENT = max (GCALIGNMENT, 4),
   };
 
@@ -241,8 +243,8 @@ verify (DUMP_ALIGNMENT >= GCALIGNMENT);
 
 struct dump_start
 {
-  ENUM_BF (Lisp_Type) type : RELOC_TYPE_NBITS;
-  dump_off offset : RELOC_OFFS_NBITS;
+  ENUM_BF (Lisp_Type) type : START_TYPE_NBITS;
+  dump_off offset : START_OFFS_NBITS;
 };
 
 struct dump_reloc

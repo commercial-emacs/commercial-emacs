@@ -3286,13 +3286,6 @@ mark_maybe_pointer (void *const *p)
   VALGRIND_MAKE_MEM_DEFINED (p, sizeof (*p));
 #endif
 
-  /* On a host with 32-bit pointers and 64-bit Lisp_Objects, a
-     Lisp_Object might be split into registers on non-adjacent words
-     with P the lower word.  Reconstruct a potential Lisp Symbol by
-     adding lispsym. Casts are how XSYMBOL does it. (Bug#41321)  */
-  void *maybe_sym;
-  INT_ADD_WRAPV ((uintptr_t) *p, (uintptr_t) lispsym, (uintptr_t *) &maybe_sym);
-
   if (pdumper_address_p (*p))
     {
       const struct dump_start *start = pdumper_object_start (*p);
@@ -3374,14 +3367,23 @@ mark_maybe_pointer (void *const *p)
 	  break;
 	}
     }
-  else if ((m = mem_find_which_thread (maybe_sym, &thr)) != mem_nil
-	   && m->type == MEM_TYPE_SYMBOL)
+  else
     {
-      struct Lisp_Symbol *h = live_symbol_holding (thr, m, maybe_sym);
-      if (h)
+      /* On a host with 32-bit pointers and 64-bit Lisp_Objects, a
+	 Lisp_Object might be split into registers on non-adjacent words
+	 with P the lower word.  Reconstruct a potential Lisp Symbol by
+	 adding lispsym. Casts are how XSYMBOL does it. (Bug#41321)  */
+      void *maybe_sym;
+      INT_ADD_WRAPV ((uintptr_t) *p, (uintptr_t) lispsym, (uintptr_t *) &maybe_sym);
+      if ((m = mem_find_which_thread (maybe_sym, &thr)) != mem_nil
+	  && m->type == MEM_TYPE_SYMBOL)
 	{
-	  mark_automatic_object (make_lisp_ptr (h, Lisp_Symbol));
-	  ret = true;
+	  struct Lisp_Symbol *h = live_symbol_holding (thr, m, maybe_sym);
+	  if (h)
+	    {
+	      mark_automatic_object (make_lisp_ptr (h, Lisp_Symbol));
+	      ret = true;
+	    }
 	}
     }
 
