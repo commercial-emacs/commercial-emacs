@@ -59,9 +59,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "mem_node.h"
 #include "syssignal.h"
 
-static int pdumper_count;
-static int main_count;
-
 #ifdef HAVE_GCC_TLS
 # define mem_root (current_thread->m_mem_root)
 # define interval_blocks (current_thread->m_interval_blocks)
@@ -2900,7 +2897,6 @@ vector_marked_p (const struct Lisp_Vector *v)
     }
   else
     {
-      ++main_count;
       ret = XVECTOR_MARKED_P (v);
     }
   return ret;
@@ -2912,13 +2908,11 @@ set_vector_marked (struct Lisp_Vector *v)
   eassert (!vector_marked_p (v));
   if (pdumper_address_p (v))
     {
-      ++pdumper_count;
       eassert (PVTYPE (v) != PVEC_BOOL_VECTOR);
       pdumper_set_marked (v);
     }
   else
     {
-      ++main_count;
       XMARK_VECTOR (v);
     }
 }
@@ -2949,12 +2943,10 @@ set_cons_marked (struct Lisp_Cons *c)
 {
   if (pdumper_address_p (c))
     {
-      ++pdumper_count;
       pdumper_set_marked (c);
     }
   else
     {
-      ++main_count;
       XMARK_CONS (c);
     }
 }
@@ -2980,12 +2972,10 @@ set_string_marked (struct Lisp_String *s)
   eassert (!string_marked_p (s));
   if (pdumper_address_p (s))
     {
-      ++pdumper_count;
       pdumper_set_marked (s);
     }
   else
     {
-      ++main_count;
       XMARK_STRING (s);
     }
 }
@@ -3003,12 +2993,10 @@ set_symbol_marked (struct Lisp_Symbol *s)
 {
   if (pdumper_address_p (s))
     {
-      ++pdumper_count;
       pdumper_set_marked (s);
     }
   else
     {
-      ++main_count;
       s->u.s.gcmarkbit = true;
     }
 }
@@ -3026,12 +3014,10 @@ set_interval_marked (INTERVAL i)
 {
   if (pdumper_address_p (i))
     {
-      ++pdumper_count;
       pdumper_set_marked (i);
     }
   else
     {
-      ++main_count;
       i->gcmarkbit = true;
     }
 }
@@ -5019,7 +5005,6 @@ void
 mark_objects (Lisp_Object *objs, ptrdiff_t n)
 {
   ptrdiff_t sp = mark_stk.sp;
-  main_count += n;
   mark_stack_push_n (objs, n);
   process_mark_stack (sp);
 }
