@@ -3289,9 +3289,9 @@ mark_maybe_pointer (void *const *p)
   /* On a host with 32-bit pointers and 64-bit Lisp_Objects, a
      Lisp_Object might be split into registers on non-adjacent words
      with P the lower word.  Reconstruct a potential Lisp Symbol by
-     adding lispsym.  (Bug#41321) */
-  Lisp_Object maybe_sym /* casts are how XSYMBOL does it */
-    = make_lisp_ptr ((char *) lispsym + (uintptr_t) *p, Lisp_Symbol);
+     adding lispsym. Casts are how XSYMBOL does it. (Bug#41321)  */
+  void *maybe_sym;
+  INT_ADD_WRAPV ((uintptr_t) *p, (uintptr_t) lispsym, (uintptr_t *) &maybe_sym);
 
   if (pdumper_address_p (*p))
     {
