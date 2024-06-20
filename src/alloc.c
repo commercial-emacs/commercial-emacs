@@ -59,6 +59,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "mem_node.h"
 #include "syssignal.h"
 
+static int pdumper_count;
+static int main_count;
+
 #ifdef HAVE_GCC_TLS
 # define mem_root (current_thread->m_mem_root)
 # define interval_blocks (current_thread->m_interval_blocks)
@@ -190,6 +193,14 @@ pointer_align (void *ptr, int alignment)
   return (void *) ROUNDUP ((uintptr_t) ptr, alignment);
 }
 
+/* Dumped symbols don't subtract lispsym? */
+
+static ATTRIBUTE_NO_SANITIZE_UNDEFINED void *
+UNTAG (Lisp_Object a)
+{
+  return (char *) XLP (a) - (XLI (a) & ~VALMASK);
+}
+
 /* Extract the lisp struct payload of A.  */
 
 static ATTRIBUTE_NO_SANITIZE_UNDEFINED void *
@@ -197,7 +208,7 @@ XPNTR (Lisp_Object a)
 {
   return (SYMBOLP (a)
 	  ? (char *) lispsym + (XLI (a) - LISP_WORD_TAG (Lisp_Symbol))
-	  : (char *) XLP (a) - (XLI (a) & ~VALMASK));
+	  : UNTAG (a));
 }
 
 static void
@@ -2888,7 +2899,10 @@ vector_marked_p (const struct Lisp_Vector *v)
 	ret = pdumper_marked_p (v);
     }
   else
-    ret = XVECTOR_MARKED_P (v);
+    {
+      ++main_count;
+      ret = XVECTOR_MARKED_P (v);
+    }
   return ret;
 }
 
@@ -2898,11 +2912,15 @@ set_vector_marked (struct Lisp_Vector *v)
   eassert (!vector_marked_p (v));
   if (pdumper_address_p (v))
     {
+      ++pdumper_count;
       eassert (PVTYPE (v) != PVEC_BOOL_VECTOR);
       pdumper_set_marked (v);
     }
   else
-    XMARK_VECTOR (v);
+    {
+      ++main_count;
+      XMARK_VECTOR (v);
+    }
 }
 
 static bool
@@ -2930,9 +2948,15 @@ static void
 set_cons_marked (struct Lisp_Cons *c)
 {
   if (pdumper_address_p (c))
-    pdumper_set_marked (c);
+    {
+      ++pdumper_count;
+      pdumper_set_marked (c);
+    }
   else
-    XMARK_CONS (c);
+    {
+      ++main_count;
+      XMARK_CONS (c);
+    }
 }
 
 static bool
@@ -2940,9 +2964,13 @@ string_marked_p (const struct Lisp_String *s)
 {
   bool ret;
   if (pdumper_address_p (s))
-    ret = pdumper_marked_p (s);
+    {
+      ret = pdumper_marked_p (s);
+    }
   else
-    ret = XSTRING_MARKED_P (s);
+    {
+      ret = XSTRING_MARKED_P (s);
+    }
   return ret;
 }
 
@@ -2951,9 +2979,15 @@ set_string_marked (struct Lisp_String *s)
 {
   eassert (!string_marked_p (s));
   if (pdumper_address_p (s))
-    pdumper_set_marked (s);
+    {
+      ++pdumper_count;
+      pdumper_set_marked (s);
+    }
   else
-    XMARK_STRING (s);
+    {
+      ++main_count;
+      XMARK_STRING (s);
+    }
 }
 
 static bool
@@ -2968,9 +3002,15 @@ static void
 set_symbol_marked (struct Lisp_Symbol *s)
 {
   if (pdumper_address_p (s))
-    pdumper_set_marked (s);
+    {
+      ++pdumper_count;
+      pdumper_set_marked (s);
+    }
   else
-    s->u.s.gcmarkbit = true;
+    {
+      ++main_count;
+      s->u.s.gcmarkbit = true;
+    }
 }
 
 static bool
@@ -2985,9 +3025,15 @@ static void
 set_interval_marked (INTERVAL i)
 {
   if (pdumper_address_p (i))
-    pdumper_set_marked (i);
+    {
+      ++pdumper_count;
+      pdumper_set_marked (i);
+    }
   else
-    i->gcmarkbit = true;
+    {
+      ++main_count;
+      i->gcmarkbit = true;
+    }
 }
 
 void
@@ -3248,43 +3294,28 @@ static bool
 mark_maybe_pointer (void *const *p)
 {
   bool ret = false;
-  uintptr_t mask = VALMASK & UINTPTR_MAX;
   struct mem_node *m;
-  void *p_sym;
   struct thread_state *thr = NULL;
-
-  /* Research Bug#41321.  If we didn't special-case Lisp_Symbol
-     to subtract off lispsym in make_lisp_ptr(), this hack wouldn't
-     be necessary.
-  */
-  INT_ADD_WRAPV ((uintptr_t) *p, (uintptr_t) lispsym, (uintptr_t *) &p_sym);
 #if USE_VALGRIND
   VALGRIND_MAKE_MEM_DEFINED (p, sizeof (*p));
 #endif
+
+  /* On a host with 32-bit pointers and 64-bit Lisp_Objects, a
+     Lisp_Object might be split into registers on non-adjacent words
+     with P the lower word.  Reconstruct a potential Lisp Symbol by
+     adding lispsym.  (Bug#41321) */
+  Lisp_Object maybe_sym /* casts are how XSYMBOL does it */
+    = make_lisp_ptr ((char *) lispsym + (uintptr_t) *p, Lisp_Symbol);
+
   if (pdumper_address_p (*p))
     {
-      uintptr_t masked_p = (uintptr_t) *p & mask;
-      void *po = (void *) masked_p;
-      char *cp = *p;
-      char *cpo = po;
-      int type = pdumper_precise_type (po);
-      ret = (type != PDUMPER_NO_OBJECT
-	     // Verify P’s tag, if any, matches pdumper-reported type.
-	     && (!USE_LSB_TAG || *p == po || cp - cpo == type));
-      if (ret)
-	mark_automatic_object (make_lisp_ptr (po, type));
-    }
-  else if (pdumper_address_p (p_sym))
-    {
-      uintptr_t masked_p = (uintptr_t) p_sym & mask;
-      void *po = (void *) masked_p;
-      char *cp = p_sym;
-      char *cpo = po;
-      ret = (pdumper_precise_type (po) == Lisp_Symbol
-	     // Verify P’s tag, if any, matches pdumper-reported type.
-	     && (!USE_LSB_TAG || p_sym == po || cp - cpo == Lisp_Symbol));
-      if (ret)
-	mark_automatic_object (make_lisp_ptr (po, Lisp_Symbol));
+      const struct dump_start *start = pdumper_object_start (*p);
+      if (start && start->type == XTYPE ((Lisp_Object) *p))
+	{
+	  /* write_field_lisp_xpntr() does not subtract lispsym so we call
+	     UNTAG instead of XPNTR.  */
+	  mark_automatic_object (make_lisp_ptr (UNTAG (*p), start->type));
+	}
     }
   else if ((m = mem_find_which_thread (*p, &thr)) != mem_nil)
     {
@@ -3357,16 +3388,17 @@ mark_maybe_pointer (void *const *p)
 	  break;
 	}
     }
-  else if ((m = mem_find_which_thread (p_sym, &thr)) != mem_nil
+  else if ((m = mem_find_which_thread (maybe_sym, &thr)) != mem_nil
 	   && m->type == MEM_TYPE_SYMBOL)
     {
-      struct Lisp_Symbol *h = live_symbol_holding (thr, m, p_sym);
+      struct Lisp_Symbol *h = live_symbol_holding (thr, m, maybe_sym);
       if (h)
 	{
 	  mark_automatic_object (make_lisp_ptr (h, Lisp_Symbol));
 	  ret = true;
 	}
     }
+
   return ret;
 }
 
@@ -3578,7 +3610,7 @@ valid_lisp_object_p (Lisp_Object obj)
     return 2;
 
   if (pdumper_address_p (p))
-    return pdumper_precise_p (p) ? 1 : 0;
+    return pdumper_object_start (p) ? 1 : 0;
 
   struct thread_state *thr = NULL;
   struct mem_node *m = mem_find_which_thread (p, &thr);
@@ -4326,11 +4358,12 @@ mark_overlay (struct Lisp_Overlay *ov)
 static void
 mark_overlays (struct itree_node *node)
 {
-  if (node == NULL)
-    return;
-  mark_object (&node->data);
-  mark_overlays (node->left);
-  mark_overlays (node->right);
+  if (node)
+    {
+      mark_object (&node->data);
+      mark_overlays (node->left);
+      mark_overlays (node->right);
+    }
 }
 
 /* Mark Lisp_Objects and special pointers in BUFFER.  */
@@ -4352,7 +4385,7 @@ mark_buffer (struct buffer *buffer)
      for dead buffers, the undo_list should be nil (set by Fkill_buffer),
      but just to be on the safe side, we mark it here.  */
   if (!BUFFER_LIVE_P (buffer))
-      mark_object (&BVAR (buffer, undo_list));
+    mark_object (&BVAR (buffer, undo_list));
 
   if (!itree_empty_p (buffer->overlays))
     mark_overlays (buffer->overlays->root);
@@ -4734,7 +4767,6 @@ check_live (void *xpntr, enum mem_type mtype)
 #ifdef ENABLE_CHECKING
   if (pdumper_address_p (xpntr))
     {
-      eassume (pdumper_precise_p (xpntr));
       return true;
     }
   else
@@ -4987,6 +5019,7 @@ void
 mark_objects (Lisp_Object *objs, ptrdiff_t n)
 {
   ptrdiff_t sp = mark_stk.sp;
+  main_count += n;
   mark_stack_push_n (objs, n);
   process_mark_stack (sp);
 }

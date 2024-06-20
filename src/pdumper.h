@@ -29,13 +29,6 @@ INLINE_HEADER_BEGIN
 
 enum { PDUMPER_NO_OBJECT = -1 };
 
-extern uintptr_t emacs_basis (void);
-
-/* "Remember" functions preserve auxiliary C variables not pointed to by
-   Lisp heap (as one does in staticpro).  */
-
-extern void pdumper_remember_scalar (void *data, ptrdiff_t nbytes);
-extern void pdumper_remember (void *ptr, enum Lisp_Type type);
 
 #define PDUMPER_REMEMBER_SCALAR(thing)                  \
   pdumper_remember_scalar (&(thing), sizeof (thing))
@@ -44,7 +37,6 @@ extern void pdumper_remember (void *ptr, enum Lisp_Type type);
 #define PDUMPER_IGNORE(thing) ((void) &(thing))
 
 typedef void (*pdumper_hook)(void);
-extern void pdumper_do_now_and_after_load (pdumper_hook hook);
 
 /* Macros useful in pdumper callback functions.  Assign a value if
    we're loading a dump and the value needs to be reset to its
@@ -78,28 +70,6 @@ enum pdumper_load_result
     PDUMPER_LOAD_VERSION_MISMATCH,
     PDUMPER_LOAD_ERROR /* Must be last, as errno may be added.  */
   };
-
-extern int pdumper_load (char *dump_filename);
-extern bool pdumper_cold_p (const void *obj);
-extern int pdumper_precise_type (const void *obj);
-
-INLINE _GL_ATTRIBUTE_CONST bool
-pdumper_precise_p (const void *obj)
-{
-  return pdumper_precise_type (obj) != PDUMPER_NO_OBJECT;
-}
-
-extern void pdumper_fingerprint (FILE *output, char const *label,
-				 unsigned char const xfingerprint[sizeof fingerprint]);
-extern bool pdumper_marked_p (const void *obj);
-extern void pdumper_set_marked (const void *obj);
-extern void pdumper_clear_marks (void);
-
-/* Record directory where dump was loaded.  */
-extern void pdumper_record_wd (const char *);
-
-extern void init_pdumper_once (void);
-extern void syms_of_pdumper (void);
 
 #define VM_POSIX 1
 #define VM_MS_WINDOWS 2
@@ -151,13 +121,13 @@ struct dump_header
   /* Associated Emacs binary.  */
   unsigned char fingerprint[sizeof fingerprint];
 
-  /* Where to find dump relocations.  */
+  /* Find dump relocations.  */
   struct dump_locator dump_relocs[RELOC_NUM_PHASES];
 
-  /* Where to find lisp object types. See "irritating".  */
+  /* Find types for ambiguous Lisp_Object pointers (mark_memory).  */
   struct dump_locator object_starts;
 
-  /* Where to find executable relocations.  */
+  /* Find executable relocations.  */
   struct dump_locator emacs_relocs;
 
   /* Marks end of hot region.  Discardable objects are copied into the
@@ -176,8 +146,6 @@ struct dump_header
   /* Offset of a vector of the dumped hash tables.  */
   dump_off hash_list;
 };
-
-extern ssize_t read_bytes (int fd, void *buf, size_t bytes_to_read);
 
 /* Worst-case allocation granularity.  */
 #define MAX_PAGE_SIZE (64 * 1024)
@@ -205,11 +173,6 @@ struct dump_memory_map
   void (*release) (struct dump_memory_map *);
   void *private;
 };
-
-extern bool mmap_contiguous_vm (struct dump_memory_map *maps, int nr_maps,
-				size_t total_size);
-extern bool mmap_contiguous_heap (struct dump_memory_map *maps, int nr_maps,
-				  size_t total_size);
 
 enum dump_section
   {
@@ -276,6 +239,12 @@ enum reloc_type
 verify (RELOC_EMACS_LV + 8 < (1 << RELOC_TYPE_NBITS));
 verify (DUMP_ALIGNMENT >= GCALIGNMENT);
 
+struct dump_start
+{
+  ENUM_BF (Lisp_Type) type : RELOC_TYPE_NBITS;
+  dump_off offset : RELOC_OFFS_NBITS;
+};
+
 struct dump_reloc
 {
   ENUM_BF (reloc_type) type : RELOC_TYPE_NBITS;
@@ -283,7 +252,8 @@ struct dump_reloc
 };
 
 /* Colascione irritatingly conflated object starts and relocations so
-   dump_reloc's and dump_off's are the same type.  */
+   dump_start's, dump_reloc's, and dump_off's are same-sized ints.  */
+verify (sizeof (struct dump_start) == sizeof (dump_off));
 verify (sizeof (struct dump_reloc) == sizeof (dump_off));
 
 struct emacs_reloc
@@ -306,6 +276,36 @@ struct bignum_reload_info
 
 extern pdumper_hook dump_hooks[24];
 extern int nr_dump_hooks;
+
+extern uintptr_t emacs_basis (void);
+
+/* "Remember" functions preserve auxiliary C variables not pointed to by
+   Lisp heap (as one does in staticpro).  */
+extern void pdumper_remember_scalar (void *data, ptrdiff_t nbytes);
+extern void pdumper_remember (void *ptr, enum Lisp_Type type);
+
+extern const struct dump_start *pdumper_object_start (const void *obj);
+extern void pdumper_do_now_and_after_load (pdumper_hook hook);
+extern int pdumper_load (char *dump_filename);
+extern bool pdumper_cold_p (const void *obj);
+
+extern void pdumper_fingerprint (FILE *output, char const *label,
+				 unsigned char const xfingerprint[sizeof fingerprint]);
+extern bool pdumper_marked_p (const void *obj);
+extern void pdumper_set_marked (const void *obj);
+extern void pdumper_clear_marks (void);
+
+/* Record directory where dump was loaded.  */
+extern void pdumper_record_wd (const char *);
+
+extern ssize_t read_bytes (int fd, void *buf, size_t bytes_to_read);
+extern bool mmap_contiguous_vm (struct dump_memory_map *maps, int nr_maps,
+				size_t total_size);
+extern bool mmap_contiguous_heap (struct dump_memory_map *maps, int nr_maps,
+				  size_t total_size);
+
+extern void init_pdumper_once (void);
+extern void syms_of_pdumper (void);
 
 INLINE_HEADER_END
 #endif

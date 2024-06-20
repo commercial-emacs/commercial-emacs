@@ -3603,35 +3603,6 @@ pdumper_remember (void *ptr, enum Lisp_Type type)
   pdumper_remember_user_data (ptr, -type);
 }
 
-/* Return the object qua relocation (see "irritating") whose offset is
-   at or after OFF.  */
-static const struct dump_reloc *
-find_object (const dump_off off)
-{
-  struct dump_locator locator = pdumper_info.header.object_starts;
-  struct dump_reloc *relocs
-    = (struct dump_reloc *) ((char *) pdumper_info.addr_beg + locator.offset);
-  const struct dump_reloc *found = NULL;
-  ptrdiff_t idx_left = 0, idx_right = locator.nr_entries;
-
-  while (idx_left < idx_right) /* binary search */
-    {
-      const ptrdiff_t idx_mid = idx_left + (idx_right - idx_left) / 2;
-      const struct dump_reloc *mid = &relocs[idx_mid];
-      if (off > mid->offset)
-        idx_left = idx_mid + 1;
-      else
-        {
-          found = mid;
-          idx_right = idx_mid;
-	  if (idx_right <= idx_left
-	      || off > relocs[idx_right - 1].offset)
-            break;
-        }
-   }
-  return found;
-}
-
 void
 pdumper_fingerprint (FILE *output, char const *label,
 		     unsigned char const xfingerprint[sizeof fingerprint])
@@ -3657,21 +3628,38 @@ pdumper_cold_p (const void *obj)
   return ret;
 }
 
-/* Return the type of the dumped object that starts at OBJ.  */
-int
-pdumper_precise_type (const void *obj)
+/* Return dump entry corresponding to ADDR.  */
+const struct dump_start *
+pdumper_object_start (const void *addr)
 {
-  int ret = PDUMPER_NO_OBJECT;
-  if (pdumper_address_p (obj))
+  const struct dump_start *ret = NULL;
+  if (pdumper_address_p (addr))
     {
-      const dump_off offset = DUMP_OFF ((uintptr_t) obj - pdumper_info.addr_beg);
+      const dump_off offset = DUMP_OFF ((uintptr_t) addr - pdumper_info.addr_beg);
       if (offset % DUMP_ALIGNMENT == 0)
 	{
-	  const struct dump_reloc *reloc = find_object (offset);
-	  if (reloc != NULL
-	      /* checks overflow */
-	      && reloc->offset == offset)
-	    ret = reloc->type;
+	  struct dump_start *starts
+	    = (struct dump_start *) ((char *) pdumper_info.addr_beg
+				     + pdumper_info.header.object_starts.offset);
+	  ptrdiff_t i_left = 0;
+	  ptrdiff_t i_right = pdumper_info.header.object_starts.nr_entries;
+	  while (i_left < i_right) /* binary search */
+	    {
+	      const ptrdiff_t i_mid = i_left + (i_right - i_left) / 2;
+	      const struct dump_start *mid = &starts[i_mid];
+	      if (offset > mid->offset)
+		i_left = i_mid + 1;
+	      else
+		{
+		  ret = mid;
+		  i_right = i_mid;
+		  if (i_right <= i_left
+		      || offset > starts[i_right - 1].offset)
+		    break;
+		}
+	    }
+	  if (ret && ret->offset != offset)
+	    ret = NULL;
 	}
     }
   return ret;

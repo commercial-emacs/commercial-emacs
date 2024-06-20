@@ -543,7 +543,7 @@ INLINE enum Lisp_Type
   return lisp_h_XTYPE (a);
 #else
   EMACS_UINT i = XLI (a);
-  return USE_LSB_TAG ? i & ~VALMASK : i >> VALBITS;
+  return i >> VALBITS;
 #endif
 }
 
@@ -2598,7 +2598,7 @@ extern Lisp_Object make_misc_ptr (void *);
    Preferably (and typically), OBJ is a fixnum I such that
    XFIXNUMPTR (I) == P, as this represents P within a single Lisp value
    without requiring any auxiliary memory.  However, if P would be
-   damaged by being tagged as an integer and then untagged via
+   damaged by being tagged as an integer and then untaggedvia
    XFIXNUMPTR, then OBJ is a Lisp_Misc_Ptr with pointer component P.
 
    mint_ptr objects are efficiency hacks intended for C code.
