@@ -6185,7 +6185,7 @@ pop_it (struct it *it)
   it->bidi_p = p->bidi_p;
   it->paragraph_embedding = p->paragraph_embedding;
   it->from_disp_prop_p = p->from_disp_prop_p;
-
+  it->align_visually_p = false;
   if (it->bidi_p)
     {
       bidi_pop_it (&it->bidi_it);
@@ -20727,17 +20727,14 @@ static void
 handle_line_prefix (struct it *it)
 {
   Lisp_Object prefix;
+  bool wrap_prop = false;
 
   if (it->continuation_lines_width > 0)
     {
       prefix = get_line_prefix_it_property (it, Qwrap_prefix);
       if (NILP (prefix))
 	prefix = Vwrap_prefix;
-      /* Interpreting :align-to relative to the beginning of the logical
-         line effectively renders this feature unusable, so we make an
-         exception for this use of :align-to.  */
-      if (!NILP (prefix))
-	it->align_visually_p = true;
+      wrap_prop = true;
     }
   else
     {
@@ -20752,6 +20749,11 @@ handle_line_prefix (struct it *it)
 	 continuation lines.  */
       it->line_wrap = TRUNCATE;
       it->avoid_cursor_p = true;
+      /* Interpreting :align-to relative to the beginning of the logical
+         line effectively renders this feature unusable, so we make an
+         exception for this use of :align-to.  */
+      if (wrap_prop && CONSP (prefix) && EQ (XCAR (prefix), Qspace))
+	it->align_visually_p = true;
     }
 }
 
