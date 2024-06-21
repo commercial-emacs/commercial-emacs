@@ -11816,18 +11816,14 @@ syms_of_keyboard (void)
   DEFSYM (Qselect_window, "select-window");
   DEFSYM (Qselection_request, "selection-request");
   DEFSYM (Qwindow_edges, "window-edges");
-  {
-    int i;
-
-    for (i = 0; i < ARRAYELTS (head_table); i++)
-      {
-	const struct event_head *p = &head_table[i];
-	Lisp_Object var = builtin_lisp_symbol (p->var);
-	Lisp_Object kind = builtin_lisp_symbol (p->kind);
-	Fput (var, Qevent_kind, kind);
-	Fput (var, Qevent_symbol_elements, list1 (var));
-      }
-  }
+  for (int i = 0; i < ARRAYELTS (head_table); ++i)
+    {
+      const struct event_head *p = &head_table[i];
+      Lisp_Object var = builtin_lisp_symbol (p->var);
+      Lisp_Object kind = builtin_lisp_symbol (p->kind);
+      Fput (var, Qevent_kind, kind);
+      Fput (var, Qevent_symbol_elements, list1 (var));
+    }
   DEFSYM (Qno_record, "no-record");
   DEFSYM (Qencoded, "encoded");
 

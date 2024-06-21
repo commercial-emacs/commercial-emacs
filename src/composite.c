@@ -1567,7 +1567,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
 	{
 	  int c = STRING_CHAR (cur.p);
 	  Lisp_Object candidate = Qnil;
-	  struct position_record probe;
+	  struct position_record probe = { 0 };
 
 	  for (Lisp_Object val = CHAR_TABLE_REF (Vcomposition_function_table, c);
 	       CONSP (val) && NILP (candidate); val = XCDR (val))
@@ -1600,7 +1600,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit,
 	  else
 	    {
 	      *start = probe.pos;
-	      cur.pos = *end = probe.pos + LGSTRING_CHAR_LEN (candidate);
+	      cur.pos = *end = *start + LGSTRING_CHAR_LEN (candidate);
 	      cur.pos_byte = (NILP (string)
 			      ? CHAR_TO_BYTE (cur.pos)
 			      : string_char_to_byte (string, cur.pos));

@@ -190,14 +190,6 @@ pointer_align (void *ptr, int alignment)
   return (void *) ROUNDUP ((uintptr_t) ptr, alignment);
 }
 
-/* Dumped symbols don't subtract lispsym? */
-
-static ATTRIBUTE_NO_SANITIZE_UNDEFINED void *
-UNTAG (Lisp_Object a)
-{
-  return (char *) XLP (a) - (XLI (a) & ~VALMASK);
-}
-
 /* Extract the lisp struct payload of A.  */
 
 static ATTRIBUTE_NO_SANITIZE_UNDEFINED void *
@@ -205,7 +197,7 @@ XPNTR (Lisp_Object a)
 {
   return (SYMBOLP (a)
 	  ? (char *) lispsym + (XLI (a) - LISP_WORD_TAG (Lisp_Symbol))
-	  : UNTAG (a));
+	  : XUNTAG (a, Lisp_Int0, void *));
 }
 
 static void
@@ -3282,7 +3274,8 @@ mark_maybe_pointer (void *const *p)
 	{
 	  /* write_field_lisp_xpntr() does not subtract lispsym so we call
 	     UNTAG instead of XPNTR.  */
-	  mark_automatic_object (make_lisp_ptr (UNTAG (*p), start->type));
+	  mark_automatic_object
+	    (make_lisp_ptr (XUNTAG (*p, start->type, void *), start->type));
 	}
     }
   else if ((m = mem_find_which_thread (*p, &thr)) != mem_nil)

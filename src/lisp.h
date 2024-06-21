@@ -836,12 +836,19 @@ XSYMBOL (Lisp_Object obj)
 		   + (uintptr_t) XUNTAG (obj, Lisp_Symbol, struct Lisp_Symbol));
 }
 
-/* "Prefer symbol indexes to struct Lisp_Symbol * casted and then
-   widened, as the latter had trouble with GCC on Fedora 21 when
-   configured --with-wide-int and when used in static initializers."
-   -- Eggert in 6a37ece
+/* Why the lispsym subtraction gymnastics for symbols?
 
-   And so began the shitstorm of exceptions for symbols.
+   In 6a37ece Eggert raised a gcc complication to rationalize making a
+   symbol Lisp_Object's xpntr (what should be a struct Lisp_Symbol *) be
+   instead its distance from lispsym.  This obviously made no sense for
+   non-pdumped symbols that did not lie within lispsym, but
+   conscientiously applying the addition or subtraction of lispsym made
+   for an innocuous no-op.
+
+   Regardless of the wisdom of Eggert's workaround, the code came to
+   rely on Qnil, the first element of lispsym and thus having a zero
+   value, to be falsy (in the same way we rely on NULL to be zero).  So
+   now we're stuck with it.
 */
 
 INLINE Lisp_Object
