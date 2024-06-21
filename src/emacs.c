@@ -1214,11 +1214,14 @@ main (int argc, char **argv)
 
   if (!will_dump_p ())
     {
+      eassert (!was_dumped_p ());
       int result = load_pdump (argc, argv, initial_emacs_executable);
       if (result == PDUMPER_LOAD_FILE_NOT_FOUND)
 	fputs ("Running without pdumper initialization\n", stderr);
       else if (result != PDUMPER_LOAD_SUCCESS)
 	fatal ("Could not load pdump file: %s", dump_error_to_string (result));
+      else
+	eassert (was_dumped_p ());
     }
 
   argc = maybe_disable_address_randomization (argc, argv);
@@ -1267,7 +1270,7 @@ main (int argc, char **argv)
   bool only_version = false;
   sort_args (argc, argv);
   argc = 0;
-  while (argv[argc]) argc++;
+  while (argv[argc]) ++argc;
 
   int skip_args = 0;
   if (argmatch (argv, argc, "-version", "--version", 3, NULL, &skip_args))
@@ -1551,7 +1554,6 @@ main (int argc, char **argv)
 #else
   w32_daemon_event = NULL;
 #endif
-
 
   int sockfd = -1;
 
@@ -2385,6 +2387,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
   /* Enter editor command loop.  This never returns.  */
   set_initial_minibuffer_mode ();
+  debug_print (Fgc_counts ());
   Frecursive_edit ();
   eassume (false);
 }

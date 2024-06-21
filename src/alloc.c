@@ -1156,13 +1156,16 @@ sweep_strings (struct thread_state *thr)
 	      if (XSTRING_MARKED_P (s))
 		{
 		  /* S shall remain in live state.  */
-		  XUNMARK_STRING (s);
+		  XSTRING_UNMARK (s);
 
 		  /* Do not use string_(set|get)_intervals here.  */
 		  s->u.s.intervals = balance_intervals (s->u.s.intervals);
 
-		  ++gcstat.total_strings;
-		  gcstat.total_string_bytes += STRING_BYTES (s);
+		  if (pdumper_address_p (s))
+		    {
+		      ++gcstat.total_strings;
+		      gcstat.total_string_bytes += STRING_BYTES (s);
+		    }
 		}
 	      else
 		{
@@ -1674,10 +1677,10 @@ struct cons_block
 #define XCONS_MARKED_P(fptr) \
   GETMARKBIT (CONS_BLOCK (fptr), CONS_INDEX (fptr))
 
-#define XMARK_CONS(fptr) \
+#define XCONS_MARK(fptr) \
   SETMARKBIT (CONS_BLOCK (fptr), CONS_INDEX (fptr))
 
-#define XUNMARK_CONS(fptr) \
+#define XCONS_UNMARK(fptr) \
   UNSETMARKBIT (CONS_BLOCK (fptr), CONS_INDEX (fptr))
 
 #if GC_ASAN_POISON_OBJECTS
@@ -2230,9 +2233,12 @@ sweep_vectors (struct thread_state *thr)
 		  run_bytes = 0;
 		  run_vector = NULL;
 		}
-	      XUNMARK_VECTOR (vector);
-	      ++gcstat.total_vectors;
-	      gcstat.total_vector_slots += nbytes / word_size;
+	      XVECTOR_UNMARK (vector);
+	      if (pdumper_address_p (vector))
+		{
+		  ++gcstat.total_vectors;
+		  gcstat.total_vector_slots += nbytes / word_size;
+		}
 	    }
 	  else
 	    {
@@ -2279,12 +2285,15 @@ sweep_vectors (struct thread_state *thr)
       struct Lisp_Vector *vector = large_vector_contents (lv);
       if (XVECTOR_MARKED_P (vector))
 	{
-	  XUNMARK_VECTOR (vector);
-	  ++gcstat.total_vectors;
-	  gcstat.total_vector_slots
-	    += (vector->header.size & PSEUDOVECTOR_FLAG
-		? vector_nbytes (vector) / word_size
-		: header_size / word_size + vector->header.size);
+	  XVECTOR_UNMARK (vector);
+	  if (pdumper_address_p (vector))
+	    {
+	      ++gcstat.total_vectors;
+	      gcstat.total_vector_slots
+		+= (vector->header.size & PSEUDOVECTOR_FLAG
+		    ? vector_nbytes (vector) / word_size
+		    : header_size / word_size + vector->header.size);
+	    }
 	  lvprev = &lv->next;
 	}
       else
@@ -2896,9 +2905,7 @@ vector_marked_p (const struct Lisp_Vector *v)
 	ret = pdumper_marked_p (v);
     }
   else
-    {
-      ret = XVECTOR_MARKED_P (v);
-    }
+    ret = XVECTOR_MARKED_P (v);
   return ret;
 }
 
@@ -2912,9 +2919,7 @@ set_vector_marked (struct Lisp_Vector *v)
       pdumper_set_marked (v);
     }
   else
-    {
-      XMARK_VECTOR (v);
-    }
+    XMARK_VECTOR (v);
 }
 
 static bool
@@ -2942,13 +2947,9 @@ static void
 set_cons_marked (struct Lisp_Cons *c)
 {
   if (pdumper_address_p (c))
-    {
-      pdumper_set_marked (c);
-    }
+    pdumper_set_marked (c);
   else
-    {
-      XMARK_CONS (c);
-    }
+    XCONS_MARK (c);
 }
 
 static bool
@@ -2971,13 +2972,9 @@ set_string_marked (struct Lisp_String *s)
 {
   eassert (!string_marked_p (s));
   if (pdumper_address_p (s))
-    {
-      pdumper_set_marked (s);
-    }
+    pdumper_set_marked (s);
   else
-    {
-      XMARK_STRING (s);
-    }
+    XMARK_STRING (s);
 }
 
 static bool
@@ -2992,13 +2989,9 @@ static void
 set_symbol_marked (struct Lisp_Symbol *s)
 {
   if (pdumper_address_p (s))
-    {
-      pdumper_set_marked (s);
-    }
+    pdumper_set_marked (s);
   else
-    {
-      s->u.s.gcmarkbit = true;
-    }
+    s->u.s.gcmarkbit = true;
 }
 
 static bool
@@ -3013,13 +3006,9 @@ static void
 set_interval_marked (INTERVAL i)
 {
   if (pdumper_address_p (i))
-    {
-      pdumper_set_marked (i);
-    }
+    pdumper_set_marked (i);
   else
-    {
-      i->gcmarkbit = true;
-    }
+    i->gcmarkbit = true;
 }
 
 void
@@ -4101,18 +4090,18 @@ mark_most_objects (void)
   struct Lisp_Vector *vbuffer_slot_symbols =
     (struct Lisp_Vector *) &buffer_slot_symbols;
 
-  for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
-    {
-      mark_object (&vbuffer_slot_defaults->contents[i]);
-      mark_object (&vbuffer_slot_symbols->contents[i]);
-    }
-
   for (int i = 0; i < ARRAYELTS (lispsym); ++i)
     mark_automatic_object (builtin_lisp_symbol (i));
 
   // defvar_lisp calls staticpro.
   for (int i = 0; i < staticidx; ++i)
     mark_object ((Lisp_Object *)staticvec[i]);
+
+  for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
+    {
+      mark_object (&vbuffer_slot_defaults->contents[i]);
+      mark_object (&vbuffer_slot_symbols->contents[i]);
+    }
 }
 
 /* Merely a local register.  NULL on gc entry and exit.  */
@@ -4612,6 +4601,8 @@ maybe_garbage_collect (void)
 
 /* Subroutine of Fgarbage_collect that does most of the work.  */
 
+static int pdumper_count;
+static int main_count;
 bool
 garbage_collect (void)
 {
@@ -4624,6 +4615,9 @@ garbage_collect (void)
 
   if (gc_inhibited)
     return false;
+
+  pdumper_count = 0;
+  main_count = 0;
 
   block_input ();
 
@@ -4732,6 +4726,8 @@ garbage_collect (void)
       unbind_to (gc_count, Qnil);
     }
 
+  fprintf (stderr, "pdumper_count=%d main_count=%d\n",
+	   pdumper_count, main_count);
   return finalizer_run;
 }
 
@@ -5007,6 +5003,10 @@ void
 mark_objects (Lisp_Object *objs, ptrdiff_t n)
 {
   ptrdiff_t sp = mark_stk.sp;
+  if (objs && pdumper_address_p (objs[0]))
+    pdumper_count += n;
+  else if (objs)
+    main_count += n;
   mark_stack_push_n (objs, n);
   process_mark_stack (sp);
 }
@@ -5142,14 +5142,16 @@ sweep_void (struct thread_state *thr,
 
 	    if (marked)
 	      {
-		++cum_used;
+		if (pdumper_address_p (xpntr))
+		  ++cum_used;
+
 		switch (xtype)
 		  {
 		  case Lisp_Float:
 		    XFLOAT_UNMARK (xpntr);
 		    break;
 		  case Lisp_Cons:
-		    XUNMARK_CONS (xpntr);
+		    XCONS_UNMARK (xpntr);
 		    break;
 		  default:
 		    emacs_abort ();
@@ -5319,7 +5321,8 @@ sweep_symbols (struct thread_state *thr)
         {
           if (sym->u.s.gcmarkbit)
             {
-              ++cum_used;
+	      if (pdumper_address_p (sym))
+		++cum_used;
               sym->u.s.gcmarkbit = false;
             }
 	  else

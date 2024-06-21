@@ -826,10 +826,7 @@ INLINE bool
   return lisp_h_SYMBOLP (x);
 }
 
-/* I don't understand Bug#41321, and the lispsym offset.
-
-   XSETSYMBOL() subtracts (via make_lisp_ptr) the address of lispsym,
-   then XSYMBOL() adds it back.*/
+/* See make_lisp_ptr() about reconstructing xpntr from lispsym.  */
 
 INLINE struct Lisp_Symbol * ATTRIBUTE_NO_SANITIZE_UNDEFINED
 XSYMBOL (Lisp_Object obj)
@@ -839,7 +836,13 @@ XSYMBOL (Lisp_Object obj)
 		   + (uintptr_t) XUNTAG (obj, Lisp_Symbol, struct Lisp_Symbol));
 }
 
-/* See XSYMBOL() comment regarding lispsym offset.  */
+/* "Prefer symbol indexes to struct Lisp_Symbol * casted and then
+   widened, as the latter had trouble with GCC on Fedora 21 when
+   configured --with-wide-int and when used in static initializers."
+   -- Eggert in 6a37ece
+
+   And so began the shitstorm of exceptions for symbols.
+*/
 
 INLINE Lisp_Object
 make_lisp_ptr (void *xpntr0, enum Lisp_Type type)
@@ -864,14 +867,12 @@ INLINE bool
 builtin_lisp_symbol_p (struct Lisp_Symbol *sym)
 {
   char *bp = (char *) lispsym;
-  char *sp = (char *) sym;
-  if (PTRDIFF_MAX < INTPTR_MAX)
-    return bp <= sp && sp < bp + sizeof lispsym;
-  else
-    {
-      ptrdiff_t offset = sp - bp;
-      return 0 <= offset && offset < sizeof lispsym;
-    }
+  char *p = (char *) sym;
+  ptrdiff_t offset;
+  return (PTRDIFF_MAX < INTPTR_MAX)
+    ? bp <= p && p < bp + sizeof lispsym
+    : (!ckd_sub (&offset, (uintptr_t) p, (uintptr_t) bp)
+       && 0 <= offset && offset < sizeof lispsym);
 }
 
 INLINE void

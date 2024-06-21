@@ -150,38 +150,6 @@ struct dump_header
 /* Worst-case allocation granularity.  */
 #define MAX_PAGE_SIZE (64 * 1024)
 
-/* Dump runtime */
-enum dump_memory_protection
-{
-  DUMP_MEMORY_ACCESS_NONE = 1,
-  DUMP_MEMORY_ACCESS_READ = 2,
-  DUMP_MEMORY_ACCESS_READWRITE = 3,
-};
-
-struct dump_memory_map_spec
-{
-  int fd;  /* File to map; anon zero if negative.  */
-  size_t size;  /* Number of bytes to map.  */
-  off_t offset;  /* Offset within fd.  */
-  enum dump_memory_protection protection;
-};
-
-struct dump_memory_map
-{
-  struct dump_memory_map_spec spec;
-  void *mapping;  /* Actual mapped memory.  */
-  void (*release) (struct dump_memory_map *);
-  void *private;
-};
-
-enum dump_section
-  {
-    DS_HOT,
-    DS_DISCARDABLE,
-    DS_COLD,
-    NUMBER_DUMP_SECTIONS,
-  };
-
 struct pdumper_info
 {
   struct dump_header header;
@@ -211,6 +179,7 @@ typedef int_least32_t dump_off;
 
 enum
   {
+    RELOC_LV_NTYPES = 8,
     RELOC_TYPE_NBITS = 5,
     RELOC_OFFS_NBITS = DUMP_OFF_NBITS - RELOC_TYPE_NBITS,
     DUMP_ALIGNMENT = max (GCALIGNMENT, 4),
@@ -230,13 +199,13 @@ enum reloc_type
     RELOC_COPY_FROM_DUMP,
     /* Set a memory location to the verbatim value */
     RELOC_IMMEDIATE,
-    /* dump_lv = make_lisp_ptr (dump_lv + dump_basis, type - RELOC_DUMP_LV) */
+    /* make_lisp_ptr (reloc.offset + dump_basis(), reloc.type - RELOC_DUMP_LV) */
     RELOC_DUMP_LV,
-    /* dump_lv = make_lisp_ptr (dump_lv + emacs_basis(), type - RELOC_DUMP_LV) */
-    RELOC_EMACS_LV = RELOC_DUMP_LV + 8,
+    /* make_lisp_ptr (reloc.offset + emacs_basis(), reloc.type - RELOC_EMACS_LV) */
+    RELOC_EMACS_LV = RELOC_DUMP_LV + RELOC_LV_NTYPES,
   };
 
-verify (RELOC_EMACS_LV + 8 < (1 << RELOC_TYPE_NBITS));
+verify (RELOC_EMACS_LV + RELOC_LV_NTYPES < (1 << RELOC_TYPE_NBITS));
 verify (DUMP_ALIGNMENT >= GCALIGNMENT);
 
 struct dump_start
@@ -298,11 +267,6 @@ extern void pdumper_clear_marks (void);
 extern void pdumper_record_wd (const char *);
 
 extern ssize_t read_bytes (int fd, void *buf, size_t bytes_to_read);
-extern bool mmap_contiguous_vm (struct dump_memory_map *maps, int nr_maps,
-				size_t total_size);
-extern bool mmap_contiguous_heap (struct dump_memory_map *maps, int nr_maps,
-				  size_t total_size);
-
 extern void init_pdumper_once (void);
 extern void syms_of_pdumper (void);
 

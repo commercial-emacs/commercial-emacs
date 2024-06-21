@@ -25,6 +25,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    Relocations adjust pointers within the dump to account for the new
    process's address space.
+
+   Things may make more sense if you prepend "on_load" to all the
+   reloc_* function names.
 */
 
 #include <config.h>
@@ -497,7 +500,7 @@ remember_object (struct dump_context *ctx, Lisp_Object object, dump_off offset)
 }
 
 /* If this object lives in the Emacs image and not on the heap, return
-   a pointer to the object data.  Otherwise, return NULL.  */
+   its xpntr.  Otherwise, return NULL.  */
 static void *
 emacs_ptr (Lisp_Object lv)
 {
@@ -506,8 +509,7 @@ emacs_ptr (Lisp_Object lv)
   if (builtin_symbol_p (lv))
     return XSYMBOL (lv);
   if (XTYPE (lv) == Lisp_Vectorlike
-      && PVTYPE (XVECTOR (lv)) == PVEC_THREAD
-      && main_thread_p (XTHREAD (lv)))
+      && PVTYPE (XVECTOR (lv)) == PVEC_THREAD)
     return XTHREAD (lv);
   return NULL;
 }
@@ -931,21 +933,21 @@ remember_cold_op (struct dump_context *ctx, enum cold_op op, Lisp_Object arg)
    a number relative to emacs_basis().  */
 
 static void
-reloc_emacs_ptr (struct dump_context *ctx, dump_off dump_offset)
+reloc_emacs_ptr (struct dump_context *ctx, dump_off offset)
 {
   if (ctx->flags.dump_object_contents)
     push (&ctx->dump_relocs[EARLY_RELOCS],
 	  list2 (make_fixnum (RELOC_EMACS_PTR),
-		 INT_TO_INTEGER (dump_offset)));
+		 INT_TO_INTEGER (offset)));
 }
 
 /* Add a dump (versus emacs) relocation that updates the Lisp_Object
-   at DUMP_OFFSET in the dump to point to another object in the dump.
-   The Lisp_Object-sized value at DUMP_OFFSET in the dump file should
+   at OFFSET in the dump to point to another object in the dump.
+   The Lisp_Object-sized value at OFFSET in the dump file should
    contain the offset of the target object relative to the start of
    the dump.  */
 static void
-reloc_dump_lv (struct dump_context *ctx, dump_off dump_offset,
+reloc_dump_lv (struct dump_context *ctx, dump_off offset,
 	       enum Lisp_Type type)
 {
   if (ctx->flags.dump_object_contents)
@@ -962,49 +964,33 @@ reloc_dump_lv (struct dump_context *ctx, dump_off dump_offset,
 	  break;
 	default:
 	  emacs_abort ();
+	  break;
 	}
 
       push (&ctx->dump_relocs[EARLY_RELOCS],
 	    list2 (make_fixnum (reloc_type),
-		   INT_TO_INTEGER (dump_offset)));
+		   INT_TO_INTEGER (offset)));
     }
 }
 
 static void
-reloc_dump_ptr (struct dump_context *ctx, dump_off dump_offset)
+reloc_dump_ptr (struct dump_context *ctx, dump_off offset)
 {
   if (ctx->flags.dump_object_contents)
     push (&ctx->dump_relocs[EARLY_RELOCS],
 	  list2 (make_fixnum (RELOC_DUMP_PTR),
-		 INT_TO_INTEGER (dump_offset)));
+		 INT_TO_INTEGER (offset)));
 }
 
-/* Populate Lisp_Object-sized value at DUMP_OFFSET with
-   offset of the target Lisp_Object relative to emacs_basis().
-   TYPE is that of Lisp value.  */
+/* On load, rebase Lisp_Object at OFFSET in the readback from emacs_basis().  */
 static void
-reloc_emacs_lv (struct dump_context *ctx, dump_off dump_offset,
+reloc_emacs_lv (struct dump_context *ctx, dump_off offset,
 		enum Lisp_Type type)
 {
   if (ctx->flags.dump_object_contents)
-    {
-      int reloc_type;
-      switch (type)
-	{
-	case Lisp_String:
-	case Lisp_Vectorlike:
-	case Lisp_Cons:
-	case Lisp_Float:
-	  reloc_type = RELOC_EMACS_LV + type;
-	  break;
-	default:
-	  emacs_abort ();
-	  break;
-	}
-      push (&ctx->dump_relocs[EARLY_RELOCS],
-	    list2 (make_fixnum (reloc_type),
-		   INT_TO_INTEGER (dump_offset)));
-    }
+    push (&ctx->dump_relocs[EARLY_RELOCS],
+	  list2 (make_fixnum (RELOC_EMACS_LV + type),
+		 INT_TO_INTEGER (offset)));
 }
 
 uintptr_t
@@ -1019,31 +1005,29 @@ emacs_offset (const void *emacs_ptr)
   return DUMP_OFF ((intptr_t) emacs_ptr - (intptr_t) emacs_basis ());
 }
 
-/* Add an executable (versus dump) relocation that copies arbitrary bytes
+/* Add an out-of-dump relocation that copies arbitrary bytes
    from the dump.
 
    When the dump is loaded, Emacs copies SIZE bytes from OFFSET in
    dump to LOCATION in the Emacs data section.  This copying happens
-   after other relocations, so it's all right to, say, copy a
-   Lisp_Object (since by the time we copy the Lisp_Object, it'll have
-   been adjusted to account for the location of the running Emacs and
-   dump file).  */
+   after other relocations so all Lisp_Objects will have been
+   rebased for the new process.  */
 static void
-reloc_copy_from_dump (struct dump_context *ctx, dump_off dump_offset,
+reloc_copy_from_dump (struct dump_context *ctx, dump_off offset,
 		      void *emacs_ptr, dump_off length)
 {
   if (ctx->flags.dump_object_contents && length)
     {
-      eassert (dump_offset >= 0);
+      eassert (offset >= 0);
       push (&ctx->emacs_relocs,
 	    list4 (make_fixnum (RELOC_COPY_FROM_DUMP),
 		   INT_TO_INTEGER (emacs_offset (emacs_ptr)),
-		   INT_TO_INTEGER (dump_offset),
+		   INT_TO_INTEGER (offset),
 		   INT_TO_INTEGER (length)));
     }
 }
 
-/* Modify executable at EMACS_PTR to arbitrary bytes at VALUE_PTR.  */
+/* Modify emacs at EMACS_PTR to arbitrary bytes at VALUE_PTR.  */
 static void
 reloc_immediate (struct dump_context *ctx, const void *emacs_ptr,
 		 const void *value_ptr, dump_off size)
@@ -1077,21 +1061,20 @@ DEFINE_EMACS_IMMEDIATE_FN (reloc_immediate_int, int)
 DEFINE_EMACS_IMMEDIATE_FN (reloc_immediate_bool, bool)
   ;
 
-/* Add an executable (versus dump) relocation that points into the dump.  */
+/* Add an out-of-dump relocation that points into the dump.  */
 static void
 reloc_to_dump_ptr (struct dump_context *ctx,
-		   const void *emacs_ptr, dump_off dump_offset)
+		   const void *emacs_ptr, dump_off offset)
 {
   if (ctx->flags.dump_object_contents)
     push (&ctx->emacs_relocs,
 	  list3 (make_fixnum (RELOC_DUMP_PTR),
 		 INT_TO_INTEGER (emacs_offset (emacs_ptr)),
-		 INT_TO_INTEGER (dump_offset)));
+		 INT_TO_INTEGER (offset)));
 }
 
-/* Add executable (versus dump) relocation to point to a
+/* Add out-of-dump relocation to point to a
    Lisp_Object.  */
-
 static void
 reloc_to_lv (struct dump_context *ctx, Lisp_Object const *obj)
 {
@@ -1100,17 +1083,16 @@ reloc_to_lv (struct dump_context *ctx, Lisp_Object const *obj)
   else
     {
       if (ctx->flags.dump_object_contents)
-	push (&ctx->emacs_relocs,
-	      list3 (make_fixnum (emacs_ptr (*obj)
-				  ? RELOC_EMACS_LV
-				  : RELOC_DUMP_LV),
-		     INT_TO_INTEGER (emacs_offset (obj)),
-		     *obj));
+	push (&ctx->emacs_relocs, list3 (make_fixnum (emacs_ptr (*obj)
+						      ? RELOC_EMACS_LV
+						      : RELOC_DUMP_LV),
+					 INT_TO_INTEGER (emacs_offset (obj)),
+					 *obj));
       enqueue_object (ctx, *obj, WEIGHT_NONE);
     }
 }
 
-/* Add an executable (versus dump) relocation that assigns a raw pointer
+/* Add an out-of-dump relocation that assigns a raw pointer
    back to another location in the image.  */
 
 static void
@@ -1134,24 +1116,24 @@ enum dump_fixup_type
     FIXUP_BIGNUM_DATA,
   };
 
-/* Plan to have pointer-sized value at DUMP_OFFSET get fixed to NEW_DUMP_OFFSET.  */
+/* Plan to have pointer-sized value at OFFSET get fixed to NEW_OFFSET.  */
 static void
 remember_fixup_ptr (struct dump_context *ctx,
-		    dump_off dump_offset,
-		    dump_off new_dump_offset)
+		    dump_off offset,
+		    dump_off new_offset)
 {
   if (ctx->flags.dump_object_contents)
     {
       /* We should not be generating relocations into the
 	 to-be-copied-into-Emacs dump region.  */
       eassert (ctx->header.discardable_start == 0
-	       || new_dump_offset < ctx->header.discardable_start
+	       || new_offset < ctx->header.discardable_start
 	       || (ctx->header.cold_start != 0
-		   && new_dump_offset >= ctx->header.cold_start));
+		   && new_offset >= ctx->header.cold_start));
       push (&ctx->fixups,
 	    list3 (make_fixnum (FIXUP_PTR_DUMP_RAW),
-		   INT_TO_INTEGER (dump_offset),
-		   INT_TO_INTEGER (new_dump_offset)));
+		   INT_TO_INTEGER (offset),
+		   INT_TO_INTEGER (new_offset)));
     }
 }
 
@@ -1309,25 +1291,25 @@ write_field_lisp_object (struct dump_context *ctx,
   write_field_lisp_common (ctx, (char *) out + relpos, value, weight);
 }
 
-/* Point dumped object field to contents at TARGET_DUMP_OFFSET.  */
+/* Point dumped object field to contents at TARGET_OFFSET.  */
 static void
 write_field_dump_ptr (struct dump_context *ctx,
 		      void *out,
 		      const void *in_start,
 		      const void *in_field,
-		      dump_off target_dump_offset)
+		      dump_off target_offset)
 {
   eassert (ctx->obj_offset > 0);
   if (ctx->flags.dump_object_contents)
     {
       dump_off relpos = field_relpos (in_start, in_field);
       reloc_dump_ptr (ctx, ctx->obj_offset + relpos);
-      intptr_t outval = target_dump_offset;
+      intptr_t outval = target_offset;
       memcpy ((char *) out + relpos, &outval, sizeof (outval));
     }
 }
 
-/* Point dumped object field to verbatim address within executable.
+/* Point dumped object field to verbatim address within emacs.
 
    CTX is the dump context.  OUT points to the dumped object.  IN_START
    and IN_FIELD are the starting address and target field of the current
@@ -2418,11 +2400,8 @@ dump_vectorlike (struct dump_context *ctx,
 #endif
       break;
     case PVEC_THREAD:
-      if (main_thread_p (v))
-        {
-          eassert (emacs_ptr (lv));
-          return IS_RUNTIME_MAGIC;
-        }
+      eassert (emacs_ptr (lv));
+      return IS_RUNTIME_MAGIC;
       break;
     case PVEC_WINDOW_CONFIGURATION:
     case PVEC_OTHER:
@@ -2481,8 +2460,7 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
       return offset;
     }
 
-  void *in_emacs = emacs_ptr (object);
-  if (in_emacs && ctx->flags.defer_copied_objects)
+  if (emacs_ptr (object) && ctx->flags.defer_copied_objects)
     {
       if (offset != ON_COPIED_QUEUE)
         {
@@ -2504,14 +2482,14 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
   /* Object needs to be dumped.  */
   switch (XTYPE (object))
     {
+    case Lisp_Symbol:
+      offset = dump_symbol (ctx, object, offset);
+      break;
     case Lisp_String:
       offset = dump_string (ctx, XSTRING (object));
       break;
     case Lisp_Vectorlike:
       offset = dump_vectorlike (ctx, object, offset);
-      break;
-    case Lisp_Symbol:
-      offset = dump_symbol (ctx, object, offset);
       break;
     case Lisp_Cons:
       offset = dump_cons (ctx, XCONS (object));
@@ -2519,8 +2497,8 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
     case Lisp_Float:
       offset = dump_float (ctx, XFLOAT (object));
       break;
-    case_Lisp_Int: /* self representing ought not be dumped */
     default:
+      /* self representing, e.g., Lisp_Int, ought not be dumped */
       emacs_abort ();
       break;
     }
@@ -2716,8 +2694,8 @@ dump_cold_charset (struct dump_context *ctx, Lisp_Object data)
 {
   /* Dump charset lookup tables.  */
   int cs_i = XFIXNUM (XCAR (data));
-  dump_off cs_dump_offset = INTEGER_TO_INT (XCDR (data));
-  remember_fixup_ptr (ctx, cs_dump_offset + DUMP_OFFSETOF (struct charset, code_space_mask),
+  dump_off cs_offset = INTEGER_TO_INT (XCDR (data));
+  remember_fixup_ptr (ctx, cs_offset + DUMP_OFFSETOF (struct charset, code_space_mask),
 		      ctx->offset);
   struct charset *cs = charset_table + cs_i;
   write_bytes (ctx, cs->code_space_mask, 256);
@@ -2948,10 +2926,10 @@ drain_user_remembered_data_cold (struct dump_context *ctx)
               else
                 {
                   eassert (!self_representing_p (lv));
-                  dump_off dump_offset = recall_object (ctx, lv);
-                  if (dump_offset <= 0)
+                  dump_off offset = recall_object (ctx, lv);
+                  if (offset <= 0)
                     error ("raw-pointer object not dumped?!");
-                  reloc_to_dump_ptr (ctx, mem, dump_offset);
+                  reloc_to_dump_ptr (ctx, mem, offset);
                 }
             }
         }
@@ -3060,10 +3038,7 @@ destructure_emacs_reloc (struct dump_context *ctx, Lisp_Object lreloc)
         reloc.length = tag_type;
 
         if (type == RELOC_EMACS_LV)
-          {
-            void *in_emacs = emacs_ptr (target_value);
-            reloc.ptr.offset = emacs_offset (in_emacs);
-          }
+	  reloc.ptr.offset = emacs_offset (emacs_ptr (target_value));
         else
           {
 	    eassume (ctx); /* Pacify GCC 9.2.1 -O3 -Wnull-dereference.  */
@@ -3206,58 +3181,64 @@ fixup (struct dump_context *ctx)
       Lisp_Object arg = pop (&fixup);
       eassert (NILP (fixup));
       seek (ctx, dump_fixup_offset);
-      intptr_t dump_value;
-      bool do_write = true;
       switch (type)
 	{
 	case FIXUP_LISP_OBJECT:
-	case FIXUP_LISP_OBJECT_RAW:
-	  /* Dump wants a pointer to a Lisp object.
-	     If FIXUP_LISP_OBJECT_RAW, we should stick a C pointer in
-	     the dump; otherwise, a Lisp_Object.  */
+	  /* Dump wants a Lisp_Object */
 	  if (SUBRP (arg) && !SUBR_NATIVE_COMPILEDP (arg))
 	    {
-	      dump_value = emacs_offset (XSUBR (arg));
-	      if (type == FIXUP_LISP_OBJECT)
-		reloc_emacs_lv (ctx, ctx->offset, XTYPE (arg));
-	      else
-		reloc_emacs_ptr (ctx, ctx->offset);
+	      intptr_t dump_value = emacs_offset (XSUBR (arg));
+	      reloc_emacs_lv (ctx, ctx->offset, XTYPE (arg));
+	      write_bytes (ctx, &dump_value, sizeof (dump_value));
 	    }
 	  else if (builtin_symbol_p (arg))
 	    {
 	      eassert (self_representing_p (arg));
-	      /* These symbols are part of Emacs, so point there.  If we
-		 want a Lisp_Object, we're set.  If we want a raw pointer,
-		 we need to emit a relocation.  */
-	      if (type == FIXUP_LISP_OBJECT)
-		{
-		  do_write = false;
-		  write_bytes (ctx, &arg, sizeof (arg));
-		}
-	      else
-		{
-		  dump_value = emacs_offset (XSYMBOL (arg));
-		  reloc_emacs_ptr (ctx, ctx->offset);
-		}
+	      write_bytes (ctx, &arg, sizeof (arg));
 	    }
 	  else
 	    {
 	      eassert (emacs_ptr (arg) == NULL);
-	      dump_value = recall_object (ctx, arg);
+	      intptr_t dump_value = recall_object (ctx, arg);
 	      if (dump_value <= 0)
 		error ("fixup object not dumped");
-	      if (type == FIXUP_LISP_OBJECT)
-		reloc_dump_lv (ctx, ctx->offset, XTYPE (arg));
-	      else
-		reloc_dump_ptr (ctx, ctx->offset);
+	      reloc_dump_lv (ctx, ctx->offset, XTYPE (arg));
+	      write_bytes (ctx, &dump_value, sizeof (dump_value));
+	    }
+	  break;
+	case FIXUP_LISP_OBJECT_RAW:
+	  /* Dump wants a C pointer */
+	  if (SUBRP (arg) && !SUBR_NATIVE_COMPILEDP (arg))
+	    {
+	      intptr_t dump_value = emacs_offset (XSUBR (arg));
+	      reloc_emacs_ptr (ctx, ctx->offset);
+	      write_bytes (ctx, &dump_value, sizeof (dump_value));
+	    }
+	  else if (builtin_symbol_p (arg))
+	    {
+	      eassert (self_representing_p (arg));
+	      intptr_t dump_value = emacs_offset (XSYMBOL (arg));
+	      reloc_emacs_ptr (ctx, ctx->offset);
+	      write_bytes (ctx, &dump_value, sizeof (dump_value));
+	    }
+	  else
+	    {
+	      eassert (emacs_ptr (arg) == NULL);
+	      intptr_t dump_value = recall_object (ctx, arg);
+	      if (dump_value <= 0)
+		error ("fixup object not dumped");
+	      reloc_dump_ptr (ctx, ctx->offset);
+	      write_bytes (ctx, &dump_value, sizeof (dump_value));
 	    }
 	  break;
 	case FIXUP_PTR_DUMP_RAW:
-	  /* Dump wants a raw pointer to something that's not a lisp
-	     object.  It knows the exact location it wants, so just
+	  /* Dump knows the exact location it wants, so just
 	     believe it.  */
-	  dump_value = INTEGER_TO_INT (arg);
-	  reloc_dump_ptr (ctx, ctx->offset);
+	  {
+	    intptr_t dump_value = INTEGER_TO_INT (arg);
+	    reloc_dump_ptr (ctx, ctx->offset);
+	    write_bytes (ctx, &dump_value, sizeof (dump_value));
+	  }
 	  break;
 	case FIXUP_BIGNUM_DATA:
 	  {
@@ -3270,15 +3251,12 @@ fixup (struct dump_context *ctx)
 	    reload_info.nlimbs = INTEGER_TO_INT (pop (&arg));
 	    eassert (NILP (arg));
 	    write_bytes (ctx, &reload_info, sizeof (reload_info));
-	    do_write = false;
 	    break;
 	  }
 	default:
 	  emacs_abort ();
 	  break;
 	}
-      if (do_write)
-	write_bytes (ctx, &dump_value, sizeof (dump_value));
     }
   seek (ctx, saved_offset);
 }
@@ -3469,7 +3447,7 @@ DEFUN ("dump-emacs-portable",
      the next page boundary.  */
   const dump_off hot_end = ctx->offset;
 
-  /* The discardable section is memcpy()ed into the executable data
+  /* The discardable section is memcpy()ed into the emacs data
      segment upon load (and discarded afterwards).  */
   ctx->header.discardable_start = hot_end;
   drain_copied_objects (ctx);
@@ -3488,7 +3466,7 @@ DEFUN ("dump-emacs-portable",
   /* That's it for Lisp data in the heap.  */
   ctx->end_heap = ctx->offset;
 
-  /* Make remembered modifications.  */
+  /* Make promised modifications.  */
   fixup (ctx);
 
   /* Emit relocations in the cold section.  */
