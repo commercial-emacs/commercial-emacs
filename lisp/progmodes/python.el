@@ -5048,8 +5048,6 @@ See `python-check-command' for the default."
                 doc = '{objtype} {name}{args}'.format(
                     objtype=objtype, name=name, args=args
                 )
-        else:
-            doc = doc.splitlines()[0]
     except:
         doc = ''
     return doc"
