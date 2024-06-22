@@ -4762,6 +4762,7 @@ unwind_create_frame (Lisp_Object frame)
 
 #if defined GLYPH_DEBUG && defined ENABLE_CHECKING
       /* Check that reference counts are indeed correct.  */
+      struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
       eassert (dpyinfo->reference_count == dpyinfo_refcount);
       eassert (dpyinfo->terminal->image_cache->refcount == image_cache_refcount);
 #endif
