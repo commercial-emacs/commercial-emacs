@@ -58,6 +58,20 @@ fit these criteria."
   :version "24.1"
   :type 'float)
 
+(defcustom shr-sliced-image-height 0.9
+  "How tall images can be before slicing in relation to the window they're in.
+A value of 0.7 means that images are allowed to take up 70% of the
+height of the window before being sliced by `insert-sliced-image'.  If
+nil, never slice images.
+
+Sliced images allow for more intuitive scrolling up/down by letting you
+scroll past each slice, instead of jumping past the entire image.
+Alternately, you can use `pixel-scroll-precision-mode' to scroll
+pixel-wise past images, in which case you can set this option to nil."
+  :version "31.1"
+  :type '(choice (const :tag "Never slice images")
+                 float))
+
 (defcustom shr-allowed-images nil
   "If non-nil, only images that match this regexp are displayed.
 If nil, all URLs are allowed.  Also see `shr-blocked-images'."
@@ -259,17 +273,17 @@ temporarily blinks with this face."
   :version "28.1")
 
 (defface shr-h4
-  '((t :inherit default))
+  '((t (:inherit default)))
   "Face for <h4> elements."
   :version "28.1")
 
 (defface shr-h5
-  '((t :inherit default))
+  '((t (:inherit default)))
   "Face for <h5> elements."
   :version "28.1")
 
 (defface shr-h6
-  '((t :inherit default))
+  '((t (:inherit default)))
   "Face for <h6> elements."
   :version "28.1")
 
@@ -1119,35 +1133,31 @@ the mouse click event."
   "Insert image SPEC with a string ALT.  Return image.
 SPEC is either an image data blob, or a list where the first
 element is the data blob and the second element is the content-type."
-  (let (image)
-    (when (display-graphic-p)
+  (if (display-graphic-p)
       (let* ((size (cdr (assq 'size flags)))
 	     (data (if (consp spec)
 		       (car spec)
 		     spec))
 	     (content-type (and (consp spec)
 				(cadr spec)))
-	     (start (point)))
-        (setq image
-              (cond
-	       ((eq size 'original)
-		(create-image data nil t :ascent 100
-			      :format content-type))
-	       ((eq content-type 'image/svg+xml)
-                (when (image-type-available-p 'svg)
-		  (create-image data 'svg t :ascent 100)))
-               ((eq content-type 'application/octet-stream)
-                nil)
-	       ((eq size 'full)
-		(ignore-errors
-		  (shr-rescale-image data content-type
-                                     (plist-get flags :width)
-                                     (plist-get flags :height))))
-	       (t
-		(ignore-errors
-		  (shr-rescale-image data content-type
-                                     (plist-get flags :width)
-                                     (plist-get flags :height))))))
+	     (start (point))
+	     (image (cond
+		     ((eq size 'original)
+		      (create-image data nil t :ascent shr-image-ascent
+				    :format content-type))
+		     ((eq content-type 'image/svg+xml)
+                      (when (image-type-available-p 'svg)
+		        (create-image data 'svg t :ascent shr-image-ascent)))
+		     ((eq size 'full)
+		      (ignore-errors
+			(shr-rescale-image data content-type
+                                           (plist-get flags :width)
+                                           (plist-get flags :height))))
+		     (t
+		      (ignore-errors
+			(shr-rescale-image data content-type
+                                           (plist-get flags :width)
+                                           (plist-get flags :height)))))))
         (when image
           ;; The trailing space can confuse shr-insert into not
           ;; putting any space after inline images.
@@ -1157,26 +1167,39 @@ element is the data blob and the second element is the content-type."
           (when (length= alt 0) (setq alt "*"))
 	  ;; When inserting big-ish pictures, put them at the
 	  ;; beginning of the line.
-          (when (and (> (current-column) 0)
-		     (> (car (image-size image t)) 400))
-	    (insert "\n"))
-	  (if (eq size 'original)
-              ;; Normally, we try to keep the buffer text the same
-              ;; by preserving ALT.  With a sliced image, we have to
-              ;; repeat the text for each line, so we can't do that.
-              ;; Just use "*" for the string to insert instead.
-              (progn
-                (insert-sliced-image image "*" nil 20 1)
-                (let ((overlay (make-overlay start (point))))
-                  ;; Avoid displaying unsightly decorations on the
-                  ;; image slices.
-                  (overlay-put overlay 'face 'shr-sliced-image)))
-	    (insert-image image alt))
-          (put-text-property start (point) 'image-size size)
-          (when (and shr-image-animate
-                     (cdr (image-multi-frame-p image)))
-            (image-animate image nil 60)))))
-    (or image (insert (or alt "")))))
+	  (let ((inline (shr--inline-image-p image)))
+	    (when (and (> (current-column) 0)
+		     (not inline))
+		(insert "\n"))
+	    (let ((image-pos (point))
+                  image-height body-height)
+	      (if (and shr-sliced-image-height
+                       (setq image-height (cdr (image-size image t))
+                             body-height (window-body-height
+                                          (get-buffer-window (current-buffer))
+                                          t))
+                       (> (/ image-height body-height 1.0)
+                          shr-sliced-image-height))
+                  ;; Normally, we try to keep the buffer text the same
+                  ;; by preserving ALT.  With a sliced image, we have to
+                  ;; repeat the text for each line, so we can't do that.
+                  ;; Just use "*" for the string to insert instead.
+                  (progn
+                    (insert-sliced-image
+                     image "*" nil (/ image-height (default-line-height)) 1)
+                    (let ((overlay (make-overlay start (point))))
+                      ;; Avoid displaying unsightly decorations on the
+                      ;; image slices.
+                      (overlay-put overlay 'face 'shr-sliced-image)))
+		(insert-image image alt))
+	      (put-text-property start (point) 'image-size size)
+	      (when (and (not inline) shr-max-inline-image-size)
+		(insert "\n"))
+	      (when (and shr-image-animate
+			 (cdr (image-multi-frame-p image)))
+		(image-animate image nil 60 image-pos)))))
+	image)
+    (insert (or alt ""))))
 
 (defun shr--image-type ()
   "Emacs image type to use when displaying images.
