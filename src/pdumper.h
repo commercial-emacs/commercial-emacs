@@ -154,6 +154,7 @@ struct pdumper_info
 {
   struct dump_header header;
   bitset mark_bits;
+  bitset gc_frontier;
   double load_time;
   char *filename;
   uintptr_t addr_beg;
@@ -262,6 +263,7 @@ extern void pdumper_fingerprint (FILE *output, char const *label,
 extern bool pdumper_marked_p (const void *obj);
 extern void pdumper_set_marked (const void *obj);
 extern void pdumper_clear_marks (void);
+extern void pdumper_set_frontier (const void *obj);
 
 /* Record directory where dump was loaded.  */
 extern void pdumper_record_wd (const char *);

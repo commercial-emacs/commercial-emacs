@@ -744,7 +744,7 @@ typedef EMACS_UINT Lisp_Word_tag;
   LISP_INITIALLY ((Lisp_Word) ((uintptr_t) (p) + LISP_WORD_TAG (tag)))
 
 /* LISPSYM_INITIALLY (Qfoo) is equivalent to Qfoo except it is
-   designed for use as a (possibly static) initializer.  */
+   designed for use as a static initializer.  */
 #define LISPSYM_INITIALLY(name) \
   TAG_PTR_INITIALLY (Lisp_Symbol, (intptr_t) ((i##name) * sizeof *lispsym))
 

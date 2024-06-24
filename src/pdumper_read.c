@@ -929,6 +929,9 @@ pdumper_load (char *filename)
   pdumper_info.mark_bits = bitset_create
     (divide_round_up (header->discardable_start, DUMP_ALIGNMENT),
      BITSET_FIXED);
+  pdumper_info.gc_frontier = bitset_create
+    (divide_round_up (header->discardable_start, DUMP_ALIGNMENT),
+     BITSET_FIXED);
   pdumper_info.addr_beg = (uintptr_t) sections[0].mapping;
   pdumper_info.addr_end = (uintptr_t) ((char *) pdumper_info.addr_beg + dump_size);
 

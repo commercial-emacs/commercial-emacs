@@ -499,8 +499,9 @@ remember_object (struct dump_context *ctx, Lisp_Object object, dump_off offset)
   Fputhash (object, INT_TO_INTEGER (offset), ctx->objects_dumped);
 }
 
-/* If this object lives in the Emacs image and not on the heap, return
-   its xpntr.  Otherwise, return NULL.  */
+/* If LV lives outside alloc.c blocks, return its xpntr and NULL
+   otherwise.
+*/
 static void *
 emacs_ptr (Lisp_Object lv)
 {
@@ -2466,11 +2467,11 @@ dump_object (struct dump_context *ctx, Lisp_Object object)
         {
 	  eassert (offset == ON_NORMAL_QUEUE || offset == NOT_SEEN);
           /* Recursively enqueue object's referents.  */
-          struct dump_flags old_flags = ctx->flags;
+          struct dump_flags restore_flags = ctx->flags;
           ctx->flags.dump_object_contents = false;
           ctx->flags.defer_copied_objects = false;
           dump_object (ctx, object);
-          ctx->flags = old_flags;
+          ctx->flags = restore_flags;
 
           offset = ON_COPIED_QUEUE;
           remember_object (ctx, object, offset);
@@ -3676,6 +3677,18 @@ void
 pdumper_clear_marks (void)
 {
   bitset_zero (pdumper_info.mark_bits);
+}
+
+void
+pdumper_set_frontier (const void *obj)
+{
+  eassert (pdumper_address_p (obj));
+  ptrdiff_t offset = (uintptr_t) obj - pdumper_info.addr_beg;
+  eassert (offset % DUMP_ALIGNMENT == 0);
+  eassert (offset < pdumper_info.header.cold_start);
+  eassert (offset < pdumper_info.header.discardable_start);
+  ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
+  bitset_set (pdumper_info.gc_frontier, (bitset_bindex) bitno);
 }
 
 ssize_t

@@ -197,7 +197,7 @@ XPNTR (Lisp_Object a)
 {
   return (SYMBOLP (a)
 	  ? (char *) lispsym + (XLI (a) - LISP_WORD_TAG (Lisp_Symbol))
-	  : XUNTAG (a, Lisp_Int0, void *));
+	  : XUNTAG (a, XTYPE (a), char));
 }
 
 static void
@@ -3275,7 +3275,7 @@ mark_maybe_pointer (void *const *p)
 	  /* write_field_lisp_xpntr() does not subtract lispsym so we call
 	     UNTAG instead of XPNTR.  */
 	  mark_automatic_object
-	    (make_lisp_ptr (XUNTAG (*p, start->type, void *), start->type));
+	    (make_lisp_ptr (XUNTAG (*p, start->type, void), start->type));
 	}
     }
   else if ((m = mem_find_which_thread (*p, &thr)) != mem_nil)
@@ -4467,6 +4467,7 @@ struct mark_stack
   struct mark_entry *stack;	/* base of stack */
   ptrdiff_t size;		/* allocated size in entries */
   ptrdiff_t sp;			/* current number of entries */
+  Lisp_Object *current;          /* popped stack top */
 };
 
 PER_THREAD_STATIC struct mark_stack mark_stk = {NULL, 0, 0};
@@ -4511,6 +4512,16 @@ mark_stack_push_n (Lisp_Object *values, ptrdiff_t n)
     {
       if (mark_stk.sp >= mark_stk.size)
 	grow_mark_stack ();
+
+      if (!mark_stack_empty_p ()
+	  && pdumper_address_p (XPNTR (*mark_stk.current)))
+	for (ptrdiff_t i = 0; i < n; ++i)
+	  {
+	    const void *xpntr = XPNTR (values[i]);
+	    if (!pdumper_address_p (xpntr))
+	      pdumper_set_frontier (XPNTR (*mark_stk.current));
+	  }
+
       mark_stk.stack[mark_stk.sp++] = (struct mark_entry)
 	{
 	  .n = n,
@@ -4599,6 +4610,7 @@ static int main_count;
 bool
 garbage_collect (void)
 {
+  static int repeat = 0;
   static struct timespec gc_elapsed = { 0, 0 };
   specpdl_ref count = SPECPDL_INDEX ();
 
@@ -4719,8 +4731,12 @@ garbage_collect (void)
       unbind_to (gc_count, Qnil);
     }
 
-  fprintf (stderr, "pdumper_count=%d main_count=%d\n",
-	   pdumper_count, main_count);
+  if (repeat++ % 1000000 == 0)
+    {
+      fprintf (stderr, "pdumper_count=%d main_count=%d\n",
+	       pdumper_count, main_count);
+      repeat = 0;
+    }
   return finalizer_run;
 }
 
@@ -4801,25 +4817,25 @@ process_mark_stack (ptrdiff_t base_sp)
   eassume (mark_stk.sp >= base_sp && base_sp >= 0);
   while (mark_stk.sp > base_sp)
     {
-      Lisp_Object *objp = mark_stack_pop ();
+      mark_stk.current = mark_stack_pop ();
 
-      void *xpntr = XPNTR (*objp);
+      void *xpntr = XPNTR (*mark_stk.current);
       if (PURE_P (xpntr))
 	continue;
 
-      switch (XTYPE (*objp))
+      switch (XTYPE (*mark_stk.current))
 	{
 	case Lisp_String:
 	  eassert (check_live (xpntr, MEM_TYPE_STRING));
-	  gc_process_string (objp);
+	  gc_process_string (mark_stk.current);
 	  break;
 	case Lisp_Vectorlike:
 	  {
-	    struct Lisp_Vector *ptr = XVECTOR (*objp);
+	    struct Lisp_Vector *ptr = XVECTOR (*mark_stk.current);
 	    if (!vector_marked_p (ptr))
 	      {
-		if (!PSEUDOVECTORP (*objp, PVEC_SUBR)
-		    && !PSEUDOVECTORP (*objp, PVEC_THREAD))
+		if (!PSEUDOVECTORP (*mark_stk.current, PVEC_SUBR)
+		    && !PSEUDOVECTORP (*mark_stk.current, PVEC_THREAD))
 		  eassert (check_live (xpntr, MEM_TYPE_VECTORLIKE));
 		switch (PVTYPE (ptr))
 		  {
@@ -4872,14 +4888,14 @@ process_mark_stack (ptrdiff_t base_sp)
 		    set_vector_marked (ptr);
 		    break;
 		  case PVEC_OVERLAY:
-		    mark_overlay (XOVERLAY (*objp));
+		    mark_overlay (XOVERLAY (*mark_stk.current));
 		    break;
 		  case PVEC_SUBR:
 #ifdef HAVE_NATIVE_COMP
-		    if (SUBR_NATIVE_COMPILEDP (*objp))
+		    if (SUBR_NATIVE_COMPILEDP (*mark_stk.current))
 		      {
 			set_vector_marked (ptr);
-			struct Lisp_Subr *subr = XSUBR (*objp);
+			struct Lisp_Subr *subr = XSUBR (*mark_stk.current);
 			mark_stack_push (&subr->intspec.native);
 			mark_stack_push (&subr->command_modes);
 			mark_stack_push (&subr->native_comp_u);
@@ -4908,7 +4924,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	  break;
 	case Lisp_Symbol:
 	  {
-	    struct Lisp_Symbol *ptr = XSYMBOL (*objp);
+	    struct Lisp_Symbol *ptr = XSYMBOL (*mark_stk.current);
 	    if (symbol_marked_p (ptr))
 	      break; /* !!! */
 	    else if (!builtin_lisp_symbol_p (ptr))
@@ -4955,7 +4971,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	  break;
 	case Lisp_Cons:
 	  {
-	    struct Lisp_Cons *ptr = XCONS (*objp);
+	    struct Lisp_Cons *ptr = XCONS (*mark_stk.current);
 	    if (cons_marked_p (ptr))
 	      break; /* !!! */
 	    eassert (check_live (xpntr, MEM_TYPE_CONS));
@@ -4969,7 +4985,7 @@ process_mark_stack (ptrdiff_t base_sp)
 	  break;
 	case Lisp_Float:
 	  {
-	    struct Lisp_Float *ptr = XFLOAT (*objp);
+	    struct Lisp_Float *ptr = XFLOAT (*mark_stk.current);
 	    if (ptr) /* else HASH_UNUSED_ENTRY_KEY */
 	      {
 		if (pdumper_address_p (ptr))
