@@ -2387,7 +2387,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
   /* Enter editor command loop.  This never returns.  */
   set_initial_minibuffer_mode ();
-  debug_print (Fgc_counts ());
+  /* debug_print (Fgc_counts ()); */
   Frecursive_edit ();
   eassume (false);
 }

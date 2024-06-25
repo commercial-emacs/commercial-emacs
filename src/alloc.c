@@ -4737,12 +4737,10 @@ garbage_collect (void)
       unbind_to (gc_count, Qnil);
     }
 
-  if (repeat++ % 1000000 == 0 && was_dumped_p ())
+  if (0 && was_dumped_p () && ++repeat % 1000000 == 0)
     {
       fprintf (stderr, "pdumper_count=%d main_count=%d frontier_count=%lu\n",
-	       pdumper_count,
-	       main_count,
-	       bitset_count (pdumper_info.gc_frontier));
+	       pdumper_count, main_count, bitset_count (pdumper_info.gc_frontier));
       repeat = 0;
     }
   return finalizer_run;
