@@ -1153,11 +1153,8 @@ sweep_strings (struct thread_state *thr)
 		  /* Do not use string_(set|get)_intervals here.  */
 		  s->u.s.intervals = balance_intervals (s->u.s.intervals);
 
-		  if (pdumper_address_p (s))
-		    {
-		      ++gcstat.total_strings;
-		      gcstat.total_string_bytes += STRING_BYTES (s);
-		    }
+		  ++gcstat.total_strings;
+		  gcstat.total_string_bytes += STRING_BYTES (s);
 		}
 	      else
 		{
@@ -2226,11 +2223,8 @@ sweep_vectors (struct thread_state *thr)
 		  run_vector = NULL;
 		}
 	      XVECTOR_UNMARK (vector);
-	      if (pdumper_address_p (vector))
-		{
-		  ++gcstat.total_vectors;
-		  gcstat.total_vector_slots += nbytes / word_size;
-		}
+	      ++gcstat.total_vectors;
+	      gcstat.total_vector_slots += nbytes / word_size;
 	    }
 	  else
 	    {
@@ -2278,14 +2272,11 @@ sweep_vectors (struct thread_state *thr)
       if (XVECTOR_MARKED_P (vector))
 	{
 	  XVECTOR_UNMARK (vector);
-	  if (pdumper_address_p (vector))
-	    {
-	      ++gcstat.total_vectors;
-	      gcstat.total_vector_slots
-		+= (vector->header.size & PSEUDOVECTOR_FLAG
-		    ? vector_nbytes (vector) / word_size
-		    : header_size / word_size + vector->header.size);
-	    }
+	  ++gcstat.total_vectors;
+	  gcstat.total_vector_slots
+	    += (vector->header.size & PSEUDOVECTOR_FLAG
+		? vector_nbytes (vector) / word_size
+		: header_size / word_size + vector->header.size);
 	  lvprev = &lv->next;
 	}
       else
@@ -4614,7 +4605,6 @@ maybe_garbage_collect (void)
 bool
 garbage_collect (void)
 {
-  static int repeat = 0;
   static struct timespec gc_elapsed = { 0, 0 };
   specpdl_ref count = SPECPDL_INDEX ();
 
@@ -4699,6 +4689,14 @@ garbage_collect (void)
   mark_and_sweep_weak_table_contents ();
   eassert (weak_hash_tables == NULL && mark_stack_empty_p ());
 
+  if (was_dumped_p ())
+    {
+      fprintf (stderr, "pdumper_count=%d main_count=%d mark_bits=%lu frontier_bits=%lu\n",
+	       pdumper_count, main_count,
+	       bitset_count (pdumper_info.mark_bits),
+	       bitset_count (pdumper_info.gc_frontier));
+    }
+
   gc_sweep ();
 
   unmark_main_thread ();
@@ -4737,12 +4735,6 @@ garbage_collect (void)
       unbind_to (gc_count, Qnil);
     }
 
-  if (0 && was_dumped_p () && ++repeat % 1000000 == 0)
-    {
-      fprintf (stderr, "pdumper_count=%d main_count=%d frontier_count=%lu\n",
-	       pdumper_count, main_count, bitset_count (pdumper_info.gc_frontier));
-      repeat = 0;
-    }
   return finalizer_run;
 }
 
@@ -5156,8 +5148,7 @@ sweep_void (struct thread_state *thr,
 
 	    if (marked)
 	      {
-		if (pdumper_address_p (xpntr))
-		  ++cum_used;
+		++cum_used;
 
 		switch (xtype)
 		  {
@@ -5335,8 +5326,7 @@ sweep_symbols (struct thread_state *thr)
         {
           if (sym->u.s.gcmarkbit)
             {
-	      if (pdumper_address_p (sym))
-		++cum_used;
+	      ++cum_used;
               sym->u.s.gcmarkbit = false;
             }
 	  else
@@ -5450,7 +5440,10 @@ gc_sweep (void)
     sweep_vectors (thr);
   }
   if (was_dumped_p())
-    pdumper_clear_marks ();
+    {
+      pdumper_clear_marks ();
+      pdumper_clear_frontier ();
+    }
 }
 
 #ifdef HAVE_GCC_TLS
