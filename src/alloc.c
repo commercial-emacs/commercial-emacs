@@ -3269,7 +3269,7 @@ mark_maybe_pointer (void *const *p)
 
   if (pdumper_address_p (*p))
     {
-      const struct dump_start *start = pdumper_object_start (*p);
+      const struct dump_start *start = pdumper_xpntr_start (*p);
       if (start && start->type == XTYPE ((Lisp_Object) *p))
 	{
 	  /* write_field_lisp_xpntr() does not subtract lispsym so we call
@@ -3580,7 +3580,7 @@ valid_lisp_object_p (Lisp_Object obj)
     return 2;
 
   if (pdumper_address_p (p))
-    return pdumper_object_start (p) ? 1 : 0;
+    return pdumper_xpntr_start (p) ? 1 : 0;
 
   struct thread_state *thr = NULL;
   struct mem_node *m = mem_find_which_thread (p, &thr);
@@ -4088,7 +4088,7 @@ mark_most_objects (void)
 
   // defvar_lisp calls staticpro.
   for (int i = 0; i < staticidx; ++i)
-    mark_object ((Lisp_Object *)staticvec[i]);
+    mark_object ((Lisp_Object *) staticvec[i]);
 
   for (int i = 0; i < BUFFER_LISP_SIZE; ++i)
     {
@@ -4470,7 +4470,7 @@ struct mark_stack
   Lisp_Object *current;          /* popped stack top */
 };
 
-PER_THREAD_STATIC struct mark_stack mark_stk = {NULL, 0, 0};
+PER_THREAD_STATIC struct mark_stack mark_stk = {NULL, 0, 0, 0};
 
 static inline bool
 mark_stack_empty_p (void)
@@ -4504,6 +4504,8 @@ grow_mark_stack (void)
   eassert (ms->sp < ms->size);
 }
 
+static int pdumper_count;
+static int main_count;
 static inline void
 mark_stack_push_n (Lisp_Object *values, ptrdiff_t n)
 {
@@ -4513,14 +4515,18 @@ mark_stack_push_n (Lisp_Object *values, ptrdiff_t n)
       if (mark_stk.sp >= mark_stk.size)
 	grow_mark_stack ();
 
-      if (!mark_stack_empty_p ()
-	  && pdumper_address_p (XPNTR (*mark_stk.current)))
+      for (ptrdiff_t i = 0; i < n; ++i)
+	if (pdumper_address_p (XPNTR (values[i])))
+	  ++pdumper_count;
+	else
+	  ++main_count;
+
+      if (mark_stk.current
+	  && pdumper_address_p (XPNTR (*mark_stk.current))
+	  && !pdumper_frontier_p (XPNTR (*mark_stk.current)))
 	for (ptrdiff_t i = 0; i < n; ++i)
-	  {
-	    const void *xpntr = XPNTR (values[i]);
-	    if (!pdumper_address_p (xpntr))
-	      pdumper_set_frontier (XPNTR (*mark_stk.current));
-	  }
+	  if (!pdumper_address_p (XPNTR (values[i])))
+	    pdumper_set_frontier (XPNTR (*mark_stk.current));
 
       mark_stk.stack[mark_stk.sp++] = (struct mark_entry)
 	{
@@ -4605,8 +4611,6 @@ maybe_garbage_collect (void)
 
 /* Subroutine of Fgarbage_collect that does most of the work.  */
 
-static int pdumper_count;
-static int main_count;
 bool
 garbage_collect (void)
 {
@@ -4623,6 +4627,8 @@ garbage_collect (void)
 
   pdumper_count = 0;
   main_count = 0;
+  if (was_dumped_p ())
+    bitset_zero (pdumper_info.gc_frontier);
 
   block_input ();
 
@@ -4731,10 +4737,12 @@ garbage_collect (void)
       unbind_to (gc_count, Qnil);
     }
 
-  if (repeat++ % 1000000 == 0)
+  if (repeat++ % 1000000 == 0 && was_dumped_p ())
     {
-      fprintf (stderr, "pdumper_count=%d main_count=%d\n",
-	       pdumper_count, main_count);
+      fprintf (stderr, "pdumper_count=%d main_count=%d frontier_count=%lu\n",
+	       pdumper_count,
+	       main_count,
+	       bitset_count (pdumper_info.gc_frontier));
       repeat = 0;
     }
   return finalizer_run;
@@ -4815,6 +4823,7 @@ static void
 process_mark_stack (ptrdiff_t base_sp)
 {
   eassume (mark_stk.sp >= base_sp && base_sp >= 0);
+  Lisp_Object *restore_current = mark_stk.current;
   while (mark_stk.sp > base_sp)
     {
       mark_stk.current = mark_stack_pop ();
@@ -5004,18 +5013,16 @@ process_mark_stack (ptrdiff_t base_sp)
 	  break;
 	default:
 	  emacs_abort ();
+	  break;
 	}
     }
+  mark_stk.current = restore_current;
 }
 
 void
 mark_objects (Lisp_Object *objs, ptrdiff_t n)
 {
   ptrdiff_t sp = mark_stk.sp;
-  if (objs && pdumper_address_p (objs[0]))
-    pdumper_count += n;
-  else if (objs)
-    main_count += n;
   mark_stack_push_n (objs, n);
   process_mark_stack (sp);
 }

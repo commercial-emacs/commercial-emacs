@@ -3593,15 +3593,15 @@ pdumper_fingerprint (FILE *output, char const *label,
 	   hexbuf_size, hexbuf);
 }
 
-/* Return whether the OBJ is in the cold section of the dump.
+/* Return whether the XPNTR is in the cold section of the dump.
    Only bool-vectors and floats should end up there.  */
 bool
-pdumper_cold_p (const void *obj)
+pdumper_cold_p (const void *xpntr)
 {
   bool ret = false;
-  if (pdumper_address_p (obj))
+  if (pdumper_address_p (xpntr))
     {
-      dump_off offset = DUMP_OFF ((uintptr_t) obj - pdumper_info.addr_beg);
+      dump_off offset = DUMP_OFF ((uintptr_t) xpntr - pdumper_info.addr_beg);
       ret = (offset >= pdumper_info.header.cold_start);
     }
   return ret;
@@ -3609,7 +3609,7 @@ pdumper_cold_p (const void *obj)
 
 /* Return dump entry corresponding to ADDR.  */
 const struct dump_start *
-pdumper_object_start (const void *addr)
+pdumper_xpntr_start (const void *addr)
 {
   const struct dump_start *ret = NULL;
   if (pdumper_address_p (addr))
@@ -3646,12 +3646,12 @@ pdumper_object_start (const void *addr)
 
 /* Return whether OBJ is marked according to the portable dumper.  */
 bool
-pdumper_marked_p (const void *obj)
+pdumper_marked_p (const void *xpntr)
 {
   bool ret = false;
-  if (pdumper_address_p (obj))
+  if (pdumper_address_p (xpntr))
     {
-      ptrdiff_t offset = (uintptr_t) obj - pdumper_info.addr_beg;
+      ptrdiff_t offset = (uintptr_t) xpntr - pdumper_info.addr_beg;
       eassert (offset % DUMP_ALIGNMENT == 0);
       eassert (offset < pdumper_info.header.cold_start);
       eassert (offset < pdumper_info.header.discardable_start);
@@ -3662,10 +3662,10 @@ pdumper_marked_p (const void *obj)
 }
 
 void
-pdumper_set_marked (const void *obj)
+pdumper_set_marked (const void *xpntr)
 {
-  eassert (pdumper_address_p (obj));
-  ptrdiff_t offset = (uintptr_t) obj - pdumper_info.addr_beg;
+  eassert (pdumper_address_p (xpntr));
+  ptrdiff_t offset = (uintptr_t) xpntr - pdumper_info.addr_beg;
   eassert (offset % DUMP_ALIGNMENT == 0);
   eassert (offset < pdumper_info.header.cold_start);
   eassert (offset < pdumper_info.header.discardable_start);
@@ -3680,15 +3680,35 @@ pdumper_clear_marks (void)
 }
 
 void
-pdumper_set_frontier (const void *obj)
+pdumper_set_frontier (const void *xpntr)
 {
-  eassert (pdumper_address_p (obj));
-  ptrdiff_t offset = (uintptr_t) obj - pdumper_info.addr_beg;
+  eassert (pdumper_address_p (xpntr));
+  ptrdiff_t offset = (uintptr_t) xpntr - pdumper_info.addr_beg;
   eassert (offset % DUMP_ALIGNMENT == 0);
   eassert (offset < pdumper_info.header.cold_start);
   eassert (offset < pdumper_info.header.discardable_start);
   ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
   bitset_set (pdumper_info.gc_frontier, (bitset_bindex) bitno);
+}
+
+/* Return whether XPNTR is marked according to the portable dumper.  */
+bool
+pdumper_frontier_p (const void *xpntr)
+{
+  bool ret = false;
+  if (pdumper_address_p (xpntr))
+    {
+      ptrdiff_t offset = (uintptr_t) xpntr - pdumper_info.addr_beg;
+      ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
+      ret = bitset_test (pdumper_info.gc_frontier, (bitset_bindex) bitno);
+    }
+  return ret;
+}
+
+void
+pdumper_clear_frontier (void)
+{
+  bitset_zero (pdumper_info.gc_frontier);
 }
 
 ssize_t

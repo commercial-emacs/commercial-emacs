@@ -1531,7 +1531,7 @@ lists of strings."
                      (lambda (entry)
                        (zerop (or (cl-search "gnus-" (symbol-name (car entry)))
                                   -1)))
-                     (buffer-local-variables))))
+                     (cl-remove-if-not #'consp (buffer-local-variables)))))
      (with-temp-buffer
        (mapc (lambda (v) (set (make-local-variable (car v)) (cdr v))) gnus-vars)
        ,@forms)))

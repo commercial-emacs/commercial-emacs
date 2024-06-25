@@ -1193,7 +1193,7 @@ Internal use only.  Should be called at startup time."
 
 ;; CDAC fonts are actually smaller than their design sizes.
 (setq face-font-rescale-alist
-      (list (cons (purify-if-dumping "-cdac$")  1.3)))
+      (list (cons (purify-if-dumping "-cdac$") 1.3)))
 
 (defvar x-font-name-charset-alist nil
   "This variable has no meaning now.  Just kept for backward compatibility.")

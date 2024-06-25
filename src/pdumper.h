@@ -163,13 +163,13 @@ struct pdumper_info
 
 extern struct pdumper_info pdumper_info;
 
-/* Whether OBJ points somewhere into the loaded dump file.
+/* Whether XPNTR points somewhere into the loaded dump file.
    Gets called a lot so inline.  */
 INLINE _GL_ATTRIBUTE_CONST bool
-pdumper_address_p (const void *obj)
+pdumper_address_p (const void *xpntr)
 {
-  uintptr_t obj_addr = (uintptr_t) obj;
-  return pdumper_info.addr_beg <= obj_addr && obj_addr < pdumper_info.addr_end;
+  uintptr_t addr = (uintptr_t) xpntr;
+  return pdumper_info.addr_beg <= addr && addr < pdumper_info.addr_end;
 }
 
 typedef int_least32_t dump_off;
@@ -253,17 +253,19 @@ extern uintptr_t emacs_basis (void);
 extern void pdumper_remember_scalar (void *data, ptrdiff_t nbytes);
 extern void pdumper_remember (void *ptr, enum Lisp_Type type);
 
-extern const struct dump_start *pdumper_object_start (const void *obj);
+extern const struct dump_start *pdumper_xpntr_start (const void *obj);
 extern void pdumper_do_now_and_after_load (pdumper_hook hook);
 extern int pdumper_load (char *dump_filename);
-extern bool pdumper_cold_p (const void *obj);
+extern bool pdumper_cold_p (const void *xpntr);
 
 extern void pdumper_fingerprint (FILE *output, char const *label,
 				 unsigned char const xfingerprint[sizeof fingerprint]);
-extern bool pdumper_marked_p (const void *obj);
-extern void pdumper_set_marked (const void *obj);
+extern bool pdumper_marked_p (const void *xpntr);
+extern void pdumper_set_marked (const void *xpntr);
 extern void pdumper_clear_marks (void);
-extern void pdumper_set_frontier (const void *obj);
+extern bool pdumper_frontier_p (const void *xpntr);
+extern void pdumper_set_frontier (const void *xpntr);
+extern void pdumper_clear_frontier (void);
 
 /* Record directory where dump was loaded.  */
 extern void pdumper_record_wd (const char *);
