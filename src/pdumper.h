@@ -154,7 +154,6 @@ struct pdumper_info
 {
   struct dump_header header;
   bitset mark_bits;
-  bitset gc_frontier;
   double load_time;
   char *filename;
   uintptr_t addr_beg;

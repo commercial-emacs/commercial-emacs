@@ -3679,38 +3679,6 @@ pdumper_clear_marks (void)
   bitset_zero (pdumper_info.mark_bits);
 }
 
-void
-pdumper_set_frontier (const void *xpntr)
-{
-  eassert (pdumper_address_p (xpntr));
-  ptrdiff_t offset = (uintptr_t) xpntr - pdumper_info.addr_beg;
-  eassert (offset % DUMP_ALIGNMENT == 0);
-  eassert (offset < pdumper_info.header.cold_start);
-  eassert (offset < pdumper_info.header.discardable_start);
-  ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
-  bitset_set (pdumper_info.gc_frontier, (bitset_bindex) bitno);
-}
-
-/* Return whether XPNTR is marked according to the portable dumper.  */
-bool
-pdumper_frontier_p (const void *xpntr)
-{
-  bool ret = false;
-  if (pdumper_address_p (xpntr))
-    {
-      ptrdiff_t offset = (uintptr_t) xpntr - pdumper_info.addr_beg;
-      ptrdiff_t bitno = offset / DUMP_ALIGNMENT;
-      ret = bitset_test (pdumper_info.gc_frontier, (bitset_bindex) bitno);
-    }
-  return ret;
-}
-
-void
-pdumper_clear_frontier (void)
-{
-  bitset_zero (pdumper_info.gc_frontier);
-}
-
 ssize_t
 read_bytes (int fd, void *buf, size_t bytes_to_read)
 {
