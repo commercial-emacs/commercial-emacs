@@ -742,9 +742,10 @@ command."
 		       ((string-equal shell "ksh") "~/.sh_history")
 		       ((string-equal shell "zsh") "~/.zsh_history")
 		       (t "~/.history")))))
-      (if (or (equal comint-input-ring-file-name "")
-	      (equal (file-truename comint-input-ring-file-name)
-		     (file-truename null-device)))
+      (if (and comint-input-ring-file-name
+               (or (equal comint-input-ring-file-name "")
+	           (equal (file-truename comint-input-ring-file-name)
+		          (file-truename null-device))))
 	  (setq comint-input-ring-file-name nil))
       ;; Arrange to write out the input ring on exit, if the shell doesn't
       ;; do this itself.
