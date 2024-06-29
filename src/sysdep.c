@@ -4259,14 +4259,8 @@ does the same thing as `current-time'.  */)
 # include <wctype.h>
 
 # include <locale.h>
-# ifndef LC_COLLATE
-#  define LC_COLLATE 0
-# endif
 # ifndef LC_COLLATE_MASK
 #  define LC_COLLATE_MASK 0
-# endif
-# ifndef LC_CTYPE
-#  define LC_CTYPE 0
 # endif
 # ifndef LC_CTYPE_MASK
 #  define LC_CTYPE_MASK 0
