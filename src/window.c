@@ -3955,14 +3955,14 @@ run_window_change_functions (void)
 	     tracing size changes in a buffer-locally fashion might
 	     want to be informed about that change.  */
 	  window_size_change =
-	    (frame_window_change
-	     && (window_buffer_change
-		 || w->pixel_width != w->old_pixel_width
-		 || w->pixel_height != w->old_pixel_height
-		 || (window_body_width (w, WINDOW_BODY_IN_PIXELS)
-		     != w->old_body_pixel_width)
-		 || (window_body_height (w, WINDOW_BODY_IN_PIXELS)
-		     != w->old_body_pixel_height)));
+	    window_buffer_change
+	    || (frame_window_change
+		&& (w->pixel_width != w->old_pixel_width
+		    || w->pixel_height != w->old_pixel_height
+		    || (window_body_width (w, WINDOW_BODY_IN_PIXELS)
+			!= w->old_body_pixel_width)
+		    || (window_body_height (w, WINDOW_BODY_IN_PIXELS)
+			!= w->old_body_pixel_height)));
 
 	  /* The following two are needed when running the default
 	     values for this frame below.  */
@@ -6999,7 +6999,7 @@ DEFUN ("set-window-configuration", Fset_window_configuration,
        Sset_window_configuration, 1, 3, 0,
        doc: /* Set the configuration of windows and buffers as specified by CONFIGURATION.
 CONFIGURATION must be a value previously returned
-by `current-window-configuration' (which see).
+by `current-window-configuration'.
 
 Normally, this function selects the frame of the CONFIGURATION, but if
 DONT-SET-FRAME is non-nil, it leaves selected the frame which was
