@@ -928,10 +928,11 @@ remember_cold_op (struct dump_context *ctx, enum cold_op op, Lisp_Object arg)
     push (&ctx->cold_queue, Fcons (make_fixnum (op), arg));
 }
 
-/* Add a dump (versus emacs) relocation that updates the pointer stored at
-   DUMP_OFFSET to point into the Emacs binary upon dump load.  The
-   pointer-sized value at DUMP_OFFSET in the dump file should contain
-   a number relative to emacs_basis().  */
+/* On load:
+   uintptr_t value = read_word (reloc.offset);
+   value += emacs_basis ();
+   write_word (reloc.offset, value);
+*/
 
 static void
 reloc_emacs_ptr (struct dump_context *ctx, dump_off offset)
@@ -942,11 +943,11 @@ reloc_emacs_ptr (struct dump_context *ctx, dump_off offset)
 		 INT_TO_INTEGER (offset)));
 }
 
-/* Add a dump (versus emacs) relocation that updates the Lisp_Object
-   at OFFSET in the dump to point to another object in the dump.
-   The Lisp_Object-sized value at OFFSET in the dump file should
-   contain the offset of the target object relative to the start of
-   the dump.  */
+/* On load:
+   uintptr_t value = pdumper_info.addr_beg + read_word (reloc.offset);
+   write_lv (reloc.offset, make_lisp_ptr ((void *) value, lisp_type));
+*/
+
 static void
 reloc_dump_lv (struct dump_context *ctx, dump_off offset,
 	       enum Lisp_Type type)
@@ -974,6 +975,12 @@ reloc_dump_lv (struct dump_context *ctx, dump_off offset,
     }
 }
 
+/* On load:
+   uintptr_t value = read_word (reloc.offset);
+   value += pdumper_info.addr_beg;
+   write_word (reloc.offset, value);
+*/
+
 static void
 reloc_dump_ptr (struct dump_context *ctx, dump_off offset)
 {
@@ -983,7 +990,11 @@ reloc_dump_ptr (struct dump_context *ctx, dump_off offset)
 		 INT_TO_INTEGER (offset)));
 }
 
-/* On load, rebase Lisp_Object at OFFSET in the readback from emacs_basis().  */
+/* On load:
+   uintptr_t value = emacs_basis () + read_word (reloc.offset);
+   write_lv (reloc.offset, make_lisp_ptr ((void *) value, lisp_type));
+*/
+
 static void
 reloc_emacs_lv (struct dump_context *ctx, dump_off offset,
 		enum Lisp_Type type)
@@ -1006,13 +1017,11 @@ emacs_offset (const void *emacs_ptr)
   return DUMP_OFF ((intptr_t) emacs_ptr - (intptr_t) emacs_basis ());
 }
 
-/* Add an out-of-dump relocation that copies arbitrary bytes
-   from the dump.
-
-   When the dump is loaded, Emacs copies SIZE bytes from OFFSET in
-   dump to LOCATION in the Emacs data section.  This copying happens
-   after other relocations so all Lisp_Objects will have been
-   rebased for the new process.  */
+/* On load:
+   memcpy (emacs_ptr_at (reloc.offset),
+           (char *) pdumper_info.addr_beg + reloc.ptr.offset,
+           reloc.length);
+*/
 static void
 reloc_copy_from_dump (struct dump_context *ctx, dump_off offset,
 		      void *emacs_ptr, dump_off length)
@@ -1028,7 +1037,10 @@ reloc_copy_from_dump (struct dump_context *ctx, dump_off offset,
     }
 }
 
-/* Modify emacs at EMACS_PTR to arbitrary bytes at VALUE_PTR.  */
+/* On load:
+   memcpy (emacs_ptr_at (reloc.offset), &reloc.ptr.immediate, reloc.length);
+*/
+
 static void
 reloc_immediate (struct dump_context *ctx, const void *emacs_ptr,
 		 const void *value_ptr, dump_off size)
@@ -1062,7 +1074,11 @@ DEFINE_EMACS_IMMEDIATE_FN (reloc_immediate_int, int)
 DEFINE_EMACS_IMMEDIATE_FN (reloc_immediate_bool, bool)
   ;
 
-/* Add an out-of-dump relocation that points into the dump.  */
+/* On load:
+   pval = reloc.ptr.offset + pdumper_info.addr_beg;
+   memcpy (emacs_ptr_at (reloc.offset), &pval, sizeof (pval));
+*/
+
 static void
 reloc_to_dump_ptr (struct dump_context *ctx,
 		   const void *emacs_ptr, dump_off offset)
@@ -1074,8 +1090,14 @@ reloc_to_dump_ptr (struct dump_context *ctx,
 		 INT_TO_INTEGER (offset)));
 }
 
-/* Add out-of-dump relocation to point to a
-   Lisp_Object.  */
+/* On load:
+   void *obj_ptr = reloc.type == RELOC_DUMP_LV
+     ? (char *) pdumper_info.addr_beg + reloc.ptr.offset
+     : emacs_ptr_at (reloc.ptr.offset);
+   lv = make_lisp_ptr (obj_ptr, reloc.length);
+   memcpy (emacs_ptr_at (reloc.offset), &lv, sizeof (lv));
+*/
+
 static void
 reloc_to_lv (struct dump_context *ctx, Lisp_Object const *obj)
 {
@@ -1093,8 +1115,10 @@ reloc_to_lv (struct dump_context *ctx, Lisp_Object const *obj)
     }
 }
 
-/* Add an out-of-dump relocation that assigns a raw pointer
-   back to another location in the image.  */
+/* On load:
+   pval = reloc.ptr.offset + emacs_basis ();
+   memcpy (emacs_ptr_at (reloc.offset), &pval, sizeof (pval));
+*/
 
 static void
 reloc_to_emacs_ptr (struct dump_context *ctx, void *emacs_ptr,
@@ -2904,24 +2928,7 @@ drain_user_remembered_data_cold (struct dump_context *ctx)
             {
               if (emacs_ptr (lv) != NULL)
                 {
-                  /* We have situation like this:
-
-                     static Lisp_Symbol *foo;
-                     ...
-                     foo = XSYMBOL(Qt);
-                     ...
-                     pdumper_remember (&foo, Lisp_Symbol);
-
-                     Built-in symbols like Qt aren't in the dump!
-                     They're actually in Emacs proper.  We need a
-                     special case to point this value back at Emacs
-                     instead of to something in the dump that
-                     isn't there.
-
-                     An analogous situation applies to subrs, since
-                     Lisp_Subr structures always live in Emacs, not
-                     the dump.
-                  */
+                  /* Out-of-dump objects like built-in symbols and subrs.  */
 		  reloc_to_emacs_ptr (ctx, mem, emacs_ptr (lv));
                 }
               else
