@@ -11837,16 +11837,12 @@ syms_of_keyboard (void)
   wheel_syms = initialize_vector (ARRAYELTS (lispy_wheel_names), Qnil);
   staticpro (&wheel_syms);
 
-  {
-    int i;
-    int len = ARRAYELTS (modifier_names);
-
-    modifier_symbols = initialize_vector (len, Qnil);
-    for (i = 0; i < len; i++)
-      if (modifier_names[i])
-	ASET (modifier_symbols, i, intern_c_string (modifier_names[i]));
-    staticpro (&modifier_symbols);
-  }
+  const int len = ARRAYELTS (modifier_names);
+  modifier_symbols = initialize_vector (len, Qnil);
+  for (int i = 0; i < len; ++i)
+    if (modifier_names[i])
+      ASET (modifier_symbols, i, intern_c_string (modifier_names[i]));
+  staticpro (&modifier_symbols);
 
   recent_keys = initialize_vector (lossage_limit, Qnil);
   staticpro (&recent_keys);

@@ -833,12 +833,19 @@ json_byte_workspace_put (struct json_parser *parser, const unsigned char value)
 	{
 	  const size_t extant_size = (parser->byte_workspace_current -
 				      parser->internal_byte_workspace);
-	  parser->byte_workspace = xmalloc (new_size + 1); /* +1 string terminator */
+	  /* +1 string terminator */
+	  parser->byte_workspace = xmalloc (new_size + 1);
 	  memcpy (parser->byte_workspace, parser->internal_byte_workspace, extant_size);
 	  parser->byte_workspace_current = parser->byte_workspace + extant_size;
 	}
       else
-	parser->byte_workspace = xrealloc (parser->byte_workspace, new_size);
+	{
+	  const size_t extant_size = (parser->byte_workspace_current -
+				      parser->byte_workspace);
+	  /* +1 string terminator */
+	  parser->byte_workspace = xrealloc (parser->byte_workspace, new_size + 1);
+	  parser->byte_workspace_current = parser->byte_workspace + extant_size;
+	}
       parser->byte_workspace_end = parser->byte_workspace + new_size;
     }
   *parser->byte_workspace_current++ = value;
