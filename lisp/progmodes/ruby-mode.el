@@ -336,7 +336,7 @@ Only has effect when `ruby-use-smie' is t."
   "If non-nil, align chained method calls.
 
 Each method call on a separate line will be aligned to the column
-of its parent. Example:
+of its parent.  Example:
 
   my_array.select { |str| str.size > 5 }
           .map    { |str| str.downcase }
@@ -386,7 +386,7 @@ Only has effect when `ruby-use-smie' is t."
   "Non-nil to align the body of a block to the statement's start.
 
 The body and the closer will be aligned to the column where the
-statement containing the block starts. Example:
+statement containing the block starts.  Example:
 
   foo.bar
     .each do
