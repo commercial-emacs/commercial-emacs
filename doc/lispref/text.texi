@@ -5974,8 +5974,16 @@ This API has mandatory and optional parts.
 
 @findex jsonrpc-connection-send
 To allow its users to initiate JSONRPC contacts (notifications or
-requests) or reply to endpoint requests, the subclass must have an
-implementation of the @code{jsonrpc-connection-send} method.
+requests) or reply to endpoint requests, the new transport
+implementation must equip the @code{jsonrpc-connection-send} generic
+function with a specialization for the new subclass
+(@pxref{Generic Functions}).  This generic function is called
+automatically by primitives such as @code{jsonrpc-request} and
+@code{jsonrpc-notify}.  The specialization should ensure that the
+message described in the argument list is sent through whatever
+underlying communication mechanism (a.k.a.@: ``wire'') is used by the
+new transport to talk to endpoints.  This ``wire'' may be a network
+socket, a serial interface, an HTTP connection, etc.
 
 @findex jsonrpc-connection-receive
 Likewise, for handling the three types of remote contacts (requests,
