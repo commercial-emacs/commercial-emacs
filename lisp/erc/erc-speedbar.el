@@ -548,7 +548,7 @@ The INDENT level is ignored."
 (defvar erc-speedbar--force-update-interval-secs 5 "Speedbar update period.")
 
 (defvar-local erc-speedbar--last-ran nil
-  "When non-nil, a lisp timestamp updated when the speedbar timer runs.")
+  "When non-nil, a Lisp timestamp updated when the speedbar timer runs.")
 
 (defun erc-speedbar--run-timer-on-post-insert ()
   "Refresh speedbar if idle for `erc-speedbar--force-update-interval-secs'."
