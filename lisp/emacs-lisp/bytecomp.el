@@ -5242,7 +5242,7 @@ OP and OPERAND are as passed to `byte-compile-out'."
 (defun byte-compile-out (op &optional operand)
   "Push the operation onto `byte-compile-output'.
 OP is an opcode, a symbol.  OPERAND is either nil or a number or
-a one-element list of a lisp form."
+a one-element list of a Lisp form."
   (push (cons op operand) byte-compile-output)
   (if (eq op 'byte-return)
       ;; Consider abort since byte-return no longer produces ops
