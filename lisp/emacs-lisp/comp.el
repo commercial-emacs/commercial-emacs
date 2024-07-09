@@ -774,12 +774,9 @@ of hexified SYM, a human readable SYM munging, and a counter
                                               :byte-func byte-code)))
     (maphash #'comp--intern-func-in-ctxt byte-to-native-lambdas-h)))
 
-(cl-defmethod comp--spill-lap-function ((form list))
-  "Byte-compile FORM, spilling data from the byte compiler."
-  (unless (memq (car-safe form) '(lambda closure))
-    (signal 'native-compiler-error
-            '("Cannot native-compile, form is not a lambda or closure")))
-  (let* ((byte-code (byte-compile form))
+(defun comp--spill-lap-single-function (function)
+  "Byte-compile FUNCTION, spilling data from the byte compiler."
+  (let* ((byte-code (byte-compile function))
          (c-name (comp-next-gccjit-name nil)))
     (unless (comp-ctxt-output comp-ctxt)
       (setf (comp-ctxt-output comp-ctxt)
@@ -789,6 +786,17 @@ of hexified SYM, a human readable SYM munging, and a counter
                                               :c-name c-name
                                               :byte-func byte-code)))
     (maphash #'comp--intern-func-in-ctxt byte-to-native-lambdas-h)))
+
+(cl-defmethod comp--spill-lap-function ((form list))
+  "Byte-compile FORM, spilling data from the byte compiler."
+  (unless (eq (car-safe form) 'lambda)
+    (signal 'native-compiler-error
+            '("Cannot native-compile, form is not a lambda")))
+  (comp--spill-lap-single-function form))
+
+(cl-defmethod comp--spill-lap-function ((fun interpreted-function))
+  "Spill data from the byte compiler for the interpreted-function FUN."
+  (comp--spill-lap-single-function fun))
 
 (defun comp--intern-func-in-ctxt (_ obj)
   "Given OBJ of type `byte-to-native-lambda', create a function in `comp-ctxt'."
