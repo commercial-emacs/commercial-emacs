@@ -176,11 +176,8 @@ directly.  Instead, use `eldoc-add-command' and `eldoc-remove-command'.")
 
 (defvar eldoc-last-message nil)
 
-(defvar eldoc-timer nil "ElDoc's timer object.")
-
-(defvar eldoc-current-idle-delay eldoc-idle-delay
-  "Idle time delay currently in use by timer.
-This is used to determine if `eldoc-idle-delay' is changed by the user.")
+(make-obsolete-variable 'eldoc-current-idle-delay nil "30.1")
+(make-obsolete-variable 'eldoc-timer nil "30.1")
 
 (defvar eldoc-message-function #'eldoc-minibuffer-message
   "The function used by `eldoc--message' to display messages.
@@ -212,23 +209,19 @@ displays the first line of that variable's doc string.  Otherwise
 it displays the argument list of the function called in the
 expression point is on." :lighter eldoc-minor-mode-string
   (setq eldoc-last-message nil)
-  (cond
-   ((not (eldoc--supported-p))
-    (when (called-interactively-p 'any)
-      (message "There is no ElDoc support in this buffer"))
-    (setq eldoc-mode nil))
-   (eldoc-mode
-    (when eldoc-print-after-edit
-      (setq-local eldoc-message-commands (eldoc-edit-message-commands)))
-    (add-hook 'post-command-hook #'eldoc-schedule-timer nil t)
-    (add-hook 'pre-command-hook #'eldoc-pre-command-refresh-echo-area nil t))
-   (t
+  (if eldoc-mode
+      (if (not (eldoc--supported-p))
+          (progn
+            (setq eldoc-mode nil)
+            (when (called-interactively-p 'any)
+              (message "There is no ElDoc support in this buffer")))
+        (when eldoc-print-after-edit
+          (setq-local eldoc-message-commands (eldoc-edit-message-commands)))
+        (add-hook 'post-command-hook #'eldoc-schedule-timer nil t)
+        (add-hook 'pre-command-hook #'eldoc-pre-command-refresh-echo-area nil t))
     (kill-local-variable 'eldoc-message-commands)
     (remove-hook 'post-command-hook #'eldoc-schedule-timer t)
-    (remove-hook 'pre-command-hook #'eldoc-pre-command-refresh-echo-area t)
-    (when eldoc-timer
-      (cancel-timer eldoc-timer)
-      (setq eldoc-timer nil)))))
+    (remove-hook 'pre-command-hook #'eldoc-pre-command-refresh-echo-area t)))
 
 ;;;###autoload
 (define-globalized-minor-mode global-eldoc-mode eldoc-mode turn-on-eldoc-mode
@@ -259,7 +252,7 @@ expression point is on." :lighter eldoc-minor-mode-string
                      #'elisp-eldoc-funcall nil t)
            (setq-local eldoc-documentation-strategy
                        'eldoc-documentation-default)))
-  (eldoc-mode +1))
+  (eldoc-mode 1))
 
 ;;;###autoload
 (defun turn-on-eldoc-mode ()
@@ -270,27 +263,16 @@ See `eldoc-documentation-strategy' for more detail."
 
 
 (defun eldoc-schedule-timer ()
-  "Ensure `eldoc-timer' is running.
-
-If the user has changed `eldoc-idle-delay', update the timer to
-reflect the change."
-  (or (and eldoc-timer
-           (memq eldoc-timer timer-idle-list)) ;FIXME: Why?
-      (setq eldoc-timer
-            (run-with-idle-timer
-	     eldoc-idle-delay nil
-	     (lambda ()
-               (when (or eldoc-mode
-                         (and global-eldoc-mode
-                              (eldoc--supported-p)))
-                 ;; Don't ignore, but also don't full-on signal errors
-                 (with-demoted-errors "eldoc error: %s"
-                   (eldoc-print-current-symbol-info)) )))))
-
-  ;; If user has changed the idle delay, update the timer.
-  (cond ((not (= eldoc-idle-delay eldoc-current-idle-delay))
-         (setq eldoc-current-idle-delay eldoc-idle-delay)
-         (timer-set-idle-time eldoc-timer eldoc-idle-delay t))))
+  (run-with-idle-timer
+   eldoc-idle-delay nil
+   (apply-partially
+    (lambda (marker)
+      ;; idle would suggest point unmoved but allow for a background
+      ;; process that warps point
+      (when (equal (point-marker) marker)
+        (with-demoted-errors "eldoc error: %s"
+          (eldoc-print-current-symbol-info))))
+    (point-marker))))
 
 (defvar eldoc-mode-line-string nil)
 (put 'eldoc-mode-line-string 'risky-local-variable t)
@@ -860,8 +842,7 @@ will be responsible for eventually calling the FN."
   "Invoke `eldoc-documentation-strategy' function.
 
 If INTERACTIVE is non-nil, the request came directly from a user
-command, otherwise it came from ElDoc's idle
-timer, `eldoc-timer'.
+command, otherwise it came from ElDoc's idle timer.
 
 That function's job is to run the `eldoc-documentation-functions'
 special hook, using the `run-hook' family of functions.  ElDoc's
