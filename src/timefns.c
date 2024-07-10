@@ -865,8 +865,7 @@ decode_time_components (enum timeform form,
 
     case TIMEFORM_TICKS_HZ:
       if (!INTEGERP (high)
-	  || NILP (Fnatnump (low))
-	  || EQ (low, make_fixnum (0)))
+	  || FIXNUMP (low) ? 0 >= XFIXNUM (low) : NILP (Fnatnump (low)))
 	return (struct err_time) { .err = EINVAL };
       ticks = high;
       hz = low;
