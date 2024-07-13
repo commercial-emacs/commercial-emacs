@@ -2087,7 +2087,7 @@ Such as the current syntax table and the applied syntax properties."
         (insert text)
         (goto-char (point-min))
         (when syntax-needed
-          (syntax-ppss-flush-cache (point)))
+          (syntax-ppss-invalidate-cache (point)))
         (xref--collect-matches-1 regexp file line
                                  (point)
                                  (point-max)
