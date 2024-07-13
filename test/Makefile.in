@@ -157,22 +157,9 @@ else
 SELECTOR_ACTUAL=$(SELECTOR_EXPENSIVE)
 endif
 
-ifeq ($(TEST_NATIVE_COMP),yes)
-export TRAMPOLINE_MKDIR=TRAMPOLINE_DIR=`mktemp -d 2>/dev/null || mktemp -d -t make_elc`
-export TRAMPOLINE_SET=-l comp --eval "(setq comp-trampoline-dir \"$${TRAMPOLINE_DIR}\")"
-export TRAMPOLINE_RMDIR=rm -rf $${TRAMPOLINE_DIR}
-else
-export TRAMPOLINE_MKDIR=true
-export TRAMPOLINE_SET=true
-export TRAMPOLINE_RMDIR=true
-endif
-
+## Byte-compile all test files to test for errors.
 %.elc: %.el $(srcdir)/../lisp/emacs-lisp/bytecomp.el
-	$(AM_V_ELC)$(TRAMPOLINE_MKDIR) && \
-	$(emacs_env) $(emacs) --batch $(TRAMPOLINE_SET) -f batch-byte-compile $< && \
-	$(TRAMPOLINE_RMDIR)
-
-unexport TRAMPOLINE_MKDIR TRAMPOLINE_SET TRAMPOLINE_RMDIR
+	$(AM_V_ELC)$(emacs_env) $(emacs) --batch -f batch-byte-compile $<
 
 ifdef EMACS_HYDRA_CI
 WRITE_LOG = 2>&1 | tee $@
