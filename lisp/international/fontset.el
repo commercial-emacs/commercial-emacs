@@ -199,6 +199,7 @@
         (tai-tham #x1A20 #x1A55 #x1A61 #x1A80)
 	(symbol . [#x201C #x2200 #x2500])
 	(braille #x2800)
+        (tifinagh #x2D30 #x2D60)
 	(ideographic-description #x2FF0)
 	(cjk-misc #x300E)
 	(kana #x304B)
@@ -843,6 +844,7 @@
                     nag-mundari
                     mende-kikakui
 		    adlam
+                    tifinagh
                     tai-tham
                     indic-siyaq-number
                     ottoman-siyaq-number
