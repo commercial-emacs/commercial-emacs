@@ -176,7 +176,7 @@ bool initialized;
    but instead should use the virtual terminal under which it was started.  */
 bool inhibit_window_system;
 
-#if defined (HAVE_X_WINDOWS) || defined (HAVE_NS)
+#if defined (HAVE_X_WINDOWS) || defined (HAVE_PGTK) || defined (HAVE_NS)
 /* If true, -d was specified, meaning we're using some window system.  */
 bool display_arg;
 #endif
@@ -1888,7 +1888,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   {
     int count_before = skip_args;
 
-#ifdef HAVE_X_WINDOWS
+#if defined (HAVE_X_WINDOWS) || defined (HAVE_PGTK)
     char *displayname = 0;
 
     /* Skip any number of -d options, but only use the last one.  */
