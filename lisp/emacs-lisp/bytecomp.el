@@ -2072,6 +2072,17 @@ If compilation is needed, this functions returns the result of
 
 (defvar bytecomp--inhibit-lexical-cookie-warning nil)
 
+(defmacro with-temp-trampoline-dir (&rest forms)
+  (if (not (featurep 'native-compile))
+      `(progn ,@forms)
+    `(let* ((_ (require 'comp))
+            (comp-trampoline-dir (condition-case nil
+                                     (make-temp-file "bytecomp-trampolines" :dir)
+                                   (file-error comp-trampoline-dir))))
+       (unwind-protect
+           (progn ,@forms)
+         (ignore-errors (delete-directory comp-trampoline-dir :recursive))))))
+
 ;;;###autoload
 (defun byte-compile-file (filename &optional load)
   "Compile a file of Lisp code named FILENAME into a file of byte code.
@@ -2165,8 +2176,10 @@ See also `emacs-lisp-byte-compile-and-load'."
 	(message "Compiling %s..." filename))
       (let* (byte-compile-abort-elc
              (byte-compile-level (1+ byte-compile-level))
-             (output-buffer (save-current-buffer
-                              (byte-compile-from-buffer input-buffer))))
+             (output-buffer
+              (with-temp-trampoline-dir
+               (save-current-buffer
+                 (byte-compile-from-buffer input-buffer)))))
         (unless byte-compile-abort-elc
           (prog1 t
 	    (when byte-compile-verbose
