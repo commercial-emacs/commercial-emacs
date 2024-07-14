@@ -125,13 +125,15 @@ Emacs Lisp file:
 ;; Local Variables:\n;; no-native-compile: t\n;; End:")
 ;;;###autoload(put 'no-native-compile 'safe-local-variable 'booleanp)
 
-(defvar comp-trampoline-dir (cond ((and init-file-user user-init-file) ;live
-                                   (expand-file-name "trampolines" user-emacs-directory))
-                                  (installation-directory ;within repo
-                                   (expand-file-name "lisp/trampolines" installation-directory))
-                                  (t ;lack of a better place
-                                   (expand-file-name (make-temp-name "trampolines-")
-                                                     temporary-file-directory)))
+(defvar comp-trampoline-dir
+  (cond ((and init-file-user user-init-file) ;live
+         (expand-file-name (substring emacs-repository-version 0 7)
+                           (expand-file-name "trampolines/" user-emacs-directory)))
+        (installation-directory ;within repo
+         (expand-file-name "lisp/trampolines" installation-directory))
+        (t ;lack of a better place
+         (expand-file-name (make-temp-name "trampolines-")
+                           temporary-file-directory)))
   "User directory from which to save and load trampolines.")
 
 (defvar comp-log-time-report nil
