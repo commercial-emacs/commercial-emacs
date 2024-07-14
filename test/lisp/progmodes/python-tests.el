@@ -7369,7 +7369,7 @@ buffer with overlapping strings."
                        "W0611: Unused import a.b.c (unused-import)"))))))
 
 (ert-deftest python-test--shell-send-block ()
-  (skip-unless (python-tests-get-shell-interpreter))
+  (skip-unless (executable-find python-tests-shell-interpreter))
   (python-tests-with-temp-buffer-with-shell
     "print('current 0')
 for x in range(1,3):
