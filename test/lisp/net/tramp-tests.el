@@ -64,7 +64,6 @@
 (declare-function tramp-method-out-of-band-p "tramp-sh")
 (declare-function tramp-smb-get-localname "tramp-smb")
 (defvar ange-ftp-make-backup-files)
-(defvar comp-warn-primitives)
 (defvar tramp-connection-properties)
 (defvar tramp-copy-size-limit)
 (defvar tramp-fuse-remove-hidden-files)
@@ -3685,8 +3684,7 @@ This tests also `access-file', `file-readable-p',
 	    ;; `access-file' returns nil in case of success.
 	    (should-not (access-file tmp-name1 "error"))
 	    ;; `access-file' could use a timeout.
-	    (let ((remote-file-name-access-timeout 1)
-		  comp-warn-primitives)
+	    (let ((remote-file-name-access-timeout 1))
 	      (cl-letf (((symbol-function #'file-exists-p)
 			 (lambda (_filename) (sleep-for 5))))
 		(should-error
