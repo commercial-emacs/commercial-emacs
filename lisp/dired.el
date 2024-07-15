@@ -2248,10 +2248,9 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
   "~"       #'dired-flag-backup-files
   ;; Upper case keys (except !) for operating on the marked files
   "A"       #'dired-do-find-regexp
-  "B"       #'dired-do-byte-compile
   "C"       #'dired-do-copy
+  "B"       #'dired-do-byte-compile
   "D"       #'dired-do-delete
-  "E"       #'dired-do-open
   "G"       #'dired-do-chgrp
   "H"       #'dired-do-hardlink
   "I"       #'dired-do-info
@@ -2454,9 +2453,7 @@ Do so according to the former subdir alist OLD-SUBDIR-ALIST."
     ["Display Image" image-dired-dired-display-image
      :help "Display sized image in a separate window"]
     ["Display Image Externally" image-dired-dired-display-external
-     :help "Display image in external viewer"]
-    ["Display Externally" dired-do-open
-     :help "Display file in external viewer"]))
+     :help "Display image in external viewer"]))
 
 (easy-menu-define dired-mode-regexp-menu dired-mode-map
   "Regexp menu for Dired mode."
