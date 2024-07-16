@@ -325,8 +325,7 @@ Return t if file exists."
         (unless nomessage
 	  (message "Loading %s (source)..." file))
         (unwind-protect
-	    (let ((load-true-file-name fullname)
-                  (load-file-name fullname)
+	    (let ((load-file-name fullname)
                   (set-auto-coding-for-load t)
 		  (inhibit-file-name-operation nil)
                   shorthands)

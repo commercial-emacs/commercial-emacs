@@ -83,7 +83,7 @@
                  (or (size-gt . 10000)
                      (and (not (starred-name))
                           (directory . "<org>")))))
-        (test2 '((or (mode . emacs-lisp-mode) (file-extension . "elc?")
+        (test2 '((or (mode . emacs-lisp-mode) (file-extension . "el[cn]?")
                      (and (starred-name) (name . "elisp"))
                      (mode . lisp-interaction-mode))))
         (test3 '((size-lt . 100) (derived-mode . prog-mode)
@@ -760,7 +760,7 @@
         (test5 '(or (filename . "scratch")
                     (filename . "bonz")
                     (filename . "temp")))
-        (test6 '(or (mode . emacs-lisp-mode) (file-extension . "elc?")
+        (test6 '(or (mode . emacs-lisp-mode) (file-extension . "el[cn]?")
                     (and (starred-name) (name . "elisp"))
                     (mode . lisp-interaction-mode)))
         (description (lambda (q)
@@ -802,7 +802,7 @@
                             (funcall tag (funcall description 'mode)
                                      ": " "emacs-lisp-mode")
                             (funcall tag (funcall description 'file-extension)
-                                     ": " "elc?")
+                                     ": " "el[cn]?")
                             (funcall tag "AND"
                                      (funcall tag
                                               (funcall description 'starred-name)

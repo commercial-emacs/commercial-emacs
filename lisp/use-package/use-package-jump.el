@@ -54,7 +54,7 @@ will jump to the file that originally required PACKAGE instead."
          file location)
     (if (null requiring-file)
         (user-error "Can't find file requiring file; may have been autoloaded")
-      (setq file (if (string= (file-name-extension requiring-file) "elc")
+      (setq file (if (string-match-p "el[cn]?" (file-name-extension requiring-file))
                      (concat (file-name-sans-extension requiring-file) ".el")
                    requiring-file))
       (when (file-exists-p file)

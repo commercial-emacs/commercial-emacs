@@ -1262,7 +1262,7 @@ provide FEATURE, signal an error.  This cannot be suppressed."
   (cond
    ((featurep feature) feature)
    ((let* ((path (custom-theme--load-path))
-           (file (locate-file (symbol-name feature) path '(".elc" ".el"))))
+           (file (locate-file (symbol-name feature) path '(".eln" ".elc" ".el"))))
       (and file (require feature (file-name-sans-extension file) noerror))))
    ((not noerror)
     (signal 'file-missing `("Cannot open load file" "No such file or directory"

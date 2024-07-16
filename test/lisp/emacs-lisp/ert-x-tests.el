@@ -256,7 +256,7 @@
           (should (string-match (concat
                                  "\\`ert-test-describe-test is a test"
                                  " defined in"
-                                 " ['`‘]ert-x-tests.elc?['’]\\.\n\n"
+                                 " ['`‘]ert-x-tests.el[cn]?['’]\\.\n\n"
                                  "Tests ['`‘]ert-describe-test['’]\\.\n\\'")
                                 (buffer-string))))))))
 

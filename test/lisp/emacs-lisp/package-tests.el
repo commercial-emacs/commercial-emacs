@@ -426,7 +426,7 @@ but with a different end of line convention (bug#48137)."
             ;; `macro-builtin-10-and-90' depends on an entirely new macro from `macro-aux'.
             (should (equal (macro-builtin-10-and-90) '(10 90))))
         (mapc #'delete-file
-              (directory-files-recursively dir "\\`[^\\.].*\\.elc\\'"))
+              (directory-files-recursively dir "\\`[^\\.].*\\.el[cn]\\'"))
         (mapc (lambda (f) (call-process "gunzip" nil nil nil f))
               (directory-files-recursively dir "\\`[^\\.].*\\.el\\.gz\\'"))))))
 

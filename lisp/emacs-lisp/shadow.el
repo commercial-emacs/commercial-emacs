@@ -95,7 +95,7 @@ See the documentation for `list-load-path-shadows' for further information."
 	(setq dir (directory-file-name (or pp ".")))
 	(setq curr-files (if (file-accessible-directory-p dir)
 			     (directory-files dir nil
-                                              "\\.elc?\\(?:\\.gz\\)?\\'" t)))
+                                              "\\.el[cn]?\\(?:\\.gz\\)?\\'" t)))
 	(and curr-files
 	     (not noninteractive)
 	     (message "Checking %d files in %s..." (length curr-files) dir))
@@ -139,7 +139,9 @@ See the documentation for `list-load-path-shadows' for further information."
 				 (concat base1 ".el") (concat base2 ".el"))
 				;; This is a bit strict, but safe.
 				(load-path-shadows-same-file-or-nonexistent
-				 (concat base1 ".elc") (concat base2 ".elc"))))
+				 (concat base1 ".elc") (concat base2 ".elc"))
+                                (load-path-shadows-same-file-or-nonexistent
+                                 (concat base1 ".eln") (concat base2 ".eln"))))
 		      (setq shadows
 			    (append shadows (list base1 base2)))))
 

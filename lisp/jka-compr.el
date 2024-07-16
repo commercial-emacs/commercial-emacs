@@ -624,7 +624,7 @@ There should be no more than seven characters after the final `/'."
 		       ;; load-history.  Therefore try truename if the
 		       ;; original name is not in load-history.
 		       (assoc (file-truename load-file) load-history))))
-	    ;; Remove .gz and .elc?.
+	    ;; Remove .gz and .el[cn]?.
 	    (while (file-name-extension file)
 	      (setq file (file-name-sans-extension file)))
 	    (setcar l file)))

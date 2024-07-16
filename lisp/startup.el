@@ -515,7 +515,7 @@ DIRS are relative."
           (if (eq system-type 'windows-nt)
               (if (file-directory-p (concat "~" user-name))
                   (directory-files (concat "~" user-name) nil
-                                   "\\`[._]emacs\\(\\.elc?\\)?\\'"))
+                                   "\\`[._]emacs\\(\\.el[cn]?\\)?\\'"))
             (file-exists-p (concat "~" init-file-user
                                    (if (eq system-type 'ms-dos)
                                        "/_emacs"
@@ -1392,10 +1392,10 @@ please check its value")
         ((not (eq system-type 'windows-nt))
          (concat "~" init-file-user "/.emacs"))
         ;; Else deal with the Windows situation.
-        ((directory-files "~" nil "\\`\\.emacs\\(\\.elc?\\)?\\'")
+        ((directory-files "~" nil "\\`\\.emacs\\(\\.el[cn]?\\)?\\'")
          ;; Prefer .emacs on Windows.
          "~/.emacs")
-        ((directory-files "~" nil "\\`_emacs\\(\\.elc?\\)?\\'")
+        ((directory-files "~" nil "\\`_emacs\\(\\.el[cn]?\\)?\\'")
          ;; Also support _emacs for compatibility, but warn about it.
          (push `(initialization
                  ,(format-message

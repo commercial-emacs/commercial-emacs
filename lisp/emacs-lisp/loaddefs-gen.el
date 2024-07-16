@@ -129,7 +129,7 @@ scanning for autoloads and will be in the `load-path'."
           ;; added to load-path.
           (setq dir (expand-file-name (pop names) dir)))
          (t (setq name (mapconcat #'identity names "/"))))))
-    (if (string-match "\\.elc?\\(\\.\\|\\'\\)" name)
+    (if (string-match "\\.el[cn]?\\(\\.\\|\\'\\)" name)
         (substring name 0 (match-beginning 0))
       name)))
 
@@ -203,8 +203,7 @@ expression, in which case we want to handle forms differently."
                        define-inline cl-defun cl-defmacro cl-defgeneric
                        cl-defstruct pcase-defmacro iter-defun cl-iter-defun))
            (macrop car)
-	   (setq expand (let ((load-true-file-name file)
-                              (load-file-name file))
+	   (setq expand (let ((load-file-name file))
                           (macroexpand form)))
 	   (memq (car expand) '(progn prog1 defalias)))
       ;; Recurse on the expansion.
@@ -592,7 +591,7 @@ instead of just updating them with the new/changed autoloads."
                        ;; we don't want to depend on whether Emacs was
                        ;; built with or without modules support, nor
                        ;; what is the suffix for the underlying OS.
-		       (unless (string-match "\\.\\(elc\\|so\\|dll\\)" suf)
+		       (unless (string-match "\\.\\(el[cn]\\|so\\|dll\\)" suf)
                          (push suf tmp)))
                      (concat "\\`[^=.].*" (regexp-opt tmp t) "\\'")))
 	 (files (apply #'nconc

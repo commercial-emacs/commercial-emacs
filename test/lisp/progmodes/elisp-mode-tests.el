@@ -405,6 +405,7 @@ to (xref-elisp-test-descr-to-target xref)."
     "(cl-defstruct (xref-elisp-location")
    ))
 
+
 (require 'em-xtra)
 (require 'find-dired)
 (xref-elisp-deftest find-defs-defalias-defun-el
@@ -413,7 +414,10 @@ to (xref-elisp-test-descr-to-target xref)."
    (xref-make "(defalias eshell/ff)"
 	      (xref-make-elisp-location
 	       'eshell/ff 'defalias
-	       (expand-file-name "../../../lisp/eshell/em-xtra.elc"
+	       (expand-file-name (concat "../../../lisp/eshell/em-xtra"
+                                         (if (featurep 'native-compile)
+                                             ".eln"
+                                           ".elc"))
                                  emacs-test-dir)))
    (xref-make "(defun find-name-dired)"
 	      (xref-make-elisp-location

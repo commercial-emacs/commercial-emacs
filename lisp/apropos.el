@@ -891,7 +891,7 @@ Optional arg BUFFER (default: current buffer) is the buffer to check."
          (concat "\\`"
                  (regexp-quote lisp-directory)
                  (regexp-opt preloaded-file-list)
-                 "\\.elc?\\'")))
+                 "\\.el[cn]?\\'")))
     ;; FIXME: I find this regexp approach brittle.  Maybe a better
     ;; option would be find/record the nthcdr of `load-history' which
     ;; corresponds to the `load-history' state when we dumped.

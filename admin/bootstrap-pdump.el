@@ -65,6 +65,20 @@
 (set-buffer "*scratch*")
 (setq buffer-undo-list t)
 
+;; Hassle
+(setq restore-load-suffixes (copy-sequence load-suffixes))
+(let ((new-load-suffixes load-suffixes)
+      parent)
+  (while load-suffixes
+    (if (equal (car load-suffixes) ".eln")
+        (if (eq load-suffixes new-load-suffixes)
+            (setq new-load-suffixes (cdr new-load-suffixes))
+	  (message "ari %s" load-suffixes)
+          (setcdr parent (cdr load-suffixes))))
+    (setq parent load-suffixes
+	  load-suffixes (cdr load-suffixes)))
+  (setq load-suffixes new-load-suffixes))
+
 ;; Bootstrap remains a game of "disable shit until it works."
 (setq native-comp-disable-subr-trampolines t)
 
@@ -421,6 +435,8 @@
   (ignore-errors (delete-file output-path))
   (condition-case err
       (let (lexical-binding)
+        (setq load-suffixes restore-load-suffixes)
+        (makunbound 'restore-load-suffixes)
         (dump-emacs-portable output-path))
     (error (ignore-errors (delete-file output-path))
            (apply #'signal err))))

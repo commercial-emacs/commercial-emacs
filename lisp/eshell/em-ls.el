@@ -162,7 +162,7 @@ files."
   "The face used for highlighting backup file names.")
 
 (defcustom eshell-ls-product-regexp
-  "\\.\\(elc\\|o\\(bj\\)?\\|a\\|lib\\|res\\)\\'"
+  "\\.\\(el[cn]\\|o\\(bj\\)?\\|a\\|lib\\|res\\)\\'"
   "A regular expression that matches names of product files.
 Products are files that get generated from a source file, and hence
 ought to be recreatable if they are deleted."

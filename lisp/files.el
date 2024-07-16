@@ -1025,7 +1025,7 @@ See `file-symlink-p' to distinguish symlinks."
   (interactive
    (let ((completion-ignored-extensions ; don't ignore .elc or .so
           (cl-remove-if
-           (lambda (ext) (member ext `(".elc" ,module-file-suffix)))
+           (lambda (ext) (member ext `(".eln" ".elc" ,module-file-suffix)))
            completion-ignored-extensions)))
      (list (read-file-name "Load file: " nil nil 'lambda
                            (when buffer-file-name

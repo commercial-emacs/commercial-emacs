@@ -857,7 +857,7 @@ byte-compilation of the new package to fail."
                                 (replace-regexp-in-string
                                  "\\.el\\'" ".elc" truename t)
                               (replace-regexp-in-string
-                               "\\.elc\\'" ".el" truename t)))
+                               "\\.el[cn]\\'" ".el" truename t)))
                    (found (or (member truename history)
                               (and (not (string= altname truename))
                                    (member altname history))))
@@ -2580,7 +2580,7 @@ object."
     ;; load them (in case they contain byte code/macros that are now
     ;; invalid).
     (dolist (elc (directory-files-recursively
-                  (package-desc-dir pkg-desc) "\\.elc\\'"))
+                  (package-desc-dir pkg-desc) "\\.el[cn]\\'"))
       (delete-file elc))
     (package--compile pkg-desc)))
 
@@ -4588,8 +4588,7 @@ activations need to be changed, such as when `package-load-list' is modified."
                 (let ((load-suffixes '(".el" ".elc")))
                   (locate-library (package--autoloads-file-name pkg))))
                (pfile (prin1-to-string file)))
-          (insert "(let* ((load-file-name " pfile ")\
-\(load-true-file-name load-file-name))\n")
+          (insert "(let* ((load-file-name " pfile "))\n")
           (insert-file-contents file)
           ;; Fixup the special #$ reader form and throw away comments.
           (while (re-search-forward "#\\$\\|^;\\(.*\n\\)" nil 'move)

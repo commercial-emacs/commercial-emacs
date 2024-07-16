@@ -41,7 +41,7 @@
 
 (ert-deftest macroexp--tests-file-name ()
   (should (string-match
-           "\\`macroexp-tests.elc?\\'"
+           "\\`macroexp-tests.el[cn]?\\'"
            (file-name-nondirectory macroexp--tests-filename)))
   (let ((rsrc-dir (expand-file-name
                    "macroexp-resources"

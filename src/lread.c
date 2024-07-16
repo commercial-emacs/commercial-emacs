@@ -1168,7 +1168,7 @@ Return t if on success.  */)
   int fd = -1;
   specpdl_ref fd_index UNINIT;
   specpdl_ref count = SPECPDL_INDEX ();
-  Lisp_Object found, hist_file_name;
+  Lisp_Object found;
   /* True means we are loading a compiled file.  */
   bool compiled = false;
   Lisp_Object handler;
@@ -1326,13 +1326,6 @@ Return t if on success.  */)
      override.  */
   specbind (Qlexical_binding, Qnil);
 
-  /* Workaround for native comp horseshit since load-history still
-     keys off .elc, not .eln */
-  hist_file_name = is_native_lisp
-    ? concat2 (Fsubstring (found, make_fixnum (0), make_fixnum (-1)),
-	       build_string ("c"))
-    : found;
-
   /* Warn about unescaped character literals.  */
   specbind (Qlread_unescaped_character_literals, Qnil);
   record_unwind_protect (load_warn_unescaped_character_literals, file);
@@ -1371,7 +1364,7 @@ Return t if on success.  */)
 	    }
 	  val = call4 (Vload_source_file_function, found,
 		       concat2 (Ffile_name_directory (file),
-				Ffile_name_nondirectory (hist_file_name)),
+				Ffile_name_nondirectory (found)),
 		       NILP (noerror) ? Qnil : Qt,
 		       (NILP (nomessage) || force_load_messages) ? Qnil : Qt);
 	  return unbind_to (count, val);
@@ -1439,8 +1432,7 @@ Return t if on success.  */)
 
   MESSAGE_LOADING ("");
 
-  specbind (Qload_file_name, hist_file_name);
-  specbind (Qload_true_file_name, found);
+  specbind (Qload_file_name, found);
   specbind (Qinhibit_file_name_operation, Qnil);
   specbind (Qload_in_progress, Qt);
 
@@ -1451,16 +1443,15 @@ Return t if on success.  */)
       Fmodule_load (found);
       build_load_history (found, true);
 #else
-      /* This cannot happen.  */
       emacs_abort ();
 #endif
     }
   else if (is_native_lisp)
     {
 #ifdef HAVE_NATIVE_COMP
-      loadhist_initialize (hist_file_name);
+      loadhist_initialize (found);
       Fnative_elisp_load (found);
-      build_load_history (hist_file_name, true);
+      build_load_history (found, true);
 #else
       emacs_abort ();
 #endif
@@ -1472,14 +1463,14 @@ Return t if on success.  */)
       if (version && version < 22)
 	report_file_error ("Version too old", file);
       else
-        readevalloop (Qget_file_char, &input, hist_file_name,
+        readevalloop (Qget_file_char, &input, found,
                       0, Qnil, Qnil, Qnil, Qnil);
     }
   unbind_to (count, Qnil);
 
   /* Run any eval-after-load forms for this file.  */
   if (!NILP (Ffboundp (Qdo_after_load_evaluation)))
-    call1 (Qdo_after_load_evaluation, hist_file_name) ;
+    call1 (Qdo_after_load_evaluation, found) ;
 
   for (int i = 0; i < ARRAYELTS (saved_strings); i++)
     {
@@ -1816,9 +1807,8 @@ readevalloop_1 (int old)
 static AVOID
 end_of_file_error (void)
 {
-  if (STRINGP (Vload_true_file_name))
-    xsignal1 (Qend_of_file, Vload_true_file_name);
-
+  if (STRINGP (Vload_file_name))
+    xsignal1 (Qend_of_file, Vload_file_name);
   xsignal0 (Qend_of_file);
 }
 
@@ -1873,7 +1863,8 @@ readevalloop (Lisp_Object readcharfun,
     CHECK_STRING (sourcename);
 
   if (NILP (Ffboundp (macroexpand))
-      || (STRINGP (sourcename) && suffix_p (sourcename, ".elc")))
+      || (STRINGP (sourcename) && (suffix_p (sourcename, ".elc")
+				   || suffix_p (sourcename, ".eln"))))
     /* Don't macroexpand before the corresponding function is defined
        and don't bother macroexpanding in .elc files, since it should have
        been done already.  */
@@ -5112,7 +5103,6 @@ init_lread (void)
 
   load_in_progress = 0;
   Vload_file_name = Qnil;
-  Vload_true_file_name = Qnil;
   Vstandard_input = Qt;
   Vloads_in_progress = Qnil;
 }
@@ -5302,16 +5292,8 @@ directory.  These file names are converted to absolute at startup.  */);
   Vload_history = Qnil;
 
   DEFVAR_LISP ("load-file-name", Vload_file_name,
-	       doc: /* Full name of file being loaded by `load'.
-
-In case of native code being loaded this is indicating the
-corresponding bytecode filename.  Use `load-true-file-name' to obtain
-the .eln filename.  */);
+	       doc: /* File being loaded by `load'.  */);
   Vload_file_name = Qnil;
-
-  DEFVAR_LISP ("load-true-file-name", Vload_true_file_name,
-	       doc: /* Full name of file being loaded by `load'.  */);
-  Vload_true_file_name = Qnil;
 
   DEFVAR_LISP ("user-init-file", Vuser_init_file,
 	       doc: /* File name, including directory, of user's initialization file.
@@ -5459,7 +5441,6 @@ For internal use only.  */);
   DEFSYM (Qfunction, "function");
   DEFSYM (Qload, "load");
   DEFSYM (Qload_file_name, "load-file-name");
-  DEFSYM (Qload_true_file_name, "load-true-file-name");
   DEFSYM (Qeval_buffer_list, "eval-buffer-list");
   DEFSYM (Qdir_ok, "dir-ok");
   DEFSYM (Qdo_after_load_evaluation, "do-after-load-evaluation");

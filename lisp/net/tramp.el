@@ -2508,7 +2508,7 @@ remote file names."
 		 (mapcar
 		  #'file-name-sans-extension
 		  (directory-files
-		   dir nil (rx bos "tramp" (+ nonl) ".el" (? "c") eos)))))
+		   dir nil (rx bos "tramp" (+ nonl) ".el" (? (in "cn")) eos)))))
 	 (files-regexp (rx bol (regexp (regexp-opt files)) eol)))
     (mapatoms
      (lambda (atom)
@@ -4643,9 +4643,11 @@ Do not set it manually, it is used buffer-local in `tramp-get-lock-pid'.")
     (unless nosuffix
       (cond ((file-exists-p (concat file ".elc"))
 	     (setq file (concat file ".elc")))
+            ((file-exists-p (concat file ".eln"))
+	     (setq file (concat file ".eln")))
 	    ((file-exists-p (concat file ".el"))
 	     (setq file (concat file ".el")))))
-    (when (and must-suffix (not (string-match-p (rx ".el" (? "c") eos) file)))
+    (when (and must-suffix (not (string-match-p (rx ".el" (? (in "cn")) eos) file)))
       (tramp-error
        v 'file-error "File `%s' does not include a `.el' or `.elc' suffix" file))
     (unless (or noerror (file-exists-p file))

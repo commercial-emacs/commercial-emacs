@@ -713,7 +713,7 @@ This uses `ffap-file-exists-string', which may try adding suffixes from
 	 (cond
 	  ((consp nosuffix) nosuffix)
 	  (nosuffix '(""))
-	  (t '(".elc" ".el" ""))))
+	  (t '(".eln" ".elc" ".el" ""))))
 	suffixes try found)
     (while path
       (setq suffixes suffixes-to-try)
@@ -741,7 +741,7 @@ This uses `ffap-file-exists-string', which may try adding suffixes from
     ("\\.info\\'" . ffap-info)		; gzip.info
     ("\\`info/" . ffap-info-2)		; info/emacs
     ("\\`[-[:lower:]]+\\'" . ffap-info-3) ; (emacs)Top [only in the parentheses]
-    ("\\.elc?\\'" . ffap-el)		; simple.el, simple.elc
+    ("\\.el[cn]?\\'" . ffap-el)		; simple.el, simple.elc
     (emacs-lisp-mode . ffap-el-mode)	; rmail, gnus, simple, custom
     ;; (lisp-interaction-mode . ffap-el-mode) ; maybe
     (finder-mode . ffap-el-mode)	; type `C-h p' and try it

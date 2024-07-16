@@ -5674,7 +5674,7 @@ This function is called directly from the C code."
     ;; Maybe we should just use display-warning?  This seems yucky...
     (let* ((file (file-name-nondirectory abs-file))
            (package (intern (substring file 0
-			               (string-match "\\.elc?\\>" file))
+			               (string-match "\\.el[cn]?\\>" file))
                             obarray))
 	   (msg (format "Package %s is deprecated" package))
 	   (fun (lambda (msg) (message "%s" msg))))

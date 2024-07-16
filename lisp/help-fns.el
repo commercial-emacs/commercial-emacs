@@ -453,9 +453,9 @@ the C sources, too."
       ;; An autoloaded function: Locate the file since `symbol-function'
       ;; has only returned a bare string here.
       (setq file-name
-	    (locate-file file-name load-path '(".el" ".elc") 'readable)))
+	    (locate-file file-name load-path '(".el" ".elc" ".eln") 'readable)))
      ((and (stringp file-name)
-	   (string-match "[.]*loaddefs.elc?\\'" file-name))
+	   (string-match "[.]*loaddefs.el[cn]?\\'" file-name))
       ;; An autoloaded variable or face.  Visit loaddefs.el in a buffer
       ;; and try to extract the defining file.  The following form is
       ;; from `describe-function-1' and `describe-variable'.
@@ -471,7 +471,7 @@ the C sources, too."
 		    (locate-file
 		     (file-name-sans-extension
 		      (match-string-no-properties 1))
-		     load-path '(".el" ".elc") 'readable))))))))
+		     load-path '(".el" ".elc" ".eln") 'readable))))))))
 
     (cond
      ((and (not file-name)
@@ -500,7 +500,7 @@ the C sources, too."
      ;; This applies to config files like ~/.emacs,
      ;; which people sometimes compile.
      ((let (fn)
-	(and (string-match "\\`\\..*\\.elc\\'"
+	(and (string-match "\\`\\..*\\.el[cn]\\'"
 			   (file-name-nondirectory file-name))
 	     (string-equal (file-name-directory file-name)
 			   (file-name-as-directory (expand-file-name "~")))
@@ -509,7 +509,7 @@ the C sources, too."
      ;; When the Elisp source file can be found in the install
      ;; directory, return the name of that file.
      ((let ((lib-name
-	     (if (string-match "[.]elc\\'" file-name)
+	     (if (string-match "[.]el[cn]\\'" file-name)
 		 (substring-no-properties file-name 0 -1)
 	       file-name)))
 	(or (and (file-readable-p lib-name) lib-name)
@@ -522,7 +522,7 @@ the C sources, too."
 	      ;; name, convert that back to a file name and see if we
 	      ;; get the original one.  If so, they are equivalent.
 	      (if (equal file-name (locate-file lib-name load-path '("")))
-		  (if (string-match "[.]elc\\'" lib-name)
+		  (if (string-match "[.]el[cn]\\'" lib-name)
 		      (substring-no-properties lib-name 0 -1)
 		    lib-name)
 		file-name))

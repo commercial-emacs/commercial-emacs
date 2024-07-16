@@ -7785,7 +7785,7 @@ Calls `describe-variable' or `describe-function'."
   "Call `locate-library' when pushing the corresponding URL button."
   (gnus-message 9 "url=`%s'" url)
   (let* ((lib (locate-library url))
-	 (file (replace-regexp-in-string "\\.elc" ".el" (or lib ""))))
+	 (file (replace-regexp-in-string "\\.el[cn]" ".el" (or lib ""))))
     (if (not lib)
 	(gnus-message 1 "Cannot locate library `%s'." url)
       (find-file-read-only file))))

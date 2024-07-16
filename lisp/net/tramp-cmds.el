@@ -649,7 +649,7 @@ This is needed if there are compatibility problems."
       ((dir (tramp-compat-funcall
 	     'package-desc-dir
 	     (car (alist-get 'tramp (bound-and-true-p package-alist))))))
-    (dolist (elc (directory-files dir 'full (rx ".elc" eos)))
+    (dolist (elc (directory-files dir 'full (rx ".el" (in "cn") eos)))
       (delete-file elc))
     (with-current-buffer (get-buffer-create byte-compile-log-buffer)
       (let ((inhibit-read-only t))

@@ -60,7 +60,7 @@ the result."
             (if (setq tfile (locate-library file))
                 (progn
                   (setq tfile
-                        (replace-regexp-in-string "\\.elc\\'" ".el" tfile))
+                        (replace-regexp-in-string "\\.el[cn]\\'" ".el" tfile))
                   (if (and (not (file-exists-p tfile))
                            (file-exists-p (concat tfile ".gz")))
                       (concat tfile ".gz")
