@@ -1053,6 +1053,7 @@ See also `comint-input-ignoredups' and `comint-write-input-ring'."
 		(ring-size (min 1500 comint-input-ring-size))
 		(ring (make-ring ring-size))
                 ;; Use possibly buffer-local values of these variables.
+                (ring-max-size comint-input-ring-size)
                 (ring-separator comint-input-ring-separator)
                 (ring-file-prefix comint-input-ring-file-prefix)
                 (history-ignore comint-input-history-ignore)
@@ -1063,7 +1064,7 @@ See also `comint-input-ignoredups' and `comint-write-input-ring'."
              ;; Watch for those date stamps in history files!
              (goto-char (point-max))
              (let (start end history)
-               (while (and (< count comint-input-ring-size)
+               (while (and (< count ring-max-size)
                            (re-search-backward ring-separator nil t)
                            (setq end (match-beginning 0)))
                  (goto-char (if (re-search-backward ring-separator nil t)
@@ -1081,7 +1082,7 @@ See also `comint-input-ignoredups' and `comint-write-input-ring'."
 				(not (string-equal (ring-ref ring 0)
 						   history))))
 		   (when (= count ring-size)
-		     (ring-extend ring (min (- comint-input-ring-size ring-size)
+		     (ring-extend ring (min (- ring-max-size ring-size)
 					    ring-size))
 		     (setq ring-size (ring-size ring)))
 		   (ring-insert-at-beginning ring history)
