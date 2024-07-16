@@ -82,6 +82,12 @@ expression, which is useful when those arguments contain arbitrary
 characters that otherwise might require elaborate and error-prone
 escaping (to protect them from the shell).
 
+---
+** "find-func.el" commands now have history enabled.
+The 'find-function', 'find-library', 'find-face-definition', and
+'find-variable' commands now allow retrieving previous input using the
+usual minibuffer history commands.  Each command has a separate history.
+
 
 * Incompatible Changes in Emacs 30.1
 
