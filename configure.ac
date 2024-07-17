@@ -961,6 +961,7 @@ fi
 AC_SUBST([WERROR_CFLAGS])
 AS_IF([test $gl_gcc_warnings = no],
  [
+  isystem='-I'
   AS_IF([test "$emacs_cv_clang" = yes],
    [
      # Turn off some warnings if supported.
@@ -970,6 +971,8 @@ AS_IF([test $gl_gcc_warnings = no],
      gl_WARN_ADD([-Wno-unknown-pragmas])
    ])
  ],[
+  isystem='-isystem '
+
   # This, $nw, is the list of warnings we disable.
   nw=
 
@@ -1100,6 +1103,9 @@ AC_SUBST([GNULIB_WARN_CFLAGS])
 
 edit_cflags="
   s,///*,/,g
+  s/^/ /
+  s/ -I/ $isystem/g
+  s/^ //
 "
 
 AC_ARG_ENABLE([link-time-optimization],
@@ -1778,7 +1784,7 @@ fi
 AC_SUBST([LD_SWITCH_X_SITE_RPATH])
 
 if test "${x_includes}" != NONE && test -n "${x_includes}"; then
-  C_SWITCH_X_SITE=-I`AS_ECHO(["$x_includes"]) | sed -e "s/:/ -I/g"`
+  C_SWITCH_X_SITE=$isystem`AS_ECHO(["$x_includes"]) | sed -e "s/:/ $isystem/g"`
 fi
 
 if test x"${x_includes}" = x; then
@@ -1844,8 +1850,8 @@ if test "${with_ns}" != no; then
        GNUSTEP_LOCAL_HEADERS="-I${GNUSTEP_LOCAL_HEADERS}"
      test "x${GNUSTEP_LOCAL_LIBRARIES}" != "x" && \
        GNUSTEP_LOCAL_LIBRARIES="-L${GNUSTEP_LOCAL_LIBRARIES}"
-     CPPFLAGS="$CPPFLAGS -I ${GNUSTEP_SYSTEM_HEADERS} ${GNUSTEP_LOCAL_HEADERS}"
-     CFLAGS="$CFLAGS -I ${GNUSTEP_SYSTEM_HEADERS} ${GNUSTEP_LOCAL_HEADERS}"
+     CPPFLAGS="$CPPFLAGS -isystem ${GNUSTEP_SYSTEM_HEADERS} ${GNUSTEP_LOCAL_HEADERS}"
+     CFLAGS="$CFLAGS -isystem ${GNUSTEP_SYSTEM_HEADERS} ${GNUSTEP_LOCAL_HEADERS}"
      LDFLAGS="$LDFLAGS -L${GNUSTEP_SYSTEM_LIBRARIES} ${GNUSTEP_LOCAL_LIBRARIES}"
      LIBS_GNUSTEP="-lgnustep-gui -lgnustep-base -lobjc -lpthread"
      dnl GNUstep defines BASE_NATIVE_OBJC_EXCEPTIONS to 0 or 1.
@@ -4603,13 +4609,13 @@ if test "${with_xml2}" != "no"; then
 	xcsdkdir="" ;;
       esac
     fi
-    CPPFLAGS="$CPPFLAGS -I${xcsdkdir}/usr/include/libxml2"
+    CPPFLAGS="$CPPFLAGS -isystem${xcsdkdir}/usr/include/libxml2"
     AC_CHECK_HEADER([libxml/HTMLparser.h],
       [AC_CHECK_DECL([HTML_PARSE_RECOVER], [HAVE_LIBXML2=yes], [],
 		     [#include <libxml/HTMLparser.h>])])
     CPPFLAGS="$SAVE_CPPFLAGS"
     if test "${HAVE_LIBXML2}" = "yes"; then
-      LIBXML2_CFLAGS="-I${xcsdkdir}/usr/include/libxml2"
+      LIBXML2_CFLAGS="-isystem${xcsdkdir}/usr/include/libxml2"
       LIBXML2_LIBS="-lxml2"
     fi
   fi
