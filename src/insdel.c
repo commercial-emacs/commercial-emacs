@@ -1817,10 +1817,10 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   offset_intervals (current_buffer, from, - nchars_del);
 
   GAP_SIZE += nbytes_del;
-  ZV_BYTE -= nbytes_del;
-  Z_BYTE -= nbytes_del;
   ZV -= nchars_del;
   Z -= nchars_del;
+  ZV_BYTE -= nbytes_del;
+  Z_BYTE -= nbytes_del;
   GPT = from;
   GPT_BYTE = from_byte;
   /* Anchor unless decode_coding_object needs to access the original
