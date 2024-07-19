@@ -1360,6 +1360,50 @@ AC_SUBST(LD_SWITCH_SYSTEM)
 C_SWITCH_MACHINE=
 AC_SUBST(C_SWITCH_MACHINE)
 
+AC_CACHE_CHECK([for flags to work around GCC bug 58416],
+  [emacs_cv_gcc_bug_58416_CFLAGS],
+  [emacs_cv_gcc_bug_58416_CFLAGS='none needed'
+   AS_CASE([$canonical],
+     [[i[3456]86-* | x86_64-*]],
+       [AS_IF([test "$GCC" = yes],
+	  [old_CFLAGS=$CFLAGS
+	   # If no flags are needed (e.g., not GCC 4+), don't use any.
+	   # Otherwise, use -mfpmath=sse if already assuming SSE2.
+	   # Otherwise, use -fno-tree-sra.
+	   for emacs_cv_gcc_bug_58416_CFLAGS in \
+	       'none needed' -mfpmath=sse -fno-tree-sra
+	   do
+	     AS_CASE([$emacs_cv_gcc_bug_58416_CFLAGS],
+	       ['none needed'], [],
+	       [-fno-tree-sra], [break],
+	       [CFLAGS="$old_CFLAGS $emacs_cv_gcc_bug_58416_CFLAGS"])
+	     AC_COMPILE_IFELSE(
+	       [AC_LANG_DEFINES_PROVIDED
+		[/* Work around GCC bug with double in unions on x86,
+		    where the generated insns copy non-floating-point data
+		    via fldl/fstpl instruction pairs.  This can misbehave
+		    the data's bit pattern looks like a NaN.  See, e.g.:
+		       https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58416#c10
+		       https://gcc.gnu.org/bugzilla/show_bug.cgi?id=71460
+		       https://gcc.gnu.org/bugzilla/show_bug.cgi?id=93271
+		       https://gcc.gnu.org/bugzilla/show_bug.cgi?id=114659
+		    Problem observed with 'gcc -m32' with GCC 14.1.1
+		    20240607 (Red Hat 14.1.1-5) on x86-64.  */
+		 #include <float.h>
+		 #if \
+		     (4 <= __GNUC__ && !defined __clang__ \
+		      && (defined __i386__ || defined __x86_64__) \
+		      && ! (0 <= FLT_EVAL_METHOD && FLT_EVAL_METHOD <= 1))
+		 # error "GCC bug 58416 is possibly present"
+		 #endif
+	       ]],
+	       [break])
+	   done
+	   CFLAGS=$old_CFLAGS])])])
+AS_CASE([$emacs_cv_gcc_bug_58416_CFLAGS],
+  [-*],
+    [C_SWITCH_MACHINE="$C_SWITCH_MACHINE $emacs_cv_gcc_bug_58416_CFLAGS"])
+
 C_SWITCH_SYSTEM=
 ## Some programs in src produce warnings saying certain subprograms
 ## are too complex and need a MAXMEM value greater than 2000 for
