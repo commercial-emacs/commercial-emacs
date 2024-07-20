@@ -1865,8 +1865,7 @@ Useful links:
   `http://pages.cs.wisc.edu/~ghost/gv/gv_doc/gv.html'
 
 * MacGSView (Mac OS)
-  `http://pages.cs.wisc.edu/~ghost/macos/index.htm'
-"
+  `http://pages.cs.wisc.edu/~ghost/macos/index.htm'"
   :type '(string :tag "Ghostview Utility"))
 
 
@@ -1890,8 +1889,7 @@ Useful links:
   `https://www.cs.wisc.edu/~ghost/doc/cvs/Use.htm'
 
 * Printer compatibility
-  `https://www.cs.wisc.edu/~ghost/doc/printer.htm'
-"
+  `https://www.cs.wisc.edu/~ghost/doc/printer.htm'"
   :type '(string :tag "Ghostscript Utility"))
 
 
@@ -1931,8 +1929,7 @@ Useful links:
   `https://www.cs.wisc.edu/~ghost/doc/cvs/Use.htm'
 
 * Printer compatibility
-  `https://www.cs.wisc.edu/~ghost/doc/printer.htm'
-"
+  `https://www.cs.wisc.edu/~ghost/doc/printer.htm'"
   :type '(repeat (string :tag "Ghostscript Switch")))
 
 
