@@ -148,7 +148,7 @@ it returns 0.  If LIST is circular, it returns an integer that is at
 least the number of distinct elements.  */)
   (Lisp_Object list)
 {
-  intptr_t len = 0;
+  ptrdiff_t len = 0;
   FOR_EACH_TAIL_SAFE (list)
     len++;
   return make_fixnum (len);
@@ -229,7 +229,7 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil).  */
        attributes: const)
   (Lisp_Object object)
 {
-  intptr_t len = 0;
+  ptrdiff_t len = 0;
   Lisp_Object last_tail = object;
   Lisp_Object tail = object;
   FOR_EACH_TAIL_SAFE (tail)
