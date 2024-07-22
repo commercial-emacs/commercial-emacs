@@ -1788,7 +1788,8 @@ build_load_history (Lisp_Object filename, bool entire)
     {
       Lisp_Object tem = Fnreverse (Vcurrent_load_list);
       eassert (EQ (filename, Fcar (tem)));
-      Vload_history = Fcons (tem, Vload_history);
+      if (!NILP (tem))
+	Vload_history = Fcons (tem, Vload_history);
       /* FIXME: There should be an unbind_to right after calling us which
          should re-establish the previous value of Vcurrent_load_list.  */
       Vcurrent_load_list = Qt;

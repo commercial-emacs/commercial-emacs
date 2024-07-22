@@ -24,30 +24,39 @@
 
 ;;; Commentary:
 
-;; A non-nil `pdumper--pure-pool' is the sole differentiator of
-;; the final pdump run from the initial bootstrap run.
-
 ;;; Code:
 
-(setq pdumper--doctor-load-history
-      '(mapc
-        (lambda (entry)
-          (catch 'fix-entry
-            (mapc ; FIXME dolist and dotimes result in gc segv
-             (lambda (path)
-               (let ((dir (file-name-as-directory path)))
-                 (when (string-prefix-p dir (car entry))
-                   (setcar entry (concat (file-name-as-directory installed-directory)
-                                         (file-name-as-directory "lisp")
-                                         (substring (car entry) (length dir))))
-                   (throw 'fix-entry nil))))
-             (sort (copy-sequence load-path)
-                   (lambda (a b) (< (length a) (length b)))))))
-        load-history))
+(load (concat (file-name-directory (car load-path)) "admin/pdump-common"))
 
-(let* ((parent-dir (file-name-directory (car load-path)))
-       (load-path (cons (concat parent-dir "admin") load-path)))
-  (load "pdump"))
+;; We keep the load-history data in PURE space.
+;; Make sure that the spine of the list is not in pure space because it can
+;; be destructively mutated in lread.c:build_load_history.
+(mapc
+ (lambda (entry)
+   (catch 'fix-entry
+     (mapc ; FIXME dolist and dotimes result in gc segv
+      (lambda (path)
+        (let ((dir (file-name-as-directory path)))
+          (when (string-prefix-p dir (car entry))
+            (setcar entry (concat (file-name-as-directory installed-directory)
+                                  (file-name-as-directory "lisp")
+                                  (substring (car entry) (length dir))))
+            (throw 'fix-entry nil))))
+      (sort (copy-sequence load-path)
+            (lambda (a b) (< (length a) (length b)))))))
+ load-history)
+(setq load-history (mapcar #'purify-if-dumping load-history))
+
+(let ((output-path (expand-file-name (pdumping-output) invocation-directory)))
+  (message "Dumping to %s" output-path)
+  (ignore-errors (delete-file output-path))
+  (condition-case err
+      (let (lexical-binding)
+        (dump-emacs-portable output-path))
+    (error (ignore-errors (delete-file output-path))
+           (apply #'signal err))))
+
+(kill-emacs) ;crude
 
 ;; Local Variables:
 ;; no-byte-compile: t

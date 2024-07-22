@@ -30,10 +30,30 @@
 ;;; Code:
 
 (setq pdumper--pure-pool (make-hash-table :test #'equal :size 80000))
+(let* (previous
+       (handle (copy-sequence load-suffixes))
+       (current handle)
+       (load-suffixes (progn
+                        (while current
+                          (if (equal (car current) ".eln")
+			      (if (= (length handle) (length current))
+				  (setq handle (cdr handle))
+				(setcdr previous (cdr current))))
+                          (setq previous current
+	                        current (cdr current)))
+                        handle)))
+  (load (concat (file-name-directory (car load-path)) "admin/pdump-common")))
 
-(let* ((parent-dir (file-name-directory (car load-path)))
-       (load-path (cons (concat parent-dir "admin") load-path)))
-  (load "bootstrap-pdump"))
+(let ((output-path (expand-file-name (pdumping-output) invocation-directory)))
+  (message "Dumping to %s" output-path)
+  (ignore-errors (delete-file output-path))
+  (condition-case err
+      (let (lexical-binding)
+        (dump-emacs-portable output-path))
+    (error (ignore-errors (delete-file output-path))
+           (apply #'signal err))))
+
+(kill-emacs) ;crude
 
 ;; Local Variables:
 ;; no-byte-compile: t
