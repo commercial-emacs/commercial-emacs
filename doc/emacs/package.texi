@@ -572,3 +572,138 @@ are laid out in the same way as in @code{package-user-dir}.
 corresponding package subdirectory.  This only works for packages
 installed in @code{package-user-dir}; if told to act on a package in a
 system-wide package directory, the deletion command signals an error.
+
+@node Fetching Package Sources
+@section Fetching Package Sources
+@cindex package development source
+@cindex upstream source, for packages
+@cindex git source of package @c "git" is not technically correct
+
+  By default @code{package-install} downloads a Tarball from a package
+archive and installs its files.  This might be inadequate if you wish
+to hack on the package sources and share your changes with others.  In
+that case, you may prefer to directly fetch and work on the upstream
+source.  This often makes it easier to develop patches and report
+bugs.
+
+@findex package-vc-install
+@findex package-vc-checkout
+  One way to do this is to use @code{package-vc-install}, to fetch the
+source code for a package directly from source.  The command will also
+automatically ensure that all files are byte-compiled and auto-loaded,
+just like with a regular package.  Packages installed this way behave
+just like any other package.  You can upgrade them using
+@code{package-upgrade} or @code{package-upgrade-all} and delete them
+again using @code{package-delete}.  They are even displayed in the
+regular package listing.  If you just wish to clone the source of a
+package, without adding it to the package list, use
+@code{package-vc-checkout}.
+
+@findex package-report-bug
+@findex package-vc-prepare-patch
+  With the source checkout, you might want to reproduce a bug against
+the current development head or implement a new feature to scratch an
+itch.  If the package metadata indicates how to contact the
+maintainer, you can use the command @code{package-report-bug} to
+report a bug via Email.  This report will include all the user options
+that you have customized.  If you have made a change you wish to share
+with the maintainers, first commit your changes then use the command
+@code{package-vc-prepare-patch} to share it.  @xref{Preparing Patches}.
+
+@findex package-vc-install-from-checkout
+@findex package-vc-rebuild
+  If you maintain your own packages you might want to use a local
+checkout instead of cloning a remote repository.  You can do this by
+using @code{package-vc-install-from-checkout}, which creates a symbolic link
+from the package directory (@pxref{Package Files}) to your checkout
+and initializes the code.  Note that you might have to use
+@code{package-vc-rebuild} to repeat the initialization and update the
+autoloads.
+
+@subsection Specifying Package Sources
+@cindex package specification
+@cindex specification, for source packages
+
+  To install a package from source, Emacs must know where to get the
+package's source code (such as a code repository) and basic
+information about the structure of the code (such as the main file in
+a multi-file package).  A @dfn{package specification} describes these
+properties.
+
+  When supported by a package archive (@pxref{Package
+Archives,,,elisp, The Emacs Lisp Reference Manual}), Emacs can
+automatically download a package's specification from said archive.
+If the first argument passed to @code{package-vc-install} is a symbol
+naming a package, then Emacs will use the specification provided by
+the archive for that package.
+
+@example
+@group
+;; Emacs will download BBDB's specification from GNU ELPA:
+(package-vc-install 'bbdb)
+@end group
+@end example
+
+  The first argument to @code{package-vc-install} may also be a
+package specification.  This allows you to install source packages
+from locations other than the known archives listed in the user option
+@code{package-archives}.  A package specification is a list of the
+form @code{(@var{name} . @var{spec})}, in which @var{spec} should be a
+property list using any of the keys in the table below.
+
+For definitions of basic terms for working with code repositories and
+version control systems, see @ref{VCS Concepts,,,emacs, The GNU Emacs
+Manual}.
+
+@table @code
+@item :url
+A string providing the URL that specifies the repository from which to
+fetch the package's source code.
+
+@item :branch
+A string providing the revision of the code to install.  Do not
+confuse this with a package's version number.
+
+@item :lisp-dir
+A string providing the repository-relative name of the directory to
+use for loading the Lisp sources, which defaults to the root directory
+of the repository.
+
+@item :main-file
+A string providing the main file of the project, from which to gather
+package metadata.  If not given, the default is the package name with
+".el" appended to it.
+
+@item :doc
+A string providing the repository-relative name of the documentation
+file from which to build an Info file.  This can be a Texinfo file or
+an Org file.
+
+@item :make
+A string or list of strings providing the target or targets defined in
+the repository Makefile which should run before building the Info file.
+Only takes effect when @code{package-vc-allow-build-commands} is
+non-@code{nil}.
+
+@item :shell-command
+A string providing the shell command to run before building the Info
+file.  Only takes effect when @code{package-vc-allow-build-commands}
+is non-@code{nil}.
+
+@item :vc-backend
+A symbol naming the VC backend to use for downloading a copy of the
+package's repository (@pxref{Version Control Systems,,,emacs, The GNU
+Emacs Manual}).  If omitted, Emacs will attempt to make a guess based
+on the provided URL, or, failing that, the process will fall back onto
+the value of @code{package-vc-default-backend}.
+@end table
+
+@example
+@group
+;; Specifying information manually:
+(package-vc-install
+  '(bbdb :url "https://git.savannah.nongnu.org/git/bbdb.git"
+         :lisp-dir "lisp"
+         :doc "doc/bbdb.texi"))
+@end group
+@end example
