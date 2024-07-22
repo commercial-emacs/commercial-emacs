@@ -73,7 +73,6 @@
     (if (equal (car load-suffixes) ".eln")
         (if (eq load-suffixes new-load-suffixes)
             (setq new-load-suffixes (cdr new-load-suffixes))
-	  (message "ari %s" load-suffixes)
           (setcdr parent (cdr load-suffixes))))
     (setq parent load-suffixes
 	  load-suffixes (cdr load-suffixes)))
