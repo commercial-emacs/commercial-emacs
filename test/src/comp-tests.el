@@ -362,7 +362,7 @@ Check that the resulting binaries do not differ."
                    "A nice docstring."))
   ;; Check a preloaded function, we can't use `comp-tests-doc-f' now
   ;; as this is loaded manually with no .elc.
-  (should (string-match "\\.*.elc\\'" (symbol-file #'error))))
+  (should (string-match "\\.*.el[cn]\\'" (symbol-file #'error))))
 
 (comp-deftest interactive-form ()
   (should (equal (interactive-form #'comp-test-interactive-form0-f)
