@@ -205,8 +205,8 @@ enum reloc_type
     RELOC_EMACS_LV = RELOC_DUMP_LV + RELOC_LV_NTYPES,
   };
 
-verify (RELOC_EMACS_LV + RELOC_LV_NTYPES < (1 << RELOC_TYPE_NBITS));
-verify (DUMP_ALIGNMENT >= GCALIGNMENT);
+static_assert (RELOC_EMACS_LV + RELOC_LV_NTYPES < (1 << RELOC_TYPE_NBITS));
+static_assert (DUMP_ALIGNMENT >= GCALIGNMENT);
 
 struct dump_start
 {
@@ -221,8 +221,8 @@ struct dump_reloc
 };
 
 /* The various metadata need to be packed as dump_off's.  */
-verify (sizeof (struct dump_start) == sizeof (dump_off));
-verify (sizeof (struct dump_reloc) == sizeof (dump_off));
+static_assert (sizeof (struct dump_start) == sizeof (dump_off));
+static_assert (sizeof (struct dump_reloc) == sizeof (dump_off));
 
 struct emacs_reloc
 {

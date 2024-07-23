@@ -27,8 +27,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <verify.h>
-
 #include "lisp.h"
 #include "intervals.h"
 #include "process.h"
@@ -4632,7 +4630,7 @@ init_buffer_once (void)
   bset_scroll_down_aggressively (&buffer_slot_defaults, Qnil);
   bset_display_time (&buffer_slot_defaults, Qnil);
 
-  verify (sizeof (EMACS_INT) == word_size);
+  static_assert (sizeof (EMACS_INT) == word_size);
 
   Vbuffer_alist = Qnil;
   current_buffer = 0;

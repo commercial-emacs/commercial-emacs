@@ -65,11 +65,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    are the same size and have the same layout, and where bytes have
    eight bits --- that is, a general-purpose computer made after 1990.
    Also require Lisp_Object to be at least as wide as pointers.  */
-verify (sizeof (ptrdiff_t) == sizeof (void *));
-verify (sizeof (intptr_t) == sizeof (ptrdiff_t));
-verify (sizeof (void (*) (void)) == sizeof (void *));
-verify (sizeof (ptrdiff_t) <= sizeof (Lisp_Object));
-verify (sizeof (ptrdiff_t) <= sizeof (EMACS_INT));
+static_assert (sizeof (ptrdiff_t) == sizeof (void *));
+static_assert (sizeof (intptr_t) == sizeof (ptrdiff_t));
+static_assert (sizeof (void (*) (void)) == sizeof (void *));
+static_assert (sizeof (ptrdiff_t) <= sizeof (Lisp_Object));
+static_assert (sizeof (ptrdiff_t) <= sizeof (EMACS_INT));
 
 struct pdumper_info pdumper_info;
 pdumper_hook dump_hooks[24];
@@ -1589,7 +1589,7 @@ dump_bignum (struct dump_context *ctx, Lisp_Object object)
 #endif
   const struct Lisp_Bignum *bignum = XBIGNUM (object);
   START_DUMP_PVEC (ctx, &bignum->header, struct Lisp_Bignum, out);
-  verify (sizeof (out->value) >= sizeof (struct bignum_reload_info));
+  static_assert (sizeof (out->value) >= sizeof (struct bignum_reload_info));
   dump_off bignum_offset = finish_dump_pvec (ctx, &out->header);
   if (ctx->flags.dump_object_contents)
     {
@@ -3385,11 +3385,11 @@ DEFUN ("dump-emacs-portable",
                         O_RDWR | O_TRUNC | O_CREAT, 0666);
   if (ctx->fd < 0)
     report_file_error ("Opening dump output", filename);
-  verify (sizeof (ctx->header.magic) == sizeof (dump_magic));
+  static_assert (sizeof (ctx->header.magic) == sizeof (dump_magic));
   memcpy (&ctx->header.magic, dump_magic, sizeof (dump_magic));
   ctx->header.magic[0] = '!'; /* Sophomoric hack indicates in-process */
 
-  verify (sizeof (fingerprint) == sizeof (ctx->header.fingerprint));
+  static_assert (sizeof (fingerprint) == sizeof (ctx->header.fingerprint));
   for (int i = 0; i < sizeof fingerprint; ++i)
     ctx->header.fingerprint[i] = fingerprint[i];
 

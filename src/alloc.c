@@ -230,9 +230,9 @@ aligned_alloc (size_t alignment, size_t size)
   return posix_memalign (&p, alignment, size) == 0 ? p : 0;
 }
 /* Verify POSIX invariant ALIGNMENT = (2^x) * sizeof (void *).  */
-verify (BLOCK_ALIGN % sizeof (void *) == 0
+static_assert (BLOCK_ALIGN % sizeof (void *) == 0
 	&& POWER_OF_2 (BLOCK_ALIGN / sizeof (void *)));
-verify (malloc_laligned ()
+static_assert (malloc_laligned ()
 	|| (LISP_ALIGNMENT % sizeof (void *) == 0
 	    && POWER_OF_2 (LISP_ALIGNMENT / sizeof (void *))));
 #endif
@@ -357,7 +357,7 @@ xfree (void *block)
 /* Other parts of Emacs pass large int values to allocator functions
    expecting ptrdiff_t.  This is portable in practice, but check it to
    be safe.  */
-verify (INT_MAX <= PTRDIFF_MAX);
+static_assert (INT_MAX <= PTRDIFF_MAX);
 
 /* Allocate an array of NITEMS items, each of size ITEM_SIZE.
    Signal an error on memory exhaustion, and block interrupt input.  */
@@ -536,8 +536,8 @@ lisp_free (struct thread_state *thr, void *block)
 }
 
 // should someone decide to muck with VBLOCK_ALIGN...
-verify (VBLOCK_ALIGN % LISP_ALIGNMENT == 0);
-verify (VBLOCK_ALIGN <= (1 << PSEUDOVECTOR_SIZE_BITS));
+static_assert (VBLOCK_ALIGN % LISP_ALIGNMENT == 0);
+static_assert (VBLOCK_ALIGN <= (1 << PSEUDOVECTOR_SIZE_BITS));
 
 /* An aligned block of memory.  */
 struct ablock
@@ -551,15 +551,15 @@ struct ablock
   /* It's complicated.  See ABLOCK_ABASE and ABASE_SENTINEL.  */
   intptr_t overloaded;
 };
-verify (sizeof (struct ablock) % BLOCK_ALIGN == 0);
+static_assert (sizeof (struct ablock) % BLOCK_ALIGN == 0);
 
 #define ABLOCKS_NBLOCKS (1 << 4)
 struct ablocks
 {
   struct ablock blocks[ABLOCKS_NBLOCKS];
 };
-verify (sizeof (struct ablocks) % BLOCK_ALIGN == 0);
-verify (offsetof (struct ablocks, blocks) == 0);
+static_assert (sizeof (struct ablocks) % BLOCK_ALIGN == 0);
+static_assert (offsetof (struct ablocks, blocks) == 0);
 
 /* Sentinel conflates the alignedness bool (at most 1) and the obtuse
    double-counting ablock refcount (at most ABLOCK_NBLOCKS * 2).  */
@@ -2016,7 +2016,7 @@ vectorlike_nbytes (const union vectorlike_header *hdr)
 	ptrdiff_t word_bytes = (bool_vector_words (bv->size)
 				* sizeof (bits_word));
 	ptrdiff_t boolvec_bytes = bool_header_size + word_bytes;
-	verify (header_size <= bool_header_size);
+	static_assert (header_size <= bool_header_size);
 	nwords = (boolvec_bytes - header_size + word_size - 1) / word_size;
       }
       break;
@@ -2386,7 +2386,7 @@ allocate_pseudovector (int memlen, int lisplen,
   /* Catch bogus values.  */
   enum { size_max = VBLOCK_ALIGN - 1 };
   enum { rest_max = (1 << PSEUDOVECTOR_REST_BITS) - 1 };
-  verify (size_max + rest_max <= VECTOR_ELTS_MAX);
+  static_assert (size_max + rest_max <= VECTOR_ELTS_MAX);
   eassert (0 <= tag && tag <= PVEC_TAG_MAX);
   eassert (0 <= lisplen && lisplen <= zerolen && zerolen <= memlen);
   eassert (lisplen <= size_max);

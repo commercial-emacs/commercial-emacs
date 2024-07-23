@@ -50,7 +50,7 @@ union aligned_thread_state
   GCALIGNED_UNION_MEMBER
 };
 
-verify (GCALIGNED (union aligned_thread_state));
+static_assert (GCALIGNED (union aligned_thread_state));
 
 static union aligned_thread_state main_state
   = {{

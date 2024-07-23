@@ -796,7 +796,7 @@ freloc_check_fill (void)
 {
   if (!freloc.size)
     {
-      verify (sizeof (helper_link_table) < sizeof (freloc.link_table));
+      static_assert (sizeof (helper_link_table) < sizeof (freloc.link_table));
       memcpy (freloc.link_table, helper_link_table, sizeof (helper_link_table));
       freloc.size = ARRAYELTS (helper_link_table);
 

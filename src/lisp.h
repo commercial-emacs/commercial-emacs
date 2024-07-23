@@ -154,7 +154,7 @@ typedef unsigned char bits_word;
 # define BITS_WORD_MAX ((1u << BOOL_VECTOR_BITS_PER_CHAR) - 1)
 enum { BITS_PER_BITS_WORD = BOOL_VECTOR_BITS_PER_CHAR };
 #endif
-verify (BITS_WORD_MAX >> (BITS_PER_BITS_WORD - 1) == 1);
+static_assert (BITS_WORD_MAX >> (BITS_PER_BITS_WORD - 1) == 1);
 
 /* Use pD to format ptrdiff_t values, which suffice for indexes into
    buffers and strings.  Emacs never allocates objects larger than
@@ -635,7 +635,7 @@ struct interval
   bool_bf rear_sticky : 1;	    /* Likewise for just after it.  */
   Lisp_Object plist;		    /* Other properties.  */
 } GCALIGNED_STRUCT;
-verify (GCALIGNED (struct interval));
+static_assert (GCALIGNED (struct interval));
 
 
 /* Additional fields require corresponding dump_field_* in
@@ -698,7 +698,7 @@ struct Lisp_Symbol
     GCALIGNED_UNION_MEMBER
   } u;
 };
-verify (GCALIGNED (struct Lisp_Symbol));
+static_assert (GCALIGNED (struct Lisp_Symbol));
 
 /* Declare a Lisp-callable function.  The MAXARGS parameter has the same
    meaning as in the DEFUN macro, and is used to construct a prototype.  */
@@ -1227,7 +1227,7 @@ struct Lisp_Cons
     GCALIGNED_UNION_MEMBER
   } u;
 };
-verify (GCALIGNED (struct Lisp_Cons));
+static_assert (GCALIGNED (struct Lisp_Cons));
 
 INLINE bool
 (NILP) (Lisp_Object x)
@@ -1351,7 +1351,7 @@ struct Lisp_String
     GCALIGNED_UNION_MEMBER
   } u;
 };
-verify (GCALIGNED (struct Lisp_String));
+static_assert (GCALIGNED (struct Lisp_String));
 
 INLINE bool
 STRINGP (Lisp_Object x)
@@ -1749,7 +1749,7 @@ INLINE void
 memclear (void *p, ptrdiff_t nbytes)
 {
   eassert (0 <= nbytes);
-  verify (NIL_IS_ZERO);
+  static_assert (NIL_IS_ZERO);
   /* Since Qnil is zero, memset suffices.  */
   memset (p, 0, nbytes);
 }
@@ -1958,7 +1958,7 @@ union Aligned_Lisp_Subr
     struct Lisp_Subr s;
     GCALIGNED_UNION_MEMBER
   };
-verify (GCALIGNED (union Aligned_Lisp_Subr));
+static_assert (GCALIGNED (union Aligned_Lisp_Subr));
 
 INLINE bool
 SUBRP (Lisp_Object a)
@@ -1999,11 +1999,11 @@ enum char_table_specials
   };
 
 /* Sanity-check pseudovector layout.  */
-verify (offsetof (struct Lisp_Char_Table, defalt) == header_size);
-verify (offsetof (struct Lisp_Char_Table, extras)
-	== header_size + CHAR_TABLE_STANDARD_SLOTS * sizeof (Lisp_Object));
-verify (offsetof (struct Lisp_Sub_Char_Table, contents)
-	== header_size + SUB_CHAR_TABLE_OFFSET * sizeof (Lisp_Object));
+static_assert (offsetof (struct Lisp_Char_Table, defalt) == header_size);
+static_assert (offsetof (struct Lisp_Char_Table, extras)
+	       == header_size + CHAR_TABLE_STANDARD_SLOTS * sizeof (Lisp_Object));
+static_assert (offsetof (struct Lisp_Sub_Char_Table, contents)
+	       == header_size + SUB_CHAR_TABLE_OFFSET * sizeof (Lisp_Object));
 
 /* Return the number of "extra" slots in the char table CT.  */
 
@@ -2532,7 +2532,7 @@ SXHASH_REDUCE (EMACS_UINT x)
 INLINE hash_hash_t
 reduce_emacs_uint_to_hash_hash (EMACS_UINT x)
 {
-  verify (sizeof x <= 2 * sizeof (hash_hash_t));
+  static_assert (sizeof x <= 2 * sizeof (hash_hash_t));
   return (sizeof x == sizeof (hash_hash_t)
 	  ? x
 	  : x ^ (x >> (8 * (sizeof x - sizeof (hash_hash_t)))));
@@ -2828,7 +2828,7 @@ struct Lisp_Float
       GCALIGNED_UNION_MEMBER
     } u;
   };
-verify (GCALIGNED (struct Lisp_Float));
+static_assert (GCALIGNED (struct Lisp_Float));
 
 INLINE bool
 (FLOATP) (Lisp_Object x)
@@ -3929,7 +3929,7 @@ extern void tim_sort (Lisp_Object, Lisp_Object, Lisp_Object *, const ptrdiff_t,
   ARG_NONNULL ((3));
 
 /* Defined in floatfns.c.  */
-verify (FLT_RADIX == 2 || FLT_RADIX == 16);
+static_assert (FLT_RADIX == 2 || FLT_RADIX == 16);
 enum { LOG2_FLT_RADIX = FLT_RADIX == 2 ? 1 : 4 };
 int double_integer_scale (double);
 #ifndef __USE_ISOC99

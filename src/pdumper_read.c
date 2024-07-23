@@ -186,7 +186,7 @@ reloc_dump (const struct dump_header *const header, const enum reloc_phase phase
 	    struct Lisp_Bignum *bignum = (struct Lisp_Bignum *)
 	      ((char *) pdumper_info.addr_beg + reloc.offset);
 	    struct bignum_reload_info reload_info;
-	    verify (sizeof (reload_info) <= sizeof (*bignum_val (bignum)));
+	    static_assert (sizeof (reload_info) <= sizeof (*bignum_val (bignum)));
 	    memcpy (&reload_info, bignum_val (bignum), sizeof (reload_info));
 	    const mp_limb_t *limbs = (mp_limb_t *)
 	      ((char *) pdumper_info.addr_beg + reload_info.data_location);
@@ -877,7 +877,7 @@ pdumper_load (char *filename)
       goto out;
     }
 
-  verify (sizeof (header->fingerprint) == sizeof (fingerprint));
+  static_assert (sizeof (header->fingerprint) == sizeof (fingerprint));
   unsigned char desired[sizeof fingerprint];
   for (int i = 0; i < sizeof fingerprint; ++i)
     desired[i] = fingerprint[i];
