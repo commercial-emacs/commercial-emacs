@@ -30,19 +30,7 @@
 ;;; Code:
 
 (setq pdumper--pure-pool (make-hash-table :test #'equal :size 80000))
-(let* (previous
-       (handle (copy-sequence load-suffixes))
-       (current handle)
-       (load-suffixes (progn
-                        (while current
-                          (if (equal (car current) ".eln")
-			      (if (= (length handle) (length current))
-				  (setq handle (cdr handle))
-				(setcdr previous (cdr current))))
-                          (setq previous current
-	                        current (cdr current)))
-                        handle)))
-  (load (concat (file-name-directory (car load-path)) "admin/pdump-common")))
+(load (concat (file-name-directory (car load-path)) "admin/pdump-common"))
 
 (let ((output-path (expand-file-name (pdumping-output) invocation-directory))
       current-load-list)
