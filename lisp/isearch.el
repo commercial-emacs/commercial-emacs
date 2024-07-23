@@ -1334,6 +1334,7 @@ used to set the value of `isearch-regexp-function'."
   (add-hook 'pre-command-hook 'isearch-pre-command-hook)
   (add-hook 'post-command-hook 'isearch-post-command-hook)
   (add-hook 'mouse-leave-buffer-hook 'isearch-mouse-leave-buffer)
+  (add-hook 'delete-frame-functions 'isearch-done)
   (add-hook 'kbd-macro-termination-hook 'isearch-done)
 
   ;; isearch-mode can be made modal (in the sense of not returning to
@@ -1434,6 +1435,7 @@ If NOPUSH is non-nil, we don't push the string on the search ring."
   (remove-hook 'pre-command-hook 'isearch-pre-command-hook)
   (remove-hook 'post-command-hook 'isearch-post-command-hook)
   (remove-hook 'mouse-leave-buffer-hook 'isearch-mouse-leave-buffer)
+  (remove-hook 'delete-frame-functions 'isearch-done)
   (remove-hook 'kbd-macro-termination-hook 'isearch-done)
   (when (buffer-live-p isearch--current-buffer)
     (with-current-buffer isearch--current-buffer
