@@ -51,22 +51,23 @@ TARGET_EXT = elc
 TARGET_REGEX = byte
 endif
 
-BYTE_COMPILE_FLAGS = \
+COMPILE_FLAGS = \
   --eval "(custom-set-variables (quote (byte-compile-warnings (quote all))))" \
+  --eval "(setq load-suffixes (delete \".eln\" load-suffixes))" \
   $(BYTE_COMPILE_EXTRA_FLAGS)
 
 ifeq ($(HAVE_NATIVE_COMP),yes)
-BYTE_COMPILE_FLAGS += \
+COMPILE_FLAGS += \
   --eval "(setq native-comp-disable-subr-trampolines t)" -l comp
 endif
 
-BYTE_COMPILER_EL = \
+COMPILER_EL = \
 	emacs-lisp/macroexp.el \
 	emacs-lisp/cconv.el    \
 	emacs-lisp/byte-opt.el \
 	emacs-lisp/bytecomp.el
 ifeq ($(HAVE_NATIVE_COMP),yes)
-BYTE_COMPILER_EL += \
+COMPILER_EL += \
        emacs-lisp/comp-common.el \
        emacs-lisp/comp-cstr.el \
        emacs-lisp/comp-run.el \
@@ -113,7 +114,7 @@ all: compile ./cus-load.el ./finder-inf.el
 autoloads: ./loaddefs.el
 
 ./loaddefs.el: ./leim/leim-list.el
-	$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile \
+	$(emacs) $(COMPILE_FLAGS) -f batch-byte-compile \
 	  ../lisp/emacs-lisp/loaddefs-gen.el
 	$(AM_V_GEN)$(emacs) \
             -l ./emacs-lisp/loaddefs-gen \
@@ -155,29 +156,29 @@ TAGS: ${ETAGS} ${tagsfiles}
 	$(AM_V_at)ls ${tagsfiles} | xargs $(XARGS_LIMIT) "${ETAGS}" -a -o $@
 
 define byte-compile
-	$(AM_V_ELC)$(emacs) $(BYTE_COMPILE_FLAGS) -f batch-byte-compile $<
+	$(AM_V_ELC)$(emacs) $(COMPILE_FLAGS) -f batch-byte-compile $<
 endef
 
 define native-compile
-	$(AM_V_at)rm -f ./$@
-	$(AM_V_ELN)$(emacs) $(BYTE_COMPILE_FLAGS) \
+	$(AM_V_at)rm -f $@
+	$(AM_V_ELN)$(emacs) $(COMPILE_FLAGS) \
 	    --eval "(native-compile \"$<\" \"$(@D)/mv_$(@F)\")"
 	$(AM_V_at)mv -f $(@D)/mv_$(@F) $@
 endef
 
-%.elc: %.el $(BYTE_COMPILER_EL:.el=.elc)
+%.elc: %.el $(COMPILER_EL:.el=.elc)
 	$(call byte-compile)
-$(BYTE_COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
+$(COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
 	$(call byte-compile)
 
-%.eln: %.el $(BYTE_COMPILER_EL:.el=.eln)
+%.eln: %.el $(COMPILER_EL:.el=.eln)
 	$(call native-compile)
-$(BYTE_COMPILER_EL:.el=.eln): %.eln : %.el $(top_srcdir)/src/lread.c
+$(COMPILER_EL:.el=.eln): %.eln : %.el $(top_srcdir)/src/lread.c
 	$(call native-compile)
 
 # grep is the wrong way of doing this (hack-local-variables better).
 define compile-rest
-$(filter-out $(BYTE_COMPILER_EL:.el=.$(TARGET_EXT)) $(COMPILE_FIRST:.el=.$(TARGET_EXT)), $(shell \
+$(filter-out $(COMPILER_EL:.el=.$(TARGET_EXT)) $(COMPILE_FIRST:.el=.$(TARGET_EXT)), $(shell \
   read -a arr <<<`find . -type f -name '*.el' -exec grep -L '^;.*[^a-zA-Z]no-\($(TARGET_REGEX)\)-compile: *t' {} + | sort | xargs $(XARGS_LIMIT) echo`; \
   arr=( "$${arr[@]/%.el/.$(TARGET_EXT)}" ); \
   echo "$${arr[*]}"; \
@@ -186,7 +187,7 @@ endef
 
 .SECONDEXPANSION:
 .PHONY: compile
-compile: $(BYTE_COMPILER_EL:.el=.$(TARGET_EXT)) \
+compile: $(COMPILER_EL:.el=.elc) $(COMPILER_EL:.el=.$(TARGET_EXT)) \
   $(COMPILE_FIRST:.el=.$(TARGET_EXT)) \
   $$(call compile-rest)
 
@@ -196,7 +197,7 @@ compile: $(BYTE_COMPILER_EL:.el=.$(TARGET_EXT)) \
 ifeq ($(HAVE_NATIVE_COMP),yes)
 .PHONY: trampolines
 trampolines: compile
-	$(emacs) $(BYTE_COMPILE_FLAGS) -f comp-compile-all-trampolines
+	$(emacs) $(COMPILE_FLAGS) -f comp-compile-all-trampolines
 endif
 
 .PHONY: bootstrap-clean
