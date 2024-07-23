@@ -31,6 +31,7 @@ XARGS_LIMIT = @XARGS_LIMIT@
 HAVE_NATIVE_COMP = @HAVE_NATIVE_COMP@
 
 -include ${top_builddir}/src/verbose.mk
+-include ${top_builddir}/src/compile.mk
 
 FIND_DELETE = @FIND_DELETE@
 
@@ -59,19 +60,6 @@ COMPILE_FLAGS = \
 ifeq ($(HAVE_NATIVE_COMP),yes)
 COMPILE_FLAGS += \
   --eval "(setq native-comp-disable-subr-trampolines t)" -l comp
-endif
-
-COMPILER_EL = \
-	emacs-lisp/macroexp.el \
-	emacs-lisp/cconv.el    \
-	emacs-lisp/byte-opt.el \
-	emacs-lisp/bytecomp.el
-ifeq ($(HAVE_NATIVE_COMP),yes)
-COMPILER_EL += \
-       emacs-lisp/comp-common.el \
-       emacs-lisp/comp-cstr.el \
-       emacs-lisp/comp-run.el \
-       emacs-lisp/comp.el
 endif
 
 # Prevent any settings in the user environment causing problems.
@@ -168,12 +156,12 @@ endef
 
 %.elc: %.el $(COMPILER_EL:.el=.elc)
 	$(call byte-compile)
-$(COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
+$(COMPILER_EL:.el=.elc): %.elc : %.el
 	$(call byte-compile)
 
 %.eln: %.el $(COMPILER_EL:.el=.eln)
 	$(call native-compile)
-$(COMPILER_EL:.el=.eln): %.eln : %.el $(top_srcdir)/src/lread.c
+$(COMPILER_EL:.el=.eln): %.eln : %.el
 	$(call native-compile)
 
 # grep is the wrong way of doing this (hack-local-variables better).
@@ -187,7 +175,7 @@ endef
 
 .SECONDEXPANSION:
 .PHONY: compile
-compile: $(COMPILER_EL:.el=.elc) $(COMPILER_EL:.el=.$(TARGET_EXT)) \
+compile: $(COMPILER_EL:.el=.$(TARGET_EXT)) \
   $(COMPILE_FIRST:.el=.$(TARGET_EXT)) \
   $$(call compile-rest)
 

@@ -80,6 +80,7 @@ lib/strings.h
 src/buildobj.h
 src/globals.h
 src/verbose.mk
+src/compile.mk
 
 # Lisp-level sources built by 'make'.
 *cus-load.el
