@@ -2288,17 +2288,23 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
   start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, subr, header.size);
 #ifdef HAVE_NATIVE_COMP
-  bool non_primitive = !NILP (subr->native_comp_u);
+  bool primitive = NILP (subr->native_comp_u);
 #else
-  bool non_primitive = false;
+  bool primitive = true;
 #endif
-  if (non_primitive)
-    out.function.a0 = NULL;
-  else
+  if (primitive)
     write_field_emacs_ptr (ctx, &out, subr, &subr->function.a0);
+  else
+    out.function.a0 = NULL;
   DUMP_FIELD_COPY (&out, subr, min_args);
   DUMP_FIELD_COPY (&out, subr, max_args);
-  if (non_primitive)
+  if (primitive)
+    {
+      write_field_emacs_ptr (ctx, &out, subr, &subr->symbol_name);
+      write_field_emacs_ptr (ctx, &out, subr, &subr->intspec.string);
+      write_field_emacs_ptr (ctx, &out, subr, &subr->command_modes);
+    }
+  else
     {
       remember_cold_op (ctx, COLD_OP_NATIVE_SUBR,
 			make_lisp_ptr ((void *) subr, Lisp_Vectorlike));
@@ -2307,12 +2313,6 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
       write_field_lisp_object (ctx, &out, subr, &subr->command_modes,
 			       WEIGHT_NORMAL);
     }
-  else
-    {
-      write_field_emacs_ptr (ctx, &out, subr, &subr->symbol_name);
-      write_field_emacs_ptr (ctx, &out, subr, &subr->intspec.string);
-      write_field_emacs_ptr (ctx, &out, subr, &subr->command_modes);
-    }
   DUMP_FIELD_COPY (&out, subr, doc);
 #ifdef HAVE_NATIVE_COMP
   write_field_lisp_object (ctx, &out, subr, &subr->native_comp_u, WEIGHT_NORMAL);
@@ -2320,7 +2320,7 @@ dump_subr (struct dump_context *ctx, const struct Lisp_Subr *subr)
   write_field_lisp_object (ctx, &out, subr, &subr->type, WEIGHT_NORMAL);
 #endif
   dump_off subr_off = finish_object (ctx, &out, sizeof (out));
-  if (non_primitive && ctx->flags.dump_object_contents)
+  if (!primitive && ctx->flags.dump_object_contents)
     /* Must follow compilation units in NATIVE_COMP_RELOCS. */
     push (&ctx->dump_relocs[LATE_RELOCS],
 	  list2 (make_fixnum (RELOC_NATIVE_SUBR),
