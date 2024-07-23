@@ -47,7 +47,8 @@
  load-history)
 (setq load-history (mapcar #'purify-if-dumping load-history))
 
-(let ((output-path (expand-file-name (pdumping-output) invocation-directory)))
+(let ((output-path (expand-file-name (pdumping-output) invocation-directory))
+      current-load-list)
   (message "Dumping to %s" output-path)
   (ignore-errors (delete-file output-path))
   (condition-case err

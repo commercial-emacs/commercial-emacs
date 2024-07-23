@@ -1,4 +1,4 @@
-;;; pdump.el --- load libraries ahead of dump  -*- lexical-binding: t; -*-
+;;; pdump-common.el --- load libraries ahead of dump  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 1985-1986, 1992, 1994, 2001-2024 Free Software
 ;; Foundation, Inc.
@@ -349,7 +349,6 @@
   ;; macroexpansion cycles (more bootstrap fake-it-til-you-make-it).
   (setq native-comp-disable-subr-trampolines (null pdumper--pure-pool)))
 
-(setq current-load-list nil)
 ;; Avoid storing references to build directory in the binary.
 (setq custom-current-group-alist nil)
 
@@ -418,4 +417,4 @@
 ;; no-update-autoloads: t
 ;; End:
 
-;;; pdump.el ends here
+;;; pdump-common.el ends here
