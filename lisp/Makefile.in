@@ -156,12 +156,12 @@ endef
 
 %.elc: %.el $(COMPILER_EL:.el=.elc)
 	$(call byte-compile)
-$(COMPILER_EL:.el=.elc): %.elc : %.el
+$(COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
 	$(call byte-compile)
 
 %.eln: %.el $(COMPILER_EL:.el=.eln)
 	$(call native-compile)
-$(COMPILER_EL:.el=.eln): %.eln : %.el
+$(COMPILER_EL:.el=.eln): %.eln : %.el $(top_srcdir)/src/lread.c
 	$(call native-compile)
 
 # grep is the wrong way of doing this (hack-local-variables better).

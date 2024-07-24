@@ -488,12 +488,6 @@ bootstrap-emacs$(EXEEXT): | emacs$(EXEEXT)
 	@# symlink preferred but for mingw
 	cp -f $(firstword $|) $@
 
-$(patsubst %.el,../lisp/%.eln,$(COMPILER_EL)): %.eln : %.el lread.c | bootstrap-emacs.pdmp
-	$(MAKE) -C ../lisp $(patsubst ../lisp/%,%,$@) EMACS=../src/bootstrap-emacs$(EXEEXT)
-
-$(patsubst %.el,../lisp/%.elc,$(COMPILER_EL)): %.elc : %.el lread.c | bootstrap-emacs.pdmp
-	$(MAKE) -C ../lisp $(patsubst ../lisp/%,%,$@) EMACS=../src/bootstrap-emacs$(EXEEXT)
-
 ../lisp/international/charprop.el: | bootstrap-emacs.pdmp
 	$(MAKE) -C ../admin/unidata all EMACS=../../src/bootstrap-emacs$(EXEEXT)
 
@@ -529,9 +523,8 @@ endif
 .SECONDEXPANSION:
 emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el ../lisp/loaddefs.elc \
   ../lisp/international/charprop.el \
-  $(patsubst %.el,../lisp/%.$(TARGET_EXT),$(COMPILER_EL)) \
   $(patsubst %,../lisp/%.el,$(shell $(call relative-lisp-files,bootstrap-emacs$(EXEEXT),nil)))
-	-[ -e $@ ] && rm -f -- $(patsubst %.el,%.elc,$(filter %.el,$?))
+	-[ -e $@ ] && rm -f -- $(patsubst %.el,%.$(TARGET_EXT),$(filter %.el,$?))
 	$(call pdump,$@) # pdmp some interpreted elisp
 	@# if relative-lisp-files empty, .DEFAULT_GOAL=none
 	$(MAKE) .DEFAULT_GOAL=none -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\")`
