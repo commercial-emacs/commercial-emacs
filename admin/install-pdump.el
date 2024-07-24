@@ -28,9 +28,7 @@
 
 (load (concat (file-name-directory (car load-path)) "admin/pdump-common"))
 
-;; We keep the load-history data in PURE space.
-;; Make sure that the spine of the list is not in pure space because it can
-;; be destructively mutated in lread.c:build_load_history.
+;; doctor load-history entries for installed-directory
 (mapc
  (lambda (entry)
    (catch 'fix-entry
@@ -46,6 +44,15 @@
             (lambda (a b) (< (length a) (length b)))))))
  load-history)
 (setq load-history (mapcar #'purify-if-dumping load-history))
+
+;; formerly load--fixup-all-elns
+(maphash
+ (lambda (_ cu)
+   (native-comp-unit-set-file cu (replace-regexp-in-string
+                                  (regexp-quote (file-name-as-directory source-directory))
+                                  (file-name-as-directory installed-directory)
+                                  (native-comp-unit-file cu))))
+ comp-loaded-comp-units-h)
 
 (let ((output-path (expand-file-name (pdumping-output) invocation-directory))
       current-load-list)

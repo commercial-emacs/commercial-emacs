@@ -3322,7 +3322,7 @@ DEFUN ("dump-emacs-portable",
   specpdl_ref count = SPECPDL_INDEX ();
 
   Lisp_Object symbol = intern ("command-line-processed");
-  specbind (symbol, Qnil); /* Dump-borne emacs hasn't processed yet.  */
+  specbind (symbol, Qnil); /* dump-borne emacs won't have processed yet */
 
   CHECK_STRING (filename);
   filename = ENCODE_FILE (Fexpand_file_name (filename, Qnil));
