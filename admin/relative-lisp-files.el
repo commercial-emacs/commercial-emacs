@@ -33,10 +33,11 @@
 (defconst relative-lisp-files-explicit '("ldefs-boot")
   "Elisp we don't want `make -C lisp` making without explicit consent.")
 
-(defun relative-lisp-files-as-list (target-extension all)
-  "Return load-history files not yet loaded with TARGET-EXTENSION.
-If ALL return all load-history files.  In the interest of producing
-`make` targets, append TARGET-EXTENSION to return values.
+(defun relative-lisp-files-as-list (target-extension)
+  "Return loaded files not yet compiled to TARGET-EXTENSION.
+In the interest of producing `make` targets, append TARGET-EXTENSION to
+return values.  A TARGET-EXTENSION of nil intends returning the full
+complement of loaded files, whether compiled or not.
 
 For both 'elc' and 'eln' TARGET-EXTENSION, omit files excluded by the
 no-byte-compile file-local directive.  For the latter, append the 'elc'
@@ -54,14 +55,16 @@ directive."
          (hack-local-variables '(no-byte-compile no-native-compile))
          (setq no-byte-compile-p no-byte-compile
                no-native-compile-p no-native-compile))
-       (setq result (file-name-with-extension
-                     (file-name-sans-extension (file-name-nondirectory fn))
-                     (if (and (equal target-extension "eln")
-                              (not no-byte-compile-p)
-                              no-native-compile-p)
-                         (setq adjusted-extension "elc")
-                       adjusted-extension)))
-       (when (or all
+       (setq result (if adjusted-extension
+                        (file-name-with-extension
+                         (file-name-sans-extension (file-name-nondirectory fn))
+                         (if (and (equal adjusted-extension "eln")
+                                  (not no-byte-compile-p)
+                                  no-native-compile-p)
+                             (setq adjusted-extension "elc")
+                           adjusted-extension))
+                      (file-name-sans-extension (file-name-nondirectory fn))))
+       (when (or (null adjusted-extension)
                  (and (not (equal adjusted-extension (file-name-extension fn)))
                       (cond ((equal adjusted-extension "elc")
                              (not no-byte-compile-p))
@@ -74,8 +77,7 @@ directive."
              (while (not (zerop (length (setq path-leaf (file-name-nondirectory path)))))
                (if (equal "lisp" path-leaf)
                    (progn
-                     (when (member (file-name-sans-extension result)
-                                   relative-lisp-files-explicit)
+                     (when (member result relative-lisp-files-explicit)
                        (setq result nil))
                      (throw 'done result))
 	         (setq result (concat (file-name-as-directory
@@ -84,10 +86,10 @@ directive."
                (setq path (directory-file-name (file-name-directory path)))))))))
    load-history))
 
-(defun relative-lisp-files (target-extension all)
+(defun relative-lisp-files (target-extension)
   "Would use `file-relative-name' but bugs out knowingly under mingw."
   (princ (mapconcat #'identity
-                    (sort (relative-lisp-files-as-list target-extension all) #'string<)
+                    (sort (relative-lisp-files-as-list target-extension) #'string<)
                     " ")))
 
 ;; Local Variables:
