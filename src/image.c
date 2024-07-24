@@ -3721,7 +3721,7 @@ static void
 gui_put_x_image (struct frame *f, Emacs_Pix_Container pimg,
                  Emacs_Pixmap pixmap, int width, int height)
 {
-#if defined USE_CAIRO || defined HAVE_HAIKU
+#if defined USE_CAIRO || defined HAVE_HAIKU || defined HAVE_NS
   eassert (pimg == pixmap);
 #elif defined HAVE_X_WINDOWS
   GC gc;
@@ -3732,11 +3732,6 @@ gui_put_x_image (struct frame *f, Emacs_Pix_Container pimg,
              pimg->width, pimg->height);
   XFreeGC (FRAME_X_DISPLAY (f), gc);
 #endif /* HAVE_X_WINDOWS */
-
-#ifdef HAVE_NS
-  eassert (pimg == pixmap);
-  ns_retain_object (pimg);
-#endif
 }
 
 /* Thin wrapper for image_create_x_image_and_pixmap_1, so that it matches
