@@ -1910,7 +1910,11 @@ That convention was: '(error &rest ARGS)'.
 It was previously 65.  The new default formats documentation strings to
 fit on fewer lines without negatively impacting readability.
 
-** CPerl mode
+** The customization group 'wp' has been removed.
+It has been obsolete since Emacs 26.1.  Use the group 'text' instead.
+
+
+* Changes in Emacs 31.1 on Non-Free Operating Systems
 
 ---
 *** Subroutine signatures are now supported.
