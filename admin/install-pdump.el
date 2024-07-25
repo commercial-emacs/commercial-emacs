@@ -26,6 +26,7 @@
 
 ;;; Code:
 
+(setq pdumper--pure-pool (make-hash-table :test #'equal :size 80000))
 (load (concat (file-name-directory (car load-path)) "admin/pdump-common"))
 
 ;; doctor load-history entries for installed-directory
