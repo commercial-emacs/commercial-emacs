@@ -27,13 +27,10 @@
 
 ;;; Code:
 
-(setq native-comp-disable-subr-trampolines t)
-(require 'comp)
-
 (defconst relative-lisp-files-explicit '("ldefs-boot")
   "Elisp we don't want `make -C lisp` making without explicit consent.")
 
-(defun relative-lisp-files-as-list (target-extension)
+(defun relative-lisp-files-as-list (target-extension history)
   "Return loaded files not yet compiled to TARGET-EXTENSION.
 In the interest of producing `make` targets, append TARGET-EXTENSION to
 return values.  A TARGET-EXTENSION of nil intends returning the full
@@ -50,6 +47,7 @@ directive."
             (adjusted-extension target-extension)
             result no-byte-compile-p no-native-compile-p path-leaf)
        (with-temp-buffer
+         (require 'comp)
          (insert-file-contents (file-name-with-extension
                                 (file-name-sans-extension fn) "el"))
          (hack-local-variables '(no-byte-compile no-native-compile))
@@ -84,12 +82,12 @@ directive."
 			               (file-name-nondirectory path))
 			              result)))
                (setq path (directory-file-name (file-name-directory path)))))))))
-   load-history))
+   history))
 
-(defun relative-lisp-files (target-extension)
+(defun relative-lisp-files (target-extension history)
   "Would use `file-relative-name' but bugs out knowingly under mingw."
   (princ (mapconcat #'identity
-                    (sort (relative-lisp-files-as-list target-extension) #'string<)
+                    (sort (relative-lisp-files-as-list target-extension history) #'string<)
                     " ")))
 
 ;; Local Variables:

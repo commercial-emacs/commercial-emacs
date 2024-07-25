@@ -54,7 +54,6 @@ endif
 
 COMPILE_FLAGS = \
   --eval "(custom-set-variables (quote (byte-compile-warnings (quote all))))" \
-  --eval "(setq load-suffixes (delete \".eln\" load-suffixes))" \
   $(BYTE_COMPILE_EXTRA_FLAGS)
 
 ifeq ($(HAVE_NATIVE_COMP),yes)
