@@ -32,6 +32,7 @@
 (setq pdumper--pure-pool (make-hash-table :test #'equal :size 80000))
 (load (concat (file-name-directory (car load-path)) "admin/pdump-common"))
 
+(setq load-history (mapcar #'purify-if-dumping load-history))
 (let ((output-path (expand-file-name (pdumping-output) invocation-directory))
       current-load-list)
   (message "Dumping to %s" output-path)

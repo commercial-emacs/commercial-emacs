@@ -510,14 +510,16 @@ endef
 ../lisp/subdirs.el:
 	$(MAKE) -C ../lisp subdirs.el
 
-bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT) ../lisp/subdirs.el
+bootstrap-emacs.pdmp: bootstrap-emacs$(EXEEXT) ../lisp/subdirs.el ../admin/bootstrap-pdump.el ../admin/pdump-common.el
 	$(MAKE) -C ../lisp bootstrap-clean EMACS=../src/$<
 	$(call pdump,$@) # pdmp all interpreted elisp
 	$(MAKE) -C ../lisp `$(call relative-lisp-files,$<,\"elc\")` EMACS=../src/$<
 	$(call pdump,$@) # pdmp all byte-compiled
 
 .SECONDEXPANSION:
-emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el ../lisp/loaddefs.elc \
+emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el \
+  ../admin/pdump.el ../admin/pdump-common.el \
+  ../lisp/loaddefs.elc \
   ../lisp/international/charprop.el \
   $(patsubst %,../lisp/%.el,$(shell $(call relative-lisp-files,bootstrap-emacs$(EXEEXT),nil)))
 	-[ -e $@ ] && rm -f -- $(if $(filter $(addprefix ../lisp/,$(COMPILER_EL)),$(filter %.el,$?)),$(patsubst %,../lisp/%.$(TARGET_EXT),$(shell $(call relative-lisp-files,$<,nil))),$(patsubst %.el,%.$(TARGET_EXT),$(filter %.el,$?)))
@@ -526,7 +528,7 @@ emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el ../lisp/loaddefs.elc \
 	$(MAKE) .DEFAULT_GOAL=none -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\",)`
 	$(call pdump,$@) # pdmp all native- or byte-compiled
 
-install-emacs.pdmp: emacs.pdmp
+install-emacs.pdmp: emacs.pdmp ../admin/install-pdump.el ../admin/pdump-common.el
 	$(AM_V_at)rm -f install-emacs$(EXEEXT)
 	$(AM_V_at)cp -f emacs$(EXEEXT) install-emacs$(EXEEXT)
 	$(call pdump,$@)

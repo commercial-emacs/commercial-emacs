@@ -369,10 +369,6 @@
                                            (match-string 1 file)))))))))
         (mapcar #'car load-history))))
 
-;; We keep the load-history data in PURE space.
-;; Make sure that the spine of the list is not in pure space because it can
-;; be destructively mutated in lread.c:build_load_history.
-(setq load-history (mapcar #'purify-if-dumping load-history))
 (set-buffer-modified-p nil)
 
 (remove-hook 'after-load-functions (lambda (_) (garbage-collect)))
