@@ -36,6 +36,7 @@
 
 (require 'sendmail)
 (require 'message)
+(require 'lisp-mnt)
 
 (defgroup emacsbug nil
   "Sending Emacs bug reports."
@@ -493,6 +494,10 @@ and send the mail again%s."
     (when (get-buffer-window help)
       (quit-window nil (get-buffer-window help)))))
 
+(defvar submit-emacs-patch-excluded-maintainers
+  '("emacs-devel@gnu.org")
+  "List of maintainer addresses for `submit-emacs-patch' to ignore.")
+
 ;;;###autoload
 (defun submit-emacs-patch (subject file)
   "Send an Emacs patch to the Emacs maintainers.
@@ -528,6 +533,29 @@ Message buffer where you can explain more about the patch."
     (view-mode 1)
     (button-mode 1))
   (compose-mail-other-window report-emacs-bug-address subject)
+  (let ((maint (let (files)
+                 (with-temp-buffer
+                   (insert-file-contents file)
+                   (while (search-forward-regexp "^\\+\\{3\\} ./\\(.*\\)" nil t)
+                     (push (expand-file-name
+                            (match-string-no-properties 1)
+                            source-directory)
+                           files)))
+                 (mapcan
+                  (lambda (patch)
+                    (seq-remove
+                     (pcase-lambda (`(,_name . ,addr))
+                       (not (member addr submit-emacs-patch-excluded-maintainers)))
+                     (lm-maintainers patch)))
+                  files))))
+    (when maint
+      (rfc822-goto-eoh)
+      (insert "X-Debbugs-Cc: "
+              (mapconcat
+               (pcase-lambda (`(,name . ,addr))
+                 (format "%s <%s>" name addr))
+               maint ", ")
+              "\n")))
   (message-goto-body)
   (insert "\n\n\n")
   (emacs-build-description)
