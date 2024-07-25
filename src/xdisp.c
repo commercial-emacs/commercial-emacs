@@ -5266,6 +5266,12 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	  return retval;
 	}
 
+      /* We want the string to inherit the paragraph direction of the
+         parent object, so we need to calculate that if not yet done.  */
+      ptrdiff_t eob = (BUFFERP (object) ? ZV : it->end_charpos);
+      if (it->bidi_it.first_elt && it->bidi_it.charpos < eob)
+	bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
+
       /* Save current settings of IT so that we can restore them
 	 when we are finished with the glyph property value.  */
       push_it (it, position);
@@ -5298,9 +5304,10 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	  if (BUFFERP (object))
 	    *position = start_pos;
 
-	  /* Force paragraph direction to be that of the parent
-	     object.  If the parent object's paragraph direction is
-	     not yet determined, default to L2R.  */
+	  /* Force paragraph direction to be that of the parent object.
+	     If the parent object's paragraph direction is not yet
+	     determined (which shouldn not happen, since we called
+	     bidi_paragraph_init above), default to L2R.  */
 	  if (it->bidi_p && it->bidi_it.paragraph_dir == R2L)
 	    it->paragraph_embedding = it->bidi_it.paragraph_dir;
 	  else
@@ -5925,6 +5932,11 @@ get_overlay_strings_1 (struct it *it, ptrdiff_t charpos, bool compute_stop_p)
 
       eassert (it->face_id >= 0);
       eassert (!compute_stop_p || it->sp == 0);
+
+      /* We want the string to inherit the paragraph direction of the
+         parent object, so we need to calculate that if not yet done.  */
+      if (it->bidi_it.first_elt && it->bidi_it.charpos < ZV)
+	bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
 
       /* Apparently, handle_stop for a bidi-agnostic IT might load an
 	 empty display string which we don't want to stash.  */
@@ -20628,6 +20640,12 @@ push_prefix_prop (struct it *it, Lisp_Object prop)
 	   || it->method == GET_FROM_DISPLAY_VECTOR
 	   || it->method == GET_FROM_STRING
 	   || it->method == GET_FROM_IMAGE);
+
+  /* We want the string to inherit the paragraph direction of the parent
+     object, so we need to calculate that if not yet done.  */
+  ptrdiff_t eob = (STRINGP (it->string) ? SCHARS (it->string) : ZV);
+  if (it->bidi_it.first_elt && it->bidi_it.charpos < eob)
+    bidi_paragraph_init (it->paragraph_embedding, &it->bidi_it, true);
 
   /* Stash prevailing buffer/string position so we can mess with IT.
      Does `set_iterator_to_next' restore it?  */
