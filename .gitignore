@@ -87,6 +87,7 @@ src/verbose.mk
 lisp/**/*cus-load.el
 lisp/**/*loaddefs.el
 lisp/eshell/esh-module-loaddefs.el
+lisp/eshell/esh-groups.el
 lisp/finder-inf.el
 lisp/leim/ja-dic/
 leim/small-ja-dic-option
