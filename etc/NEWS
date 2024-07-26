@@ -165,6 +165,12 @@ removed, as it was considered more dangerous than useful.  RFC 9110
 To send an email address in the header of individual HTTP requests,
 see the variable 'url-request-extra-headers'.
 
+** Internationalization
+
+---
+*** New language-environment and input method for Tifinagh.
+The Tifinagh script is used to write the Berber languages.
+
 
 * Changes in Emacs 30.1
 
