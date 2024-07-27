@@ -1444,9 +1444,10 @@ undoable. Return nil when there was no change, and non-nil otherwise."
       (ses-widen)
       (goto-char ses--params-marker)
       (forward-line   (plist-get ses-paramlines-plist 'ses--numlocprn ))
-      (insert (format (plist-get ses-paramfmt-plist 'ses--numlocprn)
-                      ses--numlocprn)
-	      ?\n)
+      (let (print-level print-length)
+	(insert (format (plist-get ses-paramfmt-plist 'ses--numlocprn)
+			ses--numlocprn)
+		?\n))
       t) )))
 
 (defun ses-set-parameter (def value &optional elem)
@@ -1468,7 +1469,7 @@ If ELEM is specified, it is the array subscript within DEF to be set to VALUE."
 	(setq oldval (symbol-value def))
 	(set def value))
       ;; Special undo since it's outside the narrowed buffer.
-      (let (buffer-undo-list)
+      (let (buffer-undo-list print-level print-length)
 	(delete-region (point) (line-end-position))
 	(insert (format fmt (symbol-value def))))
       (push `(apply ses-set-parameter ,def ,oldval ,elem) buffer-undo-list))))
@@ -1479,6 +1480,7 @@ If ELEM is specified, it is the array subscript within DEF to be set to VALUE."
 Newlines in the data are escaped."
   (let* ((inhibit-read-only t)
 	 (print-escape-newlines t)
+	 print-level print-length
 	 rowcol row col cell sym formula printer text)
     (setq ses-start-time (float-time))
     (with-temp-message " "
@@ -2533,7 +2535,7 @@ Return nil if cell formula was unsafe and user declined confirmation."
 	    (row     (car rowcol))
 	    (col     (cdr rowcol))
 	    (formula (ses-cell-formula row col))
-	    initial)
+	    initial print-level print-length)
        (if (eq (car-safe formula) 'ses-safe-formula)
 	   (setq formula (cadr formula)))
        (if (eq (car-safe formula) 'quote)
