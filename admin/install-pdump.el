@@ -1,4 +1,4 @@
-;;; pdump.el --- load up standardly loaded Lisp files for Emacs  -*- lexical-binding: t; -*-
+;;; install-pdump.el --- as pdump.el with install file locations  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 1985-1986, 1992, 1994, 2001-2024 Free Software
 ;; Foundation, Inc.
@@ -72,4 +72,4 @@
 ;; no-update-autoloads: t
 ;; End:
 
-;;; pdump.el ends here
+;;; install-pdump.el ends here
