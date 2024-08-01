@@ -16922,6 +16922,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   int frame_line_height, margin;
   bool use_desired_matrix;
   void *itdata = NULL;
+  modiff_count lchars_modiff = CHARS_MODIFF, ochars_modiff = lchars_modiff;
 
   SET_TEXT_POS (lpoint, PT, PT_BYTE);
   opoint = lpoint;
@@ -17010,6 +17011,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   end_unchanged = END_UNCHANGED;
 
   SET_TEXT_POS (opoint, PT, PT_BYTE);
+  ochars_modiff = CHARS_MODIFF;
 
   specbind (Qinhibit_point_motion_hooks, Qt);
 
@@ -17929,14 +17931,23 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
     TEMP_SET_PT_BOTH (BEGV, BEGV_BYTE);
   else if (CHARPOS (opoint) > ZV)
     TEMP_SET_PT_BOTH (Z, Z_BYTE);
-  else
+  else if (ochars_modiff == CHARS_MODIFF)
     TEMP_SET_PT_BOTH (CHARPOS (opoint), BYTEPOS (opoint));
-
+  else
+    /* For fear character and byte pos mis-corresponds for redisplay
+       race conditions (display_mode_lines).  */
+    TEMP_SET_PT_BOTH (CHARPOS (opoint), CHAR_TO_BYTE (CHARPOS (opoint)));
   set_buffer_internal (old);
+
   /* Avoid an abort in TEMP_SET_PT_BOTH if the buffer has become
      shorter.  This can be caused by log truncation in `*Messages*`.  */
   if (CHARPOS (lpoint) <= ZV)
-    TEMP_SET_PT_BOTH (CHARPOS (lpoint), BYTEPOS (lpoint));
+    {
+      if (lchars_modiff == CHARS_MODIFF)
+	TEMP_SET_PT_BOTH (CHARPOS (lpoint), BYTEPOS (lpoint));
+      else
+	TEMP_SET_PT_BOTH (CHARPOS (lpoint), CHAR_TO_BYTE (CHARPOS (lpoint)));
+    }
 
   unbind_to (count, Qnil);
 }
