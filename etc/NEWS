@@ -89,81 +89,38 @@ The 'find-function', 'find-library', 'find-face-definition', and
 usual minibuffer history commands.  Each command has a separate history.
 
 
-* Incompatible Changes in Emacs 30.1
-
----
-** Tree-Sitter modes are now declared as submodes of the non-TS modes.
-In order to help the use of those Tree-Sitter modes, they are now
-declared to have the corresponding non-Tree-Sitter mode as an
-additional parent.
-This way, things like ".dir-locals.el" settings, and YASnippet
-collections of snippets automatically apply to the new Tree-Sitter modes.
-
-Note that those modes still do not inherit from the non-TS mode, so
-configuration settings installed via mode hooks are not affected.
-
----
-** Mouse wheel events should now always be 'wheel-up/down/left/right'.
-At those places where the old 'mouse-4/5/6/7' events could still occur
-(i.e., X11 input in the absence of XInput2, and 'xterm-mouse-mode'),
-we remap them to the corresponding 'wheel-up/down/left/right' event,
-according to the new user option 'mouse-wheel-buttons'.
-The old variables 'mouse-wheel-up-event', 'mouse-wheel-down-event',
-'mouse-wheel-left-event', and 'mouse-wheel-right-event' are thereby
-obsolete.
+** Windows
 
 +++
-** 'completion-auto-help' now affects 'icomplete-in-buffer'.
-Previously, 'completion-auto-help' mostly affected only minibuffer
-completion.  Now, if 'completion-auto-help' has the value 'lazy', then
-Icomplete's in-buffer display of possible completions will only appear
-after the 'completion-at-point' command has been invoked twice, and if
-'completion-auto-help' is nil, then Icomplete's in-buffer display is
-completely suppressed.  Thus, if you use 'icomplete-in-buffer', ensure
-'completion-auto-help' is not customized to 'lazy' or nil.
+*** New hook 'window-deletable-functions'.
+This abnormal hook gives its client a way to save a window from getting
+deleted implicitly by functions like 'kill-buffer', 'bury-buffer' and
+'quit-restore-window',
 
 +++
-** The "*Completions*" buffer now always accompanies 'icomplete-in-buffer'.
-Previously, it was not consistent whether the "*Completions*" buffer would
-appear when using 'icomplete-in-buffer'.  Now the "*Completions*" buffer
-and Icomplete's in-buffer display of possible completions always
-appear together.  If you would prefer to see only Icomplete's
-in-buffer display, and not the "*Completions*" buffer, you can add this
-to your init file:
-
-    (advice-add 'completion-at-point :after #'minibuffer-hide-completions)
-
----
-** The default process filter was rewritten in native code.
-The round-trip through the Lisp function
-'internal-default-process-filter' is skipped when the process filter is
-the default one.  It is reimplemented in native code, reducing GC churn.
-To undo this change, set 'fast-read-process-output' to nil.
+*** New option 'kill-buffer-quit-windows'.
+This option has 'kill-buffer' call 'quit-restore-window' to handle the
+further destiny of any window showing the buffer to be killed.
 
 +++
-** The Network Security Manager now warns about 3DES by default.
-This cypher is no longer recommended owing to a major vulnerability
-disclosed in 2016, and its small 112 bit key size.  Emacs now warns
-about its use also when 'network-security-level' is set to 'medium'
-(the default).  See 'network-security-protocol-checks'.
-
----
-** The Network Security Manager now warns about <2048 bits in DH key exchange.
-Emacs used to warn for Diffie-Hellman key exchanges with prime numbers
-smaller than 1024 bits.  Since more servers now support it, this
-number has been bumped to 2048 bits.
+*** New window parameter 'quit-restore-prev'.
+This parameter is set up by 'display-buffer' when it detects that the
+window used already has a 'quit-restore' parameter.  Its presence gives
+'quit-restore-window' a way to undo a sequence of buffer display
+operations more intuitively.
 
 +++
-** URL now never sends user email addresses in HTTP requests.
-Emacs never sent email addresses by default, but it used to be
-possible to customize 'url-privacy-level' so that the users email
-address was sent along in HTTP requests.  This feature has now been
-removed, as it was considered more dangerous than useful.  RFC 9110
-(§ 10.1.2) also recommends against it.  The user option
-'url-personal-mail-address' is now also obsolete.
+*** 'quit-restore-window' now handles the values 'killing' and 'burying'
+for its BURY-OR-KILL argument just like 'kill' and 'bury' but assumes
+that the actual killing or burying of the buffer is done by the caller.
 
-To send an email address in the header of individual HTTP requests,
-see the variable 'url-request-extra-headers'.
++++
+*** New option 'quit-restore-window-no-switch'.
+With this option set, 'quit-restore-window' will delete its window more
+aggressively rather than switching to some other buffer in it.
+
+
+* Editing Changes in Emacs 31.1
 
 ** Internationalization
 
