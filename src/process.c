@@ -235,7 +235,7 @@ static EMACS_INT process_tick;
 #define READ_OUTPUT_DELAY_MAX_MAX   (READ_OUTPUT_DELAY_INCREMENT * 7)
 
 static void start_process_unwind (Lisp_Object);
-static void create_process (Lisp_Object, char **, Lisp_Object);
+static void create_process (Lisp_Object, Lisp_Object, char **, Lisp_Object);
 #if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
 static bool keyboard_bit_set (fd_set *);
 #endif
@@ -311,6 +311,11 @@ static void
 pset_command (struct Lisp_Process *p, Lisp_Object val)
 {
   p->command = val;
+}
+static void
+pset_sexpr (struct Lisp_Process *p, Lisp_Object val)
+{
+  p->sexpr = val;
 }
 static void
 pset_decode_coding_system (struct Lisp_Process *p, Lisp_Object val)
@@ -1565,7 +1570,11 @@ also nil, meaning that this process is not associated with any buffer.
 name, followed by strings to give to the program as arguments.  If the
 program file name is not an absolute file name, `make-process' will
 look for the program file name in `exec-path' (which is a list of
-directories).
+directories).  The :command and :sexpr arguments cannot both
+be non-nil.
+
+:sexpr SEXPR -- SEXPR is the form to evaluate.  The :command and :sexpr
+arguments cannot both be non-nil.
 
 :coding CODING -- If CODING is a symbol, it specifies the coding
 system used for both reading and writing for this process.  If CODING
@@ -1609,7 +1618,7 @@ such handler, proceed as if FILE-HANDLER were nil.
 usage: (make-process &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object buffer, command, program, proc, contact, current_dir, tem;
+  Lisp_Object buffer, command, sexpr, proc, contact, current_dir, tem, program = Qnil;
   Lisp_Object xstderr, stderrproc;
   specpdl_ref count = SPECPDL_INDEX ();
 
@@ -1641,11 +1650,11 @@ usage: (make-process &rest ARGS)  */)
   Lisp_Object name = get_required_string_keyword_param (contact, QCname);
 
   command = plist_get (contact, QCcommand);
-  if (CONSP (command))
-    program = XCAR (command);
-  else
-    program = Qnil;
-
+  sexpr = plist_get (contact, QCsexpr);
+  if (!NILP (command) && !NILP (sexpr))
+    error ("Only one of :command and :sexpr can be non-nil");
+  CHECK_LIST (command);
+  program = CAR (command);
   if (!NILP (program))
     CHECK_STRING (program);
 
@@ -1661,7 +1670,6 @@ usage: (make-process &rest ARGS)  */)
     }
   else if (!NILP (xstderr))
     {
-      CHECK_STRING (program);
       stderrproc = CALLN (Fmake_pipe_process,
 			  QCname,
 			  concat2 (name, build_string (" stderr")),
@@ -1681,6 +1689,7 @@ usage: (make-process &rest ARGS)  */)
   pset_sentinel (XPROCESS (proc), plist_get (contact, QCsentinel));
   pset_filter (XPROCESS (proc), plist_get (contact, QCfilter));
   pset_command (XPROCESS (proc), Fcopy_sequence (command));
+  pset_sexpr (XPROCESS (proc), CONSP (sexpr) ? Fcopy_sequence (sexpr) : sexpr);
 
   if (!query_on_exit)
     XPROCESS (proc)->kill_without_query = 1;
@@ -1697,8 +1706,9 @@ usage: (make-process &rest ARGS)  */)
     }
   else
     {
-      XPROCESS (proc)->pty_in = XPROCESS (proc)->pty_out =
-	is_pty_from_symbol (tem);
+      XPROCESS (proc)->pty_in
+	= XPROCESS (proc)->pty_out
+	= is_pty_from_symbol (tem);
     }
 
   if (!NILP (stderrproc))
@@ -1718,82 +1728,52 @@ usage: (make-process &rest ARGS)  */)
   /* Make the process marker point into the process buffer (if any).  */
   update_process_mark (XPROCESS (proc));
 
+  /* Decide coding systems for communicating with the process.  */
   USE_SAFE_ALLOCA;
+  const Lisp_Object input_sys = plist_get (contact, QCcoding);
+  Lisp_Object decode_sys = CONSP (input_sys)
+    ? XCAR (input_sys)
+    : !NILP (input_sys)
+    ? input_sys
+    : Vcoding_system_for_read;
+  Lisp_Object encode_sys = CONSP (input_sys)
+    ? XCDR (input_sys)
+    : !NILP (input_sys)
+    ? input_sys
+    : Vcoding_system_for_write;
+  if (NILP (decode_sys) || NILP (encode_sys))
+    {
+      if (!NILP (program))
+	{
+	  ptrdiff_t nargs2 = 3 + list_length (command);
+	  Lisp_Object *args2;
+	  SAFE_ALLOCA_LISP (args2, nargs2);
+	  ptrdiff_t i = 0;
+	  args2[i++] = Qstart_process;
+	  args2[i++] = name;
+	  args2[i++] = buffer;
+	  for (Lisp_Object tail = command; CONSP (tail); tail = XCDR (tail))
+	    args2[i++] = XCAR (tail);
+	  Lisp_Object found = Ffind_operation_coding_system (nargs2, args2);
+	  if (CONSP (found))
+	    {
+	      if (NILP (decode_sys))
+		decode_sys = XCAR (found);
+	      if (NILP (encode_sys))
+		encode_sys = XCDR (found);
+	    }
+	}
+      if (CONSP (Vdefault_process_coding_system))
+	{
+	  if (NILP (decode_sys))
+	    decode_sys = XCAR (Vdefault_process_coding_system);
+	  if (NILP (encode_sys))
+	    encode_sys = XCDR (Vdefault_process_coding_system);
+	}
+    }
 
-  {
-    /* Decide coding systems for communicating with the process.  Here
-       we don't setup the structure coding_system nor pay attention to
-       unibyte mode.  They are done in create_process.  */
-
-    /* Qt denotes we have not yet called Ffind_operation_coding_system.  */
-    Lisp_Object coding_systems = Qt;
-    Lisp_Object val, *args2;
-
-    tem = plist_get (contact, QCcoding);
-    if (!NILP (tem))
-      {
-	val = tem;
-	if (CONSP (val))
-	  val = XCAR (val);
-      }
-    else
-      val = Vcoding_system_for_read;
-    if (NILP (val))
-      {
-	ptrdiff_t nargs2 = 3 + list_length (command);
-	Lisp_Object tem2;
-	SAFE_ALLOCA_LISP (args2, nargs2);
-	ptrdiff_t i = 0;
-	args2[i++] = Qstart_process;
-	args2[i++] = name;
-	args2[i++] = buffer;
-	for (tem2 = command; CONSP (tem2); tem2 = XCDR (tem2))
-	  args2[i++] = XCAR (tem2);
-	if (!NILP (program))
-	  coding_systems = Ffind_operation_coding_system (nargs2, args2);
-	if (CONSP (coding_systems))
-	  val = XCAR (coding_systems);
-	else if (CONSP (Vdefault_process_coding_system))
-	  val = XCAR (Vdefault_process_coding_system);
-      }
-    pset_decode_coding_system (XPROCESS (proc), val);
-
-    if (!NILP (tem))
-      {
-	val = tem;
-	if (CONSP (val))
-	  val = XCDR (val);
-      }
-    else
-      val = Vcoding_system_for_write;
-    if (NILP (val))
-      {
-	if (EQ (coding_systems, Qt))
-	  {
-	    ptrdiff_t nargs2 = 3 + list_length (command);
-	    Lisp_Object tem2;
-	    SAFE_ALLOCA_LISP (args2, nargs2);
-	    ptrdiff_t i = 0;
-	    args2[i++] = Qstart_process;
-	    args2[i++] = name;
-	    args2[i++] = buffer;
-	    for (tem2 = command; CONSP (tem2); tem2 = XCDR (tem2))
-	      args2[i++] = XCAR (tem2);
-	    if (!NILP (program))
-	      coding_systems = Ffind_operation_coding_system (nargs2, args2);
-	  }
-	if (CONSP (coding_systems))
-	  val = XCDR (coding_systems);
-	else if (CONSP (Vdefault_process_coding_system))
-	  val = XCDR (Vdefault_process_coding_system);
-      }
-    pset_encode_coding_system (XPROCESS (proc), val);
-    /* Note: At this moment, the above coding system may leave
-       text-conversion or eol-conversion unspecified.  They will be
-       decided after we read output from the process and decode it by
-       some coding system, or just before we actually send a text to
-       the process.  */
-  }
+  pset_decode_coding_system (XPROCESS (proc), decode_sys);
+  pset_encode_coding_system (XPROCESS (proc), encode_sys);
 
   pset_decoding_buf (XPROCESS (proc), empty_unibyte_string);
   eassert (XPROCESS (proc)->decoding_carryover == 0);
@@ -1802,9 +1782,11 @@ usage: (make-process &rest ARGS)  */)
   XPROCESS (proc)->inherit_coding_system_flag
     = (!NILP (buffer) && inherit_process_coding_system);
 
-  if (NILP (program))
-    create_pty (proc);
-  else
+  if (!NILP (sexpr))
+    {
+      create_process (proc, sexpr, NULL, current_dir);
+    }
+  else if (!NILP (program))
     {
       Lisp_Object program_args = XCDR (command);
 
@@ -1854,7 +1836,7 @@ usage: (make-process &rest ARGS)  */)
 	      arg = code_convert_string_norecord (arg, arg_encoding, 1);
 	    }
 	  tem = Fcons (arg, tem);
-	  new_argc++;
+	  ++new_argc;
 	}
 
       /* Now that everything is encoded we can collect the strings into
@@ -1863,14 +1845,16 @@ usage: (make-process &rest ARGS)  */)
       SAFE_NALLOCA (new_argv, 1, new_argc + 1);
       new_argv[new_argc] = 0;
 
-      for (ptrdiff_t i = new_argc - 1; i >= 0; i--)
+      for (ptrdiff_t i = new_argc - 1; i >= 0; --i)
 	{
 	  new_argv[i] = SSDATA (XCAR (tem));
 	  tem = XCDR (tem);
 	}
 
-      create_process (proc, new_argv, current_dir);
+      create_process (proc, Qnil, new_argv, current_dir);
     }
+  else /* neither :command nor :sexpr */
+    create_pty (proc);
 
   return SAFE_FREE_UNBIND_TO (count, proc);
 }
@@ -1937,7 +1921,8 @@ enum
 verify (PROCESS_OPEN_FDS == EXEC_MONITOR_OUTPUT + 1);
 
 static void
-create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
+create_process (Lisp_Object process, Lisp_Object sexpr, char **new_argv,
+		Lisp_Object current_dir)
 {
   struct Lisp_Process *p = XPROCESS (process);
   int inchannel = -1, outchannel = -1;
@@ -2065,8 +2050,8 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
   eassert ((pty_in || pty_out) == !NILP (lisp_pty_name));
 
   vfork_errno
-    = emacs_spawn (&pid, forkin, forkout, forkerr, new_argv, env,
-                   SSDATA (current_dir),
+    = emacs_spawn (&pid, forkin, forkout, forkerr,
+		   sexpr, new_argv, env, SSDATA (current_dir),
                    pty_in || pty_out ? SSDATA (lisp_pty_name) : NULL,
                    pty_in, pty_out, &oldset);
 
@@ -3556,7 +3541,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
       if (p->socktype != SOCK_DGRAM)
 	{
 	  pset_status (p, Qlisten);
-	  if (NILP (p->command))
+	  if (NILP (p->command) && NILP (p->sexpr))
 	    add_process_read_fd (p->infd);
 	}
     }
@@ -4856,7 +4841,7 @@ server_accept_connection (Lisp_Object server, int channel)
   pset_buffer (p, buffer);
   pset_sentinel (p, ps->sentinel);
   pset_filter (p, ps->filter);
-  eassert (NILP (p->command));
+  eassert (NILP (p->command) && NILP (p->sexpr));
   eassert (p->pid == 0);
 
   /* Discard the unwind protect for closing S.  */
@@ -6488,8 +6473,7 @@ of incoming traffic.  */)
       struct Lisp_Process *p;
 
       p = XPROCESS (process);
-      if (NILP (p->command)
-	  && p->infd >= 0)
+      if (NILP (p->command) && NILP (p->sexpr) && p->infd >= 0)
 	delete_read_fd (p->infd);
       pset_command (p, Qt);
       return process;
@@ -7731,6 +7715,7 @@ syms_of_process (void)
   DEFSYM (QCstop, ":stop");
   DEFSYM (QCplist, ":plist");
   DEFSYM (QCcommand, ":command");
+  DEFSYM (QCsexpr, ":sexpr");
   DEFSYM (QCconnection_type, ":connection-type");
   DEFSYM (QCstderr, ":stderr");
   DEFSYM (Qpty, "pty");

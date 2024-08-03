@@ -1169,11 +1169,8 @@ Return t if on success.  */)
   specpdl_ref fd_index UNINIT;
   specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object found;
-  /* True means we are loading a compiled file.  */
-  bool compiled = false;
   Lisp_Object handler;
-  const char *fmode = "r" FOPEN_TEXT;
-  int version = 0;
+  struct infile input;
 
   CHECK_STRING (file);
 
@@ -1302,102 +1299,70 @@ Return t if on success.  */)
 
   bool is_native_lisp = suffix_p (found, NATIVE_ELISP_SUFFIX);
 
-  /* Check if we're stuck in a recursive load cycle.
-
-     2000-09-21: It's not possible to just check for the file loaded
-     being a member of Vloads_in_progress.  This fails because of the
-     way the byte compiler currently works; `provide's are not
-     evaluated, see font-lock.el/jit-lock.el as an example.  This
-     leads to a certain amount of ``normal'' recursion.
-
-     Also, just loading a file recursively is not always an error in
-     the general case; the second load may do something different.  */
+  /* Check if we're stuck recursively loading. */
   {
     int load_count = 0;
     Lisp_Object tem = Vloads_in_progress;
     FOR_EACH_TAIL_SAFE (tem)
       if (!NILP (Fequal (found, XCAR (tem))) && (++load_count > 3))
 	signal_error ("Recursive load", Fcons (found, Vloads_in_progress));
-    record_unwind_protect (record_load_unwind, Vloads_in_progress);
-    Vloads_in_progress = Fcons (found, Vloads_in_progress);
   }
+  record_unwind_protect (record_load_unwind, Vloads_in_progress);
+  Vloads_in_progress = Fcons (found, Vloads_in_progress);
 
-  /* Default to dynamic scoping now so Vload_source_file_function can
-     override.  */
+  /* Default to dynamic scoping.  */
   specbind (Qlexical_binding, Qnil);
 
   /* Warn about unescaped character literals.  */
   specbind (Qlread_unescaped_character_literals, Qnil);
   record_unwind_protect (load_warn_unescaped_character_literals, file);
 
-  version = elc_version (found, fd);
-  if (version)
+  const int elc_ver = elc_version (found, fd);
+  if (elc_ver && fd != -2)
     {
-      if (fd != -2) /* not a handler-lacking remote */
-	{
-	  compiled = true;
-	  fmode = "r" FOPEN_BINARY;
-	  {
-	    struct stat s1, s2;
-	    const char *elc = SSDATA (ENCODE_FILE (found));
-	    USE_SAFE_ALLOCA;
-	    char *el = SAFE_ALLOCA (strlen (elc));
-	    memcpy (el, elc, strlen (elc) - 1);
-	    el[strlen (elc) - 1] = '\0';
-	    if (0 == emacs_fstatat (AT_FDCWD, elc, &s1, 0)
-		&& 0 == emacs_fstatat (AT_FDCWD, el, &s2, 0)
-		&& 0 > timespec_cmp (get_stat_mtime (&s1), get_stat_mtime (&s2)))
-	      message_with_string ("Loading %s despite modified .el", found, 1);
-	    SAFE_FREE ();
-	  }
-	}
-    }
-  else if (!is_module && !is_native_lisp)
-    {
-      if (!NILP (Vload_source_file_function)) /* too hard to write in C? */
-	{
-	  Lisp_Object val;
-	  if (fd >= 0)
-	    {
-	      emacs_close (fd);
-	      clear_unwind_protect (fd_index);
-	    }
-	  val = call4 (Vload_source_file_function, found,
-		       concat2 (Ffile_name_directory (file),
-				Ffile_name_nondirectory (found)),
-		       NILP (noerror) ? Qnil : Qt,
-		       (NILP (nomessage) || force_load_messages) ? Qnil : Qt);
-	  return unbind_to (count, val);
-	}
+      /* Warn if loading .elc older than its .el. */
+      struct stat s1, s2;
+      const char *elc = SSDATA (ENCODE_FILE (found));
+      USE_SAFE_ALLOCA;
+      char *el = SAFE_ALLOCA (strlen (elc));
+      memcpy (el, elc, strlen (elc) - 1);
+      el[strlen (elc) - 1] = '\0';
+      if (0 == emacs_fstatat (AT_FDCWD, elc, &s1, 0)
+	  && 0 == emacs_fstatat (AT_FDCWD, el, &s2, 0)
+	  && 0 > timespec_cmp (get_stat_mtime (&s1), get_stat_mtime (&s2)))
+	message_with_string ("Loading %s despite modified .el", found, 1);
+      SAFE_FREE ();
     }
 
-  if (fd < 0)
+  Lisp_Object ret;
+  if (!elc_ver
+      && !is_module
+      && !is_native_lisp
+      && !NILP (Vload_source_file_function))
     {
-      /* We somehow got here with fd == -2, meaning the file is deemed
-	 to be remote.  Don't even try to reopen the file locally;
-	 just force a failure.  */
-      stream = NULL;
-      errno = EINVAL;
+      /* Call load-with-code-conversion to interpret uncompiled .el then
+	 short-circuit return.  RMS begged off writing
+	 load-with-code-conversion in C so it looks disturbingly like
+	 the remainder of Fload, replete with identical diagnostic
+	 messages.  */
+      if (fd >= 0)
+	{
+	  emacs_close (fd);
+	  clear_unwind_protect (fd_index);
+	}
+      ret = unbind_to
+	(count,
+	 call4 (Vload_source_file_function, found,
+		concat2 (Ffile_name_directory (file),
+			 Ffile_name_nondirectory (found)),
+		NILP (noerror) ? Qnil : Qt,
+		(NILP (nomessage) || force_load_messages) ? Qnil : Qt));
+      goto done;
     }
-  else if (!is_module && !is_native_lisp)
-    {
-#ifdef WINDOWSNT
-      emacs_close (fd);
-      clear_unwind_protect (fd_index);
-      stream = emacs_fopen (SSDATA (ENCODE_FILE (found)), fmode);
-#else
-      stream = fdopen (fd, fmode);
-#endif
-    }
-
-  /* Declare here rather than inside the else-part because the storage
-     might be accessed by the unbind_to call below.  */
-  struct infile input;
 
   if (is_module || is_native_lisp)
     {
-      /* `module-load' uses the file name, so we can close the stream
-         now.  */
+      /* Can dismiss now since module-load handles.  */
       if (fd >= 0)
         {
           emacs_close (fd);
@@ -1406,6 +1371,22 @@ Return t if on success.  */)
     }
   else
     {
+      if (fd < 0)
+	{
+	  stream = NULL;
+	  errno = EINVAL;
+	}
+      else
+	{
+	  const char *fmode = elc_ver ? "r" FOPEN_BINARY : "r" FOPEN_TEXT;
+#ifdef WINDOWSNT
+	  emacs_close (fd);
+	  clear_unwind_protect (fd_index);
+	  stream = emacs_fopen (SSDATA (ENCODE_FILE (found)), fmode);
+#else
+	  stream = fdopen (fd, fmode);
+#endif
+	}
       if (!stream)
         report_file_error ("Opening stdio stream", file);
       set_unwind_protect_ptr (fd_index, close_infile_unwind, infile);
@@ -1423,7 +1404,7 @@ Return t if on success.  */)
 	  message_with_string ("Loading %s (module)..." done, file, 1); \
 	else if (is_native_lisp)					\
 	  message_with_string ("Loading %s (native)..." done, file, 1); \
-	else if (!compiled)						\
+	else if (!elc_ver)						\
 	  message_with_string ("Loading %s.el (source)..." done, file, 1); \
 	else								\
 	  message_with_string ("Loading %s..." done, file, 1);		\
@@ -1460,19 +1441,16 @@ Return t if on success.  */)
     {
       if (lisp_file_lexically_bound_p (Qget_file_char))
 	set_internal (Qlexical_binding, Qt, Qnil, SET_INTERNAL_SET);
-      if (version && version < 22)
-	report_file_error ("Version too old", file);
-      else
-        readevalloop (Qget_file_char, &input, found,
-                      0, Qnil, Qnil, Qnil, Qnil);
+      readevalloop (Qget_file_char, &input, found, 0, Qnil, Qnil, Qnil, Qnil);
     }
-  unbind_to (count, Qnil);
+
+  ret = unbind_to (count, Qt);
 
   /* Run any eval-after-load forms for this file.  */
   if (!NILP (Ffboundp (Qdo_after_load_evaluation)))
     call1 (Qdo_after_load_evaluation, found) ;
 
-  for (int i = 0; i < ARRAYELTS (saved_strings); i++)
+  for (int i = 0; i < ARRAYELTS (saved_strings); ++i)
     {
       xfree (saved_strings[i].string);
       saved_strings[i].string = NULL;
@@ -1484,7 +1462,8 @@ Return t if on success.  */)
 
 #undef MESSAGE_LOADING
 
-  return Qt;
+ done:
+  return ret;
 }
 
 Lisp_Object
@@ -5319,16 +5298,7 @@ The default is to use the function `read'.  */);
   Vload_read_function = Qread;
 
   DEFVAR_LISP ("load-source-file-function", Vload_source_file_function,
-	       doc: /* Function called in `load' to load an Emacs Lisp source file.
-The value should be a function for doing code conversion before
-reading a source file.  It can also be nil, in which case loading is
-done without any code conversion.
-
-If the value is a function, it is called with four arguments,
-FULLNAME, FILE, NOERROR, NOMESSAGE.  FULLNAME is the absolute name of
-the file to load, FILE is the non-absolute name (for messages etc.),
-and NOERROR and NOMESSAGE are the corresponding arguments passed to
-`load'.  The function should return t if the file was loaded.  */);
+	       doc: /* Because RMS begged off on writing this in C. */);
   Vload_source_file_function = Qnil;
 
   DEFVAR_BOOL ("load-force-doc-strings", load_force_doc_strings,

@@ -137,7 +137,7 @@ static Lisp_Object call_process (ptrdiff_t, Lisp_Object *, int, specpdl_ref);
 # define CHILD_SETUP_TYPE _Noreturn void
 #endif
 
-static CHILD_SETUP_TYPE child_setup (int, int, int, char **, char **,
+static CHILD_SETUP_TYPE child_setup (int, int, int, Lisp_Object, char **, char **,
 				     const char *);
 
 /* Return the current buffer's working directory, or the home
@@ -640,7 +640,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
   block_child_signal (&oldset);
 
   child_errno
-    = emacs_spawn (&pid, filefd, fd_output, fd_error, new_argv, env,
+    = emacs_spawn (&pid, filefd, fd_output, fd_error, Qnil, new_argv, env,
                    SSDATA (current_dir), NULL, false, false, &oldset);
   eassert ((child_errno == 0) == (0 < pid));
 
@@ -1197,8 +1197,8 @@ exec_failed (char const *name, int err)
    On MS-DOS, either return an exit status or signal an error.  */
 
 static CHILD_SETUP_TYPE
-child_setup (int in, int out, int err, char **new_argv, char **env,
-	     const char *current_dir)
+child_setup (int in, int out, int err, Lisp_Object sexpr,
+	     char **new_argv, char **env, const char *current_dir)
 {
 #ifdef MSDOS
   char *pwd_var;
@@ -1236,11 +1236,7 @@ child_setup (int in, int out, int err, char **new_argv, char **env,
   cpid = spawnve (_P_NOWAIT, new_argv[0], new_argv, env);
   reset_standard_handles (in, out, err, handles);
   return cpid;
-
 #else  /* not WINDOWSNT */
-
-#ifndef MSDOS
-
   restore_nofile_limit ();
 
   /* Redirect file descriptors and clear the close-on-exec flag on the
@@ -1253,33 +1249,18 @@ child_setup (int in, int out, int err, char **new_argv, char **env,
   setpgid (0, 0);
   tcsetpgrp (0, pid);
 
-  int errnum = emacs_exec_file (new_argv[0], new_argv, env);
-  exec_failed (new_argv[0], errnum);
-
-#else /* MSDOS */
-  i = strlen (current_dir);
-  pwd_var = xmalloc (i + 5);
-  temp = pwd_var + 4;
-  memcpy (pwd_var, "PWD=", 4);
-  stpcpy (temp, current_dir);
-
-  if (i > 2 && IS_DEVICE_SEP (temp[1]) && IS_DIRECTORY_SEP (temp[2]))
+  if (new_argv)
     {
-      temp += 2;
-      i -= 2;
+      eassert (NILP (sexpr));
+      int errnum = emacs_exec_file (new_argv[0], new_argv, env);
+      exec_failed (new_argv[0], errnum);
     }
-
-  /* Strip trailing slashes for PWD, but leave "/" and "//" alone.  */
-  while (i > 2 && IS_DIRECTORY_SEP (temp[i - 1]))
-    temp[--i] = 0;
-
-  pid = run_msdos_command (new_argv, pwd_var + 4, in, out, err, env);
-  xfree (pwd_var);
-  if (pid == -1)
-    /* An error occurred while trying to run the subprocess.  */
-    report_file_error ("Spawning child process", Qnil);
-  return pid;
-#endif  /* MSDOS */
+  else
+    {
+      eval_form (sexpr);
+      fcntl (STDERR_FILENO, F_SETFL, O_NONBLOCK);
+      _exit (0);
+    }
 #endif  /* not WINDOWSNT */
 }
 
@@ -1403,16 +1384,16 @@ emacs_posix_spawn_init_attributes (posix_spawnattr_t *attributes,
 
 int
 emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,
-             char **argv, char **envp, const char *cwd,
+             Lisp_Object sexpr, char **argv, char **envp, const char *cwd,
              const char *pty_name, bool pty_in, bool pty_out,
              const sigset_t *oldset)
 {
+  eassert (NILP (sexpr) || !argv);
 #if USABLE_POSIX_SPAWN
   /* Prefer the simpler `posix_spawn' if available.  `posix_spawn'
      doesn't yet support setting up pseudoterminals, so we fall back
      to `vfork' if we're supposed to use a pseudoterminal.  */
-
-  bool use_posix_spawn = pty_name == NULL;
+  bool use_posix_spawn = !pty_name && NILP (sexpr);
 
   posix_spawn_file_actions_t actions;
   posix_spawnattr_t attributes;
@@ -1464,6 +1445,7 @@ emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,
 
 #ifndef WINDOWSNT
   /* vfork, and prevent local vars from being clobbered by the vfork.  */
+  Lisp_Object volatile sexpr_volatile = sexpr;
   pid_t *volatile newpid_volatile = newpid;
   const char *volatile cwd_volatile = cwd;
   const char *volatile ptyname_volatile = pty_name;
@@ -1480,14 +1462,18 @@ emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,
   /* Darwin doesn't let us run setsid after a vfork, so use fork when
      necessary.  Below, we reset SIGCHLD handling after a vfork, as
      apparently macOS can mistakenly deliver SIGCHLD to the child.  */
-  if (pty_in || pty_out)
+  if (pty_in || pty_out || sexpr)
     pid = fork ();
   else
     pid = VFORK ();
 #else
-  pid = vfork ();
+  if (sexpr)
+    pid = fork ();
+  else
+    pid = vfork ();
 #endif
 
+  sexpr = sexpr_volatile;
   newpid = newpid_volatile;
   cwd = cwd_volatile;
   pty_name = ptyname_volatile;
@@ -1603,9 +1589,12 @@ emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,
       if (std_err < 0)
 	std_err = std_out;
 #ifdef WINDOWSNT
-      pid = child_setup (std_in, std_out, std_err, argv, envp, cwd);
+      if (!argv)
+	pid = -1;
+      else
+	pid = child_setup (std_in, std_out, std_err, Qnil, argv, envp, cwd);
 #else  /* not WINDOWSNT */
-      child_setup (std_in, std_out, std_err, argv, envp, cwd);
+      child_setup (std_in, std_out, std_err, sexpr, argv, envp, cwd);
 #endif /* not WINDOWSNT */
     }
 

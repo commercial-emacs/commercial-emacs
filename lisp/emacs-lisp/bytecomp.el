@@ -5649,7 +5649,7 @@ and corresponding effects."
           '(:name
             :buffer :command :coding :noquery :stop :connection-type
             :filter :sentinel :stderr :file-handler)
-          '(:name :command))))
+          '(:name))))
 
 (put 'make-pipe-process 'compiler-macro
      #'(lambda (form &rest args)

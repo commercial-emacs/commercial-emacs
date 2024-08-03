@@ -96,7 +96,7 @@
 (load "files")
 
 ;; Load-time macro-expansion can only take effect after setting
-;; load-source-file-function because of where it is called in lread.c.
+;; load-source-file-function because of where it is called in Fload.
 (load "emacs-lisp/macroexp")
 (if (not (compiled-function-p (symbol-function 'macroexpand-all)))
     (progn

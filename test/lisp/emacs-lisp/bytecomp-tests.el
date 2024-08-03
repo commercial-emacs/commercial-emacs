@@ -1390,10 +1390,6 @@ byte-compiled.  Run with dynamic binding."
  "Lexical argument shadows" 'reverse)
 
 (bytecomp--define-warning-file-test
- "warn-make-process-missing-keyword-arg.el"
- "called without required keyword argument :command")
-
-(bytecomp--define-warning-file-test
  "warn-make-process-unknown-keyword-arg.el"
  "called with unknown keyword argument :coding-system")
 

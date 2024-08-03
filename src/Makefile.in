@@ -523,9 +523,10 @@ emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el \
   ../admin/pdump.el ../admin/pdump-common.el \
   ../lisp/loaddefs.elc \
   ../lisp/international/charprop.el \
+  $(srcdir)/globals.h \
   $(addprefix ../lisp/,$(COMPILER_EL)) \
   $(patsubst %,../lisp/%.el,$(shell $(call relative-lisp-files,bootstrap-emacs$(EXEEXT),nil)))
-	-[ -e $@ ] && rm -f -- $(if $(filter $(addprefix ../lisp/,$(COMPILER_EL)),$(filter %.el,$?)),$(patsubst %,../lisp/%.$(TARGET_EXT),$(shell $(call relative-lisp-files,bootstrap-emacs$(EXEEXT),nil))),$(patsubst %.el,%.$(TARGET_EXT),$(filter %.el,$?)))
+	rm -f -- $(if $(or $(findstring globals.h,$?),$(filter $(addprefix ../lisp/,$(COMPILER_EL)),$(filter %.el,$?))),$(patsubst %,../lisp/%.eln,$(shell $(call relative-lisp-files,bootstrap-emacs$(EXEEXT),nil))),$(patsubst %.el,%.eln,$(filter %.el,$?)))
 	$(call pdump,$@) # pdmp some interpreted elisp
 	@# if relative-lisp-files empty, .DEFAULT_GOAL=none
 	$(MAKE) .DEFAULT_GOAL=none -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\")`
