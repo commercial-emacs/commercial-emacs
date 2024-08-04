@@ -1218,7 +1218,7 @@ Return t if on success.  */)
 #endif
 #endif
 #ifdef HAVE_NATIVE_COMP
-              || suffix_p (file, NATIVE_ELISP_SUFFIX)
+              || suffix_p (file, NATIVE_SUFFIX)
 #endif
 	      )
 	    must_suffix = Qnil;
@@ -1297,7 +1297,7 @@ Return t if on success.  */)
   bool is_module = false;
 #endif
 
-  bool is_native_lisp = suffix_p (found, NATIVE_ELISP_SUFFIX);
+  bool is_native = suffix_p (found, NATIVE_SUFFIX);
 
   /* Check if we're stuck recursively loading. */
   {
@@ -1337,7 +1337,7 @@ Return t if on success.  */)
   Lisp_Object ret;
   if (!elc_ver
       && !is_module
-      && !is_native_lisp
+      && !is_native
       && !NILP (Vload_source_file_function))
     {
       /* Call load-with-code-conversion to interpret uncompiled .el then
@@ -1360,7 +1360,7 @@ Return t if on success.  */)
       goto done;
     }
 
-  if (is_module || is_native_lisp)
+  if (is_module || is_native)
     {
       /* Can dismiss now since module-load handles.  */
       if (fd >= 0)
@@ -1402,7 +1402,7 @@ Return t if on success.  */)
       {									\
 	if (is_module)							\
 	  message_with_string ("Loading %s (module)..." done, file, 1); \
-	else if (is_native_lisp)					\
+	else if (is_native)					\
 	  message_with_string ("Loading %s (native)..." done, file, 1); \
 	else if (!elc_ver)						\
 	  message_with_string ("Loading %s.el (source)..." done, file, 1); \
@@ -1427,11 +1427,11 @@ Return t if on success.  */)
       emacs_abort ();
 #endif
     }
-  else if (is_native_lisp)
+  else if (is_native)
     {
 #ifdef HAVE_NATIVE_COMP
       loadhist_initialize (found);
-      Fnative_elisp_load (found);
+      Fnative__load (found);
       build_load_history (found, true);
 #else
       emacs_abort ();
@@ -1442,13 +1442,17 @@ Return t if on success.  */)
       if (lisp_file_lexically_bound_p (Qget_file_char))
 	set_internal (Qlexical_binding, Qt, Qnil, SET_INTERNAL_SET);
       readevalloop (Qget_file_char, &input, found, 0, Qnil, Qnil, Qnil, Qnil);
+#ifdef HAVE_NATIVE_COMP
+      // launch compile thread for found
+      // call1 (Qnative_compile_async, found);
+#endif
     }
 
   ret = unbind_to (count, Qt);
 
   /* Run any eval-after-load forms for this file.  */
   if (!NILP (Ffboundp (Qdo_after_load_evaluation)))
-    call1 (Qdo_after_load_evaluation, found) ;
+    call1 (Qdo_after_load_evaluation, found);
 
   for (int i = 0; i < ARRAYELTS (saved_strings); ++i)
     {

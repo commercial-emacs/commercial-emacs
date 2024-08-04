@@ -4084,7 +4084,7 @@ if test "${with_native_compilation}" != "no"; then
     CFLAGS=$SAVE_CFLAGS
     LIBS=$SAVE_LIBS
 fi
-AC_DEFINE_UNQUOTED([NATIVE_ELISP_SUFFIX], [".eln"],
+AC_DEFINE_UNQUOTED([NATIVE_SUFFIX], [".eln"],
   [System extension for native compiled elisp])
 AC_SUBST([HAVE_NATIVE_COMP])
 AC_SUBST([LIBGCCJIT_CFLAGS])

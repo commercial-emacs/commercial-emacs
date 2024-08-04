@@ -44,7 +44,8 @@
 (declare-function comp--compile-ctxt-to-file0 "comp.c")
 (declare-function comp--init-ctxt "comp.c")
 (declare-function comp--release-ctxt "comp.c")
-(declare-function native-elisp-load "comp.c")
+(declare-function native--load "comp.c")
+(define-obsolete-function-alias 'native-elisp-load #'native--load "30.1")
 
 (defgroup comp nil
   "Emacs Lisp native compiler."
@@ -3112,7 +3113,7 @@ Set it into the `type' slot."
                  do (puthash obj i h)
                  ;; Prune byte-code objects coming from lambdas.
                  ;; These are not anymore necessary as they will be
-                 ;; replaced at load time by native-elisp-subrs.
+                 ;; replaced at load time by native-comp-functions.
                  ;; Note: we leave the objects in the idx hash table
                  ;; to still be able to retrieve the correct index
                  ;; from the corresponding m-var.
@@ -3243,7 +3244,7 @@ Prepare every function for final compilation and drive the C back-end."
   (let ((filename (expand-file-name (comp-trampoline-filename subr-name)
                                     comp-trampoline-dir)))
     (when (file-readable-p filename)
-      (native-elisp-load filename))))
+      (native--load filename))))
 
 (defun comp-trampoline-compile (subr-name)
   "Synthesize, compile, and return a trampoline for SUBR-NAME."
@@ -3269,7 +3270,7 @@ Prepare every function for final compilation and drive the C back-end."
 ;;; Compiler entry points.
 
 (defun comp-compile-all-trampolines ()
-  "Pre-compile AOT all trampolines."
+  "Compile all trampolines."
   (mapatoms (lambda (f)
               (when (subr-primitive-p (symbol-function f))
                 (message "Compiling trampoline for: %s" f)
@@ -3277,7 +3278,9 @@ Prepare every function for final compilation and drive the C back-end."
 
 ;;;###autoload
 (defun native-compile (function-or-file &optional output)
-  "Compile FUNCTION-OR-FILE into native code."
+  "Compile FUNCTION-OR-FILE into native code.
+If a function, immediately load the native code.
+If a file, write native code to OUTPUT."
   (catch 'no-native-compile
     (unwind-protect
         (let ((data function-or-file)
@@ -3285,21 +3288,21 @@ Prepare every function for final compilation and drive the C back-end."
               (t0 (current-time))
               byte-native-qualities
               pass-times)
-          (dolist (pass comp-passes)
-            (unless (memq pass comp-disabled-passes)
-              (comp-log (format "\n(%s) Running pass %s:\n" function-or-file pass) 2)
-              (condition-case err
+          (condition-case err
+              (dolist (pass comp-passes)
+                (unless (memq pass comp-disabled-passes)
+                  (comp-log (format "\n(%s) Running pass %s:\n" function-or-file pass) 2)
                   (setf data (funcall pass data))
-                (native-compiler-skip)
-                (error (signal (car err) (cdr err))))
-              (push (cons pass (float-time (time-since t0))) pass-times)
-              (dolist (f (alist-get pass comp-post-pass-hooks))
-                (funcall f data))))
+                  (push (cons pass (float-time (time-since t0))) pass-times)
+                  (dolist (f (alist-get pass comp-post-pass-hooks))
+                    (funcall f data))))
+            (native-compiler-skip)
+            (error (signal (car err) (cdr err))))
           (prog1 (if (stringp function-or-file)
                      data
-                   (native-elisp-load data))
+                   (native--load data))
             (when comp-log-time-report
-              (dolist (what (cons (format "Done compiling %s" data)
+              (dolist (what (cons (format "Done compiling %s" function-or-file)
                                   (mapcar (lambda (pass-time)
                                             (format "Pass %s took: %fs."
                                                     (car pass-time)

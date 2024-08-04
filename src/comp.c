@@ -4854,8 +4854,8 @@ This gets called by top_level_run during the load phase.  */)
   return tem;
 }
 
-DEFUN ("native-elisp-load", Fnative_elisp_load, Snative_elisp_load, 1, 1, 0,
-       doc: /* Load FILENAME.  */)
+DEFUN ("native--load", Fnative__load, Snative__load, 1, 1, 0,
+       doc: /* Load native code within FILENAME.  */)
   (Lisp_Object filename)
 {
   CHECK_STRING (filename);
@@ -4863,20 +4863,7 @@ DEFUN ("native-elisp-load", Fnative_elisp_load, Snative_elisp_load, 1, 1, 0,
     xsignal2 (Qnative_lisp_load_failed, build_string ("file does not exist"),
 	      filename);
   struct Lisp_Native_Comp_Unit *comp_unit = allocate_native_comp_unit ();
-  if (!NILP (Fgethash (filename, Vcomp_loaded_comp_units_h, Qnil))
-      && !NILP (Ffile_writable_p (filename)))
-    {
-      /* FILENAME seen before.  Rename grabass ensures new file handle.  */
-      Lisp_Object temp = Fmake_temp_file_internal (filename, Qnil,
-						   build_string (".eln.tmp"),
-						   Qnil);
-      Frename_file (filename, temp, Qt);
-      comp_unit->handle = dynlib_open_for_eln (SSDATA (ENCODE_FILE (temp)));
-      Frename_file (temp, filename, Qnil);
-    }
-  else
-    comp_unit->handle = dynlib_open_for_eln (SSDATA (ENCODE_FILE (filename)));
-
+  comp_unit->handle = dynlib_open_for_eln (SSDATA (ENCODE_FILE (filename)));
   if (!comp_unit->handle)
     xsignal2 (Qnative_lisp_load_failed, filename, build_string (dynlib_error ()));
   comp_unit->file = filename;
@@ -4910,6 +4897,7 @@ syms_of_comp (void)
   DEFSYM (Qnative_comp_driver_options, "native-comp-driver-options");
   DEFSYM (Qnative_comp_compiler_options, "native-comp-compiler-options");
   DEFSYM (Qcomp_libgccjit_reproducer, "comp-libgccjit-reproducer");
+  DEFSYM (Qnative_compile_async, "native-compile-async");
 
   /* Limple instruction set.  */
   DEFSYM (Qcomment, "comment");
@@ -5028,7 +5016,7 @@ syms_of_comp (void)
   defsubr (&Scomp_libgccjit_version);
   defsubr (&Scomp__register_lambda);
   defsubr (&Scomp__register_subr);
-  defsubr (&Snative_elisp_load);
+  defsubr (&Snative__load);
 
   staticpro (&comp.exported_funcs_h);
   comp.exported_funcs_h = Qnil;

@@ -40,13 +40,13 @@
 (declare-function comp-trampoline-search "comp")
 (declare-function comp-trampoline-compile "comp")
 (declare-function comp--install-trampoline "comp.c")
-(declare-function native-elisp-load "comp.c")
+(declare-function native--load "comp.c")
 
 (defconst comp-warn-primitives
   '(null memq gethash and subrp not native-comp-function-p
          comp--install-trampoline concat if symbolp symbol-name make-string
          length aset aref length> mapcar expand-file-name
-         file-name-as-directory file-exists-p native-elisp-load)
+         file-name-as-directory file-exists-p native--load)
   "Primitives overridden at one's peril.  Weak.")
 
 ;;;###autoload

@@ -2481,7 +2481,7 @@ to find out more details about the symbols."
    ((gethash function help-fns--function-names))
    ((subrp function)
     (let ((name (subr-name function)))
-      ;; FIXME: For native-elisp-functions, should we use `help-function'
+      ;; FIXME: For native-comp-functions, should we use `help-function'
       ;; or `disassemble'?
       (format "#<%s %s>"
               (cl-type-of function)
