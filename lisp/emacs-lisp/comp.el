@@ -142,11 +142,6 @@ Emacs Lisp file:
 (defvar comp-dry-run nil
   "If non-nil, run everything but the C back-end.")
 
-(defvar comp-native-compiling nil
-  "This gets bound to t during native compilation.
-Intended to be used by code that needs to work differently when
-native compilation runs.")
-
 (defvar comp-pass nil
   "Every native-compilation pass can bind this to whatever it likes.")
 
@@ -3268,67 +3263,9 @@ Prepare every function for final compilation and drive the C back-end."
          (native-comp-speed 1) ;conservative
          (lexical-binding t))
     (make-directory comp-trampoline-dir t)
-    (comp--native-compile form (expand-file-name
-                                (comp-trampoline-filename subr-name)
-                                comp-trampoline-dir))))
-
-(defun comp--native-compile (function-or-file &optional output)
-  "Compile FUNCTION-OR-FILE into native code."
-  (comp-ensure-native-compiler)
-  (when (and (not (functionp function-or-file))
-             (not (stringp function-or-file)))
-    (signal 'native-compiler-error
-            (list "Neither function symbol nor file" function-or-file)))
-  (catch 'no-native-compile
-    (let* ((data function-or-file)
-           (comp-native-compiling t)
-           (byte-native-qualities nil)
-           (comp-ctxt (make-comp-ctxt :output output)))
-      (unwind-protect
-          (progn
-            (condition-case-unless-debug err
-                (cl-loop
-                 with report
-                 for t0 = (current-time)
-                 for pass in comp-passes
-                 unless (memq pass comp-disabled-passes)
-                 do (comp-log (format "\n(%s) Running pass %s:\n"
-                                      function-or-file
-                                      pass)
-                              2)
-                 (setf data (funcall pass data))
-                 (push (cons pass (float-time (time-since t0))) report)
-                 (cl-loop for f in (alist-get pass comp-post-pass-hooks)
-                          do (funcall f data))
-                 finally
-                 (when comp-log-time-report
-                   (comp-log (format "Done compiling %s" data) 0)
-                   (cl-loop for (pass . time) in (reverse report)
-                            do (comp-log (format "Pass %s took: %fs."
-                                                 pass time)
-                                         0))))
-              (native-compiler-skip)
-              (t
-               (let ((err-val (cdr err)))
-                 (signal (car err) (if (consp err-val)
-			               (cons function-or-file err-val)
-                                     (cl-assert (null err-val))
-			             (list function-or-file err-val))))))
-            (if (stringp function-or-file)
-                data
-              ;; So we return the compiled function.
-              (native-elisp-load data)))
-        (process--sigaction-child)
-        (when (and (not (stringp function-or-file))
-                   (not output)
-                   comp-ctxt
-                   (comp-ctxt-output comp-ctxt)
-                   (file-exists-p (comp-ctxt-output comp-ctxt)))
-          (condition-case err
-              (delete-file (comp-ctxt-output comp-ctxt))
-            (error (unless (eq 'windows-nt system-type) ;EZ exception, the fuq?
-                     (signal (car err) (cdr err))))))))))
-
+    (native-compile form (expand-file-name
+                          (comp-trampoline-filename subr-name)
+                          comp-trampoline-dir))))
 ;;; Compiler entry points.
 
 (defun comp-compile-all-trampolines ()
@@ -3340,22 +3277,47 @@ Prepare every function for final compilation and drive the C back-end."
 
 ;;;###autoload
 (defun native-compile (function-or-file &optional output)
-  "Synchronous entry into native compilation.
-FUNCTION-OR-FILE is a function symbol, form, or file name.  OUTPUT is the
-optional file name for the compiled object.  Returns FUNCTION-OR-FILE if
-a file name, else the compiled object."
-  (comp--native-compile function-or-file output))
+  "Compile FUNCTION-OR-FILE into native code."
+  (catch 'no-native-compile
+    (unwind-protect
+        (let ((data function-or-file)
+              (comp-ctxt (make-comp-ctxt :output output))
+              (t0 (current-time))
+              byte-native-qualities
+              pass-times)
+          (dolist (pass comp-passes)
+            (unless (memq pass comp-disabled-passes)
+              (comp-log (format "\n(%s) Running pass %s:\n" function-or-file pass) 2)
+              (condition-case err
+                  (setf data (funcall pass data))
+                (native-compiler-skip)
+                (error (signal (car err) (cdr err))))
+              (push (cons pass (float-time (time-since t0))) pass-times)
+              (dolist (f (alist-get pass comp-post-pass-hooks))
+                (funcall f data))))
+          (prog1 (if (stringp function-or-file)
+                     data
+                   (native-elisp-load data))
+            (when comp-log-time-report
+              (dolist (what (cons (format "Done compiling %s" data)
+                                  (mapcar (lambda (pass-time)
+                                            (format "Pass %s took: %fs."
+                                                    (car pass-time)
+                                                    (cdr pass-time)))
+                                          (reverse pass-times))))
+                (comp-log what 0)))))
+      (process--sigaction-child)
+      (ignore-errors (delete-file (comp-ctxt-output comp-ctxt))))))
 
 ;;;###autoload
 (defun batch-native-compile (&optional _unused)
   "Compile remaining command-line arguments.
 Equivalent of `batch-byte-compile' for native compilation.  Returns list
 of file names not excluded by `native-comp-bootstrap-deny-list'."
-  (comp-ensure-native-compiler)
   (cl-loop for file in command-line-args-left
            unless (cl-some (lambda (re) (string-match-p re file))
                            native-comp-bootstrap-deny-list)
-           collect (comp--native-compile file)))
+           collect (native-compile file)))
 
 ;; In use by elisp-mode.el
 (defun comp--write-bytecode-file (eln-file)

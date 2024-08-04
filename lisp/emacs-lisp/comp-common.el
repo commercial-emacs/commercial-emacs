@@ -463,16 +463,6 @@ with `message'.  Otherwise, log with `comp-log-to-buffer'."
         (with-selected-window log-window
           (goto-char (point-max)))))))
 
-(defun comp-ensure-native-compiler ()
-  "Make sure Emacs has native compiler support and libgccjit can be loaded.
-Signal an error otherwise.
-To be used by all entry points."
-  (cond
-   ((null (featurep 'native-compile))
-    (error "Emacs was not compiled with native compiler support (--with-native-compilation)"))
-   ((null (native-comp-available-p))
-    (error "Cannot find libgccjit library"))))
-
 ;;;###autoload
 (defun comp-function-type-spec (function)
   "Return the type specifier of FUNCTION.
