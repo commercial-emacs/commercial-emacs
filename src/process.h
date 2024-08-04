@@ -54,9 +54,6 @@ struct Lisp_Process
        Is set to t for a stopped network process; nil otherwise.  */
     Lisp_Object command;
 
-    /* Instead of command, subprocess can evaluate sexpr.  */
-    Lisp_Object sexpr;
-
     /* (funcall FILTER PROC STRING)  (if FILTER is non-nil)
        to dispose of a bunch of chars from the process all at once.  */
     Lisp_Object filter;
