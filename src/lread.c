@@ -1168,14 +1168,13 @@ Return t if on success.  */)
   int fd = -1;
   specpdl_ref fd_index UNINIT;
   specpdl_ref count = SPECPDL_INDEX ();
-  Lisp_Object found;
-  Lisp_Object handler;
+  Lisp_Object found = Qnil, suffixes = Qnil;
   struct infile input;
 
   CHECK_STRING (file);
 
   /* If file name is magic, call the handler.  */
-  handler = Ffind_file_name_handler (file, Qload);
+  Lisp_Object handler = Ffind_file_name_handler (file, Qload);
   if (!NILP (handler))
     return call6 (handler, Qload, file, noerror, nomessage, nosuffix, must_suffix);
 
@@ -1194,53 +1193,35 @@ Return t if on success.  */)
   else
     file = Fsubstitute_in_file_name (file);
 
-  /* Avoid weird lossage with null string as arg,
-     since it would try to load a directory as a Lisp file.  */
-  if (SCHARS (file) == 0)
+  if (SCHARS (file))
     {
-      fd = -1;
-      errno = ENOENT;
-    }
-  else
-    {
-      Lisp_Object suffixes;
-      found = Qnil;
-
-      if (!NILP (must_suffix))
-	{
-	  /* Don't insist on adding a suffix if FILE already ends with one.  */
-	  if (suffix_p (file, ".el")
+      if (!NILP (must_suffix)
+	  && (suffix_p (file, ".el")
 	      || suffix_p (file, ".elc")
 #ifdef HAVE_MODULES
 	      || suffix_p (file, MODULES_SUFFIX)
 #ifdef MODULES_SECONDARY_SUFFIX
-              || suffix_p (file, MODULES_SECONDARY_SUFFIX)
+	      || suffix_p (file, MODULES_SECONDARY_SUFFIX)
 #endif
 #endif
 #ifdef HAVE_NATIVE_COMP
-              || suffix_p (file, NATIVE_SUFFIX)
+	      || suffix_p (file, NATIVE_SUFFIX)
 #endif
-	      )
-	    must_suffix = Qnil;
-	  /* Don't insist on adding a suffix
-	     if the argument includes a directory name.  */
-	  else if (!NILP (Ffile_name_directory (file)))
-	    must_suffix = Qnil;
-	}
+	      || !NILP (Ffile_name_directory (file))))
+	/* FILE already ends with suffix or contains directory.  */
+	must_suffix = Qnil;
 
-      if (!NILP (nosuffix))
-	suffixes = Qnil;
-      else
-	{
-	  suffixes = Fget_load_suffixes ();
-	  if (NILP (must_suffix))
-	    suffixes = CALLN (Fappend, suffixes, Vload_file_rep_suffixes);
-	}
+      suffixes = NILP (nosuffix)
+	? CALLN (Fappend, Fget_load_suffixes (),
+		 NILP (must_suffix) ? Vload_file_rep_suffixes : Qnil)
+	: Qnil;
       fd = openp (Vload_path, file, suffixes, &found, Qnil);
     }
 
   if (fd == -1)
     {
+      if (SCHARS (file) == 0)
+	errno = ENOENT;
       if (NILP (noerror))
 	report_file_error ("Cannot open load file", file);
       return Qnil;
@@ -1340,11 +1321,11 @@ Return t if on success.  */)
       && !is_native
       && !NILP (Vload_source_file_function))
     {
-      /* Call load-with-code-conversion to interpret uncompiled .el then
-	 short-circuit return.  RMS begged off writing
-	 load-with-code-conversion in C so it looks disturbingly like
-	 the remainder of Fload, replete with identical diagnostic
-	 messages.  */
+      /* UGLY: For the common case of interpreting uncompiled .el, call
+	 load-with-code-conversion then short-circuit return.  RMS
+	 begged off writing load-with-code-conversion in C so it looks
+	 disturbingly like the remainder of Fload, replete with
+	 identical diagnostic messages.  */
       if (fd >= 0)
 	{
 	  emacs_close (fd);
@@ -1357,12 +1338,12 @@ Return t if on success.  */)
 			 Ffile_name_nondirectory (found)),
 		NILP (noerror) ? Qnil : Qt,
 		(NILP (nomessage) || force_load_messages) ? Qnil : Qt));
-      goto done;
+      goto done; /* !!! */
     }
 
   if (is_module || is_native)
     {
-      /* Can dismiss now since module-load handles.  */
+      /* Can dismiss FD now since module-load handles.  */
       if (fd >= 0)
         {
           emacs_close (fd);
@@ -1443,8 +1424,21 @@ Return t if on success.  */)
 	set_internal (Qlexical_binding, Qt, Qnil, SET_INTERNAL_SET);
       readevalloop (Qget_file_char, &input, found, 0, Qnil, Qnil, Qnil, Qnil);
 #ifdef HAVE_NATIVE_COMP
-      // launch compile thread for found
-      // call1 (Qnative_compile_async, found);
+      if (initialized && !noninteractive)
+	{
+	  Lisp_Object eln
+	    = Fexpand_file_name (call1 (intern ("file-name-nondirectory"),
+					call2 (intern ("file-name-with-extension"),
+					       found, build_string (NATIVE_SUFFIX))),
+				 SYMBOL_NAME (Qcomp_trampoline_dir));
+	  if (!NILP (Fmember (build_string (NATIVE_SUFFIX), suffixes))
+	      && NILP (Ffile_exists_p (eln))
+	      && false)
+	    call2 (Qnative_compile_async,
+		   call2 (intern ("file-name-with-extension"), found,
+			  build_string (".el")),
+		   eln);
+	}
 #endif
     }
 
@@ -1848,7 +1842,7 @@ readevalloop (Lisp_Object readcharfun,
 
   if (NILP (Ffboundp (macroexpand))
       || (STRINGP (sourcename) && (suffix_p (sourcename, ".elc")
-				   || suffix_p (sourcename, ".eln"))))
+				   || suffix_p (sourcename, NATIVE_SUFFIX))))
     /* Don't macroexpand before the corresponding function is defined
        and don't bother macroexpanding in .elc files, since it should have
        been done already.  */
@@ -5190,7 +5184,7 @@ to the specified file name if a suffix is allowed or required.  */);
   Vload_suffixes = list2 (build_pure_c_string (".elc"),
 			  build_pure_c_string (".el"));
 #ifdef HAVE_NATIVE_COMP
-  Vload_suffixes = Fcons (build_pure_c_string (".eln"), Vload_suffixes);
+  Vload_suffixes = Fcons (build_pure_c_string (NATIVE_SUFFIX), Vload_suffixes);
 #endif
 #ifdef HAVE_MODULES
   Vload_suffixes = Fcons (build_pure_c_string (MODULES_SUFFIX), Vload_suffixes);

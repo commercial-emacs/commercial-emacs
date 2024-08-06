@@ -4836,7 +4836,7 @@ This gets called by top_level_run during the load phase.  */)
 DEFUN ("comp--register-subr", Fcomp__register_subr, Scomp__register_subr,
        7, 7, 0,
        doc: /* Register exported subr.
-This gets called by top_level_run during the load phase.  */)
+Called by top_level_run during the load phase.  */)
   (Lisp_Object name, Lisp_Object c_name, Lisp_Object minarg,
    Lisp_Object maxarg, Lisp_Object type, Lisp_Object rest,
    Lisp_Object comp_u)
@@ -4845,13 +4845,13 @@ This gets called by top_level_run during the load phase.  */)
   Lisp_Object intspec = SECOND (rest);
   Lisp_Object command_modes = THIRD (rest);
 
-  Lisp_Object tem =
-    make_subr (SYMBOL_NAME (name), minarg, maxarg, c_name, type, doc_idx,
-	       intspec, command_modes, comp_u);
+  Lisp_Object subr
+    = make_subr (SYMBOL_NAME (name), minarg, maxarg, c_name, type, doc_idx,
+		 intspec, command_modes, comp_u);
 
-  defalias (name, tem);
+  defalias (name, subr);
 
-  return tem;
+  return subr;
 }
 
 DEFUN ("native--load", Fnative__load, Snative__load, 1, 1, 0,
@@ -4898,6 +4898,7 @@ syms_of_comp (void)
   DEFSYM (Qnative_comp_compiler_options, "native-comp-compiler-options");
   DEFSYM (Qcomp_libgccjit_reproducer, "comp-libgccjit-reproducer");
   DEFSYM (Qnative_compile_async, "native-compile-async");
+  DEFSYM (Qcomp_trampoline_dir, "comp-trampoline-dir");
 
   /* Limple instruction set.  */
   DEFSYM (Qcomment, "comment");

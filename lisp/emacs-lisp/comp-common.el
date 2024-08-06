@@ -23,7 +23,7 @@
 
 ;;; Commentary:
 
-;; This file holds common code required by comp.el and comp-run.el.
+;; Common code for comp.el and comp-run.el (obsoleted).
 
 ;;; Code:
 

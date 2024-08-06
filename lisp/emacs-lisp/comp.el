@@ -37,10 +37,11 @@
 (require 'comp-common)
 (require 'comp-cstr)
 
-;; These variables and functions are defined in comp.c
+(defvar comp-installed-trampolines-h)
 (defvar comp-subr-arities-h)
 (defvar native-comp-disable-subr-trampolines)
 
+(declare-function comp--install-trampoline "comp.c")
 (declare-function comp--compile-ctxt-to-file0 "comp.c")
 (declare-function comp--init-ctxt "comp.c")
 (declare-function comp--release-ctxt "comp.c")
@@ -1615,15 +1616,9 @@ These are stored in the reloc data array."
                 (make--comp-mvar :slot 0)))))
 
 (defun comp--limplify-top-level ()
-  "Create a Limple function to modify the global environment at load.
-
-Synthesize a function called `top_level_run' that gets one single
-parameter (the compilation unit itself).  To define native
-functions, `top_level_run' will call back `comp--register-subr'
-into the C code forwarding the compilation unit."
-  ;; Once an .eln is loaded and Emacs is dumped 'top_level_run' has no
-  ;; reasons to be executed ever again.  Therefore all objects can be
-  ;; just ephemeral.
+  "Create the top_level_run limple defining native compiled functions."
+  ;; Once an .eln is loaded into the preimage, 'top_level_run' need not run
+  ;; again, so all objects can be ephemeral.
   (let* ((comp-curr-allocation-class 'd-ephemeral)
          (func (make-comp-func-l :name 'top-level-run
                                  :c-name "top_level_run"
@@ -3312,6 +3307,29 @@ If a file, write native code to OUTPUT."
       (process--sigaction-child)
       (ignore-errors (delete-file (comp-ctxt-output comp-ctxt))))))
 
+(defun native-compile-async (infile outfile)
+  (let ((name (concat "compile/" (file-name-nondirectory infile))))
+    (make-process
+     :name name
+     :buffer (with-current-buffer
+                 (get-buffer-create (format " *%s*" name))
+               (unless (derived-mode-p 'compilation-mode)
+                 (emacs-lisp-compilation-mode))
+               (current-buffer))
+     :command `(,(expand-file-name invocation-name invocation-directory)
+                "-Q" "--batch"
+                ,@(cl-mapcan
+                   (lambda (expr) (list "--eval" expr))
+                   (list
+	            "(setq w32-disable-abort-dialog t)"
+	            (format "(native-compile %s %s)" infile outfile))))
+     :sentinel (lambda (process _event)
+                 (when (and (memq (process-status process) '(exit signal))
+                            (zerop (process-exit-status process))
+                            (file-exists-p outfile))
+                   (native--load outfile)))
+     :noquery t)))
+
 ;;;###autoload
 (defun batch-native-compile (&optional _unused)
   "Compile remaining command-line arguments.
@@ -3335,6 +3353,28 @@ of file names not excluded by `native-comp-bootstrap-deny-list'."
              (set-file-times eln-file)))
        (kill-buffer temp-buffer))
      target-file)))
+
+(defconst comp-warn-primitives
+  '(null memq gethash and subrp not native-comp-function-p
+         comp--install-trampoline concat if symbolp symbol-name make-string
+         length aset aref length> mapcar expand-file-name
+         file-name-as-directory file-exists-p native--load)
+  "Primitives overridden at one's peril.  Weak.")
+
+;;;###autoload
+(defun comp-subr-trampoline-install (subr-name)
+  "Make SUBR-NAME effectively advice-able when called from native code."
+  (when (memq subr-name comp-warn-primitives)
+    (warn "Redefining `%s' might break native compilation of trampolines."
+          subr-name))
+  (when (and (not native-comp-disable-subr-trampolines)
+             (not (memq subr-name native-comp-never-optimize-functions))
+             (not (gethash subr-name comp-installed-trampolines-h)))
+    (cl-assert (subr-primitive-p (symbol-function subr-name)))
+    (require 'comp)
+    (when-let ((trampoline (or (comp-trampoline-search subr-name)
+                               (comp-trampoline-compile subr-name))))
+      (comp--install-trampoline subr-name trampoline))))
 
 (cl-pushnew comp-trampoline-dir load-path :test #'equal)
 

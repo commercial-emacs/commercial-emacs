@@ -29,6 +29,5 @@ ifeq ($(HAVE_NATIVE_COMP),yes)
 COMPILER_EL += \
     emacs-lisp/comp-common.el \
     emacs-lisp/comp-cstr.el \
-    emacs-lisp/comp-run.el \
     emacs-lisp/comp.el
 endif
