@@ -1950,25 +1950,25 @@ also be compiled."
                                           byte-compile-ignore-files)))
 		   (setq directories (nconc directories (list source))))
                ;; It is an ordinary file.  Decide whether to compile it.
-               (if (and (string-match emacs-lisp-file-regexp source)
-			;; The next 2 tests avoid compiling lock files
-                        (file-readable-p source)
-			(not (string-match "\\`\\.#" file))
-                        (not (auto-save-file-name-p source))
-                        (not (member source (dir-locals--all-files directory)))
-                        (not (cl-some (lambda (regexp)
-                                        (string-match-p regexp source))
-                                      byte-compile-ignore-files)))
-                   (progn (cl-incf
-                           (pcase (byte-recompile-file source force arg)
-                             ('no-byte-compile skip-count)
-                             ('t file-count)
-                             (_ fail-count)))
-                          (unless noninteractive
-                            (message "Checking %s..." directory))
-                          (unless (eq last-dir directory)
-                            (setq last-dir directory
-                                  dir-count (1+ dir-count))))))))
+               (when (and (string-match emacs-lisp-file-regexp source)
+			  ;; The next 2 tests avoid compiling lock files
+                          (file-readable-p source)
+			  (not (string-match "\\`\\.#" file))
+                          (not (auto-save-file-name-p source))
+                          (not (member source (dir-locals--all-files directory)))
+                          (not (cl-some (lambda (regexp)
+                                          (string-match-p regexp source))
+                                        byte-compile-ignore-files)))
+                 (cl-incf
+                  (pcase (byte-recompile-file source force arg)
+                    ('no-byte-compile skip-count)
+                    ('t file-count)
+                    (_ fail-count)))
+                 (unless noninteractive
+                   (message "Checking %s..." directory))
+                 (unless (eq last-dir directory)
+                   (setq last-dir directory
+                         dir-count (1+ dir-count)))))))
 	 (setq directories (cdr directories))))
       (message "Done (Total of %d file%s compiled%s%s%s)"
 	       file-count (if (= file-count 1) "" "s")

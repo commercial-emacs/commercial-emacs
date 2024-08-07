@@ -1726,6 +1726,8 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
 
   if (handler)
     unwind_to_catch (handler, NONLOCAL_EXIT_SIGNAL, Fcons (error_symbol, data));
+  else if (!initialized)
+    fatal ("%s", SSDATA (Ferror_message_string (Fcons (error_symbol, data))));
 
   Fthrow (Qtop_level, Qt);
   eassume (false);
