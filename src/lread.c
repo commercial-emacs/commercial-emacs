@@ -1423,23 +1423,6 @@ Return t if on success.  */)
       if (lisp_file_lexically_bound_p (Qget_file_char))
 	set_internal (Qlexical_binding, Qt, Qnil, SET_INTERNAL_SET);
       readevalloop (Qget_file_char, &input, found, 0, Qnil, Qnil, Qnil, Qnil);
-#ifdef HAVE_NATIVE_COMP
-      if (initialized && !noninteractive)
-	{
-	  Lisp_Object eln
-	    = Fexpand_file_name (call1 (intern ("file-name-nondirectory"),
-					call2 (intern ("file-name-with-extension"),
-					       found, build_string (NATIVE_SUFFIX))),
-				 SYMBOL_NAME (Qcomp_trampoline_dir));
-	  if (!NILP (Fmember (build_string (NATIVE_SUFFIX), suffixes))
-	      && NILP (Ffile_exists_p (eln))
-	      && false)
-	    call2 (Qnative_compile_async,
-		   call2 (intern ("file-name-with-extension"), found,
-			  build_string (".el")),
-		   eln);
-	}
-#endif
     }
 
   ret = unbind_to (count, Qt);
