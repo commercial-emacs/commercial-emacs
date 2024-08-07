@@ -165,7 +165,7 @@ $(COMPILER_EL:.el=.eln): %.eln : %.el $(top_srcdir)/src/lread.c
 # grep is the wrong way of doing this (hack-local-variables better).
 define compile-rest
 $(filter-out $(COMPILER_EL:.el=.$(TARGET_EXT)) $(COMPILE_FIRST:.el=.$(TARGET_EXT)), $(shell \
-  read -a arr <<<`find . -type f -name '*.el' -exec grep -L '^;.*[^a-zA-Z]no-\($(TARGET_REGEX)\)-compile: *t' {} + | sort | xargs $(XARGS_LIMIT) echo`; \
+  read -a arr <<<`find * -type f -name '*.el' -exec grep -L '^;.*[^a-zA-Z]no-\($(TARGET_REGEX)\)-compile: *t' {} + | sort | xargs $(XARGS_LIMIT) echo`; \
   arr=( "$${arr[@]/%.el/.$(TARGET_EXT)}" ); \
   echo "$${arr[*]}"; \
 ))
