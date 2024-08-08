@@ -165,9 +165,9 @@ define native-compile
 	$(AM_V_at)mv -f $(@D)/mv_$(@F) $@
 endef
 
-%.elc: %.el $(COMPILER_EL:.el=.elc)
+%.elc: %.el | $(COMPILER_EL:.el=.elc)
 	$(call byte-compile)
-$(COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
+$(COMPILER_EL:.el=.elc): %.elc : %.el
 	$(call byte-compile)
 
 # Cannot dep on $(COMPILER_EL:.el=.eln), else rug pulled from pdmp
