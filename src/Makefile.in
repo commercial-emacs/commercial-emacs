@@ -524,6 +524,7 @@ emacs.pdmp: emacs$(EXEEXT) ../lisp/subdirs.el \
   ../lisp/loaddefs.elc \
   ../lisp/international/charprop.el \
   $(patsubst %,../lisp/%.el,$(shell $(call relative-lisp-files,bootstrap-emacs$(EXEEXT),nil)))
+	rm -f -- $(patsubst %.el,%.eln,$(filter %.el,$?))
 	$(call pdump,$@) # pdmp some interpreted elisp
 	@# if relative-lisp-files empty, .DEFAULT_GOAL=none
 	$(MAKE) .DEFAULT_GOAL=none -C ../lisp `$(call relative-lisp-files,$<,\"$(TARGET_EXT)\")`
@@ -581,6 +582,7 @@ ALLLIBS = $(LIBS) $(W32_LIBS) $(LIBS_GNUSTEP) $(PGTK_LIBS) $(LIBX_BASE) $(LIBIMA
 	$(MAKE) -C ../admin/unidata ../$@
 
 emacs$(EXEEXT): $(LIBXMENU) $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(EMACSRES) \
+  ../admin/globals.h.stamp \
   ../admin/charsets/charsets.stamp \
   ../lisp/international/charscript.el \
   ../lisp/international/emoji-zwj.el \
@@ -623,8 +625,9 @@ buildobj.h: Makefile
 
 GLOBAL_SOURCES = $(base_obj:.o=.c) $(NS_OBJC_OBJ:.o=.m)
 
-globals.h: $(libsrc)/make-docfile$(EXEEXT) $(GLOBAL_SOURCES)
-	$(AM_V_GLOBALS)$(libsrc)/make-docfile -d $(srcdir) -g $(doc_obj) > $@
+../admin/globals.h.stamp: $(libsrc)/make-docfile$(EXEEXT) $(GLOBAL_SOURCES)
+	$(AM_V_GLOBALS)$< -d $(srcdir) -g $(doc_obj) > $@
+	$(AM_V_at)if ! diff -q $@ globals.h ; then cp -pf $@ globals.h ; fi
 
 $(ALLOBJS): globals.h
 

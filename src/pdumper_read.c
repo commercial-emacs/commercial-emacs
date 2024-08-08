@@ -151,8 +151,8 @@ reloc_dump (const struct dump_header *const header, const enum reloc_phase phase
 	case RELOC_NATIVE_SUBR:
 	  {
 	    /* Revive them one-by-one.  */
-	    struct Lisp_Subr *subr
-	      = (struct Lisp_Subr *) ((char *) pdumper_info.addr_beg + reloc.offset);
+	    struct Lisp_Subr *subr =
+	      (struct Lisp_Subr *) ((char *) pdumper_info.addr_beg + reloc.offset);
 	    struct Lisp_Native_Comp_Unit *comp_u =
 	      XNATIVE_COMP_UNIT (subr->native_comp_u);
 	    if (!comp_u->handle)
