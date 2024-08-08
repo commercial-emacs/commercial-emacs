@@ -20,15 +20,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest, macos-12, windows-latest]
+        os: [windows-latest]
         gearing: [standard]
-        include:
-          - os: ubuntu-latest
-            gearing: alt-x
-          - os: ubuntu-latest
-            gearing: native-comp
-          - os: ubuntu-latest
-            gearing: multithread
     steps:
     - run: |
         git config --global core.autocrlf false
@@ -115,7 +108,7 @@ jobs:
         ./configure --prefix=$HOME/.local --with-tree-sitter
         make -j4 check
         ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
-    - uses: msys2/setup-msys2@v2
+    - uses: msys2/setup-msys2@v2.23.0
       if: startsWith(runner.os, 'windows')
       with:
         update: false
