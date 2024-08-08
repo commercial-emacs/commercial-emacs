@@ -627,7 +627,7 @@ GLOBAL_SOURCES = $(base_obj:.o=.c) $(NS_OBJC_OBJ:.o=.m)
 
 ../admin/globals.h.stamp: $(libsrc)/make-docfile$(EXEEXT) $(GLOBAL_SOURCES)
 	$(AM_V_GLOBALS)$< -d $(srcdir) -g $(doc_obj) > $@
-	$(AM_V_at)if ! diff -q $@ globals.h ; then cp -pf $@ globals.h ; fi
+	$(AM_V_at)if [ ! -e globals.h ] || ! diff -q $@ globals.h ; then cp -pf $@ globals.h ; fi
 
 globals.h: ../admin/globals.h.stamp; @true
 
