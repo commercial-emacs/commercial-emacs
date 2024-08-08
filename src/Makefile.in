@@ -643,7 +643,7 @@ $(LIBEGNU_ARCHIVE): $(config_h)
 
 ## The following oldxmenu-related rules are only (possibly) used if
 ## HAVE_X11 && !USE_GTK, but there is no harm in always defining them.
-$(lwlibdir)/liblw.a: $(config_h) globals.h lisp.h
+$(lwlibdir)/liblw.a: $(config_h) globals.h.stamp lisp.h
 	$(MAKE) -C $(dir $@) $(notdir $@)
 $(oldXMenudir)/libXMenu11.a:
 	$(MAKE) -C $(dir $@) $(notdir $@)
