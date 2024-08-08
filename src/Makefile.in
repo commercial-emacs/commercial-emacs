@@ -357,7 +357,6 @@ HAVE_BE_APP = @HAVE_BE_APP@
 DO_CODESIGN=$(patsubst aarch64-apple-darwin%,yes,@configuration@)
 
 -include ${top_builddir}/src/verbose.mk
--include ${top_builddir}/src/compile.mk
 
 # Flags that might be in WARN_CFLAGS but are not valid for Objective C.
 NON_OBJC_CFLAGS = -Wignored-attributes -Wignored-qualifiers -Wopenmp-simd \

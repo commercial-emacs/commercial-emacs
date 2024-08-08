@@ -31,9 +31,21 @@ XARGS_LIMIT = @XARGS_LIMIT@
 HAVE_NATIVE_COMP = @HAVE_NATIVE_COMP@
 
 -include ${top_builddir}/src/verbose.mk
--include ${top_builddir}/src/compile.mk
 
 FIND_DELETE = @FIND_DELETE@
+
+COMPILER_EL = \
+    emacs-lisp/macroexp.el \
+    emacs-lisp/cconv.el    \
+    emacs-lisp/byte-opt.el \
+    emacs-lisp/bytecomp.el
+
+ifeq ($(HAVE_NATIVE_COMP),yes)
+COMPILER_EL += \
+    emacs-lisp/comp-common.el \
+    emacs-lisp/comp-cstr.el \
+    emacs-lisp/comp.el
+endif
 
 EMACS = ../src/emacs${EXEEXT}
 
@@ -153,13 +165,14 @@ define native-compile
 	$(AM_V_at)mv -f $(@D)/mv_$(@F) $@
 endef
 
+%.elc: %.el $(COMPILER_EL:.el=.elc)
+	$(call byte-compile)
+$(COMPILER_EL:.el=.elc): %.elc : %.el $(top_srcdir)/src/lread.c
+	$(call byte-compile)
+
 # Cannot dep on $(COMPILER_EL:.el=.eln), else rug pulled from pdmp
 %.eln: %.el
 	$(call native-compile)
-
-# Not depending on $(COMPILER_EL:.el=.elc) to mirror eln rule
-%.elc: %.el
-	$(call byte-compile)
 
 # grep is the wrong way of doing this (hack-local-variables better).
 define compile-rest
