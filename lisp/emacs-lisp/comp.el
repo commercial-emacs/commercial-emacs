@@ -129,7 +129,7 @@ Emacs Lisp file:
 
 (defvar comp-trampoline-dir
   (cond ((and init-file-user user-init-file) ;live
-         (expand-file-name (substring emacs-repository-version 0 7)
+         (expand-file-name comp-abi-hash
                            (expand-file-name "trampolines/" user-emacs-directory)))
         (installation-directory ;within repo
          (expand-file-name "lisp/trampolines" installation-directory))
