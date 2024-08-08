@@ -40,6 +40,7 @@
 (defvar comp-installed-trampolines-h)
 (defvar comp-subr-arities-h)
 (defvar native-comp-disable-subr-trampolines)
+(defvar comp-abi-hash)
 
 (declare-function comp--install-trampoline "comp.c")
 (declare-function comp--compile-ctxt-to-file0 "comp.c")
