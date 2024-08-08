@@ -582,7 +582,7 @@ ALLLIBS = $(LIBS) $(W32_LIBS) $(LIBS_GNUSTEP) $(PGTK_LIBS) $(LIBX_BASE) $(LIBIMA
 	$(MAKE) -C ../admin/unidata ../$@
 
 emacs$(EXEEXT): $(LIBXMENU) $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(EMACSRES) \
-  ../admin/globals.h.stamp \
+  globals.h \
   ../admin/charsets/charsets.stamp \
   ../lisp/international/charscript.el \
   ../lisp/international/emoji-zwj.el \
@@ -629,6 +629,8 @@ GLOBAL_SOURCES = $(base_obj:.o=.c) $(NS_OBJC_OBJ:.o=.m)
 	$(AM_V_GLOBALS)$< -d $(srcdir) -g $(doc_obj) > $@
 	$(AM_V_at)if ! diff -q $@ globals.h ; then cp -pf $@ globals.h ; fi
 
+globals.h: ../admin/globals.h.stamp; @true
+
 $(ALLOBJS): globals.h
 
 LIBEGNU_ARCHIVE = $(lib)/lib$(if $(HYBRID_MALLOC),e)gnu.a
@@ -643,7 +645,7 @@ $(LIBEGNU_ARCHIVE): $(config_h)
 
 ## The following oldxmenu-related rules are only (possibly) used if
 ## HAVE_X11 && !USE_GTK, but there is no harm in always defining them.
-$(lwlibdir)/liblw.a: $(config_h) ../admin/globals.h.stamp lisp.h
+$(lwlibdir)/liblw.a: $(config_h) globals.h lisp.h
 	$(MAKE) -C $(dir $@) $(notdir $@)
 $(oldXMenudir)/libXMenu11.a:
 	$(MAKE) -C $(dir $@) $(notdir $@)
