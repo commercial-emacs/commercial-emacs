@@ -1103,7 +1103,7 @@ archive.
 \\{archive-mode-map}
 
 (fn &optional FORCE)")
-(register-definition-prefixes "arc-mode" '("arc"))
+(register-definition-prefixes "arc-mode" '("arc" "tar-archive-from-tar"))
 
 
 ;;; Generated autoloads from array.el
@@ -1872,6 +1872,10 @@ Major mode for editing BibTeX style files.
 ;;; Generated autoloads from bind-key.el
 
 (push (purify-if-dumping '(bind-key 2 4 1)) package--builtin-versions)
+(defvar personal-keybindings nil "\
+List of bindings performed by `bind-key'.
+
+Elements have the form ((KEY . [MAP]) CMD ORIGINAL-CMD)")
 (autoload 'bind-key "bind-key" "\
 Bind KEY-NAME to COMMAND in KEYMAP (`global-map' if not passed).
 
@@ -2836,7 +2840,7 @@ Optional argument ARG is passed as second argument ARG to
 and corresponding effects.
 
 (fn &optional ARG)")
-(register-definition-prefixes "bytecomp" '("batch-byte-compile-file" "byte" "displaying-byte-compile-warnings" "emacs-lisp-" "no-byte-compile"))
+(register-definition-prefixes "bytecomp" '("batch-byte-compile-file" "byte" "compilation-safety" "displaying-byte-compile-warnings" "emacs-lisp-" "no-byte-compile" "with-temp-trampoline-dir"))
 
 
 ;;; Generated autoloads from calendar/cal-bahai.el
@@ -4640,14 +4644,14 @@ With prefix arg ECHO, echo output in process buffer.
 
 If NO-DISPLAY is non-nil, do not show the output buffer.
 
-(fn COMMAND OUTPUT-BUFFER ECHO &optional NO-DISPLAY)" t)
+(fn COMMAND OUTPUT-BUFFER ECHO &optional NO-DISPLAY)" '(comint-mode))
 (autoload 'comint-redirect-send-command-to-process "comint" "\
 Send COMMAND to PROCESS, with output to OUTPUT-BUFFER.
 With prefix arg, echo output in process buffer.
 
 If NO-DISPLAY is non-nil, do not show the output buffer.
 
-(fn COMMAND OUTPUT-BUFFER PROCESS ECHO &optional NO-DISPLAY)" t)
+(fn COMMAND OUTPUT-BUFFER PROCESS ECHO &optional NO-DISPLAY)" '(comint-mode))
 (autoload 'comint-redirect-results-list "comint" "\
 Send COMMAND to current process.
 Return a list of expressions in the output which match REGEXP.
@@ -4666,23 +4670,10 @@ REGEXP-GROUP is the regular expression group in REGEXP to use.
 ;;; Generated autoloads from emacs-lisp/comp.el
 
 (put 'no-native-compile 'safe-local-variable 'booleanp)
-(autoload 'comp-next-gccjit-name "comp" "\
-Return string suitable for gcc_jit_context_new_function.
-
-(fn SYM)")
-(autoload 'comp-trampoline-search "comp" "\
-Return trampoline file for SUBR-NAME.
-
-(fn SUBR-NAME)")
-(autoload 'comp-trampoline-compile "comp" "\
-Synthesize, compile, and return a trampoline for SUBR-NAME.
-
-(fn SUBR-NAME)")
 (autoload 'native-compile "comp" "\
-Synchronous entry into native compilation.
-FUNCTION-OR-FILE is a function symbol, form, or file name.  OUTPUT is the
-optional file name for the compiled object.  Returns FUNCTION-OR-FILE if
-a file name, else the compiled object.
+Compile FUNCTION-OR-FILE into native code.
+If a function, immediately load the native code.
+If a file, write native code to OUTPUT.
 
 (fn FUNCTION-OR-FILE &optional OUTPUT)")
 (autoload 'batch-native-compile "comp" "\
@@ -4691,6 +4682,10 @@ Equivalent of `batch-byte-compile' for native compilation.  Returns list
 of file names not excluded by `native-comp-bootstrap-deny-list'.
 
 (fn &optional UNUSED)")
+(autoload 'comp-subr-trampoline-install "comp" "\
+Make SUBR-NAME effectively advice-able when called from native code.
+
+(fn SUBR-NAME)")
 (register-definition-prefixes "comp" '("comp-" "native-comp" "no-native-compile"))
 
 
@@ -4699,11 +4694,10 @@ of file names not excluded by `native-comp-bootstrap-deny-list'.
 (autoload 'comp-function-type-spec "comp-common" "\
 Return the type specifier of FUNCTION.
 
-This function returns a cons cell whose car is the function
-specifier, and cdr is a symbol, either `inferred' or `know'.
-If the symbol is `inferred', the type specifier is automatically
-inferred from the code itself by the native compiler; if it is
-`know', the type specifier comes from `comp-known-type-specifiers'.
+This function returns a cons cell whose car is the function specifier,
+and cdr is a symbol type specifier, either ='inferred (by the native
+compiler) or ='declared (by the function type itself or is one of
+`comp-primitive-type-specifiers')
 
 (fn FUNCTION)")
 (register-definition-prefixes "comp-common" '("comp-" "native-comp-"))
@@ -4712,15 +4706,6 @@ inferred from the code itself by the native compiler; if it is
 ;;; Generated autoloads from emacs-lisp/comp-cstr.el
 
 (register-definition-prefixes "comp-cstr" '("comp-" "with-comp-cstr-accessors"))
-
-
-;;; Generated autoloads from emacs-lisp/comp-run.el
-
-(autoload 'comp-subr-trampoline-install "comp-run" "\
-Make SUBR-NAME effectively advice-able when called from native code.
-
-(fn SUBR-NAME)")
-(register-definition-prefixes "comp-run" '("comp-warn-primitives"))
 
 
 ;;; Generated autoloads from vc/compare-w.el
@@ -4929,8 +4914,6 @@ evaluate `compilation-shell-minor-mode'.
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
 
-\\{compilation-shell-minor-mode-map}
-
 (fn &optional ARG)" t)
 (autoload 'compilation-minor-mode "compile" "\
 Toggle Compilation minor mode.
@@ -4952,8 +4935,6 @@ evaluate `compilation-minor-mode'.
 
 The mode's hook is called both when the mode is enabled and when it is
 disabled.
-
-\\{compilation-minor-mode-map}
 
 (fn &optional ARG)" t)
 (autoload 'compilation-next-error-function "compile" "\
@@ -5020,11 +5001,12 @@ Show in-buffer completion suggestions in a preview as you type.
 
 This mode automatically shows and updates the completion preview
 according to the text around point.
-\\<completion-preview-active-mode-map>When the preview is visible, \\[completion-preview-insert]
-accepts the completion suggestion,
+\\<completion-preview-active-mode-map>When the preview is visible, \\[completion-preview-insert] accepts the
+completion suggestion, \\[completion-preview-complete] completes up to
+the longest common prefix of all completion candidates,
 \\[completion-preview-next-candidate] cycles forward to the next
-completion suggestion, and \\[completion-preview-prev-candidate]
-cycles backward.
+completion suggestion, and \\[completion-preview-prev-candidate] cycles
+backward.
 
 This is a minor mode.  If called interactively, toggle the
 `Completion-Preview mode' mode.  If the prefix argument is positive,
@@ -5041,48 +5023,6 @@ The mode's hook is called both when the mode is enabled and when it is
 disabled.
 
 (fn &optional ARG)" t)
-(put 'global-completion-preview-mode 'globalized-minor-mode t)
-(defvar global-completion-preview-mode nil "\
-Non-nil if Global Completion-Preview mode is enabled.
-See the `global-completion-preview-mode' command
-for a description of this minor mode.
-Setting this variable directly does not take effect;
-either customize it (see the info node `Easy Customization')
-or call the function `global-completion-preview-mode'.")
-(custom-autoload 'global-completion-preview-mode "completion-preview" nil)
-(autoload 'global-completion-preview-mode "completion-preview" "\
-Toggle Completion-Preview mode in all buffers.
-With prefix ARG, enable Global Completion-Preview mode if ARG is
-positive; otherwise, disable it.
-
-If called from Lisp, toggle the mode if ARG is `toggle'.
-Enable the mode if ARG is nil, omitted, or is a positive number.
-Disable the mode if ARG is a negative number.
-
-Completion-Preview mode is enabled in all buffers where
-`completion-preview-mode' would do it.
-
-See `completion-preview-mode' for more information on
-Completion-Preview mode.
-
-`global-completion-preview-modes' is used to control which modes this
-minor mode is used in.
-
-(fn &optional ARG)" t)
-(defvar global-completion-preview-modes '((not minibuffer-mode special-mode) t) "\
-Which major modes `completion-preview-mode' is switched on in.
-This variable can be either t (all major modes), nil (no major modes),
-or a list of modes and (not modes) to switch use this minor mode or
-not.  For instance
-
-  (c-mode (not message-mode mail-mode) text-mode)
-
-means \"use this mode in all modes derived from `c-mode', don't use in
-modes derived from `message-mode' or `mail-mode', but do use in other
-modes derived from `text-mode'\".  An element with value t means \"use\"
-and nil means \"don't use\".  There's an implicit nil at the end of the
-list.")
-(custom-autoload 'global-completion-preview-modes "completion-preview" t)
 (register-definition-prefixes "completion-preview" '("completion-preview-"))
 
 
@@ -7332,7 +7272,7 @@ from `default-directory'.
 (autoload 'disassemble "disass" "\
 Print disassembled code for OBJECT in (optional) BUFFER.
 OBJECT can be a symbol defined as a function, or a function itself
-(a lambda expression or a compiled-function object).
+(a lambda expression or a byte-code-function object).
 If OBJECT is not already compiled, we compile it, but do not
 redefine OBJECT if it is a symbol.
 
@@ -8942,7 +8882,7 @@ SUPERCLASSES as children.
 It creates an autoload function for CNAME's constructor.
 
 (fn CNAME SUPERCLASSES FILENAME DOC)")
-(register-definition-prefixes "eieio-core" '("class-" "eieio-" "inconsistent-class-hierarchy" "invalid-slot-" "unbound-slot"))
+(register-definition-prefixes "eieio-core" '("cl--generic-struct-tag" "class-" "eieio-" "inconsistent-class-hierarchy" "invalid-slot-" "unbound-slot"))
 
 
 ;;; Generated autoloads from emacs-lisp/eieio-custom.el
@@ -9779,6 +9719,10 @@ Look at CONFIG and try to expand GROUP.
 ;;; Generated autoloads from erc/erc.el
 
 (push (purify-if-dumping '(erc 5 6 -4)) package--builtin-versions)
+(dolist (symbol '( erc-sasl erc-spelling ; 29
+                  erc-imenu erc-nicks)) ; 30
+ (custom-add-load symbol symbol))
+(custom-autoload 'erc-modules "erc")
 (autoload 'erc-select-read-args "erc" "\
 Prompt for connection parameters and return them in a plist.
 By default, collect `:server', `:port', `:nickname', and
@@ -11337,9 +11281,10 @@ this are the `default' and `header-line' faces: they will both be
 scaled even if they have an explicit `:height' setting.
 
 See also the related command `global-text-scale-adjust'.  Unlike
-that command, which scales the font size with a increment,
-`text-scale-adjust' scales the font size with a factor,
-`text-scale-mode-step'.  With a small `text-scale-mode-step'
+that command, which scales the font size with a increment (and can
+also optionally resize frames to keep the same number of lines and
+characters per line), `text-scale-adjust' scales the font size with
+a factor, `text-scale-mode-step'.  With a small `text-scale-mode-step'
 factor, the two commands behave similarly.
 
 (fn INC)" t)
@@ -18559,6 +18504,9 @@ The symbol's function definition becomes the keyboard macro string.
 Such a \"function\" cannot be called from Lisp, but it is a valid editor command.
 
 (fn SYMBOL)" t)
+(defalias 'kmacro-menu #'list-keyboard-macros)
+(autoload 'list-keyboard-macros "kmacro" "\
+List the keyboard macros." t)
 (register-definition-prefixes "kmacro" '("kmacro-"))
 
 
@@ -18701,11 +18649,6 @@ A major mode to edit GNU ld script files.
 ;;; Generated autoloads from net/ldap.el
 
 (register-definition-prefixes "ldap" '("ldap-"))
-
-
-;;; Generated autoloads from gnus/legacy-gnus-agent.el
-
-(register-definition-prefixes "legacy-gnus-agent" '("gnus-agent-"))
 
 
 ;;; Generated autoloads from textmodes/less-css-mode.el
@@ -21324,6 +21267,11 @@ Start newsticker treeview." t)
 (register-definition-prefixes "nnagent" '("nnagent-"))
 
 
+;;; Generated autoloads from gnus/nnatom.el
+
+(register-definition-prefixes "nnatom" '("nnatom-"))
+
+
 ;;; Generated autoloads from gnus/nnbabyl.el
 
 (register-definition-prefixes "nnbabyl" '("nnbabyl-"))
@@ -21364,6 +21312,11 @@ symbol in the alist.
 ;;; Generated autoloads from gnus/nneething.el
 
 (register-definition-prefixes "nneething" '("nneething-"))
+
+
+;;; Generated autoloads from gnus/nnfeed.el
+
+(register-definition-prefixes "nnfeed" '("nnfeed-"))
 
 
 ;;; Generated autoloads from gnus/nnfolder.el
@@ -22964,7 +22917,13 @@ with \"-q\").
 
 Even if the value is nil, you can type \\[package-initialize] to
 make installed packages available at any time, or you can
-call (package-activate-all) in your init-file.")
+call (package-activate-all) in your init-file.
+
+Note that this variable must be set to a non-default value in
+your early-init file, as the variable's value is used before
+loading the regular init file.  Therefore, if you customize it
+via Customize, you should save your customized setting into
+your `early-init-file'.")
 (custom-autoload 'package-enable-at-startup "package" t)
 (defcustom package-user-dir (locate-user-emacs-file "elpa") "\
 Directory containing the user's Emacs Lisp packages.
@@ -22981,28 +22940,20 @@ contrast, `package-user-dir' contains packages for personal use." :type '(repeat
 (custom-autoload 'package-directory-list "package" t)
 (defvar package-activated-list nil "\
 List of the names of currently activated packages.")
+(autoload 'package-native-compile "package" "\
+
+
+(fn PKG-DESC)" t)
 (defvar package--activated nil "\
 Non-nil if `package-activate-all' has been run.")
 (autoload 'package-initialize "package" "\
-Load Emacs Lisp packages, and activate them.
-The variable `package-load-list' controls which packages to load.
-If optional arg NO-ACTIVATE is non-nil, don't activate packages.
-
-It is not necessary to adjust `load-path' or `require' the
-individual packages after calling `package-initialize' -- this is
-taken care of by `package-initialize'.
-
-If `package-initialize' is called twice during Emacs startup,
-signal a warning, since this is a bad idea except in highly
-advanced use cases.  To suppress the warning, remove the
-superfluous call to `package-initialize' from your init-file.  If
-you have code which must run before `package-initialize', put
-that code in the early init-file.
+Load `package-load-list' and unless NO-ACTIVATE, activate them.
+While ostensibly surfaced by autoload, no one knows anymore whether it
+should ever be user invoked.
 
 (fn &optional NO-ACTIVATE)" t)
 (defun package-activate-all nil "\
-Activate all installed packages.
-The variable `package-load-list' controls which packages to load." (setq package--activated t) (let* ((elc (concat package-quickstart-file "c")) (qs (if (file-readable-p elc) elc (if (file-readable-p package-quickstart-file) package-quickstart-file)))) (or (and qs (not (bound-and-true-p package-activated-list)) (with-demoted-errors "Error during quickstart: %S" (let ((load-source-file-function nil)) (unless (boundp 'package-activated-list) (setq package-activated-list nil)) (load qs nil 'nomessage) t))) (progn (require 'package) (with-no-warnings (package--activate-all))))))
+Activate installed packages." (setq package--activated t) (require 'package) (with-no-warnings (package--activate-all)))
 (autoload 'package-import-keyring "package" "\
 Import keys from FILE.
 
@@ -23128,9 +23079,6 @@ The return value is a string (or nil in case we can't find it).
 It works in more cases if the call is in the file which contains
 the `Version:' header.")
 (function-put 'package-get-version 'pure 't)
-(defcustom package-quickstart-file (locate-user-emacs-file "package-quickstart.el") "\
-Location of the file used to speed up activation of packages at startup." :type 'file :group 'applications :initialize #'custom-initialize-delay :version "27.1")
-(custom-autoload 'package-quickstart-file "package" t)
 (autoload 'package-report-bug "package" "\
 Prepare a message to send to the maintainers of a package.
 DESC must be a `package-desc' object.
@@ -24930,8 +24878,8 @@ Otherwise, `default-directory' is temporarily set to the current
 project's root.
 
 If OVERRIDING-MAP is non-nil, it will be used as
-`overriding-local-map' to provide shorter bindings from that map
-which will take priority over the global ones.
+`overriding-terminal-local-map' to provide shorter bindings
+from that map which will take priority over the global ones.
 
 (fn &optional OVERRIDING-MAP PROMPT-FORMAT)" t)
 (autoload 'project-prefix-or-any-command "project" "\
@@ -26024,6 +25972,7 @@ usually more efficient than that of a simplified version:
              (cdr parens))))
 
 (fn STRINGS &optional PAREN)")
+(function-put 'regexp-opt 'function-type '(function (list &optional t) string))
 (function-put 'regexp-opt 'pure 't)
 (function-put 'regexp-opt 'side-effect-free 't)
 (autoload 'regexp-opt-depth "regexp-opt" "\
@@ -30858,6 +30807,9 @@ such as if there are no commands in the file, the value of `tex-default-mode'
 says which mode to use.
 
 (fn)" t)
+ (add-to-list 'major-mode-remap-defaults '(TeX-mode . tex-mode))
+ (add-to-list 'major-mode-remap-defaults '(plain-TeX-mode . plain-tex-mode))
+ (add-to-list 'major-mode-remap-defaults '(LaTeX-mode . latex-mode))
  (defalias 'TeX-mode #'tex-mode)
  (defalias 'plain-TeX-mode #'plain-tex-mode)
  (defalias 'LaTeX-mode #'latex-mode)
@@ -31259,7 +31211,7 @@ If IGNORE-COMMENT-OR-STRING is non-nil comments and strings are
 treated as white space.
 
 (fn &optional IGNORE-COMMENT-OR-STRING)")
-(register-definition-prefixes "thingatpt" '("beginning-of-thing" "define-thing-chars" "end-of-thing" "filename" "form-at-point" "in-string-p" "sentence-at-point" "thing-at-point-" "word-at-point"))
+(register-definition-prefixes "thingatpt" '("beginning-of-thing" "bounds-of-thing-at-point-" "define-thing-chars" "end-of-thing" "filename" "for" "in-string-p" "sentence-at-point" "thing-at-point-" "word-at-point"))
 
 
 ;;; Generated autoloads from thread.el
@@ -31984,6 +31936,12 @@ the output buffer or changing the window configuration.
 (register-definition-prefixes "trace" '("inhibit-trace" "trace-" "untrace-"))
 
 
+;;; Generated autoloads from emacs-lisp/track-changes.el
+
+(push (purify-if-dumping '(track-changes 1 1)) package--builtin-versions)
+(register-definition-prefixes "track-changes" '("track-changes-" "with--track-changes"))
+
+
 ;;; Generated autoloads from net/tramp.el
 
  (when (featurep 'tramp-compat)
@@ -32148,49 +32106,7 @@ Add archive file name handler to `file-name-handler-alist'." (when (and tramp-ar
 
 ;;; Generated autoloads from transient.el
 
-(push (purify-if-dumping '(transient 0 5 2)) package--builtin-versions)
-(autoload 'transient-define-prefix "transient" "\
-Define NAME as a transient prefix command.
-
-ARGLIST are the arguments that command takes.
-DOCSTRING is the documentation string and is optional.
-
-These arguments can optionally be followed by key-value pairs.
-Each key has to be a keyword symbol, either `:class' or a keyword
-argument supported by the constructor of that class.  The
-`transient-prefix' class is used if the class is not specified
-explicitly.
-
-GROUPs add key bindings for infix and suffix commands and specify
-how these bindings are presented in the popup buffer.  At least
-one GROUP has to be specified.  See info node `(transient)Binding
-Suffix and Infix Commands'.
-
-The BODY is optional.  If it is omitted, then ARGLIST is also
-ignored and the function definition becomes:
-
-  (lambda ()
-    (interactive)
-    (transient-setup \\='NAME))
-
-If BODY is specified, then it must begin with an `interactive'
-form that matches ARGLIST, and it must call `transient-setup'.
-It may however call that function only when some condition is
-satisfied; that is one of the reason why you might want to use
-an explicit BODY.
-
-All transients have a (possibly nil) value, which is exported
-when suffix commands are called, so that they can consume that
-value.  For some transients it might be necessary to have a sort
-of secondary value, called a scope.  Such a scope would usually
-be set in the commands `interactive' form and has to be passed
-to the setup function:
-
-  (transient-setup \\='NAME nil nil :scope SCOPE)
-
-(fn NAME ARGLIST [DOCSTRING] [KEYWORD VALUE]... GROUP... [BODY...])" nil t)
-(function-put 'transient-define-prefix 'lisp-indent-function 'defun)
-(function-put 'transient-define-prefix 'doc-string-elt 3)
+(push (purify-if-dumping '(transient 0 6 0)) package--builtin-versions)
 (autoload 'transient-insert-suffix "transient" "\
 Insert a SUFFIX into PREFIX before LOC.
 PREFIX is a prefix command, a symbol.
@@ -33175,29 +33091,6 @@ Return the nondirectory part of FILE, for a URL.
 
 
 (fn QUERY &optional DOWNCASE ALLOW-NEWLINES)")
-(autoload 'url-build-query-string "url-util" "\
-Build a query-string.
-
-Given a QUERY in the form:
- ((key1 val1)
-  (key2 val2)
-  (key3 val1 val2)
-  (key4)
-  (key5 \"\"))
-
-(This is the same format as produced by `url-parse-query-string')
-
-This will return a string
-\"key1=val1&key2=val2&key3=val1&key3=val2&key4&key5\".  Keys may
-be strings or symbols; if they are symbols, the symbol name will
-be used.
-
-When SEMICOLONS is given, the separator will be \";\".
-
-When KEEP-EMPTY is given, empty values will show as \"key=\"
-instead of just \"key\" as in the example above.
-
-(fn QUERY &optional SEMICOLONS KEEP-EMPTY)")
 (autoload 'url-unhex-string "url-util" "\
 Decode %XX sequences in a percent-encoded URL.
 If optional second argument ALLOW-NEWLINES is non-nil, then allow the
@@ -33230,6 +33123,29 @@ normalization, if URL is already URI-encoded, this function
 should return it unchanged.
 
 (fn URL)")
+(autoload 'url-build-query-string "url-util" "\
+Build a query-string.
+
+Given a QUERY in the form:
+ ((key1 val1)
+  (key2 val2)
+  (key3 val1 val2)
+  (key4)
+  (key5 \"\"))
+
+(This is the same format as produced by `url-parse-query-string')
+
+This will return a string
+\"key1=val1&key2=val2&key3=val1&key3=val2&key4&key5\".  Keys may
+be strings or symbols; if they are symbols, the symbol name will
+be used.
+
+When SEMICOLONS is given, the separator will be \";\".
+
+When KEEP-EMPTY is given, empty values will show as \"key=\"
+instead of just \"key\" as in the example above.
+
+(fn QUERY &optional SEMICOLONS KEEP-EMPTY)")
 (autoload 'url-file-extension "url-util" "\
 Return the filename extension of FNAME.
 If optional argument X is t, then return the basename
@@ -33968,6 +33884,7 @@ Request editing the next VC shell command before execution.
 This is a prefix command.  It affects only a VC command executed
 immediately after this one." t)
  (put 'vc-prepare-patches-separately 'safe-local-variable 'booleanp)
+ (put 'vc-default-patch-addressee 'safe-local-variable 'stringp)
 (autoload 'vc-prepare-patch "vc" "\
 Compose an Email sending patches for REVISIONS to ADDRESSEE.
 If `vc-prepare-patches-separately' is nil, use SUBJECT as the
@@ -34265,7 +34182,7 @@ Key bindings:
 
 ;;; Generated autoloads from progmodes/verilog-mode.el
 
-(push (purify-if-dumping '(verilog-mode 2023 6 6 141322628)) package--builtin-versions)
+(push (purify-if-dumping '(verilog-mode 2024 3 1 121933719)) package--builtin-versions)
 (autoload 'verilog-mode "verilog-mode" "\
 Major mode for editing Verilog code.
 \\<verilog-mode-map>
@@ -36438,15 +36355,6 @@ output of this command when the backend is etags.
  (define-key esc-map [?\C-.] #'xref-find-apropos)
  (define-key ctl-x-4-map "." #'xref-find-definitions-other-window)
  (define-key ctl-x-5-map "." #'xref-find-definitions-other-frame)
-(autoload 'xref-references-in-directory "xref" "\
-Find all references to SYMBOL in directory DIR.
-Return a list of xref values.
-
-This function uses the Semantic Symbol Reference API, see
-`semantic-symref-tool-alist' for details on which tools are used,
-and when.
-
-(fn SYMBOL DIR)")
 (autoload 'xref-matches-in-directory "xref" "\
 Find all matches for REGEXP in directory DIR.
 Return a list of xref values.
@@ -36582,11 +36490,6 @@ run a specific program.  The program must be a member of
 
 (fn &optional PGM)" t)
 (register-definition-prefixes "zone" '("zone-"))
-
-;;; Generated autoloads from progmodes/peg.el
-
-(push (purecopy '(peg 1 0 1)) package--builtin-versions)
-(register-definition-prefixes "peg" '("bob" "bol" "bos" "bow" "define-peg-rule" "eob" "eol" "eos" "eow" "fail" "null" "peg" "with-peg-rules"))
 
 ;;; End of scraped data
 
