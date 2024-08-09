@@ -743,22 +743,18 @@ instead of just updating them with the new/changed autoloads."
     (insert ")")))
 
 (defun loaddefs-generate--excluded-files ()
-  ;; Exclude those files that are preloaded on ALL platforms.
-  ;; These are the ones in loadup.el where "(load" is at the start
-  ;; of the line (crude, but it works).
-  (let ((default-directory (file-name-directory lisp-directory))
-        (excludes nil)
-	file)
+  (mapcar
+   (lambda (s) (expand-file-name (file-name-with-extension s ".el")
+			         lisp-directory))
+   (split-string
     (with-temp-buffer
-      (insert-file-contents "../admin/pdump-common.el")
-      (while (re-search-forward "^(load \"\\([^\"]+\\)\"" nil t)
-	(setq file (match-string 1))
-	(or (string-match "\\.el\\'" file)
-	    (setq file (format "%s.el" file)))
-	(or (string-match "\\`site-" file)
-	    (push (expand-file-name file) excludes))))
-    ;; Don't scan ldefs-boot.el, either.
-    (cons (expand-file-name "ldefs-boot.el") excludes)))
+      (let ((default-directory lisp-directory))
+        (call-process (expand-file-name invocation-name invocation-directory)
+                      nil t nil "-Q" "--batch"
+                      "--eval" "(setq untouched load-history)"
+	              "-l" "../admin/relative-lisp-files"
+                      "--eval" "(relative-lisp-files nil untouched)"))
+      (buffer-string)))))
 
 ;;;###autoload
 (defun loaddefs-generate-batch ()

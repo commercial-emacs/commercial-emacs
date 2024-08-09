@@ -116,8 +116,8 @@ autoloads: ./loaddefs.el
 	$(emacs) $(COMPILE_FLAGS) -f batch-byte-compile \
 	  ../lisp/emacs-lisp/loaddefs-gen.el
 	$(AM_V_GEN)$(emacs) \
-            -l ./emacs-lisp/loaddefs-gen \
-	    -f loaddefs-generate--emacs-batch ${SUBDIRS_ALMOST}
+	  -l ./emacs-lisp/loaddefs-gen \
+	  -f loaddefs-generate--emacs-batch ${SUBDIRS_ALMOST}
 
 # Overwrought load-path augmentation dates back to 1994.
 ./subdirs.el:

@@ -496,13 +496,13 @@ bootstrap-emacs$(EXEEXT): | emacs$(EXEEXT)
 
 define pdump
 	$(AM_V_at)rm -f $(1)
-	LC_ALL=C ../src/$(1:.pdmp=)$(EXEEXT) --batch $(BUILD_DETAILS) \
+	LC_ALL=C ../src/$(1:.pdmp=)$(EXEEXT) -Q --batch $(BUILD_DETAILS) \
 	  -l ../admin/$(1:emacs.pdmp=pdump) --pdump-write=$(1)
 endef
 
 define relative-lisp-files
 	[ -s "../src/$(basename $(1)).pdmp" ] && \
-	   ../src/$(1) --batch \
+	   ../src/$(1) -Q --batch \
 	   --eval "(setq untouched load-history)" \
 	   -l ../admin/relative-lisp-files \
 	   --eval "(relative-lisp-files $(2) untouched)"
