@@ -750,7 +750,7 @@ instead of just updating them with the new/changed autoloads."
         (excludes nil)
 	file)
     (with-temp-buffer
-      (insert-file-contents "../admin/bootstrap-pdump.el")
+      (insert-file-contents "../admin/pdump-common.el")
       (while (re-search-forward "^(load \"\\([^\"]+\\)\"" nil t)
 	(setq file (match-string 1))
 	(or (string-match "\\.el\\'" file)
