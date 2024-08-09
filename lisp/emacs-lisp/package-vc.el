@@ -598,8 +598,6 @@ documentation and marking the package as installed."
         (package--save-selected-packages
          (cons name package-selected-packages))))
 
-    (package--quickstart-maybe-refresh)
-
     ;; Confirm that the installation was successful
     (let ((main-file (package-vc--main-file pkg-desc)))
       (message "VC package `%s' installed (Version %s, Revision %S).%s"
