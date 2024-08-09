@@ -1119,6 +1119,7 @@ untar into a directory named DIR; otherwise, signal an error."
 (defvar warning-minimum-level)
 (defvar byte-compile-ignore-files)
 
+;;;###autoload
 (defun package-native-compile (pkg-desc)
   (interactive
    (let* ((user-dir (expand-file-name package-user-dir))
@@ -1161,7 +1162,8 @@ Assumes PKG-DESC already activated by `package-activate-1'."
         (warning-minimum-level :error)
         (load-path load-path))
     (byte-recompile-directory (package-desc-dir pkg-desc) 0 t)
-    (package-native-compile pkg-desc)))
+    ;(package-native-compile pkg-desc)
+	))
 
 ;;;; Inferring package from current buffer
 (defun package-read-from-string (str)
