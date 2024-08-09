@@ -3308,29 +3308,6 @@ If a file, write native code to OUTPUT."
       (process--sigaction-child)
       (ignore-errors (delete-file (comp-ctxt-output comp-ctxt))))))
 
-(defun native-compile-async (infile outfile)
-  (let ((name (concat "compile/" (file-name-nondirectory infile))))
-    (make-process
-     :name name
-     :buffer (with-current-buffer
-                 (get-buffer-create (format " *%s*" name))
-               (unless (derived-mode-p 'compilation-mode)
-                 (emacs-lisp-compilation-mode))
-               (current-buffer))
-     :command `(,(expand-file-name invocation-name invocation-directory)
-                "-Q" "--batch"
-                ,@(cl-mapcan
-                   (lambda (expr) (list "--eval" expr))
-                   (list
-	            "(setq w32-disable-abort-dialog t)"
-	            (format "(native-compile %s %s)" infile outfile))))
-     :sentinel (lambda (process _event)
-                 (when (and (memq (process-status process) '(exit signal))
-                            (zerop (process-exit-status process))
-                            (file-exists-p outfile))
-                   (native--load outfile)))
-     :noquery t)))
-
 ;;;###autoload
 (defun batch-native-compile (&optional _unused)
   "Compile remaining command-line arguments.

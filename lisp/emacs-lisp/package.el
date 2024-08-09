@@ -1118,14 +1118,50 @@ untar into a directory named DIR; otherwise, signal an error."
 ;;;; Compilation
 (defvar warning-minimum-level)
 (defvar byte-compile-ignore-files)
+
+(defun package-native-compile (pkg-desc)
+  (interactive
+   (let* ((user-dir (expand-file-name package-user-dir))
+          (name-descs
+           (cl-remove-if-not
+            (lambda (name-desc)
+              (string-prefix-p user-dir (expand-file-name
+                                         (package-desc-dir
+                                          (cdr name-desc)))))
+            (mapcar (lambda (sym-descs)
+	              (cl-destructuring-bind (sym desc . descs)
+	                  sym-descs
+	                (cons (symbol-name sym) desc)))
+	            (package--alist)))))
+     (list (assoc-default (completing-read "Native compile package: "
+                                           (mapcar #'car name-descs)
+                                           nil :must-match)
+                          name-descs))))
+  (with-current-buffer (get-buffer-create byte-compile-log-buffer)
+    (unless (derived-mode-p 'compilation-mode)
+      (emacs-lisp-compilation-mode))
+    (displaying-byte-compile-warnings
+     (dolist (path (directory-files (package-desc-dir pkg-desc) t))
+       (when (and (string-match-p emacs-lisp-file-regexp path)
+                  (file-readable-p path)
+                  ;; exclude lock files
+		  (not (string-match-p "\\`\\.#" (file-name-nondirectory path)))
+                  (not (auto-save-file-name-p path))
+                  (not (member path (dir-locals--all-files
+                                     (package-desc-dir pkg-desc))))
+                  (cl-every (lambda (regexp)
+                              (not (string-match-p regexp path)))
+                            byte-compile-ignore-files))
+         (native-compile path (file-name-with-extension path ".eln")))))))
+
 (defun package--compile (pkg-desc)
   "Byte-compile installed package PKG-DESC.
-This assumes that `pkg-desc' has already been activated with
-`package-activate-1'."
+Assumes PKG-DESC already activated by `package-activate-1'."
   (let ((byte-compile-ignore-files (package--parse-elpaignore pkg-desc))
         (warning-minimum-level :error)
         (load-path load-path))
-    (byte-recompile-directory (package-desc-dir pkg-desc) 0 t)))
+    (byte-recompile-directory (package-desc-dir pkg-desc) 0 t)
+    (package-native-compile pkg-desc)))
 
 ;;;; Inferring package from current buffer
 (defun package-read-from-string (str)

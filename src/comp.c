@@ -4897,7 +4897,6 @@ syms_of_comp (void)
   DEFSYM (Qnative_comp_driver_options, "native-comp-driver-options");
   DEFSYM (Qnative_comp_compiler_options, "native-comp-compiler-options");
   DEFSYM (Qcomp_libgccjit_reproducer, "comp-libgccjit-reproducer");
-  DEFSYM (Qnative_compile_async, "native-compile-async");
   DEFSYM (Qcomp_trampoline_dir, "comp-trampoline-dir");
 
   /* Limple instruction set.  */

@@ -1793,7 +1793,13 @@ It is too wide if it has any lines longer than the largest of
                          ;; Needed e.g. for `advice-tests-nadvice'.
                          (gethash doc byte-compile--docstrings)
                        (byte-compile-output-as-comment doc nil)))
-           (newdoc (cons byte-compile--\#$ byte-pos)))
+           (newdoc (cons
+                    (let ((prefix (expand-file-name "lisp" source-directory))
+                          (elc (expand-file-name byte-compile--\#$)))
+                      (if (string-prefix-p prefix elc)
+                          (cl-subseq elc (length (file-name-as-directory prefix)))
+                        byte-compile--\#$))
+                    byte-pos)))
       (if is-a-value newdoc (macroexp-quote newdoc))))
    (t doc)))
 

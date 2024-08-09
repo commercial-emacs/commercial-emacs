@@ -504,7 +504,7 @@ IFORM if non-nil should be of the form (interactive ...).  */)
   CHECK_LIST (args);
   CHECK_LIST (iform);
   Lisp_Object ifcdr = Fcdr (iform);
-  Lisp_Object slots[] = { args,  body, env, Qnil, docstring,
+  Lisp_Object slots[] = { args, body, env, Qnil, docstring,
 			  NILP (Fcdr (ifcdr))
 			  ? Fcar (ifcdr)
 			  : CALLN (Fvector, XCAR (ifcdr), XCDR (ifcdr)) };
