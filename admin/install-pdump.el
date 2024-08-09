@@ -47,13 +47,14 @@
 (setq load-history (mapcar #'purify-if-dumping load-history))
 
 ;; formerly load--fixup-all-elns
-(maphash
- (lambda (_ cu)
-   (native-comp-unit-set-file cu (replace-regexp-in-string
-                                  (regexp-quote (file-name-as-directory source-directory))
-                                  (file-name-as-directory installed-directory)
-                                  (native-comp-unit-file cu))))
- comp-loaded-comp-units-h)
+(when (featurep 'native-compile)
+  (maphash
+   (lambda (_ cu)
+     (native-comp-unit-set-file cu (replace-regexp-in-string
+                                    (regexp-quote (file-name-as-directory source-directory))
+                                    (file-name-as-directory installed-directory)
+                                    (native-comp-unit-file cu))))
+   comp-loaded-comp-units-h))
 
 (let ((output-path (expand-file-name (pdumping-output) invocation-directory))
       current-load-list)
