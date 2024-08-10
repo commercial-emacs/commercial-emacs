@@ -1103,35 +1103,26 @@ untar into a directory named DIR; otherwise, signal an error."
                                            (mapcar #'car name-descs)
                                            nil :must-match)
                           name-descs))))
-  (with-current-buffer (get-buffer-create byte-compile-log-buffer)
-    (unless (derived-mode-p 'compilation-mode)
-      (emacs-lisp-compilation-mode))
-    (displaying-byte-compile-warnings
-     (dolist (path (directory-files (package-desc-dir pkg-desc) t))
-       (when (and (string-match-p emacs-lisp-file-regexp path)
-                  (file-readable-p path)
-                  ;; exclude lock files
-		  (not (string-match-p "\\`\\.#" (file-name-nondirectory path)))
-                  (not (auto-save-file-name-p path))
-                  (not (member path (dir-locals--all-files
-                                     (package-desc-dir pkg-desc))))
-                  (cl-every (lambda (regexp)
-                              (not (string-match-p regexp path)))
-                            byte-compile-ignore-files))
-         (condition-case err
-             (let ((eln-dir (expand-file-name comp-abi-hash
-                                              (file-name-directory path))))
-               (make-directory eln-dir t)
-               (native-compile path (expand-file-name
-                                     (file-name-with-extension
-                                      (file-name-nondirectory path)
-                                      ".eln")
-                                     eln-dir)))
-           (error (let ((inhibit-read-only t))
-                    (insert "Could not natively compile " path ": "
-                            (error-message-string err)
-                            "\n"))
-                  (compilation-forget-errors))))))))
+  (displaying-byte-compile-warnings
+   (dolist (path (directory-files (package-desc-dir pkg-desc) t))
+     (when (and (string-match-p emacs-lisp-file-regexp path)
+                (file-readable-p path)
+                ;; exclude lock files
+		(not (string-match-p "\\`\\.#" (file-name-nondirectory path)))
+                (not (auto-save-file-name-p path))
+                (not (member path (dir-locals--all-files
+                                   (package-desc-dir pkg-desc))))
+                (cl-every (lambda (regexp)
+                            (not (string-match-p regexp path)))
+                          byte-compile-ignore-files))
+       (let ((eln-dir (expand-file-name comp-abi-hash
+                                        (file-name-directory path))))
+         (make-directory eln-dir t)
+         (native-compile path (expand-file-name
+                               (file-name-with-extension
+                                (file-name-nondirectory path)
+                                ".eln")
+                               eln-dir)))))))
 
 (defun package--compile (pkg-desc)
   "Byte-compile installed package PKG-DESC.
