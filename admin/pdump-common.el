@@ -134,6 +134,7 @@
 (load "epa-hook")
 ;; hereafter can load multilingual text.
 (load "international/mule-cmds")
+(load "international/mule-util")
 (load "case-table")
 (load "international/charprop.el" t)
 (load "international/characters")
@@ -233,7 +234,6 @@
       ;; already produced, because it needs uni-*.el files that might
       ;; not be built early enough during bootstrap.
       (when (featurep 'charprop)
-        (load "international/mule-util")
         (load "international/ucs-normalize")
         (load "term/ns-win"))))
 (if (featurep 'pgtk)
@@ -277,13 +277,13 @@
 ;; Used by `kill-buffer', for instance.
 (load "emacs-lisp/rmc")
 
+(load "rx")
 ;; Load language-specific files.
 (dolist (path load-path)
   (when (equal "language" (file-name-nondirectory path))
     (dolist (el-file (directory-files path nil "\\.el$"))
       (let ((lang (file-name-sans-extension el-file)))
-        (unless (string-match-p "-util\\'" lang)
-          (load (concat "language/" lang)))))))
+        (load (concat "language/" lang))))))
 
 ;; This file doesn't exist when building a development version of Emacs
 ;; from the repository.  It is generated just after temacs is built.
