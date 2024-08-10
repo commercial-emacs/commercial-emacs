@@ -859,39 +859,41 @@ compiling the package."
   "Activate package given by PKG-DESC, even if already activated.
 If DEPS, also activate its dependencies.
 If RELOAD, also `load' any previously loaded package files."
-  (let* ((name (package-desc-name pkg-desc))
-         (pkg-dir (package-desc-dir pkg-desc)))
-    (unless pkg-dir
-      (error "Internal error: unable to find directory for `%s'"
-             (package-desc-full-name pkg-desc)))
-    (catch 'exit
-      ;; Activate its dependencies recursively.
-      ;; FIXME: This doesn't check whether the activated version is the
-      ;; required version.
-      (when deps
-        (dolist (req (package-desc-reqs pkg-desc))
-          (unless (package-activate (car req))
-            (message "Unable to activate package `%s'.\nRequired package `%s-%s' is unavailable"
-                     name (car req) (package-version-join (cadr req)))
-            (throw 'exit nil))))
-      (when reload
-        (package--reload-previously-loaded pkg-desc))
-      (with-demoted-errors "Error loading autoloads: %s"
-        (load (package--autoloads-file-name pkg-desc) nil t))
-      ;; Add info node.
-      (when (file-exists-p (expand-file-name "dir" pkg-dir))
-        ;; FIXME: not the friendliest, but simple.
-        (require 'info)
-        (info-initialize)
-        (add-to-list 'Info-directory-list pkg-dir))
-      (push name package-activated-list)
-      ;; Don't return nil.
-      t)))
+  (prog1 t
+    (let* ((name (package-desc-name pkg-desc))
+           (pkg-dir (package-desc-dir pkg-desc)))
+      (unless pkg-dir
+        (error "Internal error: unable to find directory for `%s'"
+               (package-desc-full-name pkg-desc)))
+      (catch 'exit
+        ;; Activate its dependencies recursively.
+        ;; TODO: Check against required version.
+        (when deps
+          (dolist (req (package-desc-reqs pkg-desc))
+            (unless (package-activate (car req))
+              (message "Unable to activate package `%s'.\nRequired package `%s-%s' is unavailable"
+                       name (car req) (package-version-join (cadr req)))
+              (throw 'exit nil))))
+        (when reload
+          (package--reload-previously-loaded pkg-desc))
+        (with-demoted-errors "Error loading autoloads: %s"
+          (let* ((autoloads (package--autoloads-file-name pkg-desc))
+                 (elc-dir (file-name-directory autoloads))
+                 (eln-dir (expand-file-name comp-abi-hash elc-dir)))
+            ;; Prepend elc, then eln.  Order matters.
+            (dolist (dir (list elc-dir eln-dir))
+              (add-to-list 'load-path (directory-file-name dir)))
+            (load autoloads nil :quiet)))
+        ;; Add info node.
+        (when (file-exists-p (expand-file-name "dir" pkg-dir))
+          (require 'info)
+          (info-initialize)
+          (add-to-list 'Info-directory-list pkg-dir))
+        (push name package-activated-list)))))
 
 ;;;; `package-activate'
 
 (defun package--get-activatable-pkg (pkg-name)
-  ;; Is "activatable" a word?
   (let ((pkg-descs (cdr (assq pkg-name package-alist))))
     ;; Check if PACKAGE is available in `package-alist'.
     (while (and pkg-descs
@@ -1056,13 +1058,13 @@ untar into a directory named DIR; otherwise, signal an error."
          (autoload-timestamps nil)
          (backup-inhibited t)
          (version-control 'never)
+         ;; preserve CODE for backwards-compatiblity now
+         ;; now that we change `load-path' in `package-activate-1'
          (code '(let ((dir (if load-file-name
                                (directory-file-name
                                 (file-name-directory load-file-name))
                              (car load-path))))
-                  (add-to-list 'load-path dir)
-                  (when (boundp 'comp-abi-hash)
-                    (add-to-list 'load-path (expand-file-name comp-abi-hash dir))))))
+                  (add-to-list 'load-path dir))))
     (prog1 auto-name
       (loaddefs-generate pkg-dir output-file nil (prin1-to-string code))
       (when-let ((buf (find-buffer-visiting output-file)))
