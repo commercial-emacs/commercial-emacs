@@ -1299,18 +1299,16 @@ Return t if on success.  */)
   record_unwind_protect (load_warn_unescaped_character_literals, file);
 
   const int elc_ver = elc_version (found, fd);
-  if (elc_ver
-      && fd != -2
-      && !strstr (SSDATA (Vinvocation_name), "bootstrap-emacs"))
+  if (elc_ver || is_native)
     {
-      /* Warn if loading .elc older than its .el. */
+      /* Warn out-of-date .el[cn]. */
       struct stat s1, s2;
-      const char *elc = SSDATA (ENCODE_FILE (found));
+      const char *elcn = SSDATA (ENCODE_FILE (found));
       USE_SAFE_ALLOCA;
-      char *el = SAFE_ALLOCA (strlen (elc));
-      memcpy (el, elc, strlen (elc) - 1);
-      el[strlen (elc) - 1] = '\0';
-      if (0 == emacs_fstatat (AT_FDCWD, elc, &s1, 0)
+      char *el = SAFE_ALLOCA (strlen (elcn));
+      memcpy (el, elcn, strlen (elcn) - 1);
+      el[strlen (elcn) - 1] = '\0';
+      if (0 == emacs_fstatat (AT_FDCWD, elcn, &s1, 0)
 	  && 0 == emacs_fstatat (AT_FDCWD, el, &s2, 0)
 	  && 0 > timespec_cmp (get_stat_mtime (&s1), get_stat_mtime (&s2)))
 	message_with_string ("Loading %s despite modified .el", found, 1);
