@@ -159,7 +159,6 @@ define byte-compile
 endef
 
 define native-compile
-	$(AM_V_at)rm -f $@
 	$(AM_V_ELN)$(emacs) $(COMPILE_FLAGS) \
 	    --eval "(native-compile \"$<\" \"$(@D)/mv_$(@F)\")"
 	$(AM_V_at)mv -f $(@D)/mv_$(@F) $@

@@ -389,9 +389,8 @@ but with a different end of line convention (bug#48137)."
 (declare-function macro-builtin-10-and-90 "macro-builtin" ())
 
 (ert-deftest package-test-macro-compilation ()
-  "\"Activation has to be done before compilation, so that if we're
-   upgrading and macros have changed we load the new definitions
-   before compiling.\" -- package.el"
+  "Activation must precede compilation since package upgrade
+could introduce macro redefinitions required for compile."
   (with-package-test (:basedir (ert-resource-directory))
     (package-install-file (expand-file-name "macro-problem-package-1.0/"))
     (require 'macro-problem)

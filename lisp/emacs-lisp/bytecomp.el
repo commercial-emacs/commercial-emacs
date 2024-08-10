@@ -1250,56 +1250,47 @@ message buffer `default-directory'."
 	byte-compile-last-warned-func byte-compile-current-func)
   entry)
 
-;; This no-op function is used as the value of warning-series
-;; to tell inner calls to displaying-byte-compile-warnings
-;; not to bind warning-series.
-(defun byte-compile-warning-series (&rest _ignore)
-  nil)
-
-;; (compile-mode) will cause this to be loaded.
 (declare-function compilation-forget-errors "compile" ())
 
-;; Log the start of a file in `byte-compile-log-buffer', and mark it as done.
-;; Return the position of the start of the page in the log buffer.
-;; But do nothing in batch mode.
 (defun byte-compile-log-file ()
-  (and (not (equal byte-compile-current-file byte-compile-last-logged-file))
-       (not noninteractive)
-       (with-current-buffer (get-buffer-create byte-compile-log-buffer)
-	 (goto-char (point-max))
-	 (let* ((inhibit-read-only t)
-		(dir (and (stringp byte-compile-current-file)
-			  (file-name-directory byte-compile-current-file)))
-		(was-same (equal default-directory dir))
-		pt)
-	   (when dir
-	     (unless was-same
-	       (insert (format-message "Leaving directory `%s'\n"
-                                       default-directory))))
-	   (unless (bolp)
-	     (insert "\n"))
-	   (setq pt (point-marker))
-	   (if byte-compile-current-file
-	       (insert "\f\nCompiling "
-		       (if (stringp byte-compile-current-file)
-			   (concat "file " byte-compile-current-file)
-			 (concat "in buffer "
-                                 (buffer-name byte-compile-current-file)))
-		       " at " (current-time-string) "\n")
-	     (insert "\f\nCompiling internal form(s) at " (current-time-string) "\n"))
-	   (when dir
-	     (setq default-directory dir)
-	     (unless was-same
-	       (insert (format-message "Entering directory `%s'\n"
-                                       default-directory))))
-	   (setq byte-compile-last-logged-file byte-compile-current-file
-		 byte-compile-last-warned-func nil)
-	   ;; Do this after setting default-directory.
-	   (unless (derived-mode-p 'compilation-mode)
-             (emacs-lisp-compilation-mode))
-           (setq emacs-lisp-compilation--current-file byte-compile-current-file)
-	   (compilation-forget-errors)
-	   pt))))
+  (when (and (not (equal byte-compile-current-file
+                         byte-compile-last-logged-file))
+             (not noninteractive))
+    (with-current-buffer (get-buffer-create byte-compile-log-buffer)
+      (goto-char (point-max))
+      (let* ((inhibit-read-only t)
+	     (dir (and (stringp byte-compile-current-file)
+		       (file-name-directory byte-compile-current-file)))
+	     (was-same (equal default-directory dir))
+	     pt)
+	(when dir
+	  (unless was-same
+	    (insert (format-message "Leaving directory `%s'\n"
+                                    default-directory))))
+	(unless (bolp)
+	  (insert "\n"))
+	(setq pt (point-marker))
+	(if byte-compile-current-file
+	    (insert "\f\nCompiling "
+		    (if (stringp byte-compile-current-file)
+			(concat "file " byte-compile-current-file)
+		      (concat "in buffer "
+                              (buffer-name byte-compile-current-file)))
+		    " at " (current-time-string) "\n")
+	  (insert "\f\nCompiling internal form(s) at " (current-time-string) "\n"))
+	(when dir
+	  (setq default-directory dir)
+	  (unless was-same
+	    (insert (format-message "Entering directory `%s'\n"
+                                    default-directory))))
+	(setq byte-compile-last-logged-file byte-compile-current-file
+	      byte-compile-last-warned-func nil)
+	;; Do this after setting default-directory.
+	(unless (derived-mode-p 'compilation-mode)
+          (emacs-lisp-compilation-mode))
+        (setq emacs-lisp-compilation--current-file byte-compile-current-file)
+	(compilation-forget-errors)
+	pt))))
 
 (defun byte-compile-warn-obsolete (symbol type)
   "Warn that SYMBOL (a variable, function or generalized variable) is obsolete.
@@ -1860,7 +1851,11 @@ and cl-macs.el.")
          (setq byte-to-native-plist-environment
                overriding-plist-environment)))))
 
-(defmacro displaying-byte-compile-warnings (&rest body) ;FIXME: namespace!
+(defmacro displaying-byte-compile-warnings (&rest body)
+  "Incomprehensible.
+The `warning-series' defvar is a cluster that doubles as a compilation
+context switching station and the current position in
+`byte-compile-log-buffer'."
   (declare (debug (def-body)))
   `(let ((fn (lambda ()
                (condition-case-unless-debug err
@@ -1874,20 +1869,16 @@ and cl-macs.el.")
 		  (get-buffer byte-compile-log-buffer)))
          ;; warnings already started
          (funcall fn)
-       (let ((new-warning-series (or (byte-compile-log-file)
-                                     'byte-compile-warning-series)))
-         (if (eq warning-series 'byte-compile-warning-series)
-             ;; `warning-series' comes from compilation; set globally
-             (progn
-               (setq warning-series new-warning-series)
-               (funcall fn))
-           ;; `warning-series' not from compilation; set locally
-           (let ((warning-series new-warning-series))
-             (funcall fn)))))))
+       (if-let ((pt (byte-compile-log-file)))
+           ;; byte-compile-current-file momentarily switched
+           (let ((warning-series pt))
+             (funcall fn))
+         (setq warning-series 'ignore)
+         (funcall fn)))))
 
 ;;;###autoload
 (defun byte-force-recompile (directory)
-  "Recompile every `.el' file in DIRECTORY that already has a `.elc' file.
+  "Recompile every .el file in DIRECTORY that already has a .elc file.
 Files in subdirectories of DIRECTORY are processed also."
   (interactive "DByte force recompile (directory): ")
   (byte-recompile-directory directory nil t))

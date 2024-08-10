@@ -1299,7 +1299,9 @@ Return t if on success.  */)
   record_unwind_protect (load_warn_unescaped_character_literals, file);
 
   const int elc_ver = elc_version (found, fd);
-  if (elc_ver && fd != -2)
+  if (elc_ver
+      && fd != -2
+      && !strstr (SSDATA (Vinvocation_name), "bootstrap-emacs"))
     {
       /* Warn if loading .elc older than its .el. */
       struct stat s1, s2;

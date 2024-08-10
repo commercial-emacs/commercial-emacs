@@ -856,11 +856,9 @@ compiling the package."
             (sort result (lambda (x y) (< (cdr x) (cdr y))))))))
 
 (defun package-activate-1 (pkg-desc &optional reload deps)
-  "Activate package given by PKG-DESC, even if it was already active.
-If DEPS is non-nil, also activate its dependencies (unless they
-are already activated).
-If RELOAD is non-nil, also `load' any files inside the package which
-correspond to previously loaded files."
+  "Activate package given by PKG-DESC, even if already activated.
+If DEPS, also activate its dependencies.
+If RELOAD, also `load' any previously loaded package files."
   (let* ((name (package-desc-name pkg-desc))
          (pkg-dir (package-desc-dir pkg-desc)))
     (unless pkg-dir
@@ -896,22 +894,17 @@ correspond to previously loaded files."
   ;; Is "activatable" a word?
   (let ((pkg-descs (cdr (assq pkg-name package-alist))))
     ;; Check if PACKAGE is available in `package-alist'.
-    (while
-        (when pkg-descs
-          (let ((available-version (package-desc-version (car pkg-descs))))
-            (or (package-disabled-p pkg-name available-version)
-                ;; Prefer a builtin package.
-                (package-built-in-p pkg-name available-version))))
+    (while (and pkg-descs
+                (let ((available-version (package-desc-version (car pkg-descs))))
+                  (or (package-disabled-p pkg-name available-version)
+                      ;; Prefer a builtin package.
+                      (package-built-in-p pkg-name available-version))))
       (setq pkg-descs (cdr pkg-descs)))
     (car pkg-descs)))
 
-;; This function activates a newer version of a package if an older
-;; one was already activated.  It also loads a features of this
-;; package which were already loaded.
 (defun package-activate (package &optional force)
-  "Activate the package named PACKAGE.
-If FORCE is true, (re-)activate it if it's already activated.
-Newer versions are always activated, regardless of FORCE."
+  "Activate an unactivated or updated PACKAGE.
+FORCE reactivates PACKAGE even without updates."
   (let ((pkg-desc (package--get-activatable-pkg package)))
     (cond
      ;; If no such package is found, maybe it's built-in.
@@ -1000,17 +993,11 @@ untar into a directory named DIR; otherwise, signal an error."
                      (package-desc-full-name pkg-desc))
         (error "The retrieved package (`%s') doesn't match what the archive offered (`%s')"
                (package-desc-full-name new-desc) (package-desc-full-name pkg-desc)))
-      ;; Activation has to be done before compilation, so that if we're
-      ;; upgrading and macros have changed we load the new definitions
-      ;; before compiling.
       (when (package-activate-1 new-desc :reload :deps)
-        ;; FIXME: Compilation should be done as a separate, optional, step.
-        ;; E.g. for multi-package installs, we should first install all packages
-        ;; and then compile them.
-        (package--compile new-desc)
-        ;; After compilation, load again any files loaded by
-        ;; `activate-1', so that we use the byte-compiled definitions.
-        (package--reload-previously-loaded new-desc)))
+        ;; Activation must precede compilation since package upgrade
+        ;; could introduce macro redefinitions required for compile.
+        (package--compile new-desc) ;TODO make compilation separate and optional
+        (package--reload-previously-loaded new-desc))) ;load byte-compiled defs
     pkg-dir))
 
 (defun package-generate-description-file (pkg-desc pkg-file)
@@ -1068,16 +1055,16 @@ untar into a directory named DIR; otherwise, signal an error."
          (output-file (expand-file-name auto-name pkg-dir))
          (autoload-timestamps nil)
          (backup-inhibited t)
-         (version-control 'never))
+         (version-control 'never)
+         (code '(let ((dir (if load-file-name
+                               (directory-file-name
+                                (file-name-directory load-file-name))
+                             (car load-path))))
+                  (add-to-list 'load-path dir)
+                  (when (boundp 'comp-abi-hash)
+                    (add-to-list 'load-path (expand-file-name comp-abi-hash dir))))))
     (prog1 auto-name
-      (loaddefs-generate pkg-dir output-file nil
-                         (prin1-to-string
-                          '(add-to-list
-                            'load-path
-                            (if load-file-name
-                                (directory-file-name
-                                 (file-name-directory load-file-name))
-                              (car load-path)))))
+      (loaddefs-generate pkg-dir output-file nil (prin1-to-string code))
       (when-let ((buf (find-buffer-visiting output-file)))
         (kill-buffer buf)))))
 
@@ -1129,7 +1116,20 @@ untar into a directory named DIR; otherwise, signal an error."
                   (cl-every (lambda (regexp)
                               (not (string-match-p regexp path)))
                             byte-compile-ignore-files))
-         (native-compile path (file-name-with-extension path ".eln")))))))
+         (condition-case err
+             (let ((eln-dir (expand-file-name comp-abi-hash
+                                              (file-name-directory path))))
+               (make-directory eln-dir t)
+               (native-compile path (expand-file-name
+                                     (file-name-with-extension
+                                      (file-name-nondirectory path)
+                                      ".eln")
+                                     eln-dir)))
+           (error (let ((inhibit-read-only t))
+                    (insert "Could not natively compile " path ": "
+                            (error-message-string err)
+                            "\n"))
+                  (compilation-forget-errors))))))))
 
 (defun package--compile (pkg-desc)
   "Byte-compile installed package PKG-DESC.
@@ -1138,8 +1138,8 @@ Assumes PKG-DESC already activated by `package-activate-1'."
         (warning-minimum-level :error)
         (load-path load-path))
     (byte-recompile-directory (package-desc-dir pkg-desc) 0 t)
-    ;(package-native-compile pkg-desc)
-	))
+;    (package-native-compile pkg-desc)
+    ))
 
 ;;;; Inferring package from current buffer
 (defun package-read-from-string (str)
