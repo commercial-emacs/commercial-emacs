@@ -1019,6 +1019,8 @@ untar into a directory named DIR; otherwise, signal an error."
                                            (mapcar #'car name-descs)
                                            nil :must-match)
                           name-descs))))
+  (unless (featurep 'native-compile)
+    (user-error "Native compilation unsupported"))
   (dolist (path (directory-files (package-desc-dir pkg-desc) t))
     (when (and (string-match-p emacs-lisp-file-regexp path)
                (file-readable-p path)
