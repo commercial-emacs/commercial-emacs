@@ -2186,10 +2186,9 @@ See also `emacs-lisp-byte-compile-and-load'."
 	(message "Compiling %s..." filename))
       (let* (byte-compile-abort-elc
              (byte-compile-level (1+ byte-compile-level))
-             (output-buffer
-              (with-temp-trampoline-dir
-               (save-current-buffer
-                 (byte-compile-from-buffer input-buffer)))))
+             (output-buffer (with-temp-trampoline-dir
+                             (save-current-buffer
+                               (byte-compile-from-buffer input-buffer)))))
         (unless byte-compile-abort-elc
           (prog1 t
 	    (when byte-compile-verbose
@@ -2334,11 +2333,10 @@ With argument ARG, insert value in current buffer after the form."
           (push `(no-native-compile . ,no-native-compile)
                 byte-native-qualities))
 
-        (while (progn
-		 (while (progn (skip-chars-forward " \t\n\^l")
-			       (= (following-char) ?\;))
-		   (forward-line 1))
-		 (not (eobp)))
+        (while (progn (while (progn (skip-chars-forward " \t\n\^l")
+			            (= (following-char) ?\;))
+		        (forward-line 1))
+		      (not (eobp)))
           (let* ((byte-compile-current-annotations (read-annotated inbuffer))
                  (form (byte-compile--decouple byte-compile-current-annotations
                                                #'cdr)))

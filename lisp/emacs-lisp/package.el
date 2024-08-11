@@ -26,70 +26,17 @@
 
 ;;; Commentary:
 
-;; The idea behind package.el is to be able to download packages and
-;; install them.  Packages are versioned and have versioned
-;; dependencies.  Furthermore, this supports built-in packages which
-;; may or may not be newer than user-specified packages.  This makes
-;; it possible to upgrade Emacs and automatically disable packages
-;; which have moved from external to core.  (Note though that we don't
-;; currently register any of these, so this feature does not actually
-;; work.)
-
-;; A package is described by its name and version.  The distribution
-;; format is either a tar file or a single .el file.
-
-;; A tar file should be named "NAME-VERSION.tar".  The tar file must
-;; unpack into a directory named after the package and version:
-;; "NAME-VERSION".  It must contain a file named "PACKAGE-pkg.el"
-;; which consists of a call to define-package.  It may also contain a
-;; "dir" file and the info files it references.
-
-;; A .el file is named "NAME-VERSION.el" in the remote archive, but is
-;; installed as simply "NAME.el" in a directory named "NAME-VERSION".
-
-;; The downloader downloads all dependent packages.  By default,
-;; packages come from the official GNU sources, but others may be
-;; added by customizing the `package-archives' alist.  Packages get
-;; byte-compiled at install time.
-
-;; At activation time we will set up the load-path and the info path,
-;; and we will load the package's autoloads.  If a package's
-;; dependencies are not available, we will not activate that package.
-
-;; Conceptually a package has multiple state transitions:
+;; The `package-unpack' function is the workhorse that,
 ;;
-;; * Download.  Fetching the package from ELPA.
-;; * Install.  Untar the package, or write the .el file, into
-;;   ~/.emacs.d/elpa/ directory.
-;; * Autoload generation.
-;; * Byte compile.  Currently this phase is done during install,
-;;   but we may change this.
-;; * Activate.  Evaluate the autoloads for the package to make it
-;;   available to the user.
-;; * Load.  Actually load the package and run some code from it.
+;; * Generates autoloads and manifest (i.e., foo-pkg.el).
+;; * Byte compiles manifest files.
+;; * Makes the package discoverable by adding the package directory to
+;;   `load-path' and evaluating the autoloads file.  Unfortunately,
+;;   this step was termed "activation" which misleadingly suggests
+;;   the package was eagerly loaded.
 
-;; Other external functions you may want to use:
-;;
-;; M-x list-packages
-;;    Enters a mode similar to buffer-menu which lets you manage
-;;    packages.  You can choose packages for install (mark with "i",
-;;    then "x" to execute) or deletion, and you can see what packages
-;;    are available.  This will automatically fetch the latest list of
-;;    packages from ELPA.
-;;
-;; M-x package-install-from-buffer
-;;    Install a package consisting of a single .el file that appears
-;;    in the current buffer.  This only works for packages which
-;;    define a Version header properly; package.el also supports the
-;;    extension headers Package-Version (in case Version is an RCS id
-;;    or similar), and Package-Requires (if the package requires other
-;;    packages).
-;;
-;; M-x package-install-file
-;;    Install a package from the indicated file.  The package can be
-;;    either a tar file or a .el file.  A tar file must contain an
-;;    appropriately-named "-pkg.el" file; a .el file must be properly
-;;    formatted as with `package-install-from-buffer'.
+;; Complications arise when built-in packages whose metadata are stored
+;; outside package.el get shadowed by user installs of newer versions.
 
 ;;; Thanks:
 ;;; (sorted by sort-lines):
@@ -170,7 +117,7 @@ file (but after reading the early init file).  This means that if
 you wish to set this variable, you must do so in the early init
 file.  Regardless of the value of this variable, packages are not
 made available if `user-init-file' is nil (e.g. Emacs was started
-with \"-q\").
+                                                with \"-q\").
 
 Even if the value is nil, you can type \\[package-initialize] to
 make installed packages available at any time, or you can
@@ -187,17 +134,15 @@ your `early-init-file'."
 (defcustom package-load-list '(all)
   "List of packages for `package-activate-all' to make available.
 Each element in this list should be a list (NAME VERSION), or the
-symbol `all'.  The symbol `all' says to make available the latest
-installed versions of all packages not specified by other
-elements.
+symbol \\='all, a sentinel symbol.
 
 For an element (NAME VERSION), NAME is a package name (a symbol).
 VERSION should be t, a string, or nil.
 If VERSION is t, the most recent version is made available.
 If VERSION is a string, only that version is ever made available.
- Any other version, even if newer, is silently ignored.
- Hence, the package is \"held\" at that version.
-If VERSION is nil, the package is not made available (it is \"disabled\")."
+Any other version, even if newer, is silently ignored.
+Hence, the package is \"held\" at that version.
+If VERSION is nil, the package is disabled."
   :type '(repeat (choice (const all)
                          (list :tag "Specific package"
                                (symbol :tag "Package name")
@@ -218,11 +163,11 @@ If VERSION is nil, the package is not made available (it is \"disabled\")."
 The default value points to the GNU Emacs package repository.
 
 Each element has the form (ID . LOCATION).
- ID is an archive name, as a string.
- LOCATION specifies the base location for the archive.
-  If it starts with \"http(s):\", it is treated as an HTTP(S) URL;
-  otherwise it should be an absolute directory name.
-  (Other types of URL are currently not supported.)
+ID is an archive name, as a string.
+LOCATION specifies the base location for the archive.
+If it starts with \"http(s):\", it is treated as an HTTP(S) URL;
+otherwise it should be an absolute directory name.
+(Other types of URL are currently not supported.)
 
 Only add locations that you trust, since fetching and installing
 a package can run arbitrary code.
@@ -238,16 +183,16 @@ security."
   "If non-nil, hide low priority packages from the packages menu.
 A package is considered low priority if there's another version
 of it available such that:
-    (a) the archive of the other package is higher priority than
-    this one, as per `package-archive-priorities';
-  or
-    (b) they both have the same archive priority but the other
-    package has a higher version number.
+(a) the archive of the other package is higher priority than
+this one, as per `package-archive-priorities';
+or
+(b) they both have the same archive priority but the other
+package has a higher version number.
 
 This variable has three possible values:
-    nil: no packages are hidden;
-    `archive': only criterion (a) is used;
-    t: both criteria are used.
+nil: no packages are hidden;
+`archive': only criterion (a) is used;
+t: both criteria are used.
 
 This variable has no effect if `package-menu--hide-packages' is
 nil, so it can be toggled with \\<package-menu-mode-map>\\[package-menu-toggle-hiding]."
@@ -283,8 +228,8 @@ This can be useful if you have multiple package archives enabled,
 and want to control which archive a given package gets installed from.
 
 Each element of the alist has the form (PACKAGE . ARCHIVE), where:
- PACKAGE is a symbol representing a package
- ARCHIVE is a string representing an archive (it should be the car of
+PACKAGE is a symbol representing a package
+ARCHIVE is a string representing an archive (it should be the car of
 an element in `package-archives', e.g. \"gnu\").
 
 Adding an entry to this variable means that only ARCHIVE will be
@@ -359,18 +304,17 @@ contents of the archive.
 
 The value can be one of:
 
-  t                  Accept a package only if it comes with at least
-                     one verified signature.
+t                  Accept a package only if it comes with at least
+                   one verified signature.
 
-  `all'              Same as t, but verify all signatures if there
-                     are more than one.
+`all'              Same as t, but verify all signatures if there
+                   are more than one.
 
-  `allow-unsigned'   Install a package even if it is unsigned,
-                     but verify the signature if possible (that
-                     is, if it is signed, we have the key for it,
-                     and GnuPG is installed).
+`allow-unsigned'   Install a package even if it is unsigned,
+                   but verify the signature if possible (that is, if it
+                   is signed, we have the key for it, and GnuPG is installed).
 
-  nil                Package signatures are ignored."
+nil                Package signatures are ignored."
   :type '(choice (const :value nil            :tag "Never")
                  (const :value allow-unsigned :tag "Allow unsigned")
                  (const :value t              :tag "Check always")
@@ -497,20 +441,20 @@ Slots:
 `version' Version of the package, as a version list.
 
 `summary' Short description of the package, typically taken from
-        the first line of the file.
+the first line of the file.
 
 `reqs'	Requirements of the package.  A list of (PACKAGE
-        VERSION-LIST) naming the dependent package and the minimum
-        required version.
+                                                 VERSION-LIST) naming the dependent package and the minimum
+required version.
 
 `kind'	The distribution format of the package.  Currently, it is
-        either `single' or `tar'.
+either `single' or `tar'.
 
 `archive' The name of the archive (as a string) whence this
-        package came.
+package came.
 
 `dir'	The directory where the package is installed (if installed),
-        `builtin' if it is built-in, or nil otherwise.
+`builtin' if it is built-in, or nil otherwise.
 
 `extras' Optional alist of additional keyword-value pairs.
 
@@ -658,9 +602,7 @@ loaded and/or activated, customize `package-load-list'.")
 (put 'package-alist 'risky-local-variable t)
 
 ;;;###autoload
-(defvar package-activated-list nil
-  ;; FIXME: This should implicitly include all builtin packages.
-  "List of the names of currently activated packages.")
+(defvar package-activated-list nil "Activating is not loading!")
 (put 'package-activated-list 'risky-local-variable t)
 
 ;;;; Populating `package-alist'.
@@ -755,16 +697,9 @@ EXTRA-PROPERTIES is currently unused."
   (declare (obsolete nil "29.1") (indent defun))
   (error "Don't call me!"))
 
-
-;;; Package activation
-;; Section for functions used by `package-activate', which see.
-
 (defun package-disabled-p (pkg-name version)
-  "Return whether PKG-NAME at VERSION can be activated.
-The decision is made according to `package-load-list'.
-Return nil if the package can be activated.
-Return t if the package is completely disabled.
-Return the max version (as a string) if the package is held at a lower version."
+  "Return whether PKG-NAME at VERSION is disabled.
+Return the pinned version string if VERSION differs from it."
   (let ((force (assq pkg-name package-load-list)))
     (cond ((null force) (not (memq 'all package-load-list)))
           ((null (setq force (cadr force))) t) ; disabled
@@ -778,15 +713,13 @@ Return the max version (as a string) if the package is held at a lower version."
   "Return non-nil if PACKAGE is built-in to Emacs.
 Optional arg MIN-VERSION, if non-nil, should be a version list
 specifying the minimum acceptable version."
-  (if (package-desc-p package) ;; was built-in and then was converted
+  (if (package-desc-p package) ;was built-in then converted
       (eq 'builtin (package-desc-dir package))
-    (let ((bi (assq package package--builtin-versions)))
-      (cond
-       (bi (version-list-<= min-version (cdr bi)))
-       ((remove 0 min-version) nil)
-       (t
-        (require 'finder-inf nil t) ; For `package--builtins'.
-        (assq package package--builtins))))))
+    (if-let ((ver (alist-get package package--builtin-versions)))
+        (version-list-<= min-version (cdr ver))
+      (unless (remove 0 min-version)
+        (require 'finder-inf nil t) ;For `package--builtins'.
+        (assq package package--builtins)))))
 
 (defun package--active-built-in-p (package)
   "Return non-nil if the built-in version of PACKAGE is used.
@@ -794,12 +727,11 @@ If the built-in version of PACKAGE is used and PACKAGE is
 also available for installation from an archive, it is an
 indication that PACKAGE was never upgraded to any newer
 version from the archive."
-  (and (not (assq (cond
-                   ((package-desc-p package)
-                    (package-desc-name package))
-                   ((stringp package) (intern package))
-                   ((symbolp package) package)
-                   ((error "Unknown package format: %S" package)))
+  (and (not (assq (cond ((package-desc-p package)
+                         (package-desc-name package))
+                        ((stringp package) (intern package))
+                        ((symbolp package) package)
+                        ((error "Unknown package format: %S" package)))
                   (package--alist)))
        (package-built-in-p package)))
 
@@ -814,6 +746,7 @@ PKG-DESC is a `package-desc' object."
 (declare-function info-initialize "info" ())
 
 (defsubst package--library-stem (file)
+  "Because `file-name-sans-extension' not sufficient."
   (catch 'done
     (let (result)
       (dolist (suffix (get-load-suffixes) file)
@@ -826,106 +759,88 @@ PKG-DESC is a `package-desc' object."
 The revised editions could contain macro redefinitions required for byte
 compiling the package."
   (with-demoted-errors "package--reload-previously-loaded: %s"
-    (let* (result
+    (let* (reloads
            (dir (package-desc-dir pkg-desc))
-           (effective-path (or (bound-and-true-p find-library-source-path)
-                               load-path))
            (files (directory-files-recursively dir "\\`[^\\.].*\\.el\\'"))
-           (history (mapcar #'file-truename
-                            (cl-remove-if-not #'stringp
-                                              (mapcar #'car load-history)))))
+           ;; get history in most-to-least recent order
+           (history (reverse
+                     (mapcar #'package--library-stem
+                             (cl-remove-if-not #'stringp (mapcar #'car load-history))))))
       (dolist (library (seq-keep (lambda (f) (package--library-stem
                                               (file-relative-name f dir)))
                                  files))
-        (when-let ((not-autoload (not (equal (file-name-base library)
-                                             (format "%s-autoloads"
-                                                     (package-desc-name pkg-desc)))))
-                   (canonical (locate-library library nil effective-path))
-                   (loads-after (cl-some
-                                 (lambda (f) (member (file-truename f) history))
-                                 (cons canonical
-                                       (mapcar (lambda (ext)
-                                                 (file-name-with-extension
-                                                  canonical
-                                                  ext))
-                                               '(".el" ".elc" ".eln")))))
-                   (recent-index (length loads-after)))
-          (push (cons (expand-file-name library dir) recent-index) result)))
-      ;; load most recent last
+        (when-let ((not-autoload
+                    (not (equal (file-name-base library)
+                                (format "%s-autoloads"
+                                        (package-desc-name pkg-desc)))))
+                   (recency-index
+                    (catch 'recent
+                      (prog1 nil
+                        (dotimes (i (length history))
+                          (when (string-suffix-p library (nth i history))
+                            (throw 'recent (- i))))))))
+          (push (cons (expand-file-name library dir) recency-index) reloads)))
+      ;; load in original order (least to most recent).
       (mapc (lambda (c) (load (car c) nil t))
-            (sort result (lambda (x y) (< (cdr x) (cdr y))))))))
+            (sort reloads (lambda (x y) (< (cdr x) (cdr y))))))))
 
-(defun package-activate-1 (pkg-desc &optional reload deps)
-  "Activate package given by PKG-DESC, even if already activated.
+(defun package--activate (pkg-desc reload activate-deps)
+  "Activate PKG-DESC, even if already activated.
 If DEPS, also activate its dependencies.
 If RELOAD, also `load' any previously loaded package files."
-  (prog1 t
-    (let* ((name (package-desc-name pkg-desc))
-           (pkg-dir (package-desc-dir pkg-desc)))
-      (unless pkg-dir
-        (error "Internal error: unable to find directory for `%s'"
-               (package-desc-full-name pkg-desc)))
-      (catch 'exit
-        ;; Activate its dependencies recursively.
-        ;; TODO: Check against required version.
-        (when deps
-          (dolist (req (package-desc-reqs pkg-desc))
-            (unless (package-activate (car req))
-              (message "Unable to activate package `%s'.\nRequired package `%s-%s' is unavailable"
-                       name (car req) (package-version-join (cadr req)))
-              (throw 'exit nil))))
-        (when reload
-          (package--reload-previously-loaded pkg-desc))
-        (with-demoted-errors "Error loading autoloads: %s"
-          (let* ((autoloads (package--autoloads-file-name pkg-desc))
-                 (elc-dir (file-name-directory autoloads))
-                 (eln-dir (expand-file-name comp-abi-hash elc-dir)))
-            ;; Prepend elc, then eln.  Order matters.
-            (dolist (dir (list elc-dir eln-dir))
-              (add-to-list 'load-path (directory-file-name dir)))
-            (load autoloads nil :quiet)))
-        ;; Add info node.
-        (when (file-exists-p (expand-file-name "dir" pkg-dir))
-          (require 'info)
-          (info-initialize)
-          (add-to-list 'Info-directory-list pkg-dir))
-        (push name package-activated-list)))))
+  (when-let ((name (package-desc-name pkg-desc))
+             (pkg-dir (or (package-desc-dir pkg-desc)
+                          (error "Internal error: unable to find directory for `%s'"
+                                 (package-desc-full-name pkg-desc))))
+             (deps-ok
+              (or (not activate-deps)
+                  (catch 'exit
+                    (prog1 t
+                      (dolist (req (package-desc-reqs pkg-desc))
+                        (unless (package-activate (car req))
+                          (message "Unavailable %s-%s required by %s"
+                                   (car req) (package-version-join (cadr req)) name)
+                          (throw 'exit nil))))))))
+    (prog1 t
+      (when reload
+        (package--reload-previously-loaded pkg-desc))
+      (with-demoted-errors "Error loading autoloads: %s"
+        (let* ((autoloads (package--autoloads-file-name pkg-desc))
+               (elc-dir (file-name-directory autoloads))
+               (eln-dir (expand-file-name comp-abi-hash elc-dir)))
+          ;; Prepend elc, then eln.  Order matters.
+          (dolist (dir (list elc-dir eln-dir))
+            (add-to-list 'load-path (directory-file-name dir)))
+          (load autoloads nil :quiet)))
+      ;; Add info node.
+      (when (file-exists-p (expand-file-name "dir" pkg-dir))
+        (require 'info)
+        (info-initialize)
+        (add-to-list 'Info-directory-list pkg-dir))
+      (push name package-activated-list))))
 
-;;;; `package-activate'
+(defun package--activable-desc (pkg-name)
+  "Return latest non-disabled, non-built-in descriptor for PKG-NAME."
+  (seq-find (lambda (pkg-desc)
+              (let ((version (package-desc-version pkg-desc)))
+                (and (not (package-disabled-p pkg-name version))
+                     (not (package-built-in-p pkg-name version)))))
+            (alist-get pkg-name package-alist)))
 
-(defun package--get-activatable-pkg (pkg-name)
-  (let ((pkg-descs (cdr (assq pkg-name package-alist))))
-    ;; Check if PACKAGE is available in `package-alist'.
-    (while (and pkg-descs
-                (let ((available-version (package-desc-version (car pkg-descs))))
-                  (or (package-disabled-p pkg-name available-version)
-                      ;; Prefer a builtin package.
-                      (package-built-in-p pkg-name available-version))))
-      (setq pkg-descs (cdr pkg-descs)))
-    (car pkg-descs)))
-
-(defun package-activate (package &optional force)
+(defun package-activate (pkg-name &optional force)
   "Activate an unactivated or updated PACKAGE.
-FORCE reactivates PACKAGE even without updates."
-  (let ((pkg-desc (package--get-activatable-pkg package)))
-    (cond
-     ;; If no such package is found, maybe it's built-in.
-     ((null pkg-desc)
-      (package-built-in-p package))
-     ;; If the package is already activated, just return t.
-     ((and (memq package package-activated-list) (not force))
-      t)
-     ;; Otherwise, proceed with activation.
-     (t (package-activate-1 pkg-desc nil 'deps)))))
 
+Makes PKG-NAME discoverable by adding its directory to `load-path' and
+evaluating the autoloads file.  The unfortunate term \"activation\"
+misleadingly suggests PKG-NAME is eagerly loaded.
 
-;;; Installation -- Local operations
-;; This section contains a variety of features regarding installing a
-;; package to/from disk.  This includes autoload generation,
-;; unpacking, compiling, as well as defining a package from the
-;; current buffer.
+FORCE reactivates PKG-NAME even if not updated.
+Return non-nil if activated (but not necessarily reactivated)."
+  (or (and (memq pkg-name package-activated-list) (not force))
+      (if-let ((pkg-desc (package--activable-desc pkg-name)))
+          (package--activate pkg-desc nil :deps)
+        (package-built-in-p pkg-name))))
 
-;;;; Unpacking
 (defvar tar-parse-info)
 (declare-function tar-untar-buffer "tar-mode" ())
 (declare-function tar-header-name "tar-mode" (tar-header) t)
@@ -995,10 +910,10 @@ untar into a directory named DIR; otherwise, signal an error."
                      (package-desc-full-name pkg-desc))
         (error "The retrieved package (`%s') doesn't match what the archive offered (`%s')"
                (package-desc-full-name new-desc) (package-desc-full-name pkg-desc)))
-      (when (package-activate-1 new-desc :reload :deps)
+      (when (package--activate new-desc :reload :deps)
         ;; Activation must precede compilation since package upgrade
         ;; could introduce macro redefinitions required for compile.
-        (package--compile new-desc) ;TODO make compilation separate and optional
+        (package--compile new-desc)
         (package--reload-previously-loaded new-desc))) ;load byte-compiled defs
     pkg-dir))
 
@@ -1059,7 +974,7 @@ untar into a directory named DIR; otherwise, signal an error."
          (backup-inhibited t)
          (version-control 'never)
          ;; preserve CODE for backwards-compatiblity now
-         ;; now that we change `load-path' in `package-activate-1'
+         ;; that `load-path' augmentation occurs in `package-activate'.
          (code '(let ((dir (if load-file-name
                                (directory-file-name
                                 (file-name-directory load-file-name))
@@ -1126,14 +1041,12 @@ untar into a directory named DIR; otherwise, signal an error."
          (native-compile path eln-file))))))
 
 (defun package--compile (pkg-desc)
-  "Byte-compile installed package PKG-DESC.
-Assumes PKG-DESC already activated by `package-activate-1'."
+  "Byte-compile installed package PKG-DESC."
   (let ((byte-compile-ignore-files (package--parse-elpaignore pkg-desc))
         (warning-minimum-level :error)
         (load-path load-path))
     (byte-recompile-directory (package-desc-dir pkg-desc) 0 t)
-;    (package-native-compile pkg-desc)
-    ))
+    (package-native-compile pkg-desc)))
 
 ;;;; Inferring package from current buffer
 (defun package-read-from-string (str)
@@ -1963,25 +1876,18 @@ if it is still empty."
                                  pkgs)))))))
     seen))
 
-(defun package--user-installed-p (package)
-  "Return non-nil if PACKAGE is a user-installed package.
-PACKAGE is the package name, a symbol.  Check whether the package
-was installed into `package-user-dir' where we assume to have
-control over."
-  (let* ((pkg-desc (cadr (assq package package-alist)))
-         (dir (package-desc-dir pkg-desc)))
-    (file-in-directory-p dir package-user-dir)))
-
 (defun package--removable-packages ()
   "Return a list of names of packages no longer needed.
 These are packages which are neither contained in
 `package-selected-packages' nor a dependency of one that is."
   (let ((needed (package--get-deps package-selected-packages)))
-    (cl-loop for p in (mapcar #'car package-alist)
-             unless (or (memq p needed)
-                        ;; Do not auto-remove external packages.
-                        (not (package--user-installed-p p)))
-             collect p)))
+    (cl-loop for pkg-name in (mapcar #'car package-alist)
+             when (and (not (memq pkg-name needed))
+                       ;; Do not auto-remove external packages.
+                       (let* ((pkg-desc (car (alist-get pkg-name package-alist)))
+                              (dir (package-desc-dir pkg-desc)))
+                         (file-in-directory-p dir package-user-dir)))
+             collect pkg-name)))
 
 (defun package--used-elsewhere-p (pkg-desc &optional pkg-list all)
   "Non-nil if PKG-DESC is a dependency of a package in PKG-LIST.
@@ -2129,7 +2035,7 @@ If PACKAGE is a `package-desc' object, MIN-VERSION is ignored."
   "Download and install all the packages in PACKAGES.
 PACKAGES should be a list of `package-desc'.
 This function assumes that all package requirements in
-PACKAGES are satisfied, i.e. that PACKAGES is computed
+PACKAGES are satisfied, i.e., that PACKAGES is computed
 using `package-compute-transaction'."
   (mapc #'package-install-from-archive packages))
 
@@ -2542,12 +2448,9 @@ object."
   (let ((pkg-desc (if (package-desc-p pkg)
                       pkg
                     (cadr (assq pkg package-alist)))))
-    ;; Delete the old .elc files to ensure that we don't inadvertently
-    ;; load them (in case they contain byte code/macros that are now
-    ;; invalid).
     (dolist (elc (directory-files-recursively
                   (package-desc-dir pkg-desc) "\\.el[cn]\\'"))
-      (delete-file elc))
+      (ignore-errors (delete-file elc)))
     (package--compile pkg-desc)))
 
 ;;;###autoload
@@ -4587,9 +4490,9 @@ DESC must be a `package-desc' object."
 ;;;; Introspection
 
 (defun package-get-descriptor (pkg-name)
-  "Return the `package-desc' of PKG-NAME."
+  "Return descriptor of latest installed PKG-NAME."
   (unless package--initialized (package-initialize 'no-activate))
-  (or (package--get-activatable-pkg pkg-name)
+  (or (package--activable-desc pkg-name)
       (cadr (assq pkg-name package-alist))
       (cadr (assq pkg-name package-archive-contents))))
 
