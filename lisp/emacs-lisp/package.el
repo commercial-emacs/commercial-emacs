@@ -784,6 +784,7 @@ compiling the package."
       (mapc (lambda (c) (load (car c) nil t))
             (sort reloads (lambda (x y) (< (cdr x) (cdr y))))))))
 
+(defvar comp-abi-hash)
 (defun package--activate (pkg-desc reload activate-deps)
   "Activate PKG-DESC, even if already activated.
 If DEPS, also activate its dependencies.
@@ -806,11 +807,11 @@ If RELOAD, also `load' any previously loaded package files."
         (package--reload-previously-loaded pkg-desc))
       (with-demoted-errors "Error loading autoloads: %s"
         (let* ((autoloads (package--autoloads-file-name pkg-desc))
-               (elc-dir (file-name-directory autoloads))
-               (eln-dir (expand-file-name comp-abi-hash elc-dir)))
+               (elc-dir (directory-file-name (file-name-directory autoloads))))
           ;; Prepend elc, then eln.  Order matters.
-          (dolist (dir (list elc-dir eln-dir))
-            (add-to-list 'load-path (directory-file-name dir)))
+          (add-to-list 'load-path elc-dir)
+          (when (featurep 'native-compile)
+            (add-to-list 'load-path (expand-file-name comp-abi-hash elc-dir)))
           (load autoloads nil :quiet)))
       ;; Add info node.
       (when (file-exists-p (expand-file-name "dir" pkg-dir))
@@ -1046,7 +1047,8 @@ untar into a directory named DIR; otherwise, signal an error."
         (warning-minimum-level :error)
         (load-path load-path))
     (byte-recompile-directory (package-desc-dir pkg-desc) 0 t)
-    (package-native-compile pkg-desc)))
+    (when (featurep 'native-compile)
+      (package-native-compile pkg-desc))))
 
 ;;;; Inferring package from current buffer
 (defun package-read-from-string (str)
