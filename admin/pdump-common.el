@@ -110,6 +110,8 @@
 
 (load "cus-face")
 (load "faces")  ; after here, `defface' may be used.
+(load "emacs-lisp/regexp-opt")
+(load "rx")
 
 ;; Two poorly named files defining autoloaded functions.
 (if pdumper--pure-pool
@@ -185,7 +187,6 @@
     (progn
       (load "fringe")
       ;; Needed by `imagemagick-register-types'
-      (load "emacs-lisp/regexp-opt")
       (load "image")
       (load "international/fontset")
       (load "dnd")
@@ -277,7 +278,6 @@
 ;; Used by `kill-buffer', for instance.
 (load "emacs-lisp/rmc")
 
-(load "rx")
 ;; Load language-specific files.
 (dolist (path load-path)
   (when (equal "language" (file-name-nondirectory path))

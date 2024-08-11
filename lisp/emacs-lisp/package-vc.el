@@ -583,7 +583,7 @@ documentation and marking the package as installed."
       ;; Activation has to be done before compilation, so that if we're
       ;; upgrading and macros have changed we load the new definitions
       ;; before compiling.
-      (when (package-activate-1 new-desc :reload :deps)
+      (when (package--activate new-desc :reload :deps)
         ;; FIXME: Compilation should be done as a separate, optional, step.
         ;; E.g. for multi-package installs, we should first install all packages
         ;; and then compile them.

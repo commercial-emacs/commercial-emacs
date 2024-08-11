@@ -2707,11 +2707,6 @@ disabled.
 (register-definition-prefixes "bug-reference" '("bug-reference-"))
 
 
-;;; Generated autoloads from language/burmese.el
-
-(register-definition-prefixes "burmese" '("burmese-composable-pattern"))
-
-
 ;;; Generated autoloads from emacs-lisp/byte-opt.el
 
 (register-definition-prefixes "byte-opt" '("byte" "disassemble-offset"))
@@ -2744,7 +2739,7 @@ else the global value will be modified.
 
 (fn WARNING)")
 (autoload 'byte-force-recompile "bytecomp" "\
-Recompile every `.el' file in DIRECTORY that already has a `.elc' file.
+Recompile every .el file in DIRECTORY that already has a .elc file.
 Files in subdirectories of DIRECTORY are processed also.
 
 (fn DIRECTORY)" t)
@@ -4219,38 +4214,6 @@ Find package keywords that aren't in `finder-known-keywords'." t)
 (register-definition-prefixes "checkdoc" '("checkdoc-"))
 
 
-;;; Generated autoloads from language/china-util.el
-
-(autoload 'decode-hz-region "china-util" "\
-Decode HZ/ZW encoded text in the current region.
-Return the length of resulting text.
-
-(fn BEG END)" t)
-(autoload 'decode-hz-buffer "china-util" "\
-Decode HZ/ZW encoded text in the current buffer." t)
-(autoload 'encode-hz-region "china-util" "\
-Encode the text in the current region to HZ.
-Return the length of resulting text.
-
-(fn BEG END)" t)
-(autoload 'encode-hz-buffer "china-util" "\
-Encode the text in the current buffer to HZ." t)
-(autoload 'post-read-decode-hz "china-util" "\
-
-
-(fn LEN)")
-(autoload 'pre-write-encode-hz "china-util" "\
-
-
-(fn FROM TO)")
-(register-definition-prefixes "china-util" '("decode-hz-line-continuation" "hz-" "hz/zw-start-gb" "iso2022-" "zw-start-gb"))
-
-
-;;; Generated autoloads from language/chinese.el
-
-(register-definition-prefixes "chinese" '("big5" "chinese-" "cn-" "cp9" "euc-" "gb18030" "gb2312" "gbk" "iso-2022-cn" "windows-936"))
-
-
 ;;; Generated autoloads from chistory.el
 
 (autoload 'repeat-matching-complex-command "chistory" "\
@@ -4682,6 +4645,10 @@ Equivalent of `batch-byte-compile' for native compilation.  Returns list
 of file names not excluded by `native-comp-bootstrap-deny-list'.
 
 (fn &optional UNUSED)")
+(autoload 'package-native-compile "comp" "\
+
+
+(fn PKG-DESC)" t)
 (autoload 'comp-subr-trampoline-install "comp" "\
 Make SUBR-NAME effectively advice-able when called from native code.
 
@@ -6039,36 +6006,6 @@ See `cwarn-mode' for more information on Cwarn mode.
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "cwarn" '("cwarn-" "turn-on-cwarn-mode-if-enabled"))
-
-
-;;; Generated autoloads from language/cyril-util.el
-
-(autoload 'cyrillic-encode-koi8-r-char "cyril-util" "\
-Return KOI8-R external character code of CHAR if appropriate.
-
-(fn CHAR)")
-(autoload 'cyrillic-encode-alternativnyj-char "cyril-util" "\
-Return ALTERNATIVNYJ external character code of CHAR if appropriate.
-
-(fn CHAR)")
-(autoload 'standard-display-cyrillic-translit "cyril-util" "\
-Display a Cyrillic buffer using a transliteration.
-For readability, the table is slightly
-different from the one used for the input method `cyrillic-translit'.
-
-The argument is a string which specifies which language you are using;
-that affects the choice of transliterations slightly.
-Possible values are listed in `cyrillic-language-alist'.
-If the argument is t, we use the default cyrillic transliteration.
-If the argument is nil, we return the display table to its standard state.
-
-(fn &optional CYRILLIC-LANGUAGE)" t)
-(register-definition-prefixes "cyril-util" '("cyrillic-language-alist"))
-
-
-;;; Generated autoloads from language/cyrillic.el
-
-(register-definition-prefixes "cyrillic" '("alternativnyj" "cyrillic-" "ibm855" "iso-8859-5" "koi8" "mik" "pt154" "ruscii" "windows-1251"))
 
 
 ;;; Generated autoloads from dabbrev.el
@@ -7618,26 +7555,6 @@ Default is 2.
 (fn &optional ARG)" t)
 
 
-;;; Generated autoloads from dnd.el
-
-(defvar dnd-protocol-alist `((,(purify-if-dumping "^file:///") . dnd-open-local-file) (,(purify-if-dumping "^file://[^/]") . dnd-open-file) (,(purify-if-dumping "^file:/[^/]") . dnd-open-local-file) (,(purify-if-dumping "^file:[^/]") . dnd-open-local-file) (,(purify-if-dumping "^\\(https?\\|ftp\\|nfs\\)://") . dnd-open-file)) "\
-The functions to call for different protocols when a drop is made.
-This variable is used by `dnd-handle-multiple-urls'.
-The list contains of (REGEXP . FUNCTION) pairs.
-The functions shall take two arguments, URL, which is the URL dropped and
-ACTION which is the action to be performed for the drop (move, copy, link,
-private or ask).
-If a function's `dnd-multiple-handler' property is set, it is provided
-a list of each URI dropped instead.
-If no match is found here, and the value of `browse-url-browser-function'
-is a pair of (REGEXP . FUNCTION), those regexps are tried for a match.
-If no match is found, the URL is inserted as text by calling `dnd-insert-text'.
-The function shall return the action done (move, copy, link or private)
-if some action was made, or nil if the URL is ignored.")
-(custom-autoload 'dnd-protocol-alist "dnd" t)
-(register-definition-prefixes "dnd" '("dnd-"))
-
-
 ;;; Generated autoloads from net/dns.el
 
 (autoload 'dns-query "dns" "\
@@ -7774,11 +7691,6 @@ disabled.
 (autoload 'dunnet "dunnet" "\
 Switch to *dungeon* buffer and start game." t)
 (register-definition-prefixes "dunnet" '("dun" "obj-special"))
-
-
-;;; Generated autoloads from dynamic-setting.el
-
-(register-definition-prefixes "dynamic-setting" '("dynamic-setting-handle-config-changed-event" "font-setting-change-default-font"))
 
 
 ;;; Generated autoloads from emacs-lisp/easy-mmode.el
@@ -9339,11 +9251,6 @@ Reset the size of the character under point." t)
 (register-definition-prefixes "emoji" '("emoji-"))
 
 
-;;; Generated autoloads from language/english.el
-
-(register-definition-prefixes "english" '("cp038" "cp1047" "ebcdic-" "ibm"))
-
-
 ;;; Generated autoloads from textmodes/enriched.el
 
 (autoload 'enriched-mode "enriched" "\
@@ -10528,182 +10435,9 @@ disabled.
 (register-definition-prefixes "etags-regen" '("etags-regen-"))
 
 
-;;; Generated autoloads from language/ethio-util.el
-
-(autoload 'setup-ethiopic-environment-internal "ethio-util")
-(autoload 'ethio-sera-to-fidel-buffer "ethio-util" "\
-Convert the current buffer from SERA to FIDEL.
-
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
-The variable `ethio-primary-language' specifies the primary
-language and `ethio-secondary-language' specifies the secondary.
-
-If the 1st optional argument SECONDARY is non-nil, assume the
-buffer begins with the secondary language; otherwise with the
-primary language.
-
-If the 2nd optional argument FORCE is non-nil, perform conversion
-even if the buffer is read-only.
-
-See also the descriptions of the variables
-`ethio-use-colon-for-colon' and `ethio-use-three-dot-question'.
-
-(fn &optional SECONDARY FORCE)" t)
-(autoload 'ethio-sera-to-fidel-region "ethio-util" "\
-Convert the characters in region from SERA to FIDEL.
-
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
-The variable `ethio-primary-language' specifies the primary
-language and `ethio-secondary-language' specifies the secondary.
-
-If the 3rd argument SECONDARY is given and non-nil, assume the
-region begins with the secondary language; otherwise with the
-primary language.
-
-If the 4th argument FORCE is given and non-nil, perform
-conversion even if the buffer is read-only.
-
-See also the descriptions of the variables
-`ethio-use-colon-for-colon' and `ethio-use-three-dot-question'.
-
-(fn BEGIN END &optional SECONDARY FORCE)" t)
-(autoload 'ethio-sera-to-fidel-marker "ethio-util" "\
-Convert regions surrounded by \"<sera>\" and \"</sera>\" from SERA to FIDEL.
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
-Assume that each region begins with `ethio-primary-language'.
-The markers \"<sera>\" and \"</sera>\" themselves are not deleted.
-
-(fn &optional FORCE)" t)
-(autoload 'ethio-fidel-to-sera-buffer "ethio-util" "\
-Convert all the FIDEL characters in the current buffer to the SERA format.
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
-The variable `ethio-primary-language' specifies the primary
-language and `ethio-secondary-language' specifies the secondary.
-
-If the 1st optional argument SECONDARY is non-nil, try to convert the
-region so that it begins with the secondary language; otherwise with the
-primary language.
-
-If the 2nd optional argument FORCE is non-nil, convert even if the
-buffer is read-only.
-
-See also the descriptions of the variables
-`ethio-use-colon-for-colon', `ethio-use-three-dot-question',
-`ethio-quote-vowel-always' and `ethio-numeric-reduction'.
-
-(fn &optional SECONDARY FORCE)" t)
-(autoload 'ethio-fidel-to-sera-region "ethio-util" "\
-Convert all the FIDEL characters in the region to the SERA format.
-
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
-The variable `ethio-primary-language' specifies the primary
-language and `ethio-secondary-language' specifies the secondary.
-
-If the 3rd argument SECONDARY is given and non-nil, convert
-the region so that it begins with the secondary language; otherwise with
-the primary language.
-
-If the 4th argument FORCE is given and non-nil, convert even if the
-buffer is read-only.
-
-See also the descriptions of the variables
-`ethio-use-colon-for-colon', `ethio-use-three-dot-question',
-`ethio-quote-vowel-always' and `ethio-numeric-reduction'.
-
-(fn BEGIN END &optional SECONDARY FORCE)" t)
-(autoload 'ethio-fidel-to-sera-marker "ethio-util" "\
-Convert the regions surrounded by \"<sera>\" and \"</sera>\" from FIDEL to SERA.
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
-The markers \"<sera>\" and \"</sera>\" themselves are not deleted.
-
-(fn &optional FORCE)" t)
-(autoload 'ethio-modify-vowel "ethio-util" "\
-Modify the vowel of the FIDEL that is under the cursor.
-FIDEL is the Amharic/Ethiopic alphabet." t)
-(autoload 'ethio-replace-space "ethio-util" "\
-Replace ASCII spaces with Ethiopic word separators in the region.
-
-In the specified region, replace word separators surrounded by two
-Ethiopic characters, depending on the first argument CH, which should
-be 1, 2, or 3.
-
-If CH = 1, word separator will be replaced with an ASCII space.
-If CH = 2, with two ASCII spaces.
-If CH = 3, with the Ethiopic colon-like word separator.
-
-The 2nd and 3rd arguments BEGIN and END specify the region.
-
-(fn CH BEGIN END)" t)
-(autoload 'ethio-input-special-character "ethio-util" "\
-This function is deprecated.
-
-(fn ARG)" t)
-(autoload 'ethio-fidel-to-tex-buffer "ethio-util" "\
-Convert each FIDEL characters in the current buffer into a fidel-tex command.
-FIDEL is the Amharic/Ethiopic alphabet." t)
-(autoload 'ethio-tex-to-fidel-buffer "ethio-util" "\
-Convert fidel-tex commands in the current buffer into FIDEL chars.
-FIDEL is the Amharic/Ethiopic alphabet." t)
-(autoload 'ethio-fidel-to-java-buffer "ethio-util" "\
-Convert Ethiopic characters in the buffer into the Java escape sequences.
-
-Each escape sequence is of the form \\uXXXX, where XXXX is the
-character's codepoint (in hex) in Unicode.
-
-If `ethio-java-save-lowercase' is non-nil, use [0-9a-f].
-Otherwise, [0-9A-F].")
-(autoload 'ethio-java-to-fidel-buffer "ethio-util" "\
-Convert the Java escape sequences in the buffer into Ethiopic characters.")
-(autoload 'ethio-find-file "ethio-util" "\
-Transliterate file content into Ethiopic depending on filename suffix.
-If the file-name extension is \".sera\", convert from SERA to FIDEL.
-If the file-name extension is \".html\", convert regions enclosed
-by \"<sera>..</sera>\" from SERA to FIDEL.
-If the file-name extension is \".tex\", convert fidel-tex commands
-to FIDEL characters.
-If the file-name extension is \".java\", convert Java escape sequences
-to FIDEL characters.
-
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.")
-(autoload 'ethio-write-file "ethio-util" "\
-Transliterate Ethiopic characters to ASCII depending on the file extension.
-If the file-name extension is \".sera\", convert from FIDEL to SERA.
-If the file-name extension is \".html\", convert FIDEL characters to
-SERA regions enclosed by \"<sera>..</sera>\".
-If the file-name extension is \".tex\", convert FIDEL characters
-to fidel-tex commands.
-If the file-name extension is \".java\", convert FIDEL characters to
-Java escape sequences.
-
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.")
-(autoload 'ethio-insert-ethio-space "ethio-util" "\
-Insert the Ethiopic word delimiter (the colon-like character).
-With ARG, insert that many delimiters.
-
-(fn ARG)" t)
-(autoload 'ethio-composition-function "ethio-util" "\
-
-
-(fn POS TO FONT-OBJECT STRING DIRECTION)")
-(register-definition-prefixes "ethio-util" '("ethio-" "exit-ethiopic-environment"))
-
-
 ;;; Generated autoloads from leim/quail/ethiopic.el
 
 (register-definition-prefixes "quail/ethiopic" '("ethio-select-a-translation"))
-
-
-;;; Generated autoloads from language/ethiopic.el
-
-(register-definition-prefixes "ethiopic" '("ccl-encode-ethio-font"))
 
 
 ;;; Generated autoloads from net/eudc.el
@@ -10911,11 +10645,6 @@ RETURN-ATTRS is a list of attributes to return, defaulting to
 `eudc-default-return-attributes'.
 
 (fn QUERY &optional RETURN-ATTRS)")
-
-
-;;; Generated autoloads from language/european.el
-
-(register-definition-prefixes "european" '("adobe-standard-encoding" "cp125" "cp2" "cp437" "cp775" "cp8" "ebcdic-" "hp-roman8" "ibm" "iso-" "latin-" "mac" "next" "roman8" "turkish-case-conversion-" "windows-125"))
 
 
 ;;; Generated autoloads from emacs-lisp/ewoc.el
@@ -12546,11 +12275,6 @@ selected if the original window is the first one in the frame.
 (register-definition-prefixes "follow" '("follow-"))
 
 
-;;; Generated autoloads from international/fontset.el
-
-(register-definition-prefixes "fontset" '("build-default-fontset-data" "charset-script-alist" "create-" "fontset-" "generate-fontset-menu" "set" "standard-fontset-spec" "x-" "xlfd-"))
-
-
 ;;; Generated autoloads from mail/footnote.el
 
 (autoload 'footnote-mode "footnote" "\
@@ -12969,22 +12693,6 @@ Interactively, reads the register using `register-read-with-preview'.
 (register-definition-prefixes "frameset" '("frameset-"))
 
 
-;;; Generated autoloads from fringe.el
-
-(unless (fboundp 'define-fringe-bitmap) (defun define-fringe-bitmap (_bitmap _bits &optional _height _width _align) "Define fringe bitmap BITMAP from BITS of size HEIGHT x WIDTH.
-BITMAP is a symbol identifying the new fringe bitmap.
-BITS is either a string or a vector of integers.
-HEIGHT is height of bitmap.  If HEIGHT is nil, use length of BITS.
-WIDTH must be an integer between 1 and 16, or nil which defaults to 8.
-Optional fifth arg ALIGN may be one of `top', `center', or `bottom',
-indicating the positioning of the bitmap relative to the rows where it
-is used; the default is to center the bitmap.  Fifth arg may also be a
-list (ALIGN PERIODIC) where PERIODIC non-nil specifies that the bitmap
-should be repeated.
-If BITMAP already exists, the existing definition is replaced."))
-(register-definition-prefixes "fringe" '("fringe-" "set-fringe-"))
-
-
 ;;; Generated autoloads from play/gamegrid.el
 
 (register-definition-prefixes "gamegrid" '("gamegrid-"))
@@ -13167,11 +12875,6 @@ regular expression that can be used as an element of
 (fn KEYWORD-LIST FACE &optional PREFIX SUFFIX)")
 (make-obsolete 'generic-make-keywords-list 'regexp-opt "24.4")
 (register-definition-prefixes "generic" '("generic-"))
-
-
-;;; Generated autoloads from language/georgian.el
-
-(register-definition-prefixes "georgian" '("georgian-"))
 
 
 ;;; Generated autoloads from progmodes/glasses.el
@@ -14162,11 +13865,6 @@ retrieval failed.
 (register-definition-prefixes "gravatar" '("gravatar-"))
 
 
-;;; Generated autoloads from language/greek.el
-
-(register-definition-prefixes "greek" '("cp1253" "cp737" "cp8" "greek-iso-8bit" "ibm8" "iso-8859-7" "windows-1253"))
-
-
 ;;; Generated autoloads from progmodes/grep.el
 
 (defvar grep-window-height nil "\
@@ -14627,11 +14325,6 @@ HELP-TEXT is a text set in `hangul-input-method-help-text'.
 (register-definition-prefixes "quail/hangul" '("hangul" "notzerop"))
 
 
-;;; Generated autoloads from language/hanja-util.el
-
-(register-definition-prefixes "hanja-util" '("han"))
-
-
 ;;; Generated autoloads from play/hanoi.el
 
 (autoload 'hanoi "hanoi" "\
@@ -14683,11 +14376,6 @@ Prefix arg sets default accept amount temporarily.
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "hashcash" '("hashcash-"))
-
-
-;;; Generated autoloads from language/hebrew.el
-
-(register-definition-prefixes "hebrew" '("cp1255" "cp862" "hebrew-" "ibm862" "iso-8859-8" "windows-1255"))
 
 
 ;;; Generated autoloads from help-at-pt.el
@@ -16694,205 +16382,6 @@ disabled.
 (register-definition-prefixes "iimage" '("iimage-" "turn-off-iimage-mode"))
 
 
-;;; Generated autoloads from image.el
-
-(autoload 'image-type-from-data "image" "\
-Determine the image type from image data DATA.
-Value is a symbol specifying the image type or nil if type cannot
-be determined.
-
-(fn DATA)")
-(autoload 'image-type-from-buffer "image" "\
-Determine the image type from data in the current buffer.
-Value is a symbol specifying the image type or nil if type cannot
-be determined.")
-(autoload 'image-type-from-file-header "image" "\
-Determine the type of image file FILE from its first few bytes.
-Value is a symbol specifying the image type, or nil if type cannot
-be determined.
-
-(fn FILE)")
-(autoload 'image-type-from-file-name "image" "\
-Determine the type of image file FILE from its name.
-Value is a symbol specifying the image type, or nil if type cannot
-be determined.
-
-(fn FILE)")
-(make-obsolete 'image-type-from-file-name 'image-supported-file-p "29.1")
-(autoload 'image-type "image" "\
-Determine and return image type.
-SOURCE is an image file name or image data.
-Optional TYPE is a symbol describing the image type.  If TYPE is omitted
-or nil, try to determine the image type from its first few bytes
-of image data.  If that doesn't work, and SOURCE is a file name,
-use its file extension as image type.
-
-Optional DATA-P non-nil means SOURCE is a string containing image
-data.  If DATA-P is a symbol with a name on the format
-`image/jpeg', that may be used as a hint to determine the image
-type if we can't otherwise guess it.
-
-(fn SOURCE &optional TYPE DATA-P)")
-(autoload 'image-type-available-p "image" "\
-Return t if image type TYPE is available.
-Image types are symbols like `xbm' or `jpeg'.
-
-(fn TYPE)")
-(autoload 'image-type-auto-detected-p "image" "\
-Return t if the current buffer contains an auto-detectable image.
-This function is intended to be used from `magic-fallback-mode-alist'.
-
-The buffer is considered to contain an auto-detectable image if
-its beginning matches an image type in `image-type-header-regexps',
-and that image type is present in `image-type-auto-detectable' with a
-non-nil value.  If that value is non-nil, but not t, then the image type
-must be available.")
-(autoload 'create-image "image" "\
-Create an image from FILE-OR-DATA.
-FILE-OR-DATA is an image file name or image data.  If it is a relative
-file name, the function will look for it along `image-load-path'.
-
-Optional TYPE is a symbol describing the image type.  If TYPE is omitted
-or nil, try to determine the image type from its first few bytes
-of image data.  If that doesn't work, and FILE-OR-DATA is a file name,
-use its file extension as image type.
-
-Optional DATA-P non-nil means FILE-OR-DATA is a string containing image data.
-
-Optional PROPS are additional image attributes to assign to the image,
-like, e.g. `:mask MASK'.  If the property `:scale' is not given and the
-display has a high resolution (more exactly, when the average width of a
-character in the default font is more than 10 pixels), the image is
-automatically scaled up in proportion to the default font.
-
-Value is the image created, or nil if images of type TYPE are not supported.
-
-Images should not be larger than specified by `max-image-size'.
-
-(fn FILE-OR-DATA &optional TYPE DATA-P &rest PROPS)")
-(autoload 'put-image "image" "\
-Put image IMAGE in front of POS in the current buffer.
-IMAGE must be an image created with `create-image' or `defimage'.
-IMAGE is displayed by putting an overlay into the current buffer with a
-`before-string' STRING that has a `display' property whose value is the
-image.  STRING defaults to \"x\" if it's nil or omitted.
-The overlay created by this function has the `put-image' property set to t.
-POS may be an integer or marker.
-AREA is where to display the image.  AREA nil or omitted means
-display it in the text area, a value of `left-margin' means
-display it in the left marginal area, a value of `right-margin'
-means display it in the right marginal area.
-
-(fn IMAGE POS &optional STRING AREA)")
-(autoload 'insert-image "image" "\
-Insert IMAGE into current buffer at point.
-IMAGE is displayed by inserting STRING into the current buffer
-with a `display' property whose value is the image.
-
-STRING defaults to a single space if you omit it, which means
-that the inserted image will behave as whitespace syntactically.
-
-AREA is where to display the image.  AREA nil or omitted means
-display it in the text area, a value of `left-margin' means
-display it in the left marginal area, a value of `right-margin'
-means display it in the right marginal area.
-
-SLICE specifies slice of IMAGE to insert.  SLICE nil or omitted
-means insert whole image.  SLICE is a list (X Y WIDTH HEIGHT)
-specifying the X and Y positions and WIDTH and HEIGHT of image area
-to insert.  A float value 0.0 - 1.0 means relative to the width or
-height of the image; integer values are taken as pixel values.
-
-Normally `isearch' is able to search for STRING in the buffer
-even if it's hidden behind a displayed image.  If INHIBIT-ISEARCH
-is non-nil, this is inhibited.
-
-(fn IMAGE &optional STRING AREA SLICE INHIBIT-ISEARCH)")
-(autoload 'insert-sliced-image "image" "\
-Insert IMAGE into current buffer at point.
-IMAGE is displayed by inserting STRING into the current buffer
-with a `display' property whose value is the image.  The default
-STRING is a single space.
-AREA is where to display the image.  AREA nil or omitted means
-display it in the text area, a value of `left-margin' means
-display it in the left marginal area, a value of `right-margin'
-means display it in the right marginal area.
-The image is automatically split into ROWS x COLS slices.
-
-(fn IMAGE &optional STRING AREA ROWS COLS)")
-(autoload 'remove-images "image" "\
-Remove images between START and END in BUFFER.
-Remove only images that were put in BUFFER with calls to `put-image'.
-BUFFER nil or omitted means use the current buffer.
-
-(fn START END &optional BUFFER)")
-(autoload 'find-image "image" "\
-Find an image that satisfies one of a list of image specifications.
-
-SPECS is a list of image specifications.
-
-Each image specification in SPECS is a property list.  The
-contents of a specification are image type dependent; see the
-info node `(elisp)Image Descriptors' for details.  All specifications
-must at least contain either the property `:file FILE' or `:data DATA',
-where FILE is the file from which to load the image, and DATA is a
-string containing the actual image data.  If the property `:type TYPE'
-is omitted or nil, try to determine the image type from its first few
-bytes of image data.  If that doesn't work, and the property `:file
-FILE' provide a file name, use its file extension as idication of the
-image type. If `:type TYPE' is provided, it must match the actual type
-determined for FILE or DATA by `create-image'.
-
-The function returns the image specification for the first specification
-in the list whose TYPE is supported and FILE, if specified, exists.  It
-returns nil if no specification in the list can be satisfied.
-
-If CACHE is non-nil, results are cached and returned on subsequent calls.
-
-The image is looked for in `image-load-path'.
-
-Image files should not be larger than specified by `max-image-size'.
-
-(fn SPECS &optional CACHE)")
-(autoload 'defimage "image" "\
-Define SYMBOL as an image, and return SYMBOL.
-
-SPECS is a list of image specifications.  DOC is an optional
-documentation string.
-
-Each image specification in SPECS is a property list.  The contents of
-a specification are image type dependent.  All specifications must at
-least contain the properties `:type TYPE' and either `:file FILE' or
-`:data DATA', where TYPE is a symbol specifying the image type,
-e.g. `xbm', FILE is the file to load the image from, and DATA is a
-string containing the actual image data.  The first image
-specification whose TYPE is supported, and FILE exists, is used to
-define SYMBOL.
-
-Example:
-
-   (defimage test-image ((:type xpm :file \"~/test1.xpm\")
-                         (:type xbm :file \"~/test1.xbm\")))
-
-(fn SYMBOL SPECS &optional DOC)" nil t)
-(function-put 'defimage 'doc-string-elt 3)
-(function-put 'defimage 'lisp-indent-function 'defun)
-(autoload 'imagemagick-register-types "image" "\
-Register file types that can be handled by ImageMagick.
-This function is called at startup, after loading the init file.
-It registers the ImageMagick types returned by `imagemagick-filter-types'.
-
-Registered image types are added to `auto-mode-alist', so that
-Emacs visits them in Image mode.  They are also added to
-`image-type-file-name-regexps', so that the `image-type' function
-recognizes these files as having image type `imagemagick'.
-
-If Emacs is compiled without ImageMagick support, this does nothing.")
-(autoload 'image-at-point-p "image" "\
-Return non-nil if there is an image at point.")
-(register-definition-prefixes "image" '("find-image--cache" "image" "unknown-image-type"))
-
-
 ;;; Generated autoloads from image/image-converter.el
 
 (autoload 'image-converter-add-handler "image-converter" "\
@@ -17372,31 +16861,6 @@ for more information.
 (register-definition-prefixes "imenu" '("imenu-"))
 
 
-;;; Generated autoloads from language/ind-util.el
-
-(autoload 'indian-compose-region "ind-util" "\
-Compose the region according to `composition-function-table'.
-
-(fn FROM TO)" t)
-(autoload 'indian-compose-string "ind-util" "\
-
-
-(fn STRING)")
-(autoload 'in-is13194-post-read-conversion "ind-util" "\
-
-
-(fn LEN)")
-(autoload 'in-is13194-pre-write-conversion "ind-util" "\
-
-
-(fn FROM TO)")
-(autoload 'indian-2-column-to-ucs-region "ind-util" "\
-Convert old Emacs Devanagari characters to UCS.
-
-(fn FROM TO)" t)
-(register-definition-prefixes "ind-util" '("combinatorial" "indian-" "is13194-"))
-
-
 ;;; Generated autoloads from indent-aux.el
 
 (defvar kill-ring-deindent-mode nil "\
@@ -17435,11 +16899,6 @@ disabled.
 ;;; Generated autoloads from leim/quail/indian.el
 
 (register-definition-prefixes "quail/indian" '("indian-mlm-mozhi-u" "inscript-" "quail-" "tamil"))
-
-
-;;; Generated autoloads from language/indian.el
-
-(register-definition-prefixes "indian" '("bengali-composable-pattern" "devanagari" "gujarati-composable-pattern" "gurmukhi-composable-pattern" "in-is13194-devanagari" "indian-compose-regexp" "kannada-composable-pattern" "malayalam-composable-pattern" "oriya-composable-pattern" "tamil-composable-pattern" "telugu-composable-pattern"))
 
 
 ;;; Generated autoloads from progmodes/inf-lisp.el
@@ -18166,78 +17625,9 @@ You can bind this to the key C-c i in GNUS or mail by adding to
 (register-definition-prefixes "ja-dic-utl" '("skkdic-"))
 
 
-;;; Generated autoloads from language/japan-util.el
-
-(autoload 'setup-japanese-environment-internal "japan-util")
-(autoload 'japanese-katakana "japan-util" "\
-Convert argument to Katakana and return that.
-The argument may be a character or string.  The result has the same type.
-The argument object is not altered--the value is a copy.
-Optional argument HANKAKU t means to convert to `hankaku' Katakana
-(`japanese-jisx0201-kana'), in which case return value
-may be a string even if OBJ is a character if two Katakanas are
-necessary to represent OBJ.
-
-(fn OBJ &optional HANKAKU)")
-(autoload 'japanese-hiragana "japan-util" "\
-Convert argument to Hiragana and return that.
-The argument may be a character or string.  The result has the same type.
-The argument object is not altered--the value is a copy.
-
-(fn OBJ)")
-(autoload 'japanese-hankaku "japan-util" "\
-Convert argument to `hankaku' and return that.
-The argument may be a character or string.  The result has the same type.
-The argument object is not altered--the value is a copy.
-Optional argument ASCII-ONLY non-nil means to return only ASCII character.
-
-(fn OBJ &optional ASCII-ONLY)")
-(autoload 'japanese-zenkaku "japan-util" "\
-Convert argument to `zenkaku' and return that.
-The argument may be a character or string.  The result has the same type.
-The argument object is not altered--the value is a copy.
-
-(fn OBJ)")
-(autoload 'japanese-katakana-region "japan-util" "\
-Convert Japanese `hiragana' chars in the region to `katakana' chars.
-Optional argument HANKAKU t means to convert to `hankaku katakana' character
-of which charset is `japanese-jisx0201-kana'.
-
-(fn FROM TO &optional HANKAKU)" t)
-(autoload 'japanese-hiragana-region "japan-util" "\
-Convert Japanese `katakana' chars in the region to `hiragana' chars.
-
-(fn FROM TO)" t)
-(autoload 'japanese-hankaku-region "japan-util" "\
-Convert Japanese `zenkaku' chars in the region to `hankaku' chars.
-`Zenkaku' chars belong to `japanese-jisx0208'
-`Hankaku' chars belong to `ascii' or `japanese-jisx0201-kana'.
-Optional argument ASCII-ONLY non-nil means to convert only to ASCII char.
-
-(fn FROM TO &optional ASCII-ONLY)" t)
-(autoload 'japanese-zenkaku-region "japan-util" "\
-Convert hankaku' chars in the region to Japanese `zenkaku' chars.
-`Zenkaku' chars belong to `japanese-jisx0208'
-`Hankaku' chars belong to `ascii' or `japanese-jisx0201-kana'.
-Optional argument KATAKANA-ONLY non-nil means to convert only KATAKANA char.
-
-(fn FROM TO &optional KATAKANA-ONLY)" t)
-(autoload 'read-hiragana-string "japan-util" "\
-Read a Hiragana string from the minibuffer, prompting with string PROMPT.
-If non-nil, second arg INITIAL-INPUT is a string to insert before reading.
-
-(fn PROMPT &optional INITIAL-INPUT)")
-(register-definition-prefixes "japan-util" '("japanese-"))
-
-
 ;;; Generated autoloads from leim/quail/japanese.el
 
 (register-definition-prefixes "quail/japanese" '("quail-japanese-"))
-
-
-;;; Generated autoloads from language/japanese.el
-
-(register-definition-prefixes "japanese" '("cp2" "cp932" "ebcdic-jp-" "euc" "ibm2" "iso-2022-jp" "japanese-" "junet" "old-jis" "shift_jis" "sjis"))
 
 
 ;;; Generated autoloads from jka-compr.el
@@ -18510,60 +17900,9 @@ List the keyboard macros." t)
 (register-definition-prefixes "kmacro" '("kmacro-"))
 
 
-;;; Generated autoloads from language/korea-util.el
-
-(defvar default-korean-keyboard (purify-if-dumping (if (string-search "3" (or (getenv "HANGUL_KEYBOARD_TYPE") "")) "3" "")) "\
-The kind of Korean keyboard for Korean (Hangul) input method.
-\"\" for 2, \"3\" for 3, and \"3f\" for 3f.")
-(autoload 'setup-korean-environment-internal "korea-util")
-(register-definition-prefixes "korea-util" '("exit-korean-environment" "isearch-" "korean-key-bindings" "quail-hangul-switch-" "toggle-korean-input-method"))
-
-
-;;; Generated autoloads from language/korean.el
-
-(register-definition-prefixes "korean" '("cp949" "euc-k" "iso-2022-kr" "korean-" "ks_c_5601-1987"))
-
-
 ;;; Generated autoloads from leim/quail/lao.el
 
 (register-definition-prefixes "quail/lao" '("lao-" "quail-lao-update-translation"))
-
-
-;;; Generated autoloads from language/lao.el
-
-(register-definition-prefixes "lao" '("lao"))
-
-
-;;; Generated autoloads from language/lao-util.el
-
-(autoload 'lao-compose-string "lao-util" "\
-
-
-(fn STR)")
-(autoload 'lao-transcribe-single-roman-syllable-to-lao "lao-util" "\
-Transcribe a Romanized Lao syllable in the region FROM and TO to Lao string.
-Only the first syllable is transcribed.
-The value has the form: (START END LAO-STRING), where
-START and END are the beginning and end positions of the Roman Lao syllable,
-LAO-STRING is the Lao character transcription of it.
-
-Optional 3rd arg STR, if non-nil, is a string to search for Roman Lao
-syllable.  In that case, FROM and TO are indexes to STR.
-
-(fn FROM TO &optional STR)")
-(autoload 'lao-transcribe-roman-to-lao-string "lao-util" "\
-Transcribe Romanized Lao string STR to Lao character string.
-
-(fn STR)")
-(autoload 'lao-composition-function "lao-util" "\
-
-
-(fn GSTRING DIRECTION)")
-(autoload 'lao-compose-region "lao-util" "\
-
-
-(fn FROM TO)" t)
-(register-definition-prefixes "lao-util" '("lao-"))
 
 
 ;;; Generated autoloads from international/latexenc.el
@@ -20236,11 +19575,6 @@ The return value is always nil.
 (register-definition-prefixes "misc" '("duplicate-" "list-dynamic-libraries--"))
 
 
-;;; Generated autoloads from language/misc-lang.el
-
-(register-definition-prefixes "misc-lang" '("arabic-shape" "cp1256" "egyptian-shape-grouping" "iso-8859-6" "windows-1256"))
-
-
 ;;; Generated autoloads from misearch.el
 
  (add-hook 'isearch-mode-hook 'multi-isearch-setup)
@@ -20790,141 +20124,6 @@ The default is 20.  If LIMIT is negative, do not limit the listing.
 (register-definition-prefixes "mule-diag" '("charset-history" "describe-font-internal" "insert-section" "list-" "mule--kbd-at" "print-" "sort-listed-character-sets"))
 
 
-;;; Generated autoloads from international/mule-util.el
-
-(autoload 'store-substring "mule-util" "\
-Embed OBJ (string or character) at index IDX of STRING.
-
-(fn STRING IDX OBJ)")
-(autoload 'truncate-string-to-width "mule-util" "\
-Truncate string STR to end at column END-COLUMN.
-The optional 3rd arg START-COLUMN, if non-nil, specifies the starting
-column (default: zero); that means to return the characters occupying
-columns START-COLUMN ... END-COLUMN of STR.  Both END-COLUMN and
-START-COLUMN are specified in terms of character display width in the
-current buffer; see `char-width'.
-
-Since character composition on display can produce glyphs whose
-width is smaller than the sum of `char-width' values of the
-composed characters, this function can produce inaccurate results
-when used in such cases.
-
-The optional 4th arg PADDING, if non-nil, specifies a padding
-character (which should have a display width of 1) to add at the end
-of the result if STR doesn't reach column END-COLUMN, or if END-COLUMN
-comes in the middle of a character in STR.  PADDING is also added at
-the beginning of the result if column START-COLUMN appears in the
-middle of a character in STR.
-
-If PADDING is nil, no padding is added in these cases, so
-the resulting string may be narrower than END-COLUMN.
-
-If ELLIPSIS is non-nil, it should be a string which will replace the
-end of STR (including any padding) if it extends beyond END-COLUMN,
-unless the display width of STR is equal to or less than the display
-width of ELLIPSIS.  If it is non-nil and not a string, then ELLIPSIS
-defaults to `truncate-string-ellipsis', or to three dots when it's nil.
-
-If ELLIPSIS-TEXT-PROPERTY is non-nil, a too-long string will not
-be truncated, but instead the elided parts will be covered by a
-`display' text property showing the ellipsis.
-
-(fn STR END-COLUMN &optional START-COLUMN PADDING ELLIPSIS ELLIPSIS-TEXT-PROPERTY)")
-(defsubst nested-alist-p (obj) "\
-Return t if OBJ is a nested alist.
-
-Nested alist is a list of the form (ENTRY . BRANCHES), where ENTRY is
-any Lisp object, and BRANCHES is a list of cons cells of the form
-(KEY-ELEMENT . NESTED-ALIST).
-
-You can use a nested alist to store any Lisp object (ENTRY) for a key
-sequence KEYSEQ, where KEYSEQ is a sequence of KEY-ELEMENT.  KEYSEQ
-can be a string, a vector, or a list." (and obj (listp obj) (listp (cdr obj))))
-(autoload 'set-nested-alist "mule-util" "\
-Set ENTRY for KEYSEQ in a nested alist ALIST.
-Optional 4th arg LEN non-nil means the first LEN elements in KEYSEQ
- are considered.
-Optional 5th argument BRANCHES if non-nil is branches for a keyseq
-longer than KEYSEQ.
-See the documentation of `nested-alist-p' for more detail.
-
-(fn KEYSEQ ENTRY ALIST &optional LEN BRANCHES)")
-(autoload 'lookup-nested-alist "mule-util" "\
-Look up key sequence KEYSEQ in nested alist ALIST.  Return the definition.
-Optional 3rd argument LEN specifies the length of KEYSEQ.
-Optional 4th argument START specifies index of the starting key.
-The returned value is normally a nested alist of which
-car part is the entry for KEYSEQ.
-If ALIST is not deep enough for KEYSEQ, return number which is
- how many key elements at the front of KEYSEQ it takes
- to reach a leaf in ALIST.
-Optional 5th argument NIL-FOR-TOO-LONG non-nil means return nil
- even if ALIST is not deep enough.
-
-(fn KEYSEQ ALIST &optional LEN START NIL-FOR-TOO-LONG)")
-(autoload 'coding-system-post-read-conversion "mule-util" "\
-Return the value of CODING-SYSTEM's `post-read-conversion' property.
-
-(fn CODING-SYSTEM)")
-(autoload 'coding-system-pre-write-conversion "mule-util" "\
-Return the value of CODING-SYSTEM's `pre-write-conversion' property.
-
-(fn CODING-SYSTEM)")
-(autoload 'coding-system-translation-table-for-decode "mule-util" "\
-Return the value of CODING-SYSTEM's `decode-translation-table' property.
-
-(fn CODING-SYSTEM)")
-(autoload 'coding-system-translation-table-for-encode "mule-util" "\
-Return the value of CODING-SYSTEM's `encode-translation-table' property.
-
-(fn CODING-SYSTEM)")
-(autoload 'with-coding-priority "mule-util" "\
-Execute BODY like `progn' with CODING-SYSTEMS at the front of priority list.
-CODING-SYSTEMS is a list of coding systems.  See `set-coding-system-priority'.
-This affects the implicit sorting of lists of coding systems returned by
-operations such as `find-coding-systems-region'.
-
-(fn CODING-SYSTEMS &rest BODY)" nil t)
-(function-put 'with-coding-priority 'lisp-indent-function 1)
-(autoload 'detect-coding-with-language-environment "mule-util" "\
-Detect a coding system for the text between FROM and TO with LANG-ENV.
-The detection takes into account the coding system priorities for the
-language environment LANG-ENV.
-
-(fn FROM TO LANG-ENV)")
-(autoload 'filepos-to-bufferpos "mule-util" "\
-Try to return the buffer position corresponding to a particular file position.
-The file position is given as a (0-based) BYTE count.
-The function presumes the file is encoded with CODING-SYSTEM, which defaults
-to `buffer-file-coding-system'.
-QUALITY can be:
-  `approximate', in which case we may cut some corners to avoid
-    excessive work.
-  `exact', in which case we may end up re-(en/de)coding a large
-    part of the file/buffer, this can be expensive and slow.  (It
-    is an error to request the `exact' method when the buffer's
-    EOL format is not yet decided.)
-  nil, in which case we may return nil rather than an approximation.
-
-(fn BYTE &optional QUALITY CODING-SYSTEM)")
-(autoload 'bufferpos-to-filepos "mule-util" "\
-Try to return the file byte corresponding to a particular buffer POSITION.
-Value is the file position given as a (0-based) byte count.
-The function presumes the file is encoded with CODING-SYSTEM, which defaults
-to `buffer-file-coding-system'.
-QUALITY can be:
-  `approximate', in which case we may cut some corners to avoid
-    excessive work.
-  `exact', in which case we may end up re-(en/de)coding a large
-    part of the file/buffer, this can be expensive and slow.  (It
-    is an error to request the `exact' method when the buffer's
-    EOL format is not yet decided.)
-  nil, in which case we may return nil rather than an approximation.
-
-(fn POSITION &optional QUALITY CODING-SYSTEM)")
-(register-definition-prefixes "mule-util" '("filepos-to-bufferpos--dos" "truncate-string-ellipsis"))
-
-
 ;;; Generated autoloads from emacs-lisp/multisession.el
 
 (autoload 'define-multisession-variable "multisession" "\
@@ -20941,37 +20140,6 @@ storage method to list.
 
 (fn &optional CHOOSE-STORAGE)" t)
 (register-definition-prefixes "multisession" '("multisession-"))
-
-
-;;; Generated autoloads from mwheel.el
-
-(defvar mouse-wheel-mode t "\
-Non-nil if Mouse-Wheel mode is enabled.
-See the `mouse-wheel-mode' command
-for a description of this minor mode.
-Setting this variable directly does not take effect;
-either customize it (see the info node `Easy Customization')
-or call the function `mouse-wheel-mode'.")
-(custom-autoload 'mouse-wheel-mode "mwheel" nil)
-(autoload 'mouse-wheel-mode "mwheel" "\
-Toggle mouse wheel support (Mouse Wheel mode).
-
-This is a global minor mode.  If called interactively, toggle the
-`Mouse-Wheel mode' mode.  If the prefix argument is positive, enable the
-mode, and if it is zero or negative, disable the mode.
-
-If called from Lisp, toggle the mode if ARG is `toggle'.  Enable the
-mode if ARG is nil, omitted, or is a positive number.  Disable the mode
-if ARG is a negative number.
-
-To check whether the minor mode is enabled in the current buffer,
-evaluate `(default-value \\='mouse-wheel-mode)'.
-
-The mode's hook is called both when the mode is enabled and when it is
-disabled.
-
-(fn &optional ARG)" t)
-(register-definition-prefixes "mwheel" '("mouse-wheel-" "mwheel-"))
 
 
 ;;; Generated autoloads from emacs-lisp/nadvice.el
@@ -22913,7 +22081,7 @@ file (but after reading the early init file).  This means that if
 you wish to set this variable, you must do so in the early init
 file.  Regardless of the value of this variable, packages are not
 made available if `user-init-file' is nil (e.g. Emacs was started
-with \"-q\").
+                                                with \"-q\").
 
 Even if the value is nil, you can type \\[package-initialize] to
 make installed packages available at any time, or you can
@@ -22939,11 +22107,7 @@ These directories contain packages intended for system-wide; in
 contrast, `package-user-dir' contains packages for personal use." :type '(repeat directory) :initialize #'custom-initialize-delay :group 'applications :risky t :version "24.1")
 (custom-autoload 'package-directory-list "package" t)
 (defvar package-activated-list nil "\
-List of the names of currently activated packages.")
-(autoload 'package-native-compile "package" "\
-
-
-(fn PKG-DESC)" t)
+Activating is not loading!")
 (defvar package--activated nil "\
 Non-nil if `package-activate-all' has been run.")
 (autoload 'package-initialize "package" "\
@@ -25922,70 +25086,6 @@ This enforces rescanning the buffer on next use.")
 (register-definition-prefixes "reftex-vars" '("reftex-"))
 
 
-;;; Generated autoloads from emacs-lisp/regexp-opt.el
-
-(autoload 'regexp-opt "regexp-opt" "\
-Return a regexp to match a string in the list STRINGS.
-Each member of STRINGS is treated as a fixed string, not as a regexp.
-Optional PAREN specifies how the returned regexp is surrounded by
-grouping constructs.
-
-If STRINGS is the empty list, the return value is a regexp that
-never matches anything.
-
-The optional argument PAREN can be any of the following:
-
-a string
-    the resulting regexp is preceded by PAREN and followed by
-    \\), e.g.  use \"\\\\(?1:\" to produce an explicitly numbered
-    group.
-
-`words'
-    the resulting regexp is surrounded by \\=\\<\\( and \\)\\>.
-
-`symbols'
-    the resulting regexp is surrounded by \\_<\\( and \\)\\_>.
-
-non-nil
-    the resulting regexp is surrounded by \\( and \\).
-
-nil
-    the resulting regexp is surrounded by \\(?: and \\), if it is
-    necessary to ensure that a postfix operator appended to it will
-    apply to the whole expression.
-
-The returned regexp is ordered in such a way that it will always
-match the longest string possible.
-
-Up to reordering, the resulting regexp is equivalent to but
-usually more efficient than that of a simplified version:
-
- (defun simplified-regexp-opt (strings &optional paren)
-   (let ((parens
-          (cond ((stringp paren)       (cons paren \"\\\\)\"))
-                ((eq paren \\='words)    \\='(\"\\\\\\=<\\\\(\" . \"\\\\)\\\\>\"))
-                ((eq paren \\='symbols) \\='(\"\\\\_<\\\\(\" . \"\\\\)\\\\_>\"))
-                ((null paren)          \\='(\"\\\\(?:\" . \"\\\\)\"))
-                (t                       \\='(\"\\\\(\" . \"\\\\)\")))))
-     (concat (car parens)
-             (mapconcat \\='regexp-quote strings \"\\\\|\")
-             (cdr parens))))
-
-(fn STRINGS &optional PAREN)")
-(function-put 'regexp-opt 'function-type '(function (list &optional t) string))
-(function-put 'regexp-opt 'pure 't)
-(function-put 'regexp-opt 'side-effect-free 't)
-(autoload 'regexp-opt-depth "regexp-opt" "\
-Return the depth of REGEXP.
-This means the number of non-shy regexp grouping constructs
-(parenthesized expressions) in REGEXP.
-
-(fn REGEXP)")
-(function-put 'regexp-opt-depth 'pure 't)
-(function-put 'regexp-opt-depth 'side-effect-free 't)
-(register-definition-prefixes "regexp-opt" '("regexp-opt-"))
-
-
 ;;; Generated autoloads from emacs-lisp/regi.el
 
 (register-definition-prefixes "regi" '("regi-"))
@@ -26795,40 +25895,6 @@ must be equal.
 (register-definition-prefixes "rng-xsd" '("rng-xsd-" "xsd-duration-reference-dates"))
 
 
-;;; Generated autoloads from international/robin.el
-
-(autoload 'robin-define-package "robin" "\
-Define a robin package.
-
-NAME is the string of this robin package.
-DOCSTRING is the documentation string of this robin package.
-Each RULE is of the form (INPUT OUTPUT) where INPUT is a string and
-OUTPUT is either a character or a string.  RULES are not evaluated.
-
-If there already exists a robin package whose name is NAME, the new
-one replaces the old one.
-
-(fn NAME DOCSTRING &rest RULES)" nil t)
-(autoload 'robin-modify-package "robin" "\
-Change a rule in an already defined robin package.
-
-NAME is the string specifying a robin package.
-INPUT is a string that specifies the input pattern.
-OUTPUT is either a character or a string to be generated.
-
-(fn NAME INPUT OUTPUT)")
-(autoload 'robin-use-package "robin" "\
-Start using robin package NAME, which is a string.
-
-(fn NAME)")
-(register-definition-prefixes "robin" '("robin-"))
-
-
-;;; Generated autoloads from language/romanian.el
-
-(register-definition-prefixes "romanian" '("iso-" "latin-10"))
-
-
 ;;; Generated autoloads from rot13.el
 
 (autoload 'rot13 "rot13" "\
@@ -26949,216 +26015,6 @@ disabled.
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "ruler-mode" '("ruler-"))
-
-
-;;; Generated autoloads from emacs-lisp/rx.el
-
-(autoload 'rx-to-string "rx" "\
-Translate FORM from `rx' sexp syntax into a string regexp.
-The arguments to `literal' and `regexp' forms inside FORM must be
-constant strings.
-If NO-GROUP is non-nil, don't bracket the result in a non-capturing
-group.
-
-For extending the `rx' notation in FORM, use `rx-define' or `rx-let-eval'.
-
-(fn FORM &optional NO-GROUP)")
-(function-put 'rx-to-string 'important-return-value 't)
-(autoload 'rx "rx" "\
-Translate regular expressions REGEXPS in sexp form to a regexp string.
-Each argument is one of the forms below; RX is a subform, and RX... stands
-for zero or more RXs.  For details, see Info node `(elisp) Rx Notation'.
-See `rx-to-string' for the corresponding function.
-
-STRING         Match a literal string.
-CHAR           Match a literal character.
-
-(seq RX...)    Match the RXs in sequence.  Alias: :, sequence, and.
-(or RX...)     Match one of the RXs.  Alias: |.
-
-(zero-or-more RX...) Match RXs zero or more times.  Alias: 0+.
-(one-or-more RX...)  Match RXs one or more times.  Alias: 1+.
-(zero-or-one RX...)  Match RXs or the empty string.  Alias: opt, optional.
-(* RX...)       Match RXs zero or more times; greedy.
-(+ RX...)       Match RXs one or more times; greedy.
-(? RX...)       Match RXs or the empty string; greedy.
-(*? RX...)      Match RXs zero or more times; non-greedy.
-(+? RX...)      Match RXs one or more times; non-greedy.
-(?? RX...)      Match RXs or the empty string; non-greedy.
-(= N RX...)     Match RXs exactly N times.
-(>= N RX...)    Match RXs N or more times.
-(** N M RX...)  Match RXs N to M times.  Alias: repeat.
-(minimal-match RX)  Match RX, with zero-or-more, one-or-more, zero-or-one
-                and aliases using non-greedy matching.
-(maximal-match RX)  Match RX, with zero-or-more, one-or-more, zero-or-one
-                and aliases using greedy matching, which is the default.
-
-(any SET...)    Match a character from one of the SETs.  Each SET is a
-                character, a string, a range as string \"A-Z\" or cons
-                (?A . ?Z), or a character class (see below).  Alias: in, char.
-(not CHARSPEC)  Match one character not matched by CHARSPEC.  CHARSPEC
-                can be a character, single-char string, (any ...), (or ...),
-                (intersection ...), (syntax ...), (category ...),
-                or a character class.
-(intersection CHARSET...) Match all CHARSETs.
-                CHARSET is (any...), (not...), (or...) or (intersection...),
-                a character or a single-char string.
-not-newline     Match any character except a newline.  Alias: nonl.
-anychar         Match any character.  Alias: anything.
-unmatchable     Never match anything at all.
-
-CHARCLASS       Match a character from a character class.  One of:
- alpha, alphabetic, letter   Alphabetic characters (defined by Unicode).
- alnum, alphanumeric         Alphabetic or decimal digit chars (Unicode).
- digit, numeric, num         0-9.
- xdigit, hex-digit, hex      0-9, A-F, a-f.
- cntrl, control              ASCII codes 0-31.
- blank                       Horizontal whitespace (Unicode).
- space, whitespace, white    Chars with whitespace syntax.
- lower, lower-case           Lower-case chars, from current case table.
- upper, upper-case           Upper-case chars, from current case table.
- graph, graphic              Graphic characters (Unicode).
- print, printing             Whitespace or graphic (Unicode).
- punct, punctuation          Not control, space, letter or digit (ASCII);
-                              not word syntax (non-ASCII).
- word, wordchar              Characters with word syntax.
- ascii                       ASCII characters (codes 0-127).
- nonascii                    Non-ASCII characters (but not raw bytes).
-
-(syntax SYNTAX)  Match a character with syntax SYNTAX, being one of:
-  whitespace, punctuation, word, symbol, open-parenthesis,
-  close-parenthesis, expression-prefix, string-quote,
-  paired-delimiter, escape, character-quote, comment-start,
-  comment-end, string-delimiter, comment-delimiter
-
-(category CAT)   Match a character in category CAT, being one of:
-  space-for-indent, base, consonant, base-vowel,
-  upper-diacritical-mark, lower-diacritical-mark, tone-mark, symbol,
-  digit, vowel-modifying-diacritical-mark, vowel-sign,
-  semivowel-lower, not-at-end-of-line, not-at-beginning-of-line,
-  alpha-numeric-two-byte, chinese-two-byte, greek-two-byte,
-  japanese-hiragana-two-byte, indian-two-byte,
-  japanese-katakana-two-byte, strong-left-to-right,
-  korean-hangul-two-byte, strong-right-to-left, cyrillic-two-byte,
-  combining-diacritic, ascii, arabic, chinese, ethiopic, greek,
-  korean, indian, japanese, japanese-katakana, latin, lao,
-  tibetan, japanese-roman, thai, vietnamese, hebrew, cyrillic,
-  can-break
-
-Zero-width assertions: these all match the empty string in specific places.
- line-start         At the beginning of a line.  Alias: bol.
- line-end           At the end of a line.  Alias: eol.
- string-start       At the start of the string or buffer.
-                     Alias: buffer-start, bos, bot.
- string-end         At the end of the string or buffer.
-                     Alias: buffer-end, eos, eot.
- point              At point.
- word-start         At the beginning of a word.  Alias: bow.
- word-end           At the end of a word.  Alias: eow.
- word-boundary      At the beginning or end of a word.
- not-word-boundary  Not at the beginning or end of a word.
- symbol-start       At the beginning of a symbol.
- symbol-end         At the end of a symbol.
-
-(group RX...)  Match RXs and define a capture group.  Alias: submatch.
-(group-n N RX...) Match RXs and define capture group N.  Alias: submatch-n.
-(backref N)    Match the text that capture group N matched.
-
-(literal EXPR) Match the literal string from evaluating EXPR at run time.
-(regexp EXPR)  Match the string regexp from evaluating EXPR at run time.
-(eval EXPR)    Match the rx sexp from evaluating EXPR at macro-expansion
-                (compile) time.
-
-Additional constructs can be defined using `rx-define' and `rx-let',
-which see.
-
-(fn REGEXPS...)" nil t)
-(autoload 'rx-let-eval "rx" "\
-Evaluate BODY with local BINDINGS for `rx-to-string'.
-BINDINGS, after evaluation, is a list of definitions each on the form
-(NAME [(ARGS...)] RX), in effect for calls to `rx-to-string'
-in BODY.
-
-For bindings without an ARGS list, NAME is defined as an alias
-for the `rx' expression RX.  Where ARGS is supplied, NAME is
-defined as an `rx' form with ARGS as argument list.  The
-parameters are bound from the values in the (NAME ...) form and
-are substituted in RX.  ARGS can contain `&rest' parameters,
-whose values are spliced into RX where the parameter name occurs.
-
-Any previous definitions with the same names are shadowed during
-the expansion of BODY only.
-For extensions when using the `rx' macro, use `rx-let'.
-To make global rx extensions, use `rx-define'.
-For more details, see Info node `(elisp) Extending Rx'.
-
-(fn BINDINGS BODY...)" nil t)
-(function-put 'rx-let-eval 'lisp-indent-function 1)
-(autoload 'rx-let "rx" "\
-Evaluate BODY with local BINDINGS for `rx'.
-BINDINGS is an unevaluated list of bindings each on the form
-(NAME [(ARGS...)] RX).
-They are bound lexically and are available in `rx' expressions in
-BODY only.
-
-For bindings without an ARGS list, NAME is defined as an alias
-for the `rx' expression RX.  Where ARGS is supplied, NAME is
-defined as an `rx' form with ARGS as argument list.  The
-parameters are bound from the values in the (NAME ...) form and
-are substituted in RX.  ARGS can contain `&rest' parameters,
-whose values are spliced into RX where the parameter name occurs.
-
-Any previous definitions with the same names are shadowed during
-the expansion of BODY only.
-For local extensions to `rx-to-string', use `rx-let-eval'.
-To make global rx extensions, use `rx-define'.
-For more details, see Info node `(elisp) Extending Rx'.
-
-(fn BINDINGS BODY...)" nil t)
-(function-put 'rx-let 'lisp-indent-function 1)
-(autoload 'rx-define "rx" "\
-Define NAME as a global `rx' definition.
-If the ARGS list is omitted, define NAME as an alias for the `rx'
-expression RX.
-
-If the ARGS list is supplied, define NAME as an `rx' form with
-ARGS as argument list.  The parameters are bound from the values
-in the (NAME ...) form and are substituted in RX.
-ARGS can contain `&rest' parameters, whose values are spliced
-into RX where the parameter name occurs.
-
-Any previous global definition of NAME is overwritten with the new one.
-To make local rx extensions, use `rx-let' for `rx',
-`rx-let-eval' for `rx-to-string'.
-For more details, see Info node `(elisp) Extending Rx'.
-
-(fn NAME [(ARGS...)] RX)" nil t)
-(function-put 'rx-define 'lisp-indent-function 'defun)
-(autoload 'rx--pcase-macroexpander "rx" "\
-A pattern that matches strings against `rx' REGEXPS in sexp form.
-REGEXPS are interpreted as in `rx'.  The pattern matches any
-string that is a match for REGEXPS, as if by `string-match'.
-
-In addition to the usual `rx' syntax, REGEXPS can contain the
-following constructs:
-
-  (let REF RX...)  binds the symbol REF to a submatch that matches
-                   the regular expressions RX.  REF is bound in
-                   CODE to the string of the submatch or nil, but
-                   can also be used in `backref'.
-  (backref REF)    matches whatever the submatch REF matched.
-                   REF can be a number, as usual, or a name
-                   introduced by a previous (let REF ...)
-                   construct.
-
-(fn &rest REGEXPS)")
-(define-symbol-prop 'rx--pcase-macroexpander 'edebug-form-spec 'nil)
-(define-symbol-prop 'rx 'pcase-macroexpander #'rx--pcase-macroexpander)
-(autoload 'rx--pcase-expand "rx" "\
-
-
-(fn REGEXPS)")
-(register-definition-prefixes "rx" '("rx-"))
 
 
 ;;; Generated autoloads from net/sasl.el
@@ -27390,11 +26246,6 @@ disabled.
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "scroll-all" '("scroll-all-"))
-
-
-;;; Generated autoloads from scroll-bar.el
-
-(register-definition-prefixes "scroll-bar" '("get-scroll-bar-mode" "horizontal-scroll-bar" "previous-scroll-bar-mode" "scroll-bar-" "set-scroll-bar-mode" "toggle-"))
 
 
 ;;; Generated autoloads from scroll-lock.el
@@ -31116,37 +29967,6 @@ disabled, and this function always returns nil.
 (register-definition-prefixes "quail/thai" '("thai-generate-quail-map"))
 
 
-;;; Generated autoloads from language/thai.el
-
-(register-definition-prefixes "thai" '("cp874" "ibm874" "iso-8859-11" "tai-tham-composable-pattern" "tis"))
-
-
-;;; Generated autoloads from language/thai-util.el
-
-(autoload 'thai-compose-region "thai-util" "\
-Compose Thai characters in the region.
-When called from a program, expects two arguments,
-positions (integers or markers) specifying the region.
-
-(fn BEG END)" t)
-(autoload 'thai-compose-string "thai-util" "\
-Compose Thai characters in STRING and return the resulting string.
-
-(fn STRING)")
-(autoload 'thai-compose-buffer "thai-util" "\
-Compose Thai characters in the current buffer." t)
-(autoload 'thai-composition-function "thai-util" "\
-
-
-(fn GSTRING DIRECTION)")
-(register-definition-prefixes "thai-util" '("exit-thai-language-environment-internal" "setup-thai-language-environment-internal" "thai-"))
-
-
-;;; Generated autoloads from language/thai-word.el
-
-(register-definition-prefixes "thai-word" '("thai-"))
-
-
 ;;; Generated autoloads from thingatpt.el
 
 (autoload 'forward-thing "thingatpt" "\
@@ -31234,73 +30054,9 @@ Display a list of threads." t)
 (register-definition-prefixes "thunk" '("thunk-"))
 
 
-;;; Generated autoloads from language/tibet-util.el
-
-(autoload 'tibetan-char-p "tibet-util" "\
-Check if char CH is Tibetan character.
-Returns non-nil if CH is Tibetan.  Otherwise, returns nil.
-
-(fn CH)")
-(autoload 'tibetan-tibetan-to-transcription "tibet-util" "\
-Transcribe Tibetan string STR and return the corresponding Roman string.
-
-(fn STR)")
-(autoload 'tibetan-transcription-to-tibetan "tibet-util" "\
-Convert Tibetan Roman string STR to Tibetan character string.
-The returned string has no composition information.
-
-(fn STR)")
-(autoload 'tibetan-compose-string "tibet-util" "\
-Compose Tibetan string STR.
-
-(fn STR)")
-(autoload 'tibetan-compose-region "tibet-util" "\
-Compose Tibetan text the region BEG and END.
-
-(fn BEG END)" t)
-(autoload 'tibetan-decompose-region "tibet-util" "\
-Decompose Tibetan text in the region FROM and TO.
-This is different from `decompose-region' because precomposed
-Tibetan characters are decomposed into normal Tibetan character
-sequences.
-
-(fn FROM TO)" t)
-(autoload 'tibetan-decompose-string "tibet-util" "\
-Decompose Tibetan string STR.
-This is different from `decompose-string' because precomposed
-Tibetan characters are decomposed into normal Tibetan character
-sequences.
-
-(fn STR)")
-(autoload 'tibetan-decompose-buffer "tibet-util" "\
-Decomposes Tibetan characters in the buffer into their components.
-See also the documentation of the function `tibetan-decompose-region'." t)
-(autoload 'tibetan-compose-buffer "tibet-util" "\
-Composes Tibetan character components in the buffer.
-See also docstring of the function `tibetan-compose-region'." t)
-(autoload 'tibetan-post-read-conversion "tibet-util" "\
-
-
-(fn LEN)")
-(autoload 'tibetan-pre-write-conversion "tibet-util" "\
-
-
-(fn FROM TO)")
-(autoload 'tibetan-pre-write-canonicalize-for-unicode "tibet-util" "\
-
-
-(fn FROM TO)")
-(register-definition-prefixes "tibet-util" '("tibetan-"))
-
-
 ;;; Generated autoloads from leim/quail/tibetan.el
 
 (register-definition-prefixes "quail/tibetan" '("quail-tib" "tibetan-"))
-
-
-;;; Generated autoloads from language/tibetan.el
-
-(register-definition-prefixes "tibetan" '("tibetan"))
 
 
 ;;; Generated autoloads from textmodes/tildify.el
@@ -31813,76 +30569,6 @@ Mode for displaying and reprioritizing top priority Todo.
 (register-definition-prefixes "todo-mode" '("todo-"))
 
 
-;;; Generated autoloads from tool-bar.el
-
-(autoload 'toggle-tool-bar-mode-from-frame "tool-bar" "\
-Toggle tool bar on or off, based on the status of the current frame.
-See `tool-bar-mode' for more information.
-
-(fn &optional ARG)" t)
-(autoload 'tool-bar-add-item "tool-bar" "\
-Add an item to the tool bar.
-ICON names the image, DEF is the key definition and KEY is a symbol
-for the fake function key in the menu keymap.  Remaining arguments
-PROPS are additional items to add to the menu item specification.  See
-Info node `(elisp)Tool Bar'.  Items are added from left to right.
-
-ICON is the base name of a file containing the image to use.  The
-function will first try to use low-color/ICON.xpm if `display-color-cells'
-is less or equal to 256, then ICON.xpm, then ICON.pbm, and finally
-ICON.xbm, using `find-image'.
-
-Use this function only to make bindings in the global value of `tool-bar-map'.
-To define items in any other map, use `tool-bar-local-item'.
-
-(fn ICON DEF KEY &rest PROPS)")
-(autoload 'tool-bar-local-item "tool-bar" "\
-Add an item to the tool bar in map MAP.
-ICON names the image, DEF is the key definition and KEY is a symbol
-for the fake function key in the menu keymap.  Remaining arguments
-PROPS are additional items to add to the menu item specification.  See
-Info node `(elisp)Tool Bar'.  Items are added from left to right.
-
-ICON is the base name of a file containing the image to use.  The
-function will first try to use low-color/ICON.xpm if `display-color-cells'
-is less or equal to 256, then ICON.xpm, then ICON.pbm, and finally
-ICON.xbm, using `find-image'.
-
-(fn ICON DEF KEY MAP &rest PROPS)")
-(autoload 'tool-bar-add-item-from-menu "tool-bar" "\
-Define tool bar binding for COMMAND in keymap MAP using the given ICON.
-This makes a binding for COMMAND in `tool-bar-map', copying its
-binding from the menu bar in MAP (which defaults to `global-map'), but
-modifies the binding by adding an image specification for ICON.  It
-finds ICON just like `tool-bar-add-item'.  PROPS are additional
-properties to add to the binding.
-
-MAP must contain appropriate binding for `[menu-bar]' which holds a keymap.
-
-Use this function only to make bindings in the global value of `tool-bar-map'.
-To define items in any other map, use `tool-bar-local-item-from-menu'.
-
-(fn COMMAND ICON &optional MAP &rest PROPS)")
-(autoload 'tool-bar-local-item-from-menu "tool-bar" "\
-Define local tool bar binding for COMMAND using the given ICON.
-This makes a binding for COMMAND in IN-MAP, copying its binding from
-the menu bar in FROM-MAP (which defaults to `global-map'), but
-modifies the binding by adding an image specification for ICON.  It
-finds ICON just like `tool-bar-add-item'.  PROPS are additional
-properties to add to the binding.
-
-FROM-MAP must contain appropriate binding for `[menu-bar]' which
-holds a keymap.
-
-(fn COMMAND ICON IN-MAP &optional FROM-MAP &rest PROPS)")
-(register-definition-prefixes "tool-bar" '("toggle-tool-bar-mode-from-frame" "tool-bar-"))
-
-
-;;; Generated autoloads from tooltip.el
-
-(register-definition-prefixes "tooltip" '("tooltip-"))
-
-
 ;;; Generated autoloads from emacs-lisp/tq.el
 
 (autoload 'tq-create "tq" "\
@@ -32268,15 +30954,6 @@ resumed later.
 
 (fn &optional ARG DONT-ASK-FOR-REVERT)" t)
 (register-definition-prefixes "tutorial" '("get-lang-string" "lang-strings" "tutorial--"))
-
-
-;;; Generated autoloads from language/tv-util.el
-
-(autoload 'tai-viet-composition-function "tv-util" "\
-
-
-(fn FROM TO FONT-OBJECT STRING DIRECTION)")
-(register-definition-prefixes "tv-util" '("tai-viet-"))
 
 
 ;;; Generated autoloads from textmodes/two-column.el
@@ -34900,44 +33577,6 @@ Key bindings:
 (register-definition-prefixes "vhdl-mode" '("vhdl-"))
 
 
-;;; Generated autoloads from language/viet-util.el
-
-(autoload 'viet-encode-viscii-char "viet-util" "\
-Return VISCII character code of CHAR if appropriate.
-
-(fn CHAR)")
-(autoload 'viet-decode-viqr-region "viet-util" "\
-Convert `VIQR' mnemonics of the current region to Vietnamese characters.
-When called from a program, expects two arguments,
-positions (integers or markers) specifying the stretch of the region.
-
-(fn FROM TO)" t)
-(autoload 'viet-decode-viqr-buffer "viet-util" "\
-Convert `VIQR' mnemonics of the current buffer to Vietnamese characters." t)
-(autoload 'viet-encode-viqr-region "viet-util" "\
-Convert Vietnamese characters of the current region to `VIQR' mnemonics.
-When called from a program, expects two arguments,
-positions (integers or markers) specifying the stretch of the region.
-
-(fn FROM TO)" t)
-(autoload 'viet-encode-viqr-buffer "viet-util" "\
-Convert Vietnamese characters of the current buffer to `VIQR' mnemonics." t)
-(autoload 'viqr-post-read-conversion "viet-util" "\
-
-
-(fn LEN)")
-(autoload 'viqr-pre-write-conversion "viet-util" "\
-
-
-(fn FROM TO)")
-(register-definition-prefixes "viet-util" '("viet-viqr-alist" "viqr-regexp"))
-
-
-;;; Generated autoloads from language/vietnamese.el
-
-(register-definition-prefixes "vietnamese" '("cp1258" "tcvn" "vscii" "windows-1258"))
-
-
 ;;; Generated autoloads from view.el
 
 (defvar-local view-mode nil "\
@@ -36193,11 +34832,6 @@ Word-Wrap-Whitespace mode.
 
 (fn &optional ARG)" t)
 (register-definition-prefixes "word-wrap-mode" '("word-wrap-whitespace-characters"))
-
-
-;;; Generated autoloads from x-dnd.el
-
-(register-definition-prefixes "x-dnd" '("x-dnd-"))
 
 
 ;;; Generated autoloads from xdg.el

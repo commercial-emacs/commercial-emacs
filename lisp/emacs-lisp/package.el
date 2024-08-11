@@ -999,7 +999,6 @@ untar into a directory named DIR; otherwise, signal an error."
 ;;;; Compilation
 (defvar warning-minimum-level)
 (defvar byte-compile-ignore-files)
-(declare-function package-native-compile "comp")
 (defun package--compile (pkg-desc)
   "Byte-compile installed package PKG-DESC."
   (let ((byte-compile-ignore-files (package--parse-elpaignore pkg-desc))
