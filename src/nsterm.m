@@ -7921,6 +7921,7 @@ ns_in_echo_area (void)
     dpyinfo->ns_focus_frame = emacsframe;
 
   ns_frame_rehighlight (emacsframe);
+  [self adjustEmacsFrameRect];
 
   event.kind = FOCUS_IN_EVENT;
   XSETFRAME (event.frame_or_window, emacsframe);
