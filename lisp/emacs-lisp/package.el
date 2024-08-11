@@ -1114,15 +1114,16 @@ untar into a directory named DIR; otherwise, signal an error."
                (cl-every (lambda (regexp)
                            (not (string-match-p regexp path)))
                          byte-compile-ignore-files))
-      (let ((eln-dir (expand-file-name comp-abi-hash
-                                       (file-name-directory path))))
+      (let* ((eln-dir (expand-file-name comp-abi-hash
+                                        (file-name-directory path)))
+             (eln-file (expand-file-name (file-name-with-extension
+                                          (file-name-nondirectory path)
+                                          ".eln")
+                                         eln-dir)))
         (make-directory eln-dir t)
+        (ignore-errors (delete-file eln-file))
         (displaying-byte-compile-warnings
-         (native-compile path (expand-file-name
-                               (file-name-with-extension
-                                (file-name-nondirectory path)
-                                ".eln")
-                               eln-dir)))))))
+         (native-compile path eln-file))))))
 
 (defun package--compile (pkg-desc)
   "Byte-compile installed package PKG-DESC.
