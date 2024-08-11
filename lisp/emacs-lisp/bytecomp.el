@@ -1858,7 +1858,7 @@ context switching station and the current position in
 `byte-compile-log-buffer'."
   (declare (debug (def-body)))
   `(let ((fn (lambda ()
-               (condition-case-unless-debug err
+               (condition-case err
 		   (progn ,@body)
 	         (error
                   (prog1 nil
@@ -2342,7 +2342,7 @@ With argument ARG, insert value in current buffer after the form."
           (let* ((byte-compile-current-annotations (read-annotated inbuffer))
                  (form (byte-compile--decouple byte-compile-current-annotations
                                                #'cdr)))
-            (condition-case-unless-debug err
+            (condition-case err
                 (byte-compile-maybe-expand
                  form
                  (lambda (form*)
@@ -2456,7 +2456,7 @@ stupid (and also obsolete)."
                          (symbolp (car form))
 		         (get (car form) 'byte-hunk-handler))))
       (let* ((byte-compile-current-form form)
-             (form* (condition-case-unless-debug err
+             (form* (condition-case err
                         (funcall handler form)
                       (error
                        (prog1 nil

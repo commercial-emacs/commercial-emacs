@@ -1103,21 +1103,21 @@ untar into a directory named DIR; otherwise, signal an error."
                                            (mapcar #'car name-descs)
                                            nil :must-match)
                           name-descs))))
-  (displaying-byte-compile-warnings
-   (dolist (path (directory-files (package-desc-dir pkg-desc) t))
-     (when (and (string-match-p emacs-lisp-file-regexp path)
-                (file-readable-p path)
-                ;; exclude lock files
-		(not (string-match-p "\\`\\.#" (file-name-nondirectory path)))
-                (not (auto-save-file-name-p path))
-                (not (member path (dir-locals--all-files
-                                   (package-desc-dir pkg-desc))))
-                (cl-every (lambda (regexp)
-                            (not (string-match-p regexp path)))
-                          byte-compile-ignore-files))
-       (let ((eln-dir (expand-file-name comp-abi-hash
-                                        (file-name-directory path))))
-         (make-directory eln-dir t)
+  (dolist (path (directory-files (package-desc-dir pkg-desc) t))
+    (when (and (string-match-p emacs-lisp-file-regexp path)
+               (file-readable-p path)
+               ;; exclude lock files
+	       (not (string-match-p "\\`\\.#" (file-name-nondirectory path)))
+               (not (auto-save-file-name-p path))
+               (not (member path (dir-locals--all-files
+                                  (package-desc-dir pkg-desc))))
+               (cl-every (lambda (regexp)
+                           (not (string-match-p regexp path)))
+                         byte-compile-ignore-files))
+      (let ((eln-dir (expand-file-name comp-abi-hash
+                                       (file-name-directory path))))
+        (make-directory eln-dir t)
+        (displaying-byte-compile-warnings
          (native-compile path (expand-file-name
                                (file-name-with-extension
                                 (file-name-nondirectory path)
