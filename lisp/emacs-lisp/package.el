@@ -716,7 +716,7 @@ specifying the minimum acceptable version."
   (if (package-desc-p package) ;was built-in then converted
       (eq 'builtin (package-desc-dir package))
     (if-let ((ver (alist-get package package--builtin-versions)))
-        (version-list-<= min-version (cdr ver))
+        (version-list-<= min-version ver)
       (unless (remove 0 min-version)
         (require 'finder-inf nil t) ;For `package--builtins'.
         (assq package package--builtins)))))
