@@ -4870,13 +4870,8 @@ DEFUN ("native--load", Fnative__load, Snative__load, 1, 1, 0,
   if (NILP (Ffile_exists_p (filename)))
     xsignal2 (Qnative_lisp_load_failed, build_string ("file does not exist"),
 	      filename);
-      /* rename dance to sync filesystem */
-      Lisp_Object choate = Fmake_temp_file_internal (filename, make_fixnum (0),
-						     build_string (""), Qnil);
-      CALL2I (copy-file, filename, choate);
   struct Lisp_Native_Comp_Unit *comp_unit = allocate_native_comp_unit ();
-      comp_unit->handle = dynlib_open_for_eln (SSDATA (ENCODE_FILE (choate)));
-      internal_delete_file (choate);
+  comp_unit->handle = dynlib_open_for_eln (SSDATA (ENCODE_FILE (filename)));
   if (!comp_unit->handle)
     xsignal2 (Qnative_lisp_load_failed, filename, build_string (dynlib_error ()));
   comp_unit->file = filename;
