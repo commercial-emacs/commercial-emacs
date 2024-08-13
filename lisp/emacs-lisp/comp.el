@@ -3177,16 +3177,15 @@ Update all insn accordingly."
 (defun comp--compile-ctxt-to-file (name)
   "Compile as native code the current context naming it NAME.
 Prepare every function for final compilation and drive the C back-end."
-  (let ((dir (file-name-directory name)))
-    (comp--finalize-relocs)
-    (maphash (lambda (_ f)
-               (comp--log-func f 1))
-             (comp-ctxt-funcs-h comp-ctxt))
-    (unless (file-exists-p dir)
-      ;; In case it's created in the meanwhile.
-      (ignore-error file-already-exists
-        (make-directory dir t)))
-    (comp--compile-ctxt-to-file0 name)))
+  (comp--finalize-relocs)
+  (maphash (lambda (_ f)
+             (comp--log-func f 1))
+           (comp-ctxt-funcs-h comp-ctxt))
+  (make-directory (file-name-directory
+                   (if (file-name-absolute-p name) name
+                     (expand-file-name name default-directory)))
+                  :regardless)
+  (comp--compile-ctxt-to-file0 name))
 
 (defun comp--final (_)
   "Final pass driving the C back-end for code emission."
@@ -3263,7 +3262,6 @@ Prepare every function for final compilation and drive the C back-end."
     (native-compile form (expand-file-name
                           (comp-trampoline-filename subr-name)
                           comp-trampoline-dir))))
-;;; Compiler entry points.
 
 (defun comp-compile-all-trampolines ()
   "Compile all trampolines."

@@ -518,6 +518,10 @@ load_gccjit_if_necessary (bool mandatory)
 #define CALL2I(fun, arg1, arg2)				\
   CALLN (Ffuncall, intern_c_string (STR (fun)), arg1, arg2)
 
+/* Like call3 but stringify and intern.  */
+#define CALL3I(fun, arg1, arg2, arg3)					\
+  CALLN (Ffuncall, intern_c_string (STR (fun)), arg1, arg2, arg3)
+
 #define DECL_BLOCK(name, func)				\
   gcc_jit_block *(name) =				\
     gcc_jit_function_new_block (func, STR (name))
@@ -4458,9 +4462,10 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
       comp.ctxt,
       format_string ("%s_libgccjit_repro.c", SSDATA (base_name)));
 
+  Lisp_Object inchoate = concat2 (base_name, build_string (".eln.tmp"));
   gcc_jit_context_compile_to_file (comp.ctxt,
 				   GCC_JIT_OUTPUT_KIND_DYNAMIC_LIBRARY,
-				   SSDATA (concat2 (base_name, build_string (".eln"))));
+				   SSDATA (inchoate));
   const char *err = gcc_jit_context_get_first_error (comp.ctxt);
   if (err)
     xsignal3 (Qnative_ice,
@@ -4468,6 +4473,9 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
 	      filename,
 	      build_string (err));
 
+  /* ye olde unlink-rename dance to avoid segfault clobbers */
+  internal_delete_file (filename);
+  CALL3I (rename-file, inchoate, filename, Qnil);
   return filename;
 }
 

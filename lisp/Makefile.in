@@ -162,8 +162,7 @@ endef
 define native-compile
 	$(AM_V_at)rm -f $(basename $@).el[cn]
 	$(AM_V_ELN)$(emacs) $(COMPILE_FLAGS) \
-	    --eval "(native-compile \"$<\" \"$(@D)/mv_$(@F)\")"
-	$(AM_V_at)mv -f $(@D)/mv_$(@F) $@
+	    --eval "(native-compile \"$<\" \"$@\")"
 endef
 
 %.elc: %.el | $(COMPILER_EL:.el=.elc)
@@ -208,6 +207,8 @@ bootstrap-clean:
 # loaddefs.el can be generated.
 ./ldefs-boot.el: ./loaddefs.el
 	@sed '/^;; Local Variables:/a ;; no-byte-compile: t' < $< > $@
+# The following page break foils hack-local-variables--find-variables
+
 
 # Pain-in-the-ass OKURO-NASI trigger.
 ./leim/ja-dic/ja-dic.el: ./leim/leim-list.el

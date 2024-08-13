@@ -2477,7 +2477,7 @@ If file has multiple names, it continues to exist with the other names. */)
   return Qnil;
 }
 
-#if defined HAVE_NATIVE_COMP && defined WINDOWSNT
+#if defined HAVE_NATIVE_COMP
 
 static Lisp_Object
 internal_delete_file_1 (Lisp_Object ignore)
@@ -2498,8 +2498,8 @@ internal_delete_file (Lisp_Object filename)
   return NILP (tem);
 }
 
-#endif
-
+#endif /* HAVE_NATIVE_COMP */
+
 /* Return -1 if FILE is a case-insensitive file name, 0 if not,
    and 1 if the result cannot be determined.  */
 
