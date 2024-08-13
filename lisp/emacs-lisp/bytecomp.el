@@ -1931,7 +1931,6 @@ also be compiled."
       (displaying-byte-compile-warnings
        (while directories
 	 (setq directory (car directories))
-	 (message "Checking %s..." directory)
          (dolist (source (directory-files directory t))
            (let ((file (file-name-nondirectory source)))
 	     (if (file-directory-p source)
@@ -1961,8 +1960,13 @@ also be compiled."
                     ('no-byte-compile skip-count)
                     ('t file-count)
                     (_ fail-count)))
-                 (unless noninteractive
-                   (message "Checking %s..." directory))
+                 (when (featurep 'native-compile)
+                   (displaying-byte-compile-warnings
+                    (native-compile source
+                                    (expand-file-name
+                                     (file-name-with-extension file ".eln")
+                                     (expand-file-name comp-native-version-dir
+                                                       directory)))))
                  (unless (eq last-dir directory)
                    (setq last-dir directory
                          dir-count (1+ dir-count)))))))

@@ -1000,57 +1000,12 @@ untar into a directory named DIR; otherwise, signal an error."
 (defvar warning-minimum-level)
 (defvar byte-compile-ignore-files)
 
-;;;###autoload
-(defun package-native-compile (pkg-desc)
-  (interactive
-   (let* ((user-dir (expand-file-name package-user-dir))
-          (name-descs
-           (cl-remove-if-not
-            (lambda (name-desc)
-              (string-prefix-p user-dir (expand-file-name
-                                         (package-desc-dir
-                                          (cdr name-desc)))))
-            (mapcar (lambda (sym-descs)
-	              (cl-destructuring-bind (sym desc . descs)
-	                  sym-descs
-	                (cons (symbol-name sym) desc)))
-	            (package--alist)))))
-     (list (assoc-default (completing-read "Native compile package: "
-                                           (mapcar #'car name-descs)
-                                           nil :must-match)
-                          name-descs))))
-  (unless (featurep 'native-compile)
-    (user-error "Native compilation unsupported"))
-  (dolist (path (directory-files (package-desc-dir pkg-desc) t))
-    (when (and (string-match-p emacs-lisp-file-regexp path)
-               (file-readable-p path)
-               ;; exclude lock files
-	       (not (string-match-p "\\`\\.#" (file-name-nondirectory path)))
-               (not (auto-save-file-name-p path))
-               (not (member path (dir-locals--all-files
-                                  (package-desc-dir pkg-desc))))
-               (cl-every (lambda (regexp)
-                           (not (string-match-p regexp path)))
-                         byte-compile-ignore-files))
-      (let* ((eln-dir (expand-file-name comp-native-version-dir
-                                        (file-name-directory path)))
-             (eln-file (expand-file-name (file-name-with-extension
-                                          (file-name-nondirectory path)
-                                          ".eln")
-                                         eln-dir)))
-        (make-directory eln-dir t)
-        (ignore-errors (delete-file eln-file))
-        (displaying-byte-compile-warnings
-         (native-compile path eln-file))))))
-
 (defun package--compile (pkg-desc)
   "Byte-compile installed package PKG-DESC."
   (let ((byte-compile-ignore-files (package--parse-elpaignore pkg-desc))
         (warning-minimum-level :error)
         (load-path load-path))
-    (byte-recompile-directory (package-desc-dir pkg-desc) 0 t)
-    (when (featurep 'native-compile)
-      (package-native-compile pkg-desc))))
+    (byte-recompile-directory (package-desc-dir pkg-desc) 0 :force)))
 
 ;;;; Inferring package from current buffer
 (defun package-read-from-string (str)
@@ -2443,19 +2398,20 @@ object."
 ;;;###autoload
 (defun package-recompile (pkg)
   "Byte-compile package PKG again.
-PKG should be either a symbol, the package name, or a `package-desc'
-object."
+PKG should be either a symbol or a `package-desc' object."
   (interactive (list (intern (completing-read
                               "Recompile package: "
                               (mapcar #'symbol-name
                                       (mapcar #'car package-alist))))))
-  (let ((pkg-desc (if (package-desc-p pkg)
-                      pkg
-                    (cadr (assq pkg package-alist)))))
-    (dolist (elc (directory-files-recursively
-                  (package-desc-dir pkg-desc) "\\.el[cn]\\'"))
-      (ignore-errors (delete-file elc)))
-    (package--compile pkg-desc)))
+  (if-let ((pkg-desc (if (package-desc-p pkg)
+                         pkg
+                       (cadr (assq pkg package-alist)))))
+      (progn
+        (dolist (elcn (directory-files-recursively
+                       (package-desc-dir pkg-desc) "\\.el[cn]\\'"))
+          (ignore-errors (delete-file elcn)))
+        (package--compile pkg-desc))
+    (user-error "No such package \"%s\"" pkg)))
 
 ;;;###autoload
 (defun package-recompile-all ()
