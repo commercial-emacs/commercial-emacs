@@ -784,7 +784,7 @@ compiling the package."
       (mapc (lambda (c) (load (car c) nil t))
             (sort reloads (lambda (x y) (< (cdr x) (cdr y))))))))
 
-(defvar comp-abi-hash)
+(defvar comp-native-version-dir)
 (defun package--activate (pkg-desc reload activate-deps)
   "Activate PKG-DESC, even if already activated.
 If DEPS, also activate its dependencies.
@@ -811,7 +811,7 @@ If RELOAD, also `load' any previously loaded package files."
           ;; Prepend elc, then eln.  Order matters.
           (add-to-list 'load-path elc-dir)
           (when (featurep 'native-compile)
-            (add-to-list 'load-path (expand-file-name comp-abi-hash elc-dir)))
+            (add-to-list 'load-path (expand-file-name comp-native-version-dir elc-dir)))
           (load autoloads nil :quiet)))
       ;; Add info node.
       (when (file-exists-p (expand-file-name "dir" pkg-dir))
@@ -1032,7 +1032,7 @@ untar into a directory named DIR; otherwise, signal an error."
                (cl-every (lambda (regexp)
                            (not (string-match-p regexp path)))
                          byte-compile-ignore-files))
-      (let* ((eln-dir (expand-file-name comp-abi-hash
+      (let* ((eln-dir (expand-file-name comp-native-version-dir
                                         (file-name-directory path)))
              (eln-file (expand-file-name (file-name-with-extension
                                           (file-name-nondirectory path)

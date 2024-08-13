@@ -40,7 +40,7 @@
 (defvar comp-installed-trampolines-h)
 (defvar comp-subr-arities-h)
 (defvar native-comp-disable-subr-trampolines)
-(defvar comp-abi-hash)
+(defvar comp-native-version-dir)
 
 (declare-function comp--install-trampoline "comp.c")
 (declare-function comp--compile-ctxt-to-file0 "comp.c")
@@ -130,7 +130,7 @@ Emacs Lisp file:
 
 (defvar comp-trampoline-dir
   (cond ((and init-file-user user-init-file) ;live
-         (expand-file-name comp-abi-hash
+         (expand-file-name comp-native-version-dir
                            (expand-file-name "trampolines/" user-emacs-directory)))
         (installation-directory ;within repo
          (expand-file-name "lisp/trampolines" installation-directory))

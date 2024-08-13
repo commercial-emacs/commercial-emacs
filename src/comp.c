@@ -473,7 +473,7 @@ load_gccjit_if_necessary (bool mandatory)
 }
 
 
-/* Increase this number to force a new Vcomp_abi_hash to be generated.  */
+/* Increment to force a new Vcomp_native_comp_dir.  */
 #define ABI_VERSION "6"
 
 /* Length of the hashes used for eln file naming.  */
@@ -758,22 +758,11 @@ For internal use.  */)
 void
 hash_native_abi (void)
 {
-  /* Check runs once.  */
-  eassert (NILP (Vcomp_abi_hash));
-
-  Vcomp_abi_hash =
-    comp_hash_string (
-      concat3 (build_string (ABI_VERSION),
-	       concat3 (Vemacs_version, Vsystem_configuration,
-			Vsystem_configuration_options),
-	       Fmapconcat (intern_c_string ("comp--subr-signature"),
-			   Vcomp_subr_list, build_string (""))));
-
 #ifdef NS_SELF_CONTAINED
   /* MacOS self contained app bundles do not like having dots in the
      directory names under the Contents/Frameworks directory, so
      convert them to underscores.  */
-  version = STRING_MULTIBYTE (Vemacs_version)
+  Lisp_Object version = STRING_MULTIBYTE (Vemacs_version)
     ? make_multibyte_string (NULL,
 			     SCHARS (Vemacs_version),
 			     SBYTES (Vemacs_version))
@@ -791,7 +780,20 @@ hash_native_abi (void)
 
       *to++ = c;
     }
+#else
+  Lisp_Object version = Vemacs_version;
 #endif
+
+  eassert (NILP (Vcomp_native_version_dir)); /* only get here from pdump */
+  Vcomp_native_version_dir =
+    concat3 (version,
+	     build_string ("-"),
+	     comp_hash_string
+	     (concat3 (build_string (ABI_VERSION),
+		       concat3 (Vemacs_version, Vsystem_configuration,
+				Vsystem_configuration_options),
+		       Fmapconcat (intern_c_string ("comp--subr-signature"),
+				   Vcomp_subr_list, build_string ("")))));
 }
 
 static void
@@ -2841,8 +2843,8 @@ emit_ctxt_code (void)
     }
 
   /* Sign the .eln for the exposed ABI it expects at load.  */
-  eassert (!NILP (Vcomp_abi_hash));
-  emit_static_object (LINK_TABLE_HASH_SYM, Vcomp_abi_hash);
+  eassert (!NILP (Vcomp_native_version_dir));
+  emit_static_object (LINK_TABLE_HASH_SYM, Vcomp_native_version_dir);
 
   Lisp_Object tail = Vcomp_subr_list;
   FOR_EACH_TAIL (tail)
@@ -4667,7 +4669,7 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *xunit)
 	  || !data_impure_reloc
 	  || !data_reloc
 	  || NILP (Fstring_equal (load_static_obj (xunit, LINK_TABLE_HASH_SYM),
-				  Vcomp_abi_hash)))
+				  Vcomp_native_version_dir)))
 	xsignal1 (Qnative_lisp_file_inconsistent, xunit->file);
 
       *current_thread_reloc = &current_thread;
@@ -5040,9 +5042,9 @@ syms_of_comp (void)
 
   DEFVAR_LISP ("comp-subr-list", Vcomp_subr_list,
 	       doc: /* List of all defined subrs.  */);
-  DEFVAR_LISP ("comp-abi-hash", Vcomp_abi_hash,
-	       doc: /* String signing the .eln files ABI.  */);
-  Vcomp_abi_hash = Qnil;
+  DEFVAR_LISP ("comp-native-version-dir", Vcomp_native_version_dir,
+    doc: /* Directory in use to disambiguate eln compatibility.  */);
+  Vcomp_native_version_dir = Qnil;
 
   DEFVAR_LISP ("native-comp-disable-subr-trampolines",
 	       Vnative_comp_disable_subr_trampolines,
