@@ -155,12 +155,10 @@ TAGS: ${ETAGS} ${tagsfiles}
 	$(AM_V_at)ls ${tagsfiles} | xargs $(XARGS_LIMIT) "${ETAGS}" -a -o $@
 
 define byte-compile
-	$(AM_V_at)rm -f $(basename $@).el[cn]
 	$(AM_V_ELC)$(emacs) $(COMPILE_FLAGS) -f batch-byte-compile $<
 endef
 
 define native-compile
-	$(AM_V_at)rm -f $(basename $@).el[cn]
 	$(AM_V_ELN)$(emacs) $(COMPILE_FLAGS) \
 	    --eval "(native-compile \"$<\" \"$@\")"
 endef

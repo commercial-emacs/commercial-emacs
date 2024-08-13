@@ -518,10 +518,6 @@ load_gccjit_if_necessary (bool mandatory)
 #define CALL2I(fun, arg1, arg2)				\
   CALLN (Ffuncall, intern_c_string (STR (fun)), arg1, arg2)
 
-/* Like call3 but stringify and intern.  */
-#define CALL3I(fun, arg1, arg2, arg3)					\
-  CALLN (Ffuncall, intern_c_string (STR (fun)), arg1, arg2, arg3)
-
 #define DECL_BLOCK(name, func)				\
   gcc_jit_block *(name) =				\
     gcc_jit_function_new_block (func, STR (name))
@@ -4464,7 +4460,7 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
       comp.ctxt,
       format_string ("%s_libgccjit_repro.c", SSDATA (base_name)));
 
-  Lisp_Object inchoate = concat2 (base_name, build_string (".eln.tmp"));
+  Lisp_Object inchoate = concat2 (base_name, build_string (".eln.write"));
   gcc_jit_context_compile_to_file (comp.ctxt,
 				   GCC_JIT_OUTPUT_KIND_DYNAMIC_LIBRARY,
 				   SSDATA (inchoate));
@@ -4475,9 +4471,11 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
 	      filename,
 	      build_string (err));
 
-  /* ye olde unlink-rename dance to avoid segfault clobbers */
+  /* avoid same-inode clobbers */
   internal_delete_file (filename);
-  CALL3I (rename-file, inchoate, filename, Qnil);
+  /* rename dance to sync filesystem */
+  CALL2I (rename-file, inchoate, filename);
+
   return filename;
 }
 
@@ -4872,8 +4870,13 @@ DEFUN ("native--load", Fnative__load, Snative__load, 1, 1, 0,
   if (NILP (Ffile_exists_p (filename)))
     xsignal2 (Qnative_lisp_load_failed, build_string ("file does not exist"),
 	      filename);
+  /* rename dance to sync filesystem */
+  Lisp_Object choate = Fmake_temp_file_internal (filename, make_fixnum (0),
+						 build_string (""), Qnil);
+  CALL2I (copy-file, filename, choate);
   struct Lisp_Native_Comp_Unit *comp_unit = allocate_native_comp_unit ();
-  comp_unit->handle = dynlib_open_for_eln (SSDATA (ENCODE_FILE (filename)));
+  comp_unit->handle = dynlib_open_for_eln (SSDATA (ENCODE_FILE (choate)));
+  internal_delete_file (choate);
   if (!comp_unit->handle)
     xsignal2 (Qnative_lisp_load_failed, filename, build_string (dynlib_error ()));
   comp_unit->file = filename;
