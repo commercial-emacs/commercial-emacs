@@ -41,7 +41,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "sysstdio.h"
 #include "zlib.h"
 
-
 /********************************/
 /* Dynamic loading of libgccjit */
 /********************************/
@@ -4461,9 +4460,13 @@ DEFUN ("comp--compile-ctxt-to-file0", Fcomp__compile_ctxt_to_file0,
       format_string ("%s_libgccjit_repro.c", SSDATA (base_name)));
 
   Lisp_Object inchoate = concat2 (base_name, build_string (".eln.write"));
+  sigset_t block, restore;
+  sigfillset (&block);
+  pthread_sigmask (SIG_BLOCK, &block, &restore);
   gcc_jit_context_compile_to_file (comp.ctxt,
 				   GCC_JIT_OUTPUT_KIND_DYNAMIC_LIBRARY,
 				   SSDATA (inchoate));
+  pthread_sigmask (SIG_SETMASK, &restore, 0);
   const char *err = gcc_jit_context_get_first_error (comp.ctxt);
   if (err)
     xsignal3 (Qnative_ice,
