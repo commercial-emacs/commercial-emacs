@@ -1961,6 +1961,7 @@ also be compiled."
                     ('t file-count)
                     (_ fail-count)))
                  (when (featurep 'native-compile)
+                   (defvar comp-native-version-dir)
                    (displaying-byte-compile-warnings
                     (native-compile source
                                     (expand-file-name
