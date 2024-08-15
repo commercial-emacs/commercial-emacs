@@ -12,5 +12,7 @@
   "Description."
   90)
 
+(defun macro-aux-new-func ())
+
 (provide 'macro-aux)
 ;;; macro-aux.el ends here

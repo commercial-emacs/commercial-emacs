@@ -762,7 +762,8 @@ compiling the package."
     (let* (reloads
            (dir (package-desc-dir pkg-desc))
            (files (directory-files-recursively dir "\\`[^\\.].*\\.el\\'"))
-           ;; get history in most-to-least recent order
+           ;; `load-history' is most-to-least recent, thus
+           ;; HISTORY is least-to-most recent.
            (history (reverse
                      (mapcar #'package--library-stem
                              (cl-remove-if-not #'stringp (mapcar #'car load-history))))))
@@ -778,9 +779,9 @@ compiling the package."
                       (prog1 nil
                         (dotimes (i (length history))
                           (when (string-suffix-p library (nth i history))
-                            (throw 'recent (- i))))))))
+                            (throw 'recent i)))))))
           (push (cons (expand-file-name library dir) recency-index) reloads)))
-      ;; load in original order (least to most recent).
+      ;; load least-to-most recent
       (mapc (lambda (c) (load (car c) nil t))
             (sort reloads (lambda (x y) (< (cdr x) (cdr y))))))))
 
@@ -803,8 +804,6 @@ If RELOAD, also `load' any previously loaded package files."
                                    (car req) (package-version-join (cadr req)) name)
                           (throw 'exit nil))))))))
     (prog1 t
-      (when reload
-        (package--reload-previously-loaded pkg-desc))
       (with-demoted-errors "Error loading autoloads: %s"
         (let* ((autoloads (package--autoloads-file-name pkg-desc))
                (elc-dir (directory-file-name (file-name-directory autoloads))))
@@ -813,6 +812,8 @@ If RELOAD, also `load' any previously loaded package files."
           (when (featurep 'native-compile)
             (add-to-list 'load-path (expand-file-name comp-native-version-dir elc-dir)))
           (load autoloads nil :quiet)))
+      (when reload
+        (package--reload-previously-loaded pkg-desc))
       ;; Add info node.
       (when (file-exists-p (expand-file-name "dir" pkg-dir))
         (require 'info)

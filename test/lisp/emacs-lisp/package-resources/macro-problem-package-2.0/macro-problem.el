@@ -8,6 +8,10 @@
 
 (require 'macro-aux)
 
+; would fail if macro-aux did not come first
+; in package--reload-previously-loaded
+(macro-aux-new-func)
+
 (defmacro macro-problem-1 ( &rest forms)
   "Description."
   `(progn ,(cadr (car forms))))
