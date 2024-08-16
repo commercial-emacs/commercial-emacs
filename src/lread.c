@@ -3295,19 +3295,17 @@ struct read_stack
 
 static struct read_stack rdstack = {NULL, 0, 0};
 
-static size_t quoted_counts[RE_quoted_max];
-
 static inline bool
-quoted_parse_state (void)
+quoted_parse_state (size_t *qcounts)
 {
   for (ptrdiff_t i = 0; i < RE_quoted_max; ++i)
-    if (quoted_counts[i])
+    if (qcounts[i])
       return true;
   return false;
 }
 
 #define ANNOTATE(atom)					\
-  (annotated && !quoted_parse_state()			\
+  (annotated && !quoted_parse_state(qcounts)	\
    ? Fcons (make_fixnum (initial_charpos), atom)	\
    : atom)
 
@@ -3357,12 +3355,12 @@ read_stack_top (void)
 }
 
 static inline struct read_stack_entry *
-read_stack_pop (void)
+read_stack_pop (size_t *qcounts)
 {
   eassume (rdstack.sp > 0);
   ptrdiff_t quote_type = read_stack_top ()->type;
   if (quote_type < RE_quoted_max)
-    quoted_counts[quote_type]--;
+    --qcounts[quote_type];
   return &rdstack.stack[--rdstack.sp];
 }
 
@@ -3382,14 +3380,14 @@ grow_read_stack (void)
 }
 
 static inline void
-read_stack_push (struct read_stack_entry e)
+read_stack_push (struct read_stack_entry e, size_t *qcounts)
 {
   if (rdstack.sp >= rdstack.size)
     grow_read_stack ();
   rdstack.stack[rdstack.sp++] = e;
   ptrdiff_t quote_type = read_stack_top ()->type;
   if (quote_type < RE_quoted_max)
-    quoted_counts[quote_type]++;
+    ++qcounts[quote_type];
 }
 
 static void
@@ -3407,6 +3405,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
   char *heapbuf = NULL;
+  size_t qcounts[RE_quoted_max] = {0}; /* quoted counts */
 
   specpdl_ref base_pdl = SPECPDL_INDEX ();
   ptrdiff_t base_sp = rdstack.sp;
@@ -3430,7 +3429,8 @@ read0 (Lisp_Object readcharfun, bool annotated)
   switch (c)
     {
     case '(':
-      read_stack_push ((struct read_stack_entry) {.type = RE_list_start});
+      read_stack_push ((struct read_stack_entry) {.type = RE_list_start},
+		       qcounts);
       goto read_obj;
 
     case ')':
@@ -3439,15 +3439,15 @@ read0 (Lisp_Object readcharfun, bool annotated)
       switch (read_stack_top ()->type)
 	{
 	case RE_list_start:
-	  read_stack_pop ();
+	  read_stack_pop (qcounts);
 	  obj = ANNOTATE (Qnil);
 	  break;
 	case RE_list:
-	  obj = read_stack_pop ()->u.list.head;
+	  obj = read_stack_pop (qcounts)->u.list.head;
 	  break;
 	case RE_record:
 	  {
-	    Lisp_Object elems = Fnreverse (read_stack_pop ()->u.vector.elems);
+	    Lisp_Object elems = Fnreverse (read_stack_pop (qcounts)->u.vector.elems);
 	    if (NILP (elems))
 	      invalid_syntax ("#s", readcharfun);
 
@@ -3458,7 +3458,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	    break;
 	  }
 	case RE_string_props:
-	  obj = string_props_from_rev_list (read_stack_pop ()->u.vector.elems,
+	  obj = string_props_from_rev_list (read_stack_pop (qcounts)->u.vector.elems,
 					    readcharfun);
 	  obj = ANNOTATE (obj);
 	  break;
@@ -3472,7 +3472,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
       read_stack_push ((struct read_stack_entry) {
 	  .type = RE_vector,
 	  .u.vector.elems = Qnil,
-	});
+	}, qcounts);
       goto read_obj;
 
     case ']':
@@ -3481,18 +3481,18 @@ read0 (Lisp_Object readcharfun, bool annotated)
       switch (read_stack_top ()->type)
 	{
 	case RE_vector:
-	  obj = vector_from_rev_list (read_stack_pop ()->u.vector.elems);
+	  obj = vector_from_rev_list (read_stack_pop (qcounts)->u.vector.elems);
 	  break;
 	case RE_byte_code:
-	  obj = bytecode_from_rev_list (read_stack_pop ()->u.vector.elems,
+	  obj = bytecode_from_rev_list (read_stack_pop (qcounts)->u.vector.elems,
 					readcharfun);
 	  break;
 	case RE_char_table:
-	  obj = char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
+	  obj = char_table_from_rev_list (read_stack_pop (qcounts)->u.vector.elems,
 					  readcharfun);
 	  break;
 	case RE_sub_char_table:
-	  obj = sub_char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
+	  obj = sub_char_table_from_rev_list (read_stack_pop (qcounts)->u.vector.elems,
 					      readcharfun);
 	  break;
 	default:
@@ -3512,7 +3512,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	    read_stack_push ((struct read_stack_entry) {
 		.type = RE_special,
 		.u.special.symbol = Qfunction,
-	      });
+	      }, qcounts);
 	    goto read_obj;
 
 	  case '#':
@@ -3531,7 +3531,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	    read_stack_push ((struct read_stack_entry) {
 		.type = RE_record,
 		.u.vector.elems = Qnil,
-	      });
+	      }, qcounts);
 	    goto read_obj;
 
 	  case '^':
@@ -3546,7 +3546,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 		    read_stack_push ((struct read_stack_entry) {
 			.type = RE_sub_char_table,
 			.u.vector.elems = Qnil,
-		      });
+		      }, qcounts);
 		    goto read_obj;
 		  }
 		else
@@ -3560,7 +3560,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 		read_stack_push ((struct read_stack_entry) {
 		    .type = RE_char_table,
 		    .u.vector.elems = Qnil,
-		  });
+		  }, qcounts);
 		goto read_obj;
 	      }
 	    else
@@ -3574,7 +3574,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	    read_stack_push ((struct read_stack_entry) {
 		.type = RE_string_props,
 		.u.vector.elems = Qnil,
-	      });
+	      }, qcounts);
 	    goto read_obj;
 
 	  case '[':
@@ -3582,7 +3582,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	    read_stack_push ((struct read_stack_entry) {
 		.type = RE_byte_code,
 		.u.vector.elems = Qnil,
-	      });
+	      }, qcounts);
 	    goto read_obj;
 
 	  case '&':
@@ -3708,7 +3708,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 			    .type = RE_numbered,
 			    .u.numbered.number = number,
 			    .u.numbered.placeholder = placeholder,
-			  });
+			  }, qcounts);
 			goto read_obj;
 		      }
 		    else if (c == '#')
@@ -3747,14 +3747,14 @@ read0 (Lisp_Object readcharfun, bool annotated)
       read_stack_push ((struct read_stack_entry) {
 	  .type = RE_special,
 	  .u.special.symbol = Qquote,
-	});
+	}, qcounts);
       goto read_obj;
 
     case '`':
       read_stack_push ((struct read_stack_entry) {
 	  .type = RE_special,
 	  .u.special.symbol = Qbackquote,
-	});
+	}, qcounts);
       goto read_obj;
 
     case ',':
@@ -3772,7 +3772,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	read_stack_push ((struct read_stack_entry) {
 	    .type = RE_special,
 	    .u.special.symbol = sym,
-	  });
+	  }, qcounts);
 	goto read_obj;
       }
 
@@ -3954,7 +3954,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	    if (ch != ')')
 	      invalid_syntax ("expected )", readcharfun);
 	    XSETCDR (e->u.list.tail, obj);
-	    read_stack_pop ();
+	    read_stack_pop (qcounts);
 	    obj = e->u.list.head;
 
 	    /* Hack: immediately convert (#$ . FIXNUM) to the corresponding
@@ -3978,13 +3978,13 @@ read0 (Lisp_Object readcharfun, bool annotated)
 	  goto read_obj;
 
 	case RE_special:
-	  read_stack_pop ();
+	  read_stack_pop (qcounts);
 	  obj = ANNOTATE (list2 (e->u.special.symbol, obj));
 	  break;
 
 	case RE_numbered:
 	  {
-	    read_stack_pop ();
+	    read_stack_pop (qcounts);
 	    Lisp_Object placeholder = e->u.numbered.placeholder;
 	    if (CONSP (obj))
 	      {

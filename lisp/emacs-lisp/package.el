@@ -2412,14 +2412,45 @@ PKG should be either a symbol or a `package-desc' object."
     (user-error "No such package \"%s\"" pkg)))
 
 ;;;###autoload
-(defun package-recompile-all ()
-  "Byte-compile all installed packages.
-This is meant to be used only in the case the byte-compiled files
-are invalid due to changed byte-code, macros or the like."
-  (interactive)
-  (pcase-dolist (`(_ ,pkg-desc) package-alist)
-    (with-demoted-errors "Error while recompiling: %S"
-      (package-recompile pkg-desc))))
+(defun package-recompile-all (&optional nprocs)
+  "Recompile installed packages.  NPROCS defaults to 1.
+Blocks until compilation started for all packages."
+  (interactive "p")
+  (unless (fixnump nprocs)
+    (setq nprocs 1))
+  (let ((run (make-temp-name "recompile-")))
+    (pcase-dolist (`(_ ,pkg-desc) package-alist)
+      (if (<= nprocs 1)
+          (with-demoted-errors "Error while recompiling: %S"
+            (package-recompile (package-desc-name pkg-desc)))
+        (let ((name (concat run "/" (symbol-name (package-desc-name pkg-desc)))))
+          (while (>= (length (cl-remove-if-not
+                              (lambda (name) (string-prefix-p run name))
+                              (mapcar #'process-name (process-list))))
+                     nprocs)
+            (accept-process-output nil 0.13))
+          (make-process
+           :name name
+           :buffer (get-buffer-create (format " *%s*" name))
+           :command `(,(expand-file-name invocation-name invocation-directory)
+                      "-Q" "--batch"
+                      ,@(cl-mapcan
+                         (lambda (expr) (list "--eval" expr))
+                         (list
+                          "(package-initialize)"
+	                  "(setq w32-disable-abort-dialog t)"
+	                  (format "(package-recompile (quote %s))"
+                                  (package-desc-name pkg-desc)))))
+           :sentinel (lambda (proc _event)
+                       (when (memq (process-status proc)
+                                   '(closed exit signal failed))
+                         (if (zerop (process-exit-status proc))
+                             (let (kill-buffer-query-functions)
+                               (kill-buffer (process-buffer proc)))
+                           (message "Recompile exited with %s, see %s"
+                                    (process-exit-status proc)
+                                    (buffer-name (process-buffer proc))))))
+           :noquery t))))))
 
 ;;;###autoload
 (defun package-autoremove ()
