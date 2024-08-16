@@ -1081,17 +1081,6 @@ load_error_handler (Lisp_Object /* err */)
   return Qnil;
 }
 
-static Lisp_Object
-eln_inconsistent_handler (Lisp_Object err)
-{
-  if (CONSP (err))
-    {
-      AUTO_STRING (format, "%s");
-      CALLN (Fmessage, format, Ferror_message_string (err));
-    }
-  return err;
-}
-
 static void
 load_warn_unescaped_character_literals (Lisp_Object file)
 {
@@ -1148,6 +1137,7 @@ loadhist_initialize (Lisp_Object filename)
   specbind (Qcurrent_load_list, Fcons (filename, Qnil));
 }
 
+#ifdef HAVE_NATIVE_COMP
 static Lisp_Object
 load_retry (ptrdiff_t nargs, Lisp_Object *args)
 {
@@ -1160,6 +1150,18 @@ load_retry_handler (Lisp_Object err, ptrdiff_t nargs, Lisp_Object *args)
 {
   return err;
 }
+
+static Lisp_Object
+eln_inconsistent_handler (Lisp_Object err)
+{
+  if (CONSP (err))
+    {
+      AUTO_STRING (format, "%s");
+      CALLN (Fmessage, format, Ferror_message_string (err));
+    }
+  return err;
+}
+#endif /* HAVE_NATIVE_COMP */
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
        doc: /* Execute a file of Lisp code named FILE.
