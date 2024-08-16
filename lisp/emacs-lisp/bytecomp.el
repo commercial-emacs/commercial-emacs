@@ -1966,8 +1966,7 @@ also be compiled."
                     (native-compile source
                                     (expand-file-name
                                      (file-name-with-extension file ".eln")
-                                     (expand-file-name comp-native-version-dir
-                                                       directory)))))
+                                     directory))))
                  (unless (eq last-dir directory)
                    (setq last-dir directory
                          dir-count (1+ dir-count)))))))

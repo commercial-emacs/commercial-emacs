@@ -1076,9 +1076,20 @@ record_load_unwind (Lisp_Object old)
 /* This handler function is used via internal_condition_case_1.  */
 
 static Lisp_Object
-load_error_handler (Lisp_Object data)
+load_error_handler (Lisp_Object /* err */)
 {
   return Qnil;
+}
+
+static Lisp_Object
+eln_inconsistent_handler (Lisp_Object err)
+{
+  if (CONSP (err))
+    {
+      AUTO_STRING (format, "%s");
+      CALLN (Fmessage, format, Ferror_message_string (err));
+    }
+  return err;
 }
 
 static void
@@ -1135,6 +1146,19 @@ loadhist_initialize (Lisp_Object filename)
 {
   eassert (STRINGP (filename) || NILP (filename));
   specbind (Qcurrent_load_list, Fcons (filename, Qnil));
+}
+
+static Lisp_Object
+load_retry (ptrdiff_t nargs, Lisp_Object *args)
+{
+  eassert (nargs == 5);
+  return Fload (args[0], args[1], args[2], args[3], args[4]);
+}
+
+static Lisp_Object
+load_retry_handler (Lisp_Object err, ptrdiff_t nargs, Lisp_Object *args)
+{
+  return err;
 }
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
@@ -1412,7 +1436,38 @@ Return t if on success.  */)
     {
 #ifdef HAVE_NATIVE_COMP
       loadhist_initialize (found);
-      Fnative__load (found);
+      if (CONSP (internal_condition_case_1 (Fnative__load, found,
+					    list1 (Qnative_lisp_file_inconsistent),
+					    eln_inconsistent_handler)))
+	{
+	  /* hit Qnative_lisp_file_inconsistent, remove ".eln"
+	     from `load-suffixes' and try again.  */
+	  Lisp_Object restore_suffixes = Fcopy_sequence (Vload_suffixes),
+	    tail = Vload_suffixes, head = Qnil;
+	  FOR_EACH_TAIL (tail)
+	    {
+	      if (STRINGP (XCAR (tail))
+		  && 0 == strcmp (SSDATA (CAR (tail)), NATIVE_SUFFIX))
+		{
+		  if (NILP (head))
+		    Vload_suffixes = CDR (tail);
+		  else
+		    XSETCDR (head, CDR (tail));
+		  break;
+		}
+	      head = tail;
+	    }
+	  ret = unbind_to
+	    (count, internal_condition_case_n (load_retry, 5,
+					       ((Lisp_Object [])
+						{ file, noerror, nomessage,
+						  nosuffix, must_suffix }),
+					       Qt, load_retry_handler));
+	  Vload_suffixes = restore_suffixes;
+	  if (CONSP (ret))
+	    xsignal (CAR (ret), CDR (ret));
+	  goto done; /* !!! */
+	}
       build_load_history (found, true);
 #else
       emacs_abort ();

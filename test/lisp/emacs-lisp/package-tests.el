@@ -414,7 +414,11 @@ could introduce macro redefinitions required for compile."
             (mapc (lambda (f) (call-process "gzip" nil nil nil f))
                   (directory-files-recursively dir "\\`[^\\.].*\\.el\\'"))
             (require 'macro-builtin)
-            (should (member (expand-file-name "macro-builtin-aux.elc" dir)
+            (should (member (expand-file-name
+                             (file-name-with-extension
+                              "macro-builtin-aux"
+                              (if (featurep 'native-compile) ".eln" ".elc"))
+                             dir)
                             (mapcar #'car load-history)))
             ;; `macro-builtin-func' uses a macro from `macro-aux'.
             (should (equal (macro-builtin-func) '(progn a b)))

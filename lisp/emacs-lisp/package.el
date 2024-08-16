@@ -785,7 +785,6 @@ compiling the package."
       (mapc (lambda (c) (load (car c) nil t))
             (sort reloads (lambda (x y) (< (cdr x) (cdr y))))))))
 
-(defvar comp-native-version-dir)
 (defun package--activate (pkg-desc reload activate-deps)
   "Activate PKG-DESC, even if already activated.
 If DEPS, also activate its dependencies.
@@ -809,8 +808,6 @@ If RELOAD, also `load' any previously loaded package files."
                (elc-dir (directory-file-name (file-name-directory autoloads))))
           ;; Prepend elc, then eln.  Order matters.
           (add-to-list 'load-path elc-dir)
-          (when (featurep 'native-compile)
-            (add-to-list 'load-path (expand-file-name comp-native-version-dir elc-dir)))
           (load autoloads nil :quiet)))
       (when reload
         (package--reload-previously-loaded pkg-desc))
