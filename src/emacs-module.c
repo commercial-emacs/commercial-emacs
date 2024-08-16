@@ -96,11 +96,6 @@ To add a new module function, proceed as follows:
 #include <intprops.h>
 #include <verify.h>
 
-/* Work around GCC bug 83162.  */
-#if GNUC_PREREQ (4, 3, 0)
-# pragma GCC diagnostic ignored "-Wclobbered"
-#endif
-
 /* We use different strategies for allocating the user-visible objects
    (struct emacs_runtime, emacs_env, emacs_value), depending on
    whether the user supplied the -module-assertions flag.  If
@@ -276,11 +271,14 @@ module_decode_utf_8 (const char *str, ptrdiff_t len)
       module_out_of_memory (env);					\
       return retval;							\
     }									\
+  emacs_env *env_volatile = env;					\
   struct handler *internal_cleanup                                      \
   __attribute__ ((cleanup (module_pop_exception_stack)))		\
     = internal_handler;                                                 \
-  if (sys_setjmp (internal_cleanup->jmp))                               \
+  if (sys_setjmp (internal_handler->jmp))				\
     {									\
+      emacs_env *env = env_volatile;					\
+      struct handler *internal_handler = internal_cleanup;		\
       module_handle_nonlocal_exit (env,                                 \
                                    internal_cleanup->nonlocal_exit,     \
                                    internal_cleanup->val);              \
@@ -959,6 +957,15 @@ static bool
 module_extract_big_integer (emacs_env *env, emacs_value arg, int *sign,
                             ptrdiff_t *count, emacs_limb_t *magnitude)
 {
+#if GCC_LINT && __GNUC__ && !__clang__
+  /* These useless assignments pacify GCC 14.2.1 x86-64
+     <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=21161>.  */
+  {
+    int *volatile sign_volatile = sign;
+    sign = sign_volatile;
+  }
+#endif
+
   MODULE_FUNCTION_BEGIN (false);
   Lisp_Object o = value_to_lisp (arg);
   CHECK_INTEGER (o);
