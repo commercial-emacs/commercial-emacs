@@ -159,8 +159,7 @@ define byte-compile
 endef
 
 define native-compile
-	$(AM_V_ELN)$(emacs) $(COMPILE_FLAGS) \
-	    --eval "(native-compile \"$<\" \"$@\")"
+	$(AM_V_ELN)$(emacs) $(COMPILE_FLAGS) -f batch-native-compile $<
 endef
 
 %.elc: %.el | $(COMPILER_EL:.el=.elc)
