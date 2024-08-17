@@ -63,11 +63,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
-/* Work around GCC bug 54561.  */
-#if GNUC_PREREQ (4, 3, 0)
-# pragma GCC diagnostic ignored "-Wclobbered"
-#endif
-
 #ifdef HAVE_X_WINDOWS
 typedef struct x_bitmap_record Bitmap_Record;
 #ifndef USE_CAIRO
@@ -7613,7 +7608,7 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   bool transparent_p;
   struct png_memory_storage tbr;  /* Data to be read */
   ptrdiff_t nbytes;
-  Emacs_Pix_Container ximg, mask_img = NULL;
+  Emacs_Pix_Container ximg;
 
   /* Find out what file to load.  */
   specified_file = image_spec_value (img->spec, QCfile, NULL);
@@ -7701,9 +7696,12 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
 
   /* Set error jump-back.  We come back here when the PNG library
      detects an error.  */
+
+  struct png_load_context *volatile c_volatile = c;
   if (FAST_SETJMP (PNG_JMPBUF (png_ptr)))
     {
     error:
+      c = c_volatile;
       if (c->png_ptr)
 	png_destroy_read_struct (&c->png_ptr, &c->info_ptr, &c->end_info);
       xfree (c->pixels);
@@ -7712,6 +7710,13 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
 	fclose (c->fp);
       return 0;
     }
+
+#if GCC_LINT && __GNUC__ && !__clang__
+  /* These useless assignments pacify GCC 14.2.1 x86-64
+     <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=21161>.  */
+  c = c_volatile;
+  fp = c->fp;
+#endif
 
   /* Read image info.  */
   if (!NILP (specified_data))
@@ -7839,6 +7844,7 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
 
   /* Create an image and pixmap serving as mask if the PNG image
      contains an alpha channel.  */
+  Emacs_Pix_Container mask_img = NULL;
   if (channels == 4
       && transparent_p
       && !image_create_x_image_and_pixmap (f, img, width, height, 1,
@@ -8334,13 +8340,13 @@ jpeg_load_body (struct frame *f, struct image *img,
 		struct my_jpeg_error_mgr *mgr)
 {
   Lisp_Object specified_file, specified_data;
-  FILE *volatile fp = NULL;
+  FILE *fp = NULL;
   JSAMPARRAY buffer;
   int row_stride, x, y;
   int width, height;
   int i, ir, ig, ib;
   unsigned long *colors;
-  Emacs_Pix_Container ximg = NULL;
+  Emacs_Pix_Container volatile ximg_volatile = NULL;
 
   /* Open the JPEG file.  */
   specified_file = image_spec_value (img->spec, QCfile, NULL);
@@ -8373,8 +8379,15 @@ jpeg_load_body (struct frame *f, struct image *img,
      error is detected.  This function will perform a longjmp.  */
   mgr->cinfo.err = jpeg_std_error (&mgr->pub);
   mgr->pub.error_exit = my_error_exit;
+  struct my_jpeg_error_mgr *volatile mgr_volatile = mgr;
+  struct image *volatile img_volatile = img;
+  FILE *volatile fp_volatile = fp;
   if (sys_setjmp (mgr->setjmp_buffer))
     {
+      mgr = mgr_volatile;
+      img = img_volatile;
+      fp = fp_volatile;
+
       switch (mgr->failure_code)
 	{
 	case MY_JPEG_ERROR_EXIT:
@@ -8400,12 +8413,21 @@ jpeg_load_body (struct frame *f, struct image *img,
       jpeg_destroy_decompress (&mgr->cinfo);
 
       /* If we already have an XImage, free that.  */
+      Emacs_Pix_Container ximg = ximg_volatile;
       if (ximg)
 	image_destroy_x_image (ximg);
       /* Free pixmap and colors.  */
       image_clear_image (f, img);
       return 0;
     }
+
+#if GCC_LINT && __GNUC__ && !__clang__
+  /* These useless assignments pacify GCC 14.2.1 x86-64
+     <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=21161>.  */
+  mgr = mgr_volatile;
+  img = img_volatile;
+  fp = fp_volatile;
+#endif
 
   /* Create the JPEG decompression object.  Let it read from fp.
 	 Read the JPEG image header.  */
@@ -8433,7 +8455,11 @@ jpeg_load_body (struct frame *f, struct image *img,
     }
 
   /* Create X image and pixmap.  */
-  if (!image_create_x_image_and_pixmap (f, img, width, height, 0, &ximg, 0))
+  Emacs_Pix_Container ximg;
+  bool ximg_ok = image_create_x_image_and_pixmap (f, img, width, height, 0,
+						  &ximg, 0);
+  ximg_volatile = ximg;
+  if (!ximg_ok)
     {
       mgr->failure_code = MY_JPEG_CANNOT_CREATE_X;
       sys_longjmp (mgr->setjmp_buffer, 1);
