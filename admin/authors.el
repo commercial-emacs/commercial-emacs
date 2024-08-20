@@ -55,6 +55,7 @@ files.")
     ("Andrew G Cohen" "Andrew Cohen")
     ("Anna M. Bigatti" "Anna Bigatti")
     ("Aurélien Aptel" "Aurelien Aptel")
+    ("Azeem Hasan" "Rahguzar" "rahguzar@zohomail.eu")
     ("Barry A. Warsaw" "Barry A. Warsaw, Century Computing, Inc."
      "Barry A. Warsaw, ITB" "Barry Warsaw")
     ("Bastien Guerry" "Bastien .*bzg")
@@ -65,8 +66,10 @@ files.")
     ("Bill Rozas" "Guillermo J. Rozas")
     ("Billy Zheng" "vil963@gmail\\.com")
     (nil "binjo\\.cn@gmail\\.com")
+    (nil "BlaCk_Void" "alstjr7375@daum.net")
     (nil "bug-gnu-emacs@gnu\\.org")  ; mistake
     ("Björn Torkelsson" "Bjorn Torkelsson")
+    (nil "brandon.irizarry@gmail.com")
     ("Brian Fox" "Brian J. Fox")
     ("Brian P Templeton" "BT Templeton")
     ("Brian Sniffen" "Brian T. Sniffen")
@@ -77,6 +80,7 @@ files.")
     ("Clément Pit-Claudel" "Clément Pit--Claudel")
     (nil "Cristian" "crstml@libero\\.it")
     ("Le Trung Dan" "daanturo@gmail\\.com" "Daanturo")
+    (nil "D.K" "beerandhot@gmail.com")
     ("Daniel Freeman" "dannyfreeman")
     ("David Abrahams" "Dave Abrahams")
     ("David J. Biesack" "David Biesack")
@@ -154,6 +158,7 @@ files.")
     ("Joseph M. Kelsey" "Joe Kelsey")	; FIXME ?
     ("Juan León Lahoz García" "Juan-Leon Lahoz Garcia")
     ("Jürgen Hötzel" "Juergen Hoetzel")
+    ("Justin Burkett" "justbur" "justin@burkett.cc")
     (nil "k3tu0isui")
     (nil "kby@tilde\\.team")
     ("K. Shane Hartman" "Shane Hartman")
@@ -196,6 +201,7 @@ files.")
     ("Michael Sperber" "Mike Sperber" "Michael Sperber \\[Mr. Preprocessor\\]")
     ("Michalis V" "^mvar")
     ("Miha Rihtaršič" "Miha Rihtarsic" "miha@kamnitnik\\.top" "miha")
+    (nil "mikpom" "mikpom@mikpom.ru")
     ("Mikio Nakajima" "Nakajima Mikio")
     (nil "montag451@laposte\\.net")
     ("Morgan Smith" "Morgan J\\. Smith")
@@ -260,6 +266,7 @@ files.")
     (nil "ssnnoo")
     ("Steven L. Baur" "SL Baur" "Steven L Baur")
     ("Stewart M. Clamen" "Stewart Clamen")
+    (nil "StrawberryTea" "look@strawberrytea.xyz")
     ("Stuart D. Herring" "Stuart Herring" "Davis Herring")
     ("T.V. Raman" "T\\. V\\. Raman")
     ("Taichi Kawabata" "KAWABATA,? Taichi")
@@ -277,6 +284,7 @@ files.")
     ("Torbjörn Axelsson" "Torbjvrn Axelsson")
     ("Torbjörn Einarsson" "Torbj.*rn Einarsson")
     ("Toru Tomabechi" "Toru TOMABECHI")
+    ("Toshi Umehara" "niceume" "toshi@niceume.com")
     ("Tsugutomo Enami" "enami tsugutomo")
     ("Ulrich Müller" "Ulrich Mueller")
     (nil "vividsnow")
@@ -609,7 +617,72 @@ Changes to files matching one of the regexps in this list are not listed.")
     "lisp/org/ob-J.el"
     ;; Removed -- for now.
     "test/src/doc-tests.el"
-    )
+    "xcompile"
+    "java/org/gnu/emacs/EmacsPaintQueue.java"
+    "java/org/gnu/emacs/EmacsPaintReq.java"
+    "xcompile/lib/unistd.c"
+    "xcompile/lib/open.c"
+    "xcompile/lib/fpending.c"
+    "xcompile/lib/gnulib.mk.in"
+    "cross/lib/math.h"
+    "cross/ndk-build/ndk-build.in"
+    "cross/lib/stdalign.in.h"
+    "cross/lib/_Noreturn.h"
+    "test/lisp/tramp-tests.el"
+    "lib/vasnprintf.c"
+    "lib/isnan.c"
+    "cross/lib/verify.h"
+    "cross/lib/libc-config.h"
+    "cross/lib/cdefs.h"
+    "java/org/gnu/emacs/EmacsEditable.java"
+    "lib/math.h"
+    "cross/lib/vasnprintf.c"
+    "cross/lib/openat-proc.c"
+    "lib/math.in.h"
+    "cross/lib/string.in.h"
+    "cross/lib/stpncpy.c"
+    "cross/lib/limits.in.h"
+    "cross/lib/getopt-pfx-core.h"
+    "cross/lib/unistd.in.h"
+    "INSTALL.android"
+    "lisp/eshell/em-arg.el"
+    "test/lisp/erc/resources/base/renick/regain/normal.eld"
+    "test/lisp/erc/resources/fill/snapshots/merge-wrap-indicator-post-01.eld"
+    "if-11.cc"
+    "if-11.res"
+    "java/org/gnu/emacs/EmacsWindowAttachmentManager.java"
+    "lisp/gnus/legacy-gnus-agent.el"
+    "admin/coccinelle/xsave.cocci"
+    "register-tests.el"
+    "feat" "build" "docs" "chore"
+    "nt/ftime-nostartup.bat" "nt/ftime.bat"
+    "java/org/gnu/emacs/EmacsCopyArea.java"
+    "test/lisp/erc/resources/base/renick/regain/normal-again.eld"
+    "test/lisp/erc/resources/base/commands/motd.eld"
+    "cross/lib/math.in.h"
+    "lib/strncpy.c"
+    "cross/lib/isnan.c"
+    "lib/count-one-bits.c"
+    "lib/count-one-bits.h"
+    "lib/count-trailing-zeros.c"
+    "lib/count-trailing-zeros.h"
+    "lib/count-leading-zeros.h"
+    "lib/count-leading-zeros.c"
+    "lisp/org/ob-asymptote.el"
+    "lisp/org/ob-io.el"
+    "lisp/org/ob-shen.el"
+    "lisp/progmodes/ada-stmt.el"
+    "lib-src/profile.c"
+    "doc/misc/gnus-overrides.texi"
+    "etc/CENSORSHIP" "etc/FTP" "etc/GNU" "etc/LINUX-GNU" "etc/MORE.STUFF" "etc/ORDERS"
+    "etc/THE-GNU-PROJECT" "etc/WHY-FREE"
+    "lisp/obsolete/options.el"
+    "etc/emacs.appdata.xml"
+    "lisp/obsolete/sregex.el"
+    "lisp/org/ob-picolisp.el"
+    "lisp/obsolete/levents.el"
+    "lisp/obsolete/lucid.el"
+    "lisp/obsolete/old-whitespace.el")
   "List of files and directories to ignore.
 Changes to files in this list are not listed.")
 
@@ -1448,7 +1521,188 @@ in the repository.")
     ("test/lisp/url/url-handlers-test.el" . "url-handlers-tests.el")
     ("test/src/dired-tests.el" . "dired-tests.el")
     (".dir-locals.el" . ".dir-locals.el")
-    )
+    ;; use-package files that were moved when use-package was added:
+    ("use-package.texi" . "use-package.texi")
+    ("use-package-core.el" . "use-package-core.el")
+    ("bind-key.el" . "use-package-bind-key.el")
+    ("use-package.el" . "use-package.el")
+    ("use-package-tests.el" . "use-package-tests.el")
+    ;; pgtk stuff which used incorrect file names
+    ("pgtkmenu.c" . "pgtkmenu.c")
+    ("pgtk-win.el" . "pgtk-win.el")
+    ("pgtkfns.c" . "pgtkfns.c")
+    ("pgtkterm.c" . "pgtkterm.c")
+    ("pgtkterm.h" . "pgtkterm.h")
+    ("../src/pgtkfns.c" . "pgtkfns.c")
+    ("../src/pgtkterm.c" . "pgtkterm.c")
+    ("../src/pgtkterm.h" . "pgtkterm.h")
+    ("../src/atimer.c" . "atimer.c")
+    ("../src/gtkutil.c" . "gtkutil.c")
+    ("../src/image.c" . "image.c")
+    ("../lisp/faces.el" . "faces.el")
+    ("../src/pgkterm.h" . "pgkterm.h")
+    ("pgkterm.c" . "pgkterm.c")
+    ("../src/emacsgtkfixed.c" . "emacsgtkfixed.c")
+    ("../src/xfaces.c" . "xfaces.c")
+    ("../src/pgtkgui.h" . "pgtkgui.h")
+    ("../src/dispextern.h" . "dispextern.h")
+    ("../src/menu.c" . "menu.c")
+    ("../lisp/net/browse-url.el" . "browse-url.el")
+    ;; miscellany
+    ("nsterm.m" . "nsterm.m")
+    ("jsonrpc.el" . "jsonrpc.el")
+    ("jsonrpc-tests.el" . "jsonrpc-tests.el")
+    ("jrpc.el" . "jsonrpc.el")
+    ("eldoc.el" . "eldoc.el")
+    ("lisp/progmodes/ts-mode.el" . "typescript-ts-mode.el")
+    ("icalendar-tests.el" . "icalendar-tests.el")
+    ("lisp/progmodes/css-ts-mode.el" . "css-mode.el")
+    ("lisp/erc/erc-tests.el" . "erc-tests.el")
+    ("lisp/erc/erc-scenarios-base-reconnect.el" . "erc-scenarios-base-reconnect.el")
+    ("test/lisp/erc-tests.el" . "erc-tests.el")
+    ("eglot.el" . "eglot.el")
+    ("eglot-tests.el" . "eglot-tests.el")
+    ("NEWS.md" . "EGLOT-NEWS")
+    ("test/lisp/comp-tests.el" . "comp-tests.el")
+    ("package-vc.el" . "package-vc.el")
+    ("package.el" . "package.el")
+    ("lisp/net/tramp-docker.el" . "tramp-container.el")
+    ("xterm.c" . "xterm.c")
+    ("lisp/osc.el" . "ansi-osc.el")
+    ("test/lisp/osc-tests.el" . "ansi-osc-tests.el")
+    ("lisp/ansi-osc.el" . "ansi-osc-tests.el")
+    ("test/lisp/thumbs-tests.el" . "thumbs-tests.el")
+    ("rmail.el" . "rmail.el")
+    ("window.el" . "window.el")
+    ("nsmenu.m" . "nsmenu.m")
+    ("nsfont.m" . "nsfont.m")
+    ("nsfns.m" . "nsfns.m")
+    ("src/nsterm.c" . "nsterm.m")
+    ("subr.el" . "subr.el")
+    ("test/lisp/image-dired-tests.el" . "image-dired-tests.el")
+    ("modus-themes.org" . "modus-themes.org")
+    ("emacs-authors-mode.el" . "emacs-authors-mode.el")
+    ("lisp/textmodes/etc-authors-mode.el" . "emacs-authors-mode.el")
+    ("bytecomp.el" . "bytecomp.el")
+    ("test/lisp/makesum-tests.el" . "makesum-tests.el")
+    ("rcirc.el" . "rcirc.el")
+    ("haiku_support.cc" . "haiku_support.cc")
+    ("gnus-art.el" . "gnus-art.el")
+    ("mh-mime.el" . "mh-mime.el")
+    ("terminal.c" . "terminal.c")
+    ("eudc.texi" . "eudc.texi")
+    ("gnus-search.el" . "gnus-search.el")
+    ("lisp/gnus-search.el" . "gnus-search.el")
+    ("ETAGS_good_1" . "ETAGS_good_1")
+    ("ETAGS_good_2" . "ETAGS_good_2")
+    ("ETAGS_good_3" . "ETAGS_good_3")
+    ("ETAGS_good_4" . "ETAGS_good_4")
+    ("ETAGS_good_5" . "ETAGS_good_5")
+    ("ETAGS_good_6" . "ETAGS_good_6")
+    ("test/lisp/eshell-em-script-tests.el" . "eshell-em-script-tests.el")
+    ("test/lisp/eshell-em-glob-tests.el" . "eshell-em-glob-tests.el")
+    ("lisp/eshell/esh-var-tests.el" . "esh-var-tests.el")
+    ("test/lisp/eshell/esh-var-test.el" . "esh-var-tests.el")
+    ("gnus-logic.el" . "gnus-logic.el")
+    ("sh-script.el" . "sh-script.el")
+    ("repeat.el" . "repeat.el")
+    ("files.el" . "files.el")
+    ("lisp/emacs-lisp/generate-file.el" . "generate-lisp-file.el")
+    ("pp.el" . "pp.el")
+    ("src/help-fns.el" . "help-fns.el")
+    ("print.c" . "print.c")
+    ("shell.el" . "shell.el")
+    ("xdisp.c" . "xdisp.c")
+    ("haikufns.c" . "haikufns.c")
+    ("haikuterm.c" . "haikuterm.c")
+    ("haikumenu.c" . "haikumenu.c")
+    ("haikufont.c" . "haikufont.c")
+    ("src/haiku_support.c" . "haiku_support.cc")
+    ("src/haiku_draw_support.c" . "haiku_draw_support.cc")
+    ("haiku-win.el" . "haiku-win.el")
+    ("elisp-mode.el" . "elisp-mode.el")
+    ("doc-view.el" . "doc-view.el")
+    ("src/lisp/net/rcirc.el" . "rcirc.el")
+    ("project.el" . "project.el")
+    ("emacsbug.el" . "emacsbug.el")
+    ("timefns.c" . "timefns.c")
+    ("xwidget.c" . "xwidget.c")
+    ("src/xwidget.el" . "xwidget.el")
+    ("lisp/net/lisp/net/tramp-sshfs.el" . "tramp-sshfs.el")
+    ("tramp-sudoedit.el" . "tramp-sudoedit.el")
+    ("test/lisp/mail/undigest.el" . "undigest-tests.el")
+    ("Activate.c" . "Activate.c")
+    ("quail.el" . "quail.el")
+    ("sed1v2.inp" . "sed1v2.inp")
+    ("ruby-parenless-call-arguments-indent.rb" . "ruby-parenless-call-arguments-indent.rb")
+    ("commands.texi" . "doc/lispref/commands.texi")
+    ("message.el" . "message.el")
+    ("lisp/debug-early.el" . "debug-early.el")
+    ("tabulated-list.el" . "tabulated-list.el")
+    ("mouse.el" . "mouse.el")
+    ("hi-lock.el" . "hi-lock.el")
+    ("man.el" . "man.el")
+    ("doc/emacs/frames.tex" . "frames.texi")
+    ("lisp/emacs-list/eieio-compat.el" . "eieio-compat.el")
+    ("epa.el" . "epa.el")
+    ("lisp/emacs-lisp/macroexpand.el" . "macroexp.el")
+    ("src/pixel-scroll.el" . "pixel-scroll.el")
+    ("test/lisp/mh-e/mh-utils.el" . "mh-utils-tests.el")
+    ("compile.el" . "compile.el")
+    ("compile-tests.el" . "compile-tests.el")
+    ("Makefile.in" . "Makefile.in")
+    ("Makefie.in" . "Makefile.in")
+    ("test/lisp/net/netrc-tests.el" . "auth-source-tests.el")
+    ("test/lisp/ert-x-tests.el" . "ert-x-tests.el")
+    ("lisp/mh-e-mh-scan.el" . "mh-scan.el")
+    ("lisp/progmodes/c-fonts.el" . "cc-fonts.el")
+    ("lisp/emacs/lisp/cl-generic.el" . "cl-generic.el")
+    ("doc/lisprefdisplay.texi" . "display.texi")
+    ("erc.el" . "erc.el")
+    ("erc-tests.el" . "erc-tests.el")
+    ("vc/vc-mtn.el" . "vc-mtn.el")
+    ("net/rlogin.el" . "rlogin.el")
+    ("emacs-lisp/eieio-compat.el" . "eieio-compat.el")
+    ("mh-compat.el" . "mh-compat.el")
+    ("url-about.el" . "url-about.el")
+    ("url-dired.el" . "url-dired.el")
+    ("lisp/text-modes/tex-mode.el" . "tex-mode.el")
+    ("editfns.c" . "editfns.c")
+    ("lisp/thumbs.el" . "thumbs.el")
+    ("lisp/linum.el" . "linum.el")
+    ("lisp/image-dired.el" . "image-dired.el")
+    ("lisp/url/url-about.el" . "url-about.el")
+    ("lisp/url/url-dired.el" . "url-dired.el")
+    ("lisp/ps-def.el" . "ps-def.el")
+    ("lisp/net/quickurl.el" . "quickurl.el")
+    ("lisp/vc/vc-mtn.el" . "vc-mtn.el")
+    ("lisp/mail/uce.el" . "uce.el")
+    ("test/lisp/progmodes/csharp-ts-mode-tests.el" . "csharp-mode.el")
+    ("lisp/makesum.el" . "makesum.el")
+    ("lisp/mh-e/mh-compat.el" . "mh-compat.el")
+    ("lisp/net/rlogin.el" . "rlogin.el")
+    ("lisp/emacs-lisp/autoload.el" . "autoload.el")
+    ("lisp/emacs-lisp/eieio-compat.el" . "eieio-compat.el")
+    ("autoarg.el" . "autoarg.el")
+    ("xcompile/Makefile.in" . "cross/Makefile.in")
+    ("xcompile/README" . "cross/README")
+    ("xcompile/langinfo.h" . "cross/langinfo.h")
+    ("xcompile/verbose.mk.android" . "cross/verbose.mk.android")
+    ("test/lisp/peg-tests.el" . "test/lisp/progmodes/peg-tests.el")
+    ("doc/lispref/type_hierarchy.txt" . "doc/lispref/elisp_type_hierarchy.txt")
+    ("doc/lispref/type_hierarchy.jpg" . "doc/lispref/elisp_type_hierarchy.jpg")
+    ("etc/syncdoc-type-hierarchy.el" . "admin/syncdoc-type-hierarchy.el")
+    ("doc/lang/fr/misc/ses-fr.texi" . "doc/translations/fr/misc/ses-fr.texi")
+    ("lisp/use-package/bind-key.el" . "lisp/bind-key.el")
+    ("lisp/autoarg.el" . "lisp/obsolete/autoarg.el")
+    ("lisp/url/url-ns.el" . "lisp/obsolete/url-ns.el")
+    ("lisp/mail/rfc2368.el" . "lisp/obsolete/mail/rfc2368.el")
+    ("lisp/vt-control.el" . "lisp/obsolete/vt-control.el")
+    ("lisp/cedet/inversion.el" . "lisp/obsolete/inversion.el")
+    ("lisp/emacs-lisp/tcover-unsafep.el" . "test/lisp/emacs-lisp/unsafep-tests.el")
+    ("lisp/vt100-led.el" . "lisp/obsolete/vt100-led.el")
+    ("lisp/mail/metamail.el" . "lisp/obsolete/metamail.el")
+    ("lisp/sb-image.el" . "lisp/obsolete/sb-image.el"))
   "Alist of files which have been renamed during their lifetime.
 Elements are (OLDNAME . NEWNAME).")
 
