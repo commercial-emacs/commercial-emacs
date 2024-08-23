@@ -1041,11 +1041,24 @@ When `shr-fill-text' is nil, only indent."
 
 (defun shr-indent ()
   (when (> shr-indentation 0)
-    (if (not shr-use-fonts)
-        (insert-char ?\s shr-indentation)
-      (insert ?\s)
-      (put-text-property (1- (point)) (point)
-                         'display `(space :width (,shr-indentation))))))
+    (let ((start (point))
+          (prefix (or (get-text-property (point) 'shr-prefix-length) 0)))
+      (if (not shr-use-fonts)
+          (insert-char ?\s shr-indentation)
+        (insert ?\s)
+        ;; Set the specified space width in units of the average-width
+        ;; of the current font, like (N . width).  That way, the
+        ;; indentation is calculated correctly when using
+        ;; `text-scale-adjust'.
+        (let ((avg-space (propertize (buffer-substring (1- (point)) (point))
+                                     'display '(space :width 1))))
+          (put-text-property
+           (1- (point)) (point) 'display
+           `(space :width (,(/ (float shr-indentation)
+                               (string-pixel-width avg-space (current-buffer)))
+                           . width)))))
+      (put-text-property start (+ (point) prefix)
+                         'shr-prefix-length (+ prefix (- (point) start))))))
 
 (defun shr-fontize-dom (dom &rest types)
   (let ((start (point)))
