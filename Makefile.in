@@ -430,7 +430,7 @@ $(srcdir)/configure: $(srcdir)/configure.ac $(srcdir)/m4/*.m4
 .PHONY: install-man install-etc install-strip install-$(NTDIR)
 .PHONY: uninstall uninstall-$(NTDIR)
 
-install: install-arch-indep install-etcdoc install-arch-dep install-$(NTDIR) blessmail install-gsettings-schemas
+install: install-arch-indep install-etcdoc install-arch-dep install-$(NTDIR) install-gsettings-schemas
 
 ## Ensure that $subdir contains a subdirs.el file.
 ## Here and elsewhere, we set the umask so that any created files are
