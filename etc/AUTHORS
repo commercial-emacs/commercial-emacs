@@ -2113,6 +2113,8 @@ Gary Wong: changed termcap.c tparam.c
 Gaute B Strokkenes: changed net/imap.el gnus-fun.el mail-source.el
   process.c
 
+Gautier Ponsinet: changed calendar.texi
+
 G Dinesh Dutt: changed etags.el
 
 Geert Kloosterman: changed which-func.el
@@ -5333,6 +5335,8 @@ and changed eww.el octave.el shr.el bibtex.el configure.ac
   autoinsert.el building.texi bytecomp.el calc-lang.el cc-langs.el
   dired.texi editfns.c emacs.c emacs.texi epa.el erc.el
   and 40 other files
+
+Rudi Schlatte: changed iso-transl.el
 
 Rudi Schlatte: changed iso-transl.el
 
