@@ -864,16 +864,15 @@ This can now be entered using 'C-x 8 E' in addition to the existing
 If 'whitespace-style' includes 'missing-newline-at-eof (which is the
 default), the 'whitespace-cleanup' function will now add the newline.
 
-** SHR
+** Gnus
 
-+++
-*** SHR now slices large images into rows.
-Sliced images allow for more intuitive scrolling up/down by letting you
-scroll past each slice, instead of jumping past the entire image.
-Previously, SHR sliced images when zoomed to their original size, no
-matter how large or small that was).  Now, SHR slices any images taller
-than 'shr-sliced-image-height'.  For more information, see the "(eww)
-Advanced" node in the EWW manual.
+---
+*** Replying to icalendar events now supports specifying a comment.
+When called with a prefix argument, accepting, declining, or tentatively
+accepting an icalendar event will prompt for a comment to add to the
+response.
+
+** Eshell
 
 ---
 *** You can now customize the image zoom levels to cycle through.
