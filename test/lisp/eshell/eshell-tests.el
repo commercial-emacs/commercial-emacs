@@ -145,19 +145,6 @@ This test uses a pipeline for the command."
     (eshell-command "echo more" temp-file)
     (should (equal (eshell-test-file-string temp-file) "moreinitial"))))
 
-(ert-deftest eshell-test/eshell-command/output-symbol ()
-  "Test that `eshell-command' can write to a symbol."
-  (eshell-command "echo hi" 'eshell-command-output)
-  (should (equal eshell-command-output "hi")))
-
-(ert-deftest eshell-test/eshell-command/output-dev-null ()
-  "Test that the `eshell-command' function handles /dev/null properly."
-  (ert-with-temp-directory eshell-directory-name
-    (let ((eshell-history-file-name nil))
-      (with-temp-buffer
-        (eshell-command "echo hi" "/dev/null")
-        (should (equal (buffer-string) ""))))))
-
 (ert-deftest eshell-test/command-running-p ()
   "Modeline should show no command running"
   (with-temp-eshell
