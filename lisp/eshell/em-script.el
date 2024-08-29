@@ -128,10 +128,9 @@ Comments begin with `#'."
     (with-temp-buffer
       (eshell-mode)
       (eshell-do-eval
-       `(let ((eshell-current-handles
-               (eshell-create-handles ',stdout 'insert))
-              (eshell-current-subjob-p))
-          ,(eshell--source-file file args))
+       `(eshell-with-handles (',stdout 'insert ',stderr 'insert)
+          (let ((eshell-current-subjob-p))
+            ,(eshell--source-file file args)))
        t))))
 
 (cl-defstruct (eshell-princ-target
