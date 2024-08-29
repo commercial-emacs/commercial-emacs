@@ -376,8 +376,8 @@ Juri Linkov
 Philip Kaludercic
 	lisp/epa-ks.el
 
-Harald Jörg
-	lisp/progmodes/cperl-mode.el
+Spencer Baugh
+	lisp/progmodes/flymake.el
 
 ==============================================================================
 3. Externally maintained packages.
