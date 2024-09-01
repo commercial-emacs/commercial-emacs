@@ -394,11 +394,6 @@ It can be used to add, remove and reorder functions that change the
 appearance of every tab on the tab bar.
 
 ---
-*** New user option 'tab-line-tabs-buffer-group-function'.
-It provides two choices to group tab buffers by major mode and by
-project name.
-
----
 *** New hook 'tab-bar-tab-post-select-functions'.
 
 ---
@@ -415,7 +410,7 @@ you want to use these keys for the commands 'previous-buffer' and
 'next-buffer'.
 
 ---
-*** Default list of tabs is changed to support a fixed order.
+*** Default list of tab-line tabs is changed to support a fixed order.
 This means that 'tab-line-tabs-fixed-window-buffers', the new default
 tabs function, is like the previous 'tab-line-tabs-window-buffers' where
 both of them show only buffers that were previously displayed in the
@@ -425,7 +420,12 @@ these buffers.  You can drag the tabs and release at a new position
 to manually reorder the buffers on the tab line.
 
 ---
-*** Buffers on group tabs are now sorted alphabetically.
+*** New user option 'tab-line-tabs-buffer-group-function'.
+It provides two choices to group tab buffers by major mode and by
+project name.
+
+---
+*** Buffers on tab-line group tabs are now sorted alphabetically.
 This will keep the fixed order of tabs, even after switching between
 them.
 
@@ -1035,7 +1035,7 @@ Customizing it to 'relativize' makes commands like 'project-find-file'
 and 'project-find-dir' display previous history entries relative to
 the current project.
 
---
+---
 *** New user option 'project-key-prompt-style'.
 The look of the key prompt in the project switcher has been changed
 slightly.  To get the previous one, set this option to 'brackets'.
@@ -1946,11 +1946,260 @@ any.
 ** Diff
 
 ---
-*** New command 'diff-kill-ring-save'.
-This command copies to the 'kill-ring' a region of text modified
-according to diffs in the current buffer, but without applying the diffs
-to the original text.  If the selected range extends a hunk, the
-command attempts to look up and copy the text in-between the hunks.
+*** Subroutine signatures are now supported.
+CPerl mode fontifies subroutine signatures like variable declarations
+which makes them visually distinct from subroutine prototypes.
+
+---
+*** Syntax of Perl up to version 5.40 is supported.
+CPerl mode supports the new keywords for exception handling and the
+object oriented syntax which were added in Perl 5.36, 5.38 and 5.40.
+
+---
+*** New user option 'cperl-fontify-trailer'.
+This user option takes the values 'perl-code' or 'comment' and treats
+text after an "__END__" or "__DATA__" token accordingly.  The default
+value of 'perl-code' is useful for trailing POD and for AutoSplit
+modules, the value 'comment' makes CPerl mode treat trailers as
+comment, like Perl mode does.
+
+---
+*** New command 'cperl-file-style'.
+This command sets the indentation style for the current buffer.  To
+change the default style, either use the user option with the same name
+or use the command 'cperl-set-style'.
+
+---
+*** New minor mode 'cperl-extra-paired-delimiters-mode'.
+Perl 5.36 and newer allows using more than 200 non-ASCII paired
+delimiters for quote-like constructs, e.g. "q«text»".  Use this minor
+mode in buffers where this feature is activated.
+
+---
+*** Commands using the Perl Info manual are obsolete.
+The Perl documentation in Info format is no longer distributed with
+Perl or on CPAN since more than 10 years.  Perl documentation can be
+read with 'cperl-perldoc' instead.
+
+---
+*** Highlighting trailing whitespace has been removed.
+The user option 'cperl-invalid-face' is now obsolete, and does
+nothing.  See the user option 'show-trailing-whitespace' instead.
+
+** Emacs Sessions (Desktop)
+
++++
+*** Restoring buffers visiting remote files can now time out.
+When a buffer is restored which visits a remote file, the restoration
+of the session could hang if the remote host is off-line or slow to
+respond.  Setting the user option 'remote-file-name-access-timeout' to
+a positive number will abandon the attempt to restore such buffers
+after a timeout of that many seconds, thus allowing the rest of
+desktop restoration to continue.
+
+** Recentf
+
++++
+*** Checking recent remote files can now time out.
+Similarly to buffer restoration by Desktop, 'recentf-mode' checking
+of the accessibility of remote files can now time out if
+'remote-file-name-access-timeout' is set to a positive number.
+
+** Image Dired
+
++++
+*** New user option 'image-dired-thumb-naming'.
+You can now configure how thumbnails are named using this option.
+
+** ERT
+
++++
+*** New macro 'skip-when' to skip 'ert-deftest' tests.
+This can help to avoid some awkward skip conditions.  For example
+'(skip-unless (not noninteractive))' can be changed to the easier
+to read '(skip-when noninteractive)'.
+
++++
+*** Syntax highlighting unit testing support.
+An ERT extension ('ert-font-lock') now provides support for face
+assignment unit testing.  For more information, see the "(ert) Syntax
+Highlighting Tests" node in the ERT manual.
+
+** Socks
+
++++
+*** Socks supports version 4a.
+The 'socks-server' user option accepts '4a' as a value for its version
+field.
+
+** Edmacro
+
++++
+*** New command 'edmacro-set-macro-to-region-lines'.
+Bound to 'C-c C-r', this command replaces the macro text with the
+lines of the region.  If needed, the region is extended to include
+whole lines.  If the region ends at the beginning of a line, that last
+line is excluded.
+
++++
+*** New user option 'edmacro-reverse-macro-lines'.
+When this is non-nil, the lines of key sequences are displayed with
+the most recent line first.  This is can be useful when working with
+macros with many lines, such as from 'kmacro-edit-lossage'.
+
+** Calc
+
++++
+*** Calc parses fractions written using U+2044 FRACTION SLASH.
+Fractions of the form "123⁄456" are handled as if written "123:456".
+Note in particular the difference in behavior from U+2215 DIVISION SLASH
+and U+002F SOLIDUS, which result in division rather than a rational
+fraction.  In addition, precomposed fraction characters, such as ½
+(U+00BD VULGAR FRACTION ONE HALF), are also recognized as rational
+fractions.  (They have been recognized since 2004, but it looks like it
+was never mentioned in the NEWS, or even the Calc manual.)
+
+** IELM
+
+---
+*** IELM now remembers input history between sessions.
+The new user option 'ielm-history-file-name' is the name of the file
+where IELM input history will be saved.  Customize it to nil to revert
+to the old behavior of not remembering input history between sessions.
+
+** EasyPG
+
++++
+*** New user option 'epa-keys-select-method'.
+This allows the user to customize the key selection method, which can be
+either by using a pop-up buffer or from the minibuffer.  The pop-up
+buffer method is the default, which preserves previous behavior.
+
+** Widget
+
++++
+*** New face 'widget-unselected'.
+Customize this face to a non-default value to visually distinguish the
+labels of unselected active radio-button or checkbox widgets from the
+labels of unselected inactive widgets (the default value inherits from
+the 'widget-inactive' face).
+
++++
+*** New user option 'widget-skip-inactive'.
+If non-nil, moving point forward or backward between widgets by typing
+'TAB' or 'S-TAB' skips over inactive widgets.  The default value is nil.
+
+** Ruby mode
+
+---
+*** New user option 'ruby-rubocop-use-bundler'.
+By default it retains the previous behavior: read the contents of
+Gemfile and act accordingly.  But you can also set it to t or nil to
+skip the check.
+
+** Thingatpt
+
+---
+*** New variables for providing custom thingatpt implementations.
+The new variables 'bounds-of-thing-at-point-provider-alist' and
+'forward-thing-provider-alist' now allow defining custom implementations
+of 'bounds-of-thing-at-point' and 'forward-thing', respectively.
+
+---
+*** New helper functions for text property-based thingatpt providers.
+The new helper functions 'thing-at-point-for-char-property',
+'bounds-of-thing-at-point-for-char-property', and
+'forward-thing-for-char-property' can help to implement custom thingatpt
+providers for "things" that are defined by text properties.
+
+---
+*** 'bug-reference-mode' now supports 'thing-at-point'.
+Now, calling '(thing-at-point 'url)' when point is on a bug reference
+will return the URL for that bug.
+
+** Buffer-menu
+
+---
+*** New user option 'Buffer-menu-group-by'.
+It controls how buffers are divided into groups that are displayed with
+headings using Outline minor mode.  Using commands that mark buffers
+on the outline heading line will mark all buffers in the outline.
+
++++
+*** New command 'Buffer-menu-toggle-internal'.
+This command toggles the display of internal buffers in Buffer Menu mode;
+that is, buffers not visiting a file and whose names start with a space.
+Previously, such buffers were never shown.  This command is bound to 'I'
+in Buffer Menu mode.
+
+** Miscellaneous
+
++++
+*** New user option 'rcirc-log-time-format'.
+This allows for rcirc logs to use a custom timestamp format, which the
+chat buffers use by default.
+
+---
+*** 'ffap-lax-url' now defaults to nil.
+Previously, it was set to t, but this broke remote file name detection.
+
+---
+*** More control on automatic update of Proced buffers.
+The user option 'proced-auto-update-flag' can now be set to two
+additional values, which control automatic updates of Proced buffers
+that are not displayed in some window.
+
+---
+*** nXML Mode now comes with schemas for Mono/.NET development.
+The following new XML schemas are now supported:
+- MSBuild project files
+- Dotnet package properties files
+- Dotnet resource extension files
+- Dotnet Application config files
+- Nuget config file
+- Nuget package specification file
+- Nuget packages config file
+
+---
+*** color.el now supports the Oklab color representation.
+
++++
+*** New user option 'xwidget-webkit-disable-javascript'.
+This allows disabling JavaScript in xwidget Webkit sessions.
+
+---
+*** 'ls-lisp--insert-directory' supports more long options of 'ls'.
+'ls-lisp--insert-directory', the ls-lisp implementation of
+'insert-directory', now supports the '--time=TIME' and '--sort=time'
+options of GNU 'ls'.
+
+---
+*** 'M-x ping' can now give additional flags to the 'ping' program.
+Typing 'C-u M-x ping' prompts first for the host, and then for the flags
+to give to the 'ping' command.
+
+---
+*** Webjump now assumes URIs are HTTPS instead of HTTP.
+For links in 'webjump-sites' without an explicit URI scheme, it was
+previously assumed that they should be prefixed with "http://".  Such
+URIs are now prefixed with "https://" instead.
+
+---
+*** Added prefixes in titdic-cnv library.
+Most of the variables and functions in the file have been renamed to
+make sure they all use a 'tit-' namespace prefix.
+
+---
+*** 'xref-revert-buffer' is now an alias of 'revert-buffer'.
+The Xref buffer now sets up 'revert-buffer-function' such that
+'revert-buffer' behaves like 'xref-revert-buffer' did in previous Emacs
+versions, and the latter is now an alias of the former.
+
+---
+*** The Makefile browser is now obsolete.
+The command 'makefile-switch-to-browser' command is now obsolete,
+together with related commands used in the "*Macros and Targets*"
+buffer.  We recommend using an alternative like 'imenu' instead.
 
 
 * New Modes and Packages in Emacs 31.1
@@ -1994,7 +2243,45 @@ precedence over the variable when present.
 Mostly used internally to do a kind of topological sort of
 inheritance hierarchies.
 
-** New API for 'derived-mode-p' and control of the graph of major modes.
++++
+** 'drop' is now an alias for the function 'nthcdr'.
+
++++
+** New polymorphic comparison function 'value<'.
+This function returns non-nil if the first argument is less than the
+second.  It works for any two values of the same type with reasonable
+ordering for numbers, strings, symbols, bool-vectors, markers, buffers
+and processes.  Conses, lists, vectors and records are ordered
+lexicographically.
+It is intended as a convenient ordering predicate for sorting, and is
+likely to be faster than hand-written Lisp functions.
+
++++
+** New 'sort' arguments and features.
+The 'sort' function can now be called using the signature
+
+    (sort SEQ &rest KEYWORD-ARGUMENTS)
+
+where arguments after the first are keyword/value pairs, all optional:
+':key' specifies a function that produces the sorting key from an element,
+':lessp' specifies the ordering predicate, defaulting to 'value<',
+':reverse' is used to reverse the sorting order,
+':in-place is used for in-place sorting, as the default is now to
+sort a copy of the input.
+
+The new signature is less error-prone and reduces the need to write
+ordering predicates by hand.  We recommend that you use the ':key'
+argument instead of ':lessp' unless a suitable ordering predicate is
+already available.  This can also be used for multi-key sorting:
+
+    (sort seq :key (lambda (x) (list (age x) (size x) (cost x))))
+
+sorts by the return value of 'age', then by 'size', then by 'cost'.
+
+The old signature, '(sort SEQ PREDICATE)', can still be used and sorts
+its input in-place as before.
+
+** New API for 'derived-mode-p' and control of the graph of major modes
 
 *** 'derived-mode-p' now takes the list of modes as a single argument.
 The same holds for 'provided-mode-derived-p'.
