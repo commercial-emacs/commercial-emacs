@@ -178,22 +178,19 @@ fonts, the wrapped text will now be lined up correctly so that it's
 exactly below the text after the prefix on the first line.
 
 ---
-** The Network Security Manager now warns about <2048 bits in DH key exchange.
-Emacs used to warn for Diffie-Hellman key exchanges with prime numbers
-smaller than 1024 bits.  Since more servers now support it, this
-number has been bumped to 2048 bits.
+** New commands 'unix-word-rubout' and 'unix-filename-rubout'.
+Unix-words are words separated by whitespace regardless of the buffer's
+syntax table.  In a Unix terminal or shell, C-w kills by Unix-word.
+The new commands 'unix-word-rubout' and 'unix-filename-rubout' allow
+you to bind keys to operate more similarly to the terminal.
 
-+++
-** URL now never sends user email addresses in HTTP requests.
-Emacs never sent email addresses by default, but it used to be
-possible to customize 'url-privacy-level' so that the user's email
-address was sent along in HTTP requests.  This feature has now been
-removed, as it was considered more dangerous than useful.  RFC 9110
-(§ 10.1.2) also recommends against it.  The user option
-'url-personal-mail-address' is now also obsolete.
-
-To send an email address in the header of individual HTTP requests,
-see the variable 'url-request-extra-headers'.
+---
+** New user option 'kill-word-dwim'.
+This option, if non-nil, modifies the fall-back behavior of
+'kill-region' if no region is active, and will kill the last word
+instead of raising an error.  Note that if you have disabled Transient
+Mark mode you might prefer to use 'unix-word-rubout', as this feature
+relies on there being an active region.
 
 
 * Changes in Emacs 30.1
