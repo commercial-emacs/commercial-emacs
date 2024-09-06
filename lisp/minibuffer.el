@@ -1109,8 +1109,10 @@ and DOC describes the way this style of completion works.")
     widget))
 
 (defconst completion--styles-type
-  `(repeat :tag "insert a new menu to add more styles"
-           (choice :convert-widget completion--update-styles-options)))
+  '(repeat :tag "insert a new menu to add more styles"
+           (single-or-list
+            (choice :convert-widget completion--update-styles-options)
+            (repeat :tag "Variable overrides" (group variable sexp)))))
 
 (defconst completion--cycling-threshold-type
   '(choice (const :tag "No cycling" nil)
@@ -1144,7 +1146,7 @@ This allows repeating the same style with different configurations.
 Note that `completion-category-overrides' may override these
 styles for specific categories, such as files, buffers, etc."
   :type completion--styles-type
-  :version "23.1")
+  :version "31.1")
 
 (defvar completion-category-defaults
   '((buffer (styles . (basic substring)))
@@ -1195,7 +1197,7 @@ completing buffer and file names, respectively.
 
 If a property in a category is specified by this variable, it
 overrides the default specified in `completion-category-defaults'."
-  :version "25.1"
+  :version "31.1"
   :type `(alist :key-type (choice :tag "Category"
 				  (const buffer)
                                   (const file)
@@ -3873,7 +3875,7 @@ If non-nil, partial-completion allows any string of characters to occur
 at the beginning of a completion alternative, as if a wildcard such as
 \"*\" was present at the beginning of the minibuffer text.  This makes
 partial-completion behave more like the substring completion style."
-  :version "30.1"
+  :version "31.1"
   :type 'boolean)
 
 (defun completion-pcm--string->pattern (string &optional point)
