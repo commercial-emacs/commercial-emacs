@@ -2347,13 +2347,520 @@ Now overlays can also have this property, with the same effect for the
 text "covered" by the overlay.
 
 +++
-** New macro 'cond*'.
-The new macro 'cond*' is an alternative to 'pcase'.  Like 'pcase', it
-can be used to define several clauses, each one with its own condition;
-the first clause that matches will cause its body to be evaluated.
-'cond*' uses syntax that is different from that of 'pcase', which some
-users might find less cryptic.  See the Info node "(elisp) cond* Macro"
-for details.
+** Returned strings from functions and macros are never docstrings.
+Functions and macros whose bodies consist of a single string literal now
+only return that string, and will not use it as a docstring.  Example:
+
+    (defun sing-a-song ()
+      "Sing a song.")
+
+The above function returns the string "Sing a song." and has no
+docstring.  Previously, that string was used as both the docstring and
+return value, which was never what the programmer wanted.  If you want
+the string to be a docstring, add an explicit return value.
+
+This change applies to 'defun', 'defsubst', 'defmacro' and 'lambda'
+forms; other defining forms such as 'cl-defun' already worked this way.
+
+** New or changed byte-compilation warnings
+
+---
+*** Warn about missing 'lexical-binding' directive.
+The compiler now warns if an Elisp file lacks the standard
+'-*- lexical-binding: ... -*-' cookie on the first line.
+This line typically looks something like
+
+    ;;; My little pony mode  -*- lexical-binding: t -*-
+
+It is needed to inform the compiler about which dialect of ELisp
+your code is using: the modern dialect with lexical binding or
+the old dialect with only dynamic binding.
+
+Lexical binding avoids some name conflicts and allows the compiler to
+detect more mistakes and generate more efficient code, so it is
+recommended.  For how to adapt your code to lexical binding, see the
+manual section "(elisp) Converting to Lexical Binding".
+
+If your code cannot be converted to lexical binding, you can insert
+the line
+
+    ;;; -*- lexical-binding: nil -*-
+
+first in the file to declare that it uses the old dialect.
+
+---
+*** Warn about empty bodies for more special forms and macros.
+The compiler now warns about an empty body argument to 'when',
+'unless', 'ignore-error' and 'with-suppressed-warnings' in addition to
+the existing warnings for 'let' and 'let*'.  Example:
+
+    (when (> x 2))
+
+This warning can be suppressed using 'with-suppressed-warnings' with
+the warning name 'empty-body'.
+
+---
+*** Warn about quoted error names in 'condition-case' and 'ignore-error'.
+The compiler now warns about quoted condition (error) names
+in 'condition-case' and 'ignore-error'.  Example:
+
+    (condition-case nil
+        (/ x y)
+      ('arith-error "division by zero"))
+
+Quoting them adds the error name 'quote' to those handled or ignored
+respectively, which was probably not intended.
+
+---
+*** Warn about comparison with literal constants without defined identity.
+The compiler now warns about comparisons by identity with a literal
+string, cons, vector, record, function, large integer or float as this
+may not match any value at all.  Example:
+
+    (eq x "hello")
+
+Only literals for symbols and small integers (fixnums), including
+characters, are guaranteed to have a consistent (unique) identity.
+This warning applies to 'eq', 'eql', 'memq', 'memql', 'assq', 'rassq',
+'remq' and 'delq'.
+
+To compare by (structural) value, use 'equal', 'member', 'assoc',
+'rassoc', 'remove' or 'delete' instead.  Floats and bignums can also
+be compared using 'eql', '=' and 'memql'.  Function literals cannot be
+compared reliably at all.
+
+This warning can be suppressed using 'with-suppressed-warnings' with
+the warning name 'suspicious'.
+
+---
+*** Warn about 'condition-case' without handlers.
+The compiler now warns when the 'condition-case' form is used without
+any actual handlers, as in
+
+    (condition-case nil (read buffer))
+
+because it has no effect other than the execution of the body form.
+In particular, no errors are caught or suppressed.  If the intention
+was to catch all errors, add an explicit handler for 'error', or use
+'ignore-error' or 'ignore-errors'.
+
+This warning can be suppressed using 'with-suppressed-warnings' with
+the warning name 'suspicious'.
+
+---
+*** Warn about 'unwind-protect' without unwind forms.
+The compiler now warns when the 'unwind-protect' form is used without
+any unwind forms, as in
+
+    (unwind-protect (read buffer))
+
+because the behavior is identical to that of the argument; there is
+no protection of any kind.  Perhaps the intended unwind forms have
+been misplaced or forgotten, or the use of 'unwind-protect' could be
+simplified away.
+
+This warning can be suppressed using 'with-suppressed-warnings' with
+the warning name 'suspicious'.
+
+---
+*** Warn about useless trailing 'cond' clauses.
+The compiler now warns when a 'cond' form contains clauses following a
+default (unconditional) clause.  Example:
+
+    (cond ((= x 0) (say "none"))
+          (t (say "some"))
+          (say "goodbye"))
+
+Such a clause will never be executed, and is likely to be a mistake,
+perhaps due to misplaced parens.
+
+This warning can be suppressed using 'with-suppressed-warnings' with
+the warning name 'suspicious'.
+
+---
+*** Warn about mutation of constant values.
+The compiler now warns about code that modifies program constants in
+some obvious cases.  Examples:
+
+    (setcar '(1 2) 7)
+    (aset [3 4] 0 8)
+    (aset "abc" 1 ?d)
+
+Such code may have unpredictable behavior because the constants are part
+of the program and are not data structures generated afresh during
+execution; the compiler does not expect them to change.
+
+To avoid the warning, operate on an object created by the program
+(maybe a copy of the constant), or use a non-destructive operation
+instead.
+
+This warning can be suppressed using 'with-suppressed-warnings' with
+the warning name 'mutate-constant'.
+
+---
+*** Warn about more ignored function return values.
+The compiler now warns when the return value from certain functions is
+implicitly ignored.  Example:
+
+    (progn (nreverse my-list) my-list)
+
+will elicit a warning because it is usually pointless to call
+'nreverse' on a list without using the returned value.
+
+To silence the warning, make use of the value in some way, such as
+assigning it to a variable.  You can also wrap the function call in
+'(ignore ...)', or use 'with-suppressed-warnings' with the warning
+name 'ignored-return-value'.
+
+The warning will only be issued for calls to functions declared
+'important-return-value' or 'side-effect-free' (but not 'error-free').
+
+---
+*** Warn about docstrings that contain control characters.
+The compiler now warns about docstrings with control characters other
+than newline and tab.  This is often a result of improper escaping.
+Example:
+
+    (defun my-fun ()
+      "Uses c:\remote\dir\files and the key \C-x."
+      ...)
+
+where the docstring contains the four control characters 'CR', 'DEL',
+'FF' and 'C-x'.
+
+The warning name is 'docstrings-control-chars'.
+
+---
+*** The warning about wide docstrings can now be disabled separately.
+Its warning name is 'docstrings-wide'.
+
++++
+** 'fset', 'defalias' and 'defvaralias' now signal an error for cyclic aliases.
+Previously, 'fset', 'defalias' and 'defvaralias' could be made to
+build circular function and variable indirection chains as in
+
+    (defalias 'able 'baker)
+    (defalias 'baker 'able)
+
+but trying to use them would sometimes make Emacs hang.  Now, an attempt
+to create such a loop results in an error.
+
+Since circular alias chains now cannot occur, 'function-alias-p',
+'indirect-function' and 'indirect-variable' will never signal an error.
+Their 'noerror' arguments have no effect and are therefore obsolete.
+
+** Touch Screen support
+
++++
+*** 'x-popup-menu' now understands touch screen events.
+When a 'touchscreen-begin' or 'touchscreen-end' event is passed as the
+POSITION argument, it will behave as if that event was a mouse event.
+
++++
+*** New functions for handling touch screen events.
+The new functions 'touch-screen-track-tap' and 'touch-screen-track-drag'
+handle tracking common touch screen gestures from within a command.
+
++++
+*** New parameter to 'touchscreen-end' events.
+CANCEL non-nil establishes that the touch sequence has been intercepted
+by programs such as window managers and should be ignored with Emacs.
+
+---
+** New variable 'inhibit-auto-fill' to temporarily prevent auto-fill.
+
++++
+** New variable 'secondary-tool-bar-map'.
+If non-nil, this variable contains a keymap of menu items that are
+displayed along tool bar items defined by 'tool-bar-map'.  These items
+are displayed below the tool bar if the value of 'tool-bar-position' is
+'top', and above it if the value is 'bottom'.  This is used by
+'modifier-bar-mode'.
+
+---
+** New variable 'completion-lazy-hilit'.
+Lisp programs that present completion candidates may bind this
+variable non-nil around calls to functions such as
+'completion-all-completions'.  This tells the underlying completion
+styles to skip eager fontification of completion candidates, which
+improves performance.  Such a Lisp program can then use the
+'completion-lazy-hilit' function to fontify candidates just in time.
+
++++
+** New primitive 'buffer-last-name'.
+It returns the name of a buffer before the last time it was renamed or
+killed.
+
++++
+** New primitive 'marker-last-position'.
+It returns the last position of a marker in its buffer even if that
+buffer has been killed.  ('marker-position' would return nil in that
+case.)
+
+** Functions and variables to transpose sexps
+
+---
+*** New helper variable 'transpose-sexps-function'.
+Lisp programs can now set this variable to customize the behavior of the
+'transpose-sexps' command.
+
+---
+*** New function 'transpose-sexps-default-function'.
+The previous implementation of 'transpose-sexps' was moved into its own
+function, to be used in 'transpose-sexps-function'.
+
+---
+*** New function 'treesit-transpose-sexps'.
+Tree-sitter now unconditionally sets 'transpose-sexps-function' for all
+tree-sitter enabled modes to this function.
+
+** Functions and variables to move by program statements
+
++++
+*** New variable 'forward-sentence-function'.
+Major modes can now set this variable to customize the behavior of the
+'forward-sentence' command.
+
+---
+*** New function 'forward-sentence-default-function'.
+The previous implementation of 'forward-sentence' is moved into its
+own function, to be bound by 'forward-sentence-function'.
+
++++
+*** New function 'treesit-forward-sentence'.
+All tree-sitter enabled modes that define 'sentence' in
+'treesit-thing-settings' now set 'forward-sentence-function' to call
+'treesit-forward-sentence'.
+
+** Functions and variables to move by program sexps
+
++++
+*** New function 'treesit-forward-sexp'.
+Tree-sitter conditionally sets 'forward-sexp-function' for major modes
+that have defined 'sexp' in 'treesit-thing-settings' to enable
+sexp-related motion commands.
+
+---
+** New user option 'native-comp-async-warnings-errors-kind'.
+It allows control of what kinds of warnings and errors from asynchronous
+native compilation are reported to the parent Emacs process.  The
+default is to report all errors and only important warnings.  If you
+were used to customizing 'native-comp-async-report-warnings-errors' to
+nil or 'silent', we suggest that you now leave it at its default value,
+and see if you get only warnings that matter.
+
+** Function 'declare' forms
+
++++
+*** New 'ftype' function declaration.
+The declaration '(ftype TYPE)' specifies the type of a function.
+Example:
+
+    (defun hello (x y)
+      (declare (ftype (function (integer boolean) string)))
+      ...)
+
+specifies that the function takes two arguments, an integer and a
+boolean, and returns a string.  If the compilation happens with
+'compilation-safety' set to zero, this information can be used by the
+native compiler to produce better code, but specifying an incorrect type
+may lead to Emacs crashing.  See the Info node "(elisp) Declare Form"
+for further information.
+
++++
+*** New 'important-return-value' function declaration and property.
+The declaration '(important-return-value t)' sets the
+'important-return-value' property which indicates that the function
+return value should probably not be thrown away implicitly.
+
++++
+** New functions 'file-user-uid' and 'file-group-gid'.
+These functions are like 'user-uid' and 'group-gid', respectively, but
+are aware of file name handlers, so they will return the remote UID or
+GID for remote files (or -1 if the connection has no associated user).
+
++++
+** 'treesit-font-lock-rules' now accepts additional global keywords.
+When supplied with ':default-language LANGUAGE', rules after it will
+default to use 'LANGUAGE'.
+
+---
+** New optional argument to 'modify-dir-local-variable'.
+A 5th argument, optional, has been added to
+'modify-dir-local-variable'.  It can be used to specify which
+dir-locals file to modify.
+
+** Connection local variables
+
++++
+*** New macros 'connection-local-p' and 'connection-local-value'.
+The former macro returns non-nil if a variable has a connection-local
+binding.  The latter macro returns the connection-local value of a
+variable if any, or its current value.
+
+** Hash tables
+
++++
+*** ':rehash-size' and ':rehash-threshold' args no longer have any effect.
+These keyword arguments are now ignored by 'make-hash-table'.  Emacs
+manages the memory for all hash table objects in the same way.
+The functions 'hash-table-rehash-size' and 'hash-table-rehash-threshold'
+remain for compatibility but now always return the old default values.
+
++++
+*** The printed representation has been shrunk and simplified.
+The 'test' parameter is omitted if it is 'eql' (the default), as is
+'data' if empty.  'rehash-size', 'rehash-threshold' and 'size' are
+always omitted, and ignored if present when the object is read back in.
+
+** Obarrays
+
++++
+*** New obarray type.
+Obarrays are now represented by an opaque type instead of using vectors.
+They are created by 'obarray-make' and manage their internal storage
+automatically, which means that the size parameter to 'obarray-make' can
+safely be omitted.  That is, they do not become slower as they fill up.
+
+The old vector representation is still accepted by functions operating
+on obarrays, but 'obarrayp' only returns t for obarray objects.
+'type-of' now returns 'obarray' for obarray objects.
+
+Old code which (incorrectly) created "obarrays" as Lisp vectors filled
+with something other than 0, as in '(make-vector N nil)', will no longer
+work, and should be rewritten to use 'obarray-make'.  Alternatively, you
+can fill the vector with 0.
+
++++
+*** New function 'obarray-clear' removes all symbols from an obarray.
+
+---
+*** 'obarray-size' and 'obarray-default-size' are now obsolete.
+They pertained to the internal storage size which is now irrelevant.
+
++++
+** 'treesit-install-language-grammar' can handle local directory instead of URL.
+It is now possible to pass a directory of a local repository as URL
+inside 'treesit-language-source-alist', so that calling
+'treesit-install-language-grammar' would avoid cloning the repository.
+It may be useful, for example, for the purposes of bisecting a
+treesitter grammar.
+
++++
+** New buffer-local variable 'tabulated-list-groups'.
+It controls display and separate sorting of groups of entries.
+
++++
+** New variable 'revert-buffer-restore-functions'.
+It helps to preserve various states after reverting the buffer.
+
+---
+** New text property 'context-menu-functions'.
+Like the variable with the same name, it adds menus from the list that
+is the value of the property to context menus shown when clicking on the
+text which as this property.
+
+---
+** Detecting the end of an iteration of a keyboard macro.
+'read-event', 'read-char', and 'read-char-exclusive' no longer return -1
+when called at the end of an iteration of the execution of a keyboard
+macro.  Instead, they will transparently continue reading available input
+(e.g., from the keyboard).  If you need to detect the end of a macro
+iteration, check the following condition before calling one of the
+aforementioned functions:
+
+    (and (arrayp executing-kbd-macro)
+         (>= executing-kbd-macro-index (length executing-kbd-macro)))
+
++++
+** 'vtable-update-object' updates an existing object with just two arguments.
+It is now possible to update the representation of an object in a vtable
+by calling 'vtable-update-object' with just the vtable and the object as
+arguments.  (Previously, the OLD-OBJECT argument was required which, in
+this case, would mean repeating the object in the argument list.)  When
+replacing an object with a different one, passing both the new and old
+objects is still necessary.
+
+** 'vtable-insert-object' can insert "before" or at an index.
+The signature of 'vtable-insert-object' has changed and is now:
+
+    (vtable-insert-object TABLE OBJECT &optional LOCATION BEFORE)
+
+LOCATION corresponds to the old AFTER-OBJECT argument; if BEFORE is
+non-nil, the new object is inserted before the LOCATION object, making
+it possible to insert a new object at the top of the table.  (Before,
+this was not possible.)  In addition, LOCATION can be an integer, a
+(zero-based) index into the table at which the new object is inserted
+(BEFORE is ignored in this case).
+
++++
+** New function 'sqlite-execute-batch'.
+This function lets the user execute multiple SQL statements in one go.
+It is useful, for example, when a Lisp program needs to evaluate an
+entire SQL file.
+
+** JSON
+
++++
+*** 'json-serialize' now always returns a unibyte string.
+This is appropriate since it is an encoding operation.  In the unlikely
+event that a multibyte string is needed, the result can be decoded using
+
+  (decode-coding-string RESULT 'utf-8)
+
+---
+*** The parser keeps duplicated object keys in alist and plist output.
+A JSON object such as '{"a":1,"a":2}' will now be translated into the
+Lisp values '((a . 1) (a . 2))' or '(:a 1 :a 2)' if alist or plist
+object types are requested.
+
+---
+*** The parser sometimes signals different types of errors.
+It will now signal 'json-utf8-decode-error' for inputs that are not
+correctly UTF-8 encoded.
+
+---
+*** The parser and encoder now accept arbitrarily large integers.
+Previously, they were limited to the range of signed 64-bit integers.
+
+** New tree-sitter functions and variables for defining and using "things"
+
++++
+*** New variable 'treesit-thing-settings'.
+It allows modes to define "things" like 'defun', 'text', 'sexp', and
+'sentence' for navigation commands and tree-traversal functions.
+
++++
+*** New functions for navigating "things".
+There are new navigation functions 'treesit-thing-prev',
+'treesit-thing-next', 'treesit-navigate-thing',
+'treesit-beginning-of-thing', and 'treesit-end-of-thing'.
+
++++
+*** New functions 'treesit-thing-at', 'treesit-thing-at-point'.
+
++++
+*** Tree-traversing functions.
+The functions 'treesit-search-subtree', 'treesit-search-forward',
+'treesit-search-forward-goto', and 'treesit-induce-sparse-tree' now
+accept more kinds of predicates.  Lisp programs can now use thing
+symbols (defined in 'treesit-thing-settings') and any thing definitions
+for the predicate argument.
+
+** Other tree-sitter function and variable changes
+
++++
+*** 'treesit-parser-list' now takes additional optional arguments.
+The additional arguments are LANGUAGE and TAG.  If LANGUAGE is given,
+only return parsers for that language.  If TAG is given, only return
+parsers with that tag.  Note that passing nil as tag doesn't mean return
+all parsers, but rather "all parsers with no tags".
+
++++
+*** New variable 'treesit-primary-parser'.
+This variable should be set by multi-langauge major modes before calling
+'treesit-major-mode-setup', in order for tree-sitter integration
+functionalities to operate correctly.
 
 
 * Changes in Emacs 31.1 on Non-Free Operating Systems
