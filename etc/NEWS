@@ -2202,6 +2202,16 @@ The command 'makefile-switch-to-browser' command is now obsolete,
 together with related commands used in the "*Macros and Targets*"
 buffer.  We recommend using an alternative like 'imenu' instead.
 
+** php-ts-mode
+
+---
+*** 'php-ts-mode-run-php-webserver' can now accept a custom php.ini file.
+You can use the new optional argument CONFIG when calling
+'php-ts-mode-run-php-webserver' to pass an alternative php.ini file to
+the built-in Web server.  Interactively, when invoked with a prefix
+argument, 'php-ts-mode-run-php-webserver' prompts for the config file as
+well as for other connection parameters.
+
 
 * New Modes and Packages in Emacs 31.1
 
