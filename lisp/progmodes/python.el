@@ -3947,12 +3947,12 @@ When a match is found, native completion is disabled."
 (defcustom python-shell-completion-native-output-timeout 5.0
   "Time in seconds to wait for completion output before giving up."
   :version "25.1"
-  :type 'float)
+  :type 'number)
 
 (defcustom python-shell-completion-native-try-output-timeout 1.0
   "Time in seconds to wait for *trying* native completion output."
   :version "25.1"
-  :type 'float)
+  :type 'number)
 
 (defvar python-shell-completion-native-redirect-buffer
   " *Python completions redirect*"
