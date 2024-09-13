@@ -4619,131 +4619,129 @@ impose the use of a shell (with its need to quote arguments)."
     current-prefix-arg
     shell-command-default-error-buffer))
   ;; Look for a handler in case default-directory is a remote file name.
-  (let ((handler
-	 (find-file-name-handler (directory-file-name default-directory)
-				 'shell-command)))
-    (if handler
-	(funcall handler 'shell-command command output-buffer error-buffer)
-      (if (and output-buffer
-               (not (string-match "[ \t]*&[ \t]*\\'" command))
-               (or (eq output-buffer (current-buffer))
-                   (and (stringp output-buffer) (eq (get-buffer output-buffer) (current-buffer)))
-	           (not (or (bufferp output-buffer) (stringp output-buffer))))) ; Bug#39067
-	  ;; Synchronous command with output in current buffer.
-	  (let ((error-file
-                 (and error-buffer
-                      (make-temp-file
-                       (expand-file-name "scor"
-                                         (or small-temporary-file-directory
-                                             temporary-file-directory))))))
-	    (barf-if-buffer-read-only)
-	    (push-mark nil t)
-            (shell-command-save-pos-or-erase 'output-to-current-buffer)
-	    ;; We do not use -f for csh; we will not support broken use of
-	    ;; .cshrcs.  Even the BSD csh manual says to use
-	    ;; "if ($?prompt) exit" before things that are not useful
-	    ;; non-interactively.  Besides, if someone wants their other
-	    ;; aliases for shell commands then they can still have them.
-            (call-process-shell-command command nil (if error-file
-                                                        (list t error-file)
-                                                      t))
-	    (when (and error-file (file-exists-p error-file))
-              (when (< 0 (file-attribute-size (file-attributes error-file)))
-                (with-current-buffer (get-buffer-create error-buffer)
-                  (let ((pos-from-end (- (point-max) (point))))
-                    (or (bobp)
-                        (insert "\f\n"))
-                    ;; Do no formatting while reading error file,
-                    ;; because that can run a shell command, and we
-                    ;; don't want that to cause an infinite recursion.
-                    (format-insert-file error-file nil)
-                    ;; Put point after the inserted errors.
-                    (goto-char (- (point-max) pos-from-end)))
-                  (display-buffer (current-buffer))))
-	      (delete-file error-file))
-	    ;; This is like exchange-point-and-mark, but doesn't
-	    ;; activate the mark.  It is cleaner to avoid activation,
-	    ;; even though the command loop would deactivate the mark
-	    ;; because we inserted text.
-	    (goto-char (prog1 (mark t)
-			 (set-marker (mark-marker) (point)
-				     (current-buffer)))))
-	;; Output goes in a separate buffer.
-	(if (string-match "[ \t]*&[ \t]*\\'" command)
-	    ;; Command ending with ampersand means asynchronous.
-            (let* ((buffer (get-buffer-create
-                            (or output-buffer shell-command-buffer-name-async)))
-                   (bname (buffer-name buffer))
-                   (proc (get-buffer-process buffer))
-                   (directory default-directory))
-	      ;; Remove the ampersand.
-	      (setq command (substring command 0 (match-beginning 0)))
-	      ;; Ask the user what to do with already running process.
-	      (when proc
-		(cond
-		 ((eq async-shell-command-buffer 'confirm-kill-process)
-		  ;; If will kill a process, query first.
-                  (shell-command--same-buffer-confirm "Kill it")
-		  (kill-process proc))
-		 ((eq async-shell-command-buffer 'confirm-new-buffer)
-		  ;; If will create a new buffer, query first.
-                  (shell-command--same-buffer-confirm "Use a new buffer")
-                  (setq buffer (generate-new-buffer bname)))
-		 ((eq async-shell-command-buffer 'new-buffer)
-		  ;; It will create a new buffer.
-                  (setq buffer (generate-new-buffer bname)))
-		 ((eq async-shell-command-buffer 'confirm-rename-buffer)
-		  ;; If will rename the buffer, query first.
-                  (shell-command--same-buffer-confirm "Rename it")
-		  (with-current-buffer buffer
-		    (rename-uniquely))
-                  (setq buffer (get-buffer-create bname)))
-		 ((eq async-shell-command-buffer 'rename-buffer)
-		  ;; It will rename the buffer.
-		  (with-current-buffer buffer
-		    (rename-uniquely))
-                  (setq buffer (get-buffer-create bname)))))
-	      (with-current-buffer buffer
-                (shell-command-save-pos-or-erase)
-		(setq default-directory directory)
-                (require 'shell)
-                (let ((process-environment
-                       (append
-                        (and (natnump async-shell-command-width)
-                             (list
-                              (format "COLUMNS=%d"
-                                      async-shell-command-width)))
-                        (comint-term-environment)
-                        process-environment)))
-		  (setq proc
-			(start-process-shell-command "Shell" buffer command)))
-		(setq mode-line-process '(":%s"))
-                (shell-mode)
-                (setq-local revert-buffer-function
-                            (lambda (&rest _)
-                              (async-shell-command command buffer)))
-                (set-process-sentinel proc #'shell-command-sentinel)
-		;; Use the comint filter for proper handling of
-		;; carriage motion (see comint-inhibit-carriage-motion).
-                (set-process-filter proc #'comint-output-filter)
-                (if async-shell-command-display-buffer
-                    ;; Display buffer immediately.
-                    (display-buffer buffer '(nil (allow-no-window . t)))
-                  ;; Defer displaying buffer until first process output.
-                  ;; Use disposable named advice so that the buffer is
-                  ;; displayed at most once per process lifetime.
-                  (let ((nonce (make-symbol "nonce")))
-                    (add-function :before (process-filter proc)
-                                  (lambda (proc _string)
-                                    (let ((buf (process-buffer proc)))
-                                      (when (buffer-live-p buf)
-                                        (remove-function (process-filter proc)
-                                                         nonce)
-                                        (display-buffer buf '(nil (allow-no-window . t))))))
-                                  `((name . ,nonce)))))))
-	  ;; Otherwise, command is executed synchronously.
-	  (shell-command-on-region (point) (point) command
-				   output-buffer nil error-buffer))))))
+  (if-let ((handler (find-file-name-handler (directory-file-name default-directory)
+				            'shell-command)))
+      (funcall handler 'shell-command command output-buffer error-buffer)
+    (if (and output-buffer
+             (not (string-match "[ \t]*&[ \t]*\\'" command))
+             (or (eq output-buffer (current-buffer))
+                 (and (stringp output-buffer) (eq (get-buffer output-buffer) (current-buffer)))
+	         (not (or (bufferp output-buffer) (stringp output-buffer))))) ; Bug#39067
+	;; Synchronous command with output in current buffer.
+	(let ((error-file
+               (and error-buffer
+                    (make-temp-file
+                     (expand-file-name "scor"
+                                       (or small-temporary-file-directory
+                                           temporary-file-directory))))))
+	  (barf-if-buffer-read-only)
+	  (push-mark nil t)
+          (shell-command-save-pos-or-erase 'output-to-current-buffer)
+	  ;; We do not use -f for csh; we will not support broken use of
+	  ;; .cshrcs.  Even the BSD csh manual says to use
+	  ;; "if ($?prompt) exit" before things that are not useful
+	  ;; non-interactively.  Besides, if someone wants their other
+	  ;; aliases for shell commands then they can still have them.
+          (call-process-shell-command command nil (if error-file
+                                                      (list t error-file)
+                                                    t))
+	  (when (and error-file (file-exists-p error-file))
+            (when (< 0 (file-attribute-size (file-attributes error-file)))
+              (with-current-buffer (get-buffer-create error-buffer)
+                (let ((pos-from-end (- (point-max) (point))))
+                  (or (bobp)
+                      (insert "\f\n"))
+                  ;; Do no formatting while reading error file,
+                  ;; because that can run a shell command, and we
+                  ;; don't want that to cause an infinite recursion.
+                  (format-insert-file error-file nil)
+                  ;; Put point after the inserted errors.
+                  (goto-char (- (point-max) pos-from-end)))
+                (display-buffer (current-buffer))))
+	    (delete-file error-file))
+	  ;; This is like exchange-point-and-mark, but doesn't
+	  ;; activate the mark.  It is cleaner to avoid activation,
+	  ;; even though the command loop would deactivate the mark
+	  ;; because we inserted text.
+	  (goto-char (prog1 (mark t)
+		       (set-marker (mark-marker) (point)
+				   (current-buffer)))))
+      ;; Output goes in a separate buffer.
+      (if (string-match "[ \t]*&[ \t]*\\'" command)
+	  ;; Command ending with ampersand means asynchronous.
+          (let* ((buffer (get-buffer-create
+                          (or output-buffer shell-command-buffer-name-async)))
+                 (bname (buffer-name buffer))
+                 (proc (get-buffer-process buffer))
+                 (directory default-directory))
+	    ;; Remove the ampersand.
+	    (setq command (substring command 0 (match-beginning 0)))
+	    ;; Ask the user what to do with already running process.
+	    (when proc
+	      (cond
+	       ((eq async-shell-command-buffer 'confirm-kill-process)
+		;; If will kill a process, query first.
+                (shell-command--same-buffer-confirm "Kill it")
+		(kill-process proc))
+	       ((eq async-shell-command-buffer 'confirm-new-buffer)
+		;; If will create a new buffer, query first.
+                (shell-command--same-buffer-confirm "Use a new buffer")
+                (setq buffer (generate-new-buffer bname)))
+	       ((eq async-shell-command-buffer 'new-buffer)
+		;; It will create a new buffer.
+                (setq buffer (generate-new-buffer bname)))
+	       ((eq async-shell-command-buffer 'confirm-rename-buffer)
+		;; If will rename the buffer, query first.
+                (shell-command--same-buffer-confirm "Rename it")
+		(with-current-buffer buffer
+		  (rename-uniquely))
+                (setq buffer (get-buffer-create bname)))
+	       ((eq async-shell-command-buffer 'rename-buffer)
+		;; It will rename the buffer.
+		(with-current-buffer buffer
+		  (rename-uniquely))
+                (setq buffer (get-buffer-create bname)))))
+	    (with-current-buffer buffer
+              (shell-command-save-pos-or-erase)
+	      (setq default-directory directory)
+              (require 'shell)
+              (let ((process-environment
+                     (append
+                      (and (natnump async-shell-command-width)
+                           (list
+                            (format "COLUMNS=%d"
+                                    async-shell-command-width)))
+                      (comint-term-environment)
+                      process-environment)))
+		(setq proc
+		      (start-process-shell-command "Shell" buffer command)))
+	      (setq mode-line-process '(":%s"))
+              (shell-mode)
+              (setq-local revert-buffer-function
+                          (lambda (&rest _)
+                            (async-shell-command command buffer)))
+              (set-process-sentinel proc #'shell-command-sentinel)
+	      ;; Use the comint filter for proper handling of
+	      ;; carriage motion (see comint-inhibit-carriage-motion).
+              (set-process-filter proc #'comint-output-filter)
+              (if async-shell-command-display-buffer
+                  ;; Display buffer immediately.
+                  (display-buffer buffer '(nil (allow-no-window . t)))
+                ;; Defer displaying buffer until first process output.
+                ;; Use disposable named advice so that the buffer is
+                ;; displayed at most once per process lifetime.
+                (let ((nonce (make-symbol "nonce")))
+                  (add-function :before (process-filter proc)
+                                (lambda (proc _string)
+                                  (let ((buf (process-buffer proc)))
+                                    (when (buffer-live-p buf)
+                                      (remove-function (process-filter proc)
+                                                       nonce)
+                                      (display-buffer buf '(nil (allow-no-window . t))))))
+                                `((name . ,nonce)))))))
+	;; Otherwise, command is executed synchronously.
+	(shell-command-on-region (point) (point) command
+				 output-buffer nil error-buffer)))))
 
 (defun shell-command--same-buffer-confirm (action)
   (let ((help-form
