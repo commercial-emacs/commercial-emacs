@@ -178,11 +178,23 @@ fonts, the wrapped text will now be lined up correctly so that it's
 exactly below the text after the prefix on the first line.
 
 ---
-** New commands 'unix-word-rubout' and 'unix-filename-rubout'.
-Unix-words are words separated by whitespace regardless of the buffer's
-syntax table.  In a Unix terminal or shell, C-w kills by Unix-word.
-The new commands 'unix-word-rubout' and 'unix-filename-rubout' allow
-you to bind keys to operate more similarly to the terminal.
+** The Network Security Manager now warns about <2048 bits in DH key exchange.
+Emacs used to warn for Diffie-Hellman key exchanges with prime numbers
+smaller than 1024 bits.  Since more servers now support it, this
+number has been bumped to 2048 bits.
+
++++
+** URL now never sends user email addresses in HTTP requests.
+Emacs never sent email addresses by default, but it used to be
+possible to customize 'url-privacy-level' so that the user's email
+address was sent along in HTTP requests.  This feature has now been
+removed, as it was considered more dangerous than useful.  RFC 9110
+(§ 10.1.2) also recommends against it.  The user option
+'url-personal-mail-address' is now also obsolete.
+
+To send an email address in the header of individual HTTP requests,
+see the variable 'url-request-extra-headers'.
+
 
 * Changes in Emacs 30.1
 
@@ -694,15 +706,15 @@ that shows as diffs replacements in the marked files in Dired.
 +++
 ** New mode of prompting for register names and showing preview.
 The new user option 'register-use-preview' can be customized to the
-value t or insist to request a different user interface of prompting for
+value t or 'insist' to request a different user interface of prompting for
 register names and previewing the registers: Emacs will require
 confirmation for overwriting the value of a register, and will show
 the preview of registers without delay.  You can also customize this
 new option to disable the preview completely.
 
-The default value of 'register-use-preview' preserves the behavior of
-Emacs 29 and before.  See the Info node "(emacs) Registers" for more
-details about the new UI and its variants.
+The default value of 'register-use-preview' ('traditional') preserves the
+behavior of Emacs 29 and before.  See the Info node "(emacs) Registers"
+for more details about the new UI and its variants.
 
 +++
 ** New advanced macro counter commands.
@@ -1563,8 +1575,8 @@ bookmark URIs.
 *** New command 'eww-copy-alternate-url'.
 It copies an alternate link on the page currently visited in EWW into
 the kill ring.  Alternate links are optional metadata that HTML pages
-use for linking to their alternative representations, such as
-translated versions or associated RSS feeds.
+use for linking to their alternative representations, such as translated
+versions or associated RSS feeds.  It is bound to 'A' by default.
 
 +++
 *** 'eww-open-in-new-buffer' supports the prefix argument.
@@ -1664,9 +1676,10 @@ following to your init file:
 
 ---
 *** New user option 'package-vc-register-as-project'.
-When non-nil, it will automatically register every package as a
-project, that you can quickly select using 'project-switch-project'
-('C-x p p').
+When non-nil, 'package-vc-install' and 'package-vc-checkout' will
+automatically register every package they install as a project, that you
+can quickly select using 'project-switch-project' ('C-x p p').  Default
+is t.
 
 ---
 *** New user option 'package-vc-allow-build-commands'.
@@ -1691,9 +1704,9 @@ in a clean environment.
 
 +++
 *** New user option 'flymake-indicator-type'.
-This user option controls which error indicator type Flymake should use
-in current buffer.  Depending on your preference, this can either use
-fringes or margins for indicating errors.
+This controls which error indicator type Flymake should use in the
+current buffer.  Depending on your preference, this can either use
+fringes or margins for indicating errors, the default is 'margins'.
 
 +++
 *** New user option 'flymake-margin-indicators-string'.
@@ -1702,14 +1715,14 @@ the margin indicator.
 
 +++
 *** New user option 'flymake-autoresize-margins'.
-If non-nil, Flymake will resize the margins when 'flymake-mode' is
-turned on or off.
+If non-nil (the default), Flymake will resize the margins when
+'flymake-mode' is turned on or off.
 Only relevant if 'flymake-indicator-type' is set to 'margins'.
 
 +++
 *** New user option 'flymake-margin-indicator-position'.
-It controls which margin (left or right) is used for margin
-indicators.
+It controls whether to use margins for margin indicators, and which
+margin (left or right) to use.  Default is to use the left margin.
 
 +++
 *** New user option 'flymake-show-diagnostics-at-end-of-line'.
@@ -1717,7 +1730,7 @@ When non-nil, Flymake shows summarized descriptions of diagnostics at
 the end of the line.  Depending on your preference, this can either be
 distracting and easily confused with actual code, or a significant
 early aid that relieves you from moving the buffer or reaching for the
-mouse to consult an error message.
+mouse to consult an error message.  Default is nil.
 
 ** Flyspell
 
@@ -1725,6 +1738,7 @@ mouse to consult an error message.
 *** New user option 'flyspell-check-changes'.
 When non-nil, Flyspell mode spell-checks only words that you edited; it
 does not check unedited words just because you move point across them.
+Default is nil.
 
 ---
 ** JS mode.
@@ -1746,7 +1760,7 @@ buffers contain Javascript code.
 *** New user option 'python-indent-block-paren-deeper'.
 If non-nil, increase the indentation of the lines inside parens in a
 header of a block when they are indented to the same level as the body
-of the block:
+of the block, producing:
 
     if (some_expression
             and another_expression):
@@ -1757,6 +1771,8 @@ instead of:
     if (some_expression
         and another_expression):
         do_something()
+
+Default is nil.
 
 ---
 *** New user option 'python-interpreter-args'.
@@ -1798,8 +1814,8 @@ This keyword enables the user to install packages using package-vc.el.
 
 +++
 *** New user option 'use-package-vc-prefer-newest'.
-This allows the user to always install the newest commit of a package
-when using the ':vc' keyword.
+If non-nil, always install the newest commit of a package when using the
+':vc' keyword rather than its stable release.  Default is nil.
 
 ** Gnus
 
@@ -1848,6 +1864,7 @@ Controls how the 'dictionary-search' command prompts for and displays
 dictionary definitions.  Customize this user option to 'help' to have
 'dictionary-search' display definitions in a "*Help*" buffer and
 provide dictionary-based minibuffer completion for word selection.
+Default is nil, which means to use a "*Dictionary*" buffer.
 
 ---
 *** New user option 'dictionary-read-word-prompt'.
@@ -2104,7 +2121,11 @@ If non-nil, moving point forward or backward between widgets by typing
 *** New user option 'ruby-rubocop-use-bundler'.
 By default it retains the previous behavior: read the contents of
 Gemfile and act accordingly.  But you can also set it to t or nil to
-skip the check.
+skip checking the Gemfile.
+
+*** New user option 'ruby-bracketed-args-indent'.
+When it is set to nil, multiple consecutive open braces/brackets/parens
+result in only one additional indentation level.  Default is t.
 
 ** Thingatpt
 
@@ -2132,7 +2153,8 @@ will return the URL for that bug.
 *** New user option 'Buffer-menu-group-by'.
 It controls how buffers are divided into groups that are displayed with
 headings using Outline minor mode.  Using commands that mark buffers
-on the outline heading line will mark all buffers in the outline.
+on the outline heading line will mark all buffers in the outline.  By
+default, no grouping is performed.
 
 +++
 *** New command 'Buffer-menu-toggle-internal'.
@@ -2154,9 +2176,9 @@ Previously, it was set to t, but this broke remote file name detection.
 
 ---
 *** More control on automatic update of Proced buffers.
-The user option 'proced-auto-update-flag' can now be set to two
-additional values, which control automatic updates of Proced buffers
-that are not displayed in some window.
+The user option 'proced-auto-update-flag' can now be set to an
+additional value 'visible', which controls automatic updates of Proced
+buffers that are displayed in some window.
 
 ---
 *** nXML Mode now comes with schemas for Mono/.NET development.
@@ -2210,7 +2232,92 @@ The command 'makefile-switch-to-browser' command is now obsolete,
 together with related commands used in the "*Macros and Targets*"
 buffer.  We recommend using an alternative like 'imenu' instead.
 
-** php-ts-mode
+
+* New Modes and Packages in Emacs 30.1
+
+** New major modes based on the tree-sitter library
+
++++
+*** New major mode 'elixir-ts-mode'.
+A major mode based on the tree-sitter library for editing Elixir files.
+
++++
+*** New major mode 'heex-ts-mode'.
+A major mode based on the tree-sitter library for editing HEEx files.
+
++++
+*** New major mode 'html-ts-mode'.
+An optional major mode based on the tree-sitter library for editing
+HTML files.
+
++++
+*** New major mode 'lua-ts-mode'.
+A major mode based on the tree-sitter library for editing Lua files.
+
++++
+*** New major mode 'php-ts-mode'.
+A major mode based on the tree-sitter library for editing PHP files.
+
++++
+** New package EditorConfig.
+This package provides support for the EditorConfig standard,
+an editor-neutral way to provide directory local (project-wide) settings.
+It is enabled via a new global minor mode 'editorconfig-mode'
+which makes Emacs obey the '.editorconfig' files.
+There is also a new major mode 'editorconfig-conf-mode'
+to edit those configuration files.
+
++++
+** New global minor mode 'etags-regen-mode'.
+This minor mode generates the tags table automatically based on the
+current project configuration, and later updates it as you edit the
+files and save the changes.
+
++++
+** New package 'which-key'.
+The 'which-key' package from GNU ELPA is now included in Emacs.  It
+implements the global minor mode 'which-key-mode' that displays a table
+of key bindings upon entering a partial key chord and waiting for a
+moment.  For example, after enabling the minor mode, if you enter 'C-x'
+and wait for one second, the minibuffer will expand with all available
+key bindings that follow 'C-x' (or as many as space allows).
+
++++
+** New minor mode 'completion-preview-mode'.
+This minor mode shows you symbol completion suggestions as you type,
+using an inline preview.  New user options in the 'completion-preview'
+customization group control exactly when Emacs displays this preview.
+'completion-preview-mode' is buffer-local, to enable it globally use
+'global-completion-preview-mode'.
+
++++
+** New package Window-Tool-Bar.
+This provides a new minor mode, 'window-tool-bar-mode'.  When this minor
+mode is enabled, a tool bar is displayed at the top of a window.  To
+conserve space, no tool bar is shown if 'tool-bar-map' is nil.  The
+global minor mode 'global-window-tool-bar-mode' enables this minor mode
+in all buffers.
+
++++
+** New library Track-Changes.
+This library is a layer of abstraction above 'before-change-functions'
+and 'after-change-functions' which provides a superset of
+the functionality of 'after-change-functions':
+- It provides the actual previous text rather than only its length.
+- It takes care of accumulating and bundling changes until a time when
+  its client finds it convenient to react to them.
+- It detects most cases where some changes were not properly
+  reported (calls to 'before/after-change-functions' that are
+  incorrectly paired, missing, etc...) and reports them adequately.
+
++++
+** New global minor mode 'minibuffer-regexp-mode'.
+This is a minor mode for editing regular expressions in the minibuffer,
+for example in 'query-replace-regexp'.  It correctly highlights parens
+via 'show-paren-mode' and 'blink-matching-paren' in a user-friendly way,
+avoids reporting alleged paren mismatches and makes sexp navigation more
+intuitive.  It is enabled by default, 'minibuffer-regexp-prompts' can be
+used to tune when it takes effect.
 
 ---
 *** 'php-ts-mode-run-php-webserver' can now accept a custom "php.ini" file.
@@ -2257,7 +2364,150 @@ visiting the originating file.  Typing 'C-c C-c' will leave the Grep
 Edit mode.
 
 
-* New Modes and Packages in Emacs 31.1
+* Incompatible Lisp Changes in Emacs 30.1
+
++++
+** Evaluating a 'lambda' returns an object of type 'interpreted-function'.
+Instead of representing interpreted functions as lists that start with
+either 'lambda' or 'closure', Emacs now represents them as objects
+of their own 'interpreted-function' type, which is very similar
+to 'byte-code-function' objects (the argument list, docstring, and
+interactive forms are placed in the same slots).
+Lists that start with 'lambda' are now used only for non-evaluated
+functions (in other words, for source code), but for backward compatibility
+reasons, 'functionp' still recognizes them as functions and you can
+still call them as before.
+Thus code that attempts to "dig" into the internal structure of an
+interpreted function's object with the likes of 'car' or 'cdr' will
+no longer work and will need to use 'aref' instead to extract its
+various subparts (when 'interactive-form', 'documentation', and
+'help-function-arglist' aren't adequate).
+
+---
+** The escape sequence '\x' not followed by hex digits is now an error.
+Previously, '\x' without at least one hex digit denoted character code
+zero (NUL) but as this was neither intended nor documented or even
+known by anyone, it is now treated as an error by the Lisp reader.
+
+---
+** 'subr-native-elisp-p' is renamed to 'native-comp-function-p'.
+The previous name still exists but is marked as obsolete.
+
++++
+** 'define-globalized-minor-mode' requires that modes use 'run-mode-hooks'.
+Minor modes defined with 'define-globalized-minor-mode', such as
+'global-font-lock-mode', will not be enabled any more in those buffers
+whose major modes fail to use 'run-mode-hooks'.  Major modes defined
+with 'define-derived-mode' are not affected.  'run-mode-hooks' has been the
+recommended way to run major mode hooks since Emacs 22.
+
++++
+** 'buffer-match-p' and 'match-buffers' take '&rest ARGS'.
+They used to take a single '&optional ARG' and were documented to use
+an unreliable hack to try and support condition predicates that
+don't accept this optional ARG.
+The new semantics makes no such accommodation, but the code still
+supports it (with a warning) for backward compatibility.
+
+---
+** 'post-gc-hook' runs after updating 'gcs-done' and 'gc-elapsed'.
+
+---
+** Connection-local variables are applied in buffers visiting remote files.
+This overrides possible directory-local or file-local variables with
+the same name.
+
++++
+** 'copy-tree' now copies records when its optional 2nd argument is non-nil.
+
++++
+** Regexp zero-width assertions followed by operators are better defined.
+Previously, regexps such as "xy\\B*" would have ill-defined behavior.
+Now any operator following a zero-width assertion applies to that
+assertion only (which is useless).  For historical compatibility, an
+operator character following '^' or '\`' becomes literal, but we
+advise against relying on this.
+
++++
+** Infinities and NaNs no longer act as symbols on non-IEEE platforms.
+On old platforms like the VAX that do not support IEEE floating-point,
+tokens like '0.0e+NaN' and '1.0e+INF' are no longer read as symbols.
+Instead, the Lisp reader approximates an infinity with the nearest
+finite value, and a NaN with some other non-numeric object that
+provokes an error if used numerically.
+
++++
+** Conversion of strings to and from byte-arrays works with multibyte strings.
+The functions 'dbus-string-to-byte-array' and
+'dbus-byte-array-to-string' now accept and return multibyte Lisp
+strings, encoding to UTF-8 and decoding from UTF-8 internally.  This
+means that the argument to 'dbus-byte-array-to-string' must be a valid
+UTF-8 byte sequence, and the optional parameter MULTIBYTE of
+'dbus-byte-array-to-string' is now obsolete and unused.  The argument of
+'dbus-string-to-byte-array' should be a regular Lisp string, not a
+unibyte string.
+
++++
+** 'minibuffer-allow-text-properties' now can be set buffer-local.
+'read-from-minibuffer' and functions that use it can take the
+buffer-local value from the minibuffer.
+
++++
+** 'minibuffer-allow-text-properties' now also affects completions.
+When it has a non-nil value, then completion functions like
+'completing-read' don't discard text properties from the returned
+completion candidate.
+
++++
+** X color support compatibility aliases are now obsolete.
+The compatibility aliases 'x-defined-colors', 'x-color-defined-p',
+'x-color-values', and 'x-display-color-p' are now obsolete.
+
++++
+** 'easy-mmode-define-{minor,global}-mode' aliases are now obsolete.
+Use 'define-minor-mode' and 'define-globalized-minor-mode' instead.
+
++++
+** The 'millisec' argument of 'sleep-for' is now obsolete.
+Use a float value for the first argument instead.
+
+---
+** User options 'eshell-NAME-unload-hook' are now obsolete.
+These hooks were named incorrectly, and so they never actually ran
+when unloading the corresponding feature.  Instead, you should use
+hooks named after the feature name, like 'esh-mode-unload-hook'.
+
+** User options 'eshell-process-wait-{seconds,milliseconds}' are now obsolete.
+Instead, use 'eshell-process-wait-time', which supports floating-point
+values.
+
+---
+** User option 'tramp-completion-reread-directory-timeout' has been removed.
+This user option was obsoleted in Emacs 27, use
+'remote-file-name-inhibit-cache' instead.
+
++++
+** The obsolete calling convention of 'sit-for' has been removed.
+That convention was: '(sit-for SECONDS MILLISEC &optional NODISP)'.
+
+---
+** 'defadvice' is marked as obsolete.
+See the "(elisp) Porting Old Advice" Info node for help converting
+them to use 'advice-add' or 'define-advice' instead.
+
+---
+** 'cl-old-struct-compat-mode' is marked as obsolete.
+You may need to recompile your code if it was compiled with Emacs < 24.3.
+
+---
+** Old derived.el functions removed.
+The following functions have been deleted because they were only used
+by code compiled with Emacs < 21:
+'derived-mode-init-mode-variables', 'derived-mode-merge-abbrev-tables',
+'derived-mode-merge-keymaps', 'derived-mode-merge-syntax-tables',
+'derived-mode-run-hooks', 'derived-mode-set-abbrev-table',
+'derived-mode-set-keymap', 'derived-mode-set-syntax-table',
+'derived-mode-setup-function-name'.
 
 
 * Incompatible Lisp Changes in Emacs 31.1
@@ -2333,7 +2583,7 @@ where arguments after the first are keyword/value pairs, all optional:
 ':key' specifies a function that produces the sorting key from an element,
 ':lessp' specifies the ordering predicate, defaulting to 'value<',
 ':reverse' is used to reverse the sorting order,
-':in-place is used for in-place sorting, as the default is now to
+':in-place' is used for in-place sorting, as the default is now to
 sort a copy of the input.
 
 The new signature is less error-prone and reduces the need to write
@@ -2387,14 +2637,61 @@ but tries to reuse those previously allocated (up to a number defined by
 the new variable 'work-buffer-limit', which defaults to 10).
 
 +++
-** 'date-to-time' now defaults to local time.
-The function now assumes local time instead of Universal Time when
-its argument lacks explicit time zone information.  This has been the
-de-facto behavior since Emacs 24 although documentation said otherwise.
-Also, the fallback on 'timezone-make-date-arpa-standard' has been
-removed because its supported date styles can be handled by
-'parse-time-string'.  To restore the previously documented behavior,
-specify "+0000" or "Z" as the time zone in the argument.
+** XLFDs are no longer restricted to 255 characters.
+'font-xlfd-name' now returns an XLFD even if it is greater than 255
+characters in length, provided that the LONG_XLFDs argument is true.
+Other features in Emacs which employ XLFDs have been modified to
+produce and understand XLFDs larger than 255 characters.
+
++++
+** New macro 'static-if' for conditional evaluation of code.
+This macro hides a form from the evaluator or byte-compiler based on a
+compile-time condition.  This is handy for avoiding byte-compilation
+warnings about code that will never actually run under some conditions.
+
++++
+** Desktop notifications are now supported on the Haiku operating system.
+The new function 'haiku-notifications-notify' provides a subset of the
+capabilities of the 'notifications-notify' function in a manner
+analogous to 'w32-notification-notify'.
+
+** New Haiku specific variable 'haiku-pass-control-tab-to-system'.
+This sets whether Emacs should pass 'C-TAB' on to the system instead of
+handling it, fixing a problem where window switching would not activate
+if an Emacs frame had focus on the Haiku operating system.  Default
+value is t.
+
++++
+** New value 'if-regular' for the REPLACE argument to 'insert-file-contents'.
+It results in 'insert-file-contents' erasing the buffer instead of
+preserving markers if the file being inserted is not a regular file,
+rather than signaling an error.
+
++++
+** New variable 'current-key-remap-sequence'.
+It is bound to the key sequence that caused a call to a function bound
+within 'function-key-map' or 'input-decode-map' around those calls.
+
++++
+** The function 'key-translate' can now remove translations.
+If the second argument TO is nil, the existing key translation is
+removed.
+
++++
+** New variables describing the names of built in programs.
+The new variables 'ctags-program-name', 'ebrowse-program-name',
+'etags-program-name', 'hexl-program-name', 'emacsclient-program-name'
+'movemail-program-name', and 'rcs2log-program-name' should be used
+instead of "ctags", "ebrowse", "etags", "hexl", "emacsclient", and
+"rcs2log", when starting one of these built in programs in a subprocess.
+
++++
+** New variable 'case-symbols-as-words' affects case operations for symbols.
+If non-nil, then case operations such as 'upcase-initials' or
+'replace-match' (with nil FIXEDCASE) will treat the entire symbol name
+as a single word.  This is useful for programming languages and styles
+where only the first letter of a symbol's name is ever capitalized.
+The default value of this variable is nil.
 
 ---
 ** The 'min-width' property is now supported for overlays as well.
@@ -2742,9 +3039,9 @@ default to use 'LANGUAGE'.
 
 ---
 ** New optional argument to 'modify-dir-local-variable'.
-A 5th argument, optional, has been added to
-'modify-dir-local-variable'.  It can be used to specify which
-dir-locals file to modify.
+An optional 5th argument FILE has been added to
+'modify-dir-local-variable'.  It can be used to specify which file to
+modify instead of the default ".dir-locals.el".
 
 ** Connection local variables
 
@@ -2798,13 +3095,13 @@ They pertained to the internal storage size which is now irrelevant.
 ** 'treesit-install-language-grammar' can handle local directory instead of URL.
 It is now possible to pass a directory of a local repository as URL
 inside 'treesit-language-source-alist', so that calling
-'treesit-install-language-grammar' would avoid cloning the repository.
+'treesit-install-language-grammar' will avoid cloning the repository.
 It may be useful, for example, for the purposes of bisecting a
 treesitter grammar.
 
-+++
 ** New buffer-local variable 'tabulated-list-groups'.
-It controls display and separate sorting of groups of entries.
+It controls display and separate sorting of groups of entries.  By
+default no grouping or sorting is done.
 
 +++
 ** New variable 'revert-buffer-restore-functions'.
