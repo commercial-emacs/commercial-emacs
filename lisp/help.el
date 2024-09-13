@@ -59,6 +59,7 @@ buffer.")
   "Return `help-char' in a format suitable for the `keymap-set' KEY argument."
   (key-description (char-to-string help-char)))
 
+(declare-function help-find-source "help-fns")
 (defvar-keymap help-map
   :doc "Keymap for characters following the Help key."
   (help-key) #'help-for-help
