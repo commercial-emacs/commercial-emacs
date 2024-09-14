@@ -585,7 +585,7 @@ instead."
             (lambda (form)
               (macroexp-warn-and-return
                (format-message "avoid `lsh'; use `ash' instead")
-               form '(suspicious lsh) t form)))
+               form '(suspicious lsh) t)))
            (side-effect-free t))
   (when (and (< value 0) (< count 0))
     (when (< value most-negative-fixnum)
