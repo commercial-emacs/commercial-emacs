@@ -693,7 +693,7 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
 #ifdef HAVE_NTGUI
   ptrdiff_t id, size;
   int width, height, rc;
-  image_fd fd;
+  int fd;
   char *contents, *data;
   Emacs_Pixmap bitmap;
 
