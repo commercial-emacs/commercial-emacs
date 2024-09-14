@@ -1527,8 +1527,6 @@ manual "(tramp) Improving performance of asynchronous remote processes".
 When a direct asynchronous process is invoked, it uses 'tramp-remote-path'
 for setting the remote 'PATH' environment variable.
 
-** SHR
-
 ---
 *** New user option 'shr-fill-text'.
 When 'shr-fill-text' is non-nil (the default), SHR will fill text
