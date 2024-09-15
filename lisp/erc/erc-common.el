@@ -208,7 +208,7 @@ instead of a `set' state, which precludes any actual saving."
   (funcall (get 'erc-modules 'custom-set) 'erc-modules
            (funcall op (erc--normalize-module-symbol name) erc-modules))
   (when (equal (pcase (get 'erc-modules 'saved-value)
-                 (`(quote ,saved) saved))
+                 (`((quote ,saved)) saved))
                erc-modules)
     (customize-mark-as-set 'erc-modules)))
 
