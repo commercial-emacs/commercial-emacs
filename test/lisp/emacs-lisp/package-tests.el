@@ -814,7 +814,8 @@ could introduce macro redefinitions required for compile."
         (should (progn (package-install 'signed-good) 'noerror))
         (should (progn (package-install 'signed-bad) 'noerror)))
       ;; Check if the installed package status is updated.
-      (let ((_buf (package-list-packages)))
+      (let ((_buf (package-list-packages))
+            (package-check-signature 'allow-unsigned))
 	(revert-buffer)
 	(should (re-search-forward
 		 "^\\s-+signed-good\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-"
