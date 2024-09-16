@@ -1006,7 +1006,7 @@ Default value of `command-error-function'.  */)
   (Lisp_Object data, Lisp_Object context, Lisp_Object unused)
 {
   struct frame *sf = SELECTED_FRAME ();
-  Lisp_Object conditions = Fget (XCAR (data), Qerror_conditions);
+  Lisp_Object conditions = Fget (CAR_SAFE (data), Qerror_conditions);
   int is_minibuffer_quit = !NILP (Fmemq (Qminibuffer_quit, conditions));
 
   CHECK_STRING (context);

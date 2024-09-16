@@ -269,14 +269,16 @@ static void child_signal_read (int, void *);
 #endif
 static void child_signal_notify (void);
 
-/* Indexed by descriptor, gives the process (if any) for that descriptor.  */
+/* Process descriptor to Lisp_Process.  */
 static Lisp_Object chan_process[FD_SETSIZE];
 static void wait_for_socket_fds (Lisp_Object, char const *);
 
 /* Alist of elements (NAME . PROCESS).  */
 static Lisp_Object Vprocess_alist;
 
-/* Table of `struct coding-system' for each process.  */
+/* Coding system by process descriptor.  That the coding systems are
+   defined in two places, here and struct Lisp_Process is probably
+   historical accident.  */
 static struct coding_system *proc_decode_coding_system[FD_SETSIZE];
 static struct coding_system *proc_encode_coding_system[FD_SETSIZE];
 
@@ -5580,23 +5582,27 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
   return got_some_output;
 }
 
-/* Given a list (FUNCTION ARGS...), apply FUNCTION to the ARGS.  */
-
 static Lisp_Object
-read_process_output_call (Lisp_Object fun_and_args)
+error_handler_common (void)
 {
-  return apply1 (XCAR (fun_and_args), XCDR (fun_and_args));
-}
-
-static Lisp_Object
-read_process_output_error_handler (Lisp_Object error_val)
-{
-  cmd_error_internal (error_val, "error in process filter: ");
   Vinhibit_quit = Qt;
   update_echo_area ();
   if (process_error_pause_time > 0)
     Fsleep_for (make_fixnum (process_error_pause_time), Qnil);
   return Qt;
+}
+
+static Lisp_Object
+read_process_output_call (ptrdiff_t nargs, Lisp_Object *args)
+{
+  return Ffuncall (nargs, args);
+}
+
+static Lisp_Object
+read_process_output_error_handler (Lisp_Object error_val, ptrdiff_t, Lisp_Object *)
+{
+  cmd_error_internal (error_val, "error in process filter: ");
+  return error_handler_common ();
 }
 
 /* Read pending output from the process channel.  Return number of
@@ -5616,7 +5622,7 @@ read_process_output (Lisp_Object proc)
   const int carryover = p->decoding_carryover;
   const ptrdiff_t readmax = clip_to_bounds (1, read_process_output_max, PTRDIFF_MAX);
   const specpdl_ref count = SPECPDL_INDEX ();
-  Lisp_Object restore_deactivate;
+  Lisp_Object restore_deactivate = Qunbound;
   char *chars;
 
   USE_SAFE_ALLOCA;
@@ -5687,41 +5693,29 @@ read_process_output (Lisp_Object proc)
 
   decode_coding_c_string (coding, (unsigned char *) chars, nbytes, Qt);
   Vlast_coding_system_used = CODING_ID_NAME (coding->id);
-
-  /* Set decoder to last coding system used..  */
-  if (!EQ (p->decode_coding_system, Vlast_coding_system_used))
-    {
-      pset_decode_coding_system (p, Vlast_coding_system_used);
-
-      /* Set an undecided encoder to the decoder.  Since p->outfd
-	 could change once EOF is sent, verify its slot in
-	 proc_encode_coding_system is still valid.  */
-      eassert (p->outfd < FD_SETSIZE);
-      if (NILP (p->encode_coding_system)
-          && p->outfd >= 0
-	  && proc_encode_coding_system[p->outfd])
-	{
-	  pset_encode_coding_system
-	    (p, coding_inherit_eol_type (Vlast_coding_system_used, Qnil));
-	  setup_coding_system (p->encode_coding_system,
-			       proc_encode_coding_system[p->outfd]);
-	}
-    }
-
   if (coding->carryover_bytes > 0)
     {
       if (SCHARS (p->decoding_buf) < coding->carryover_bytes)
 	pset_decoding_buf (p, make_unibyte_string (NULL, coding->carryover_bytes));
-      memcpy (SDATA (p->decoding_buf), coding->carryover,
-	      coding->carryover_bytes);
+      memcpy (SDATA (p->decoding_buf), coding->carryover, coding->carryover_bytes);
       p->decoding_carryover = coding->carryover_bytes;
     }
 
   if (SBYTES (coding->dst_object) > 0)
-    call_process_filter (proc, coding->dst_object);
-  Vdeactivate_mark = restore_deactivate;
+    {
+      Lisp_Object *args;
+      SAFE_ALLOCA_LISP (args, 3);
+      args[0] = XPROCESS (proc)->filter;
+      args[1] = proc;
+      args[2] = coding->dst_object;
+      internal_condition_case_n (read_process_output_call, 3, args,
+				 !NILP (Vdebug_on_error) ? Qnil : Qerror,
+				 read_process_output_error_handler);
+    }
 
  done:
+  if (!EQ (restore_deactivate, Qunbound))
+    Vdeactivate_mark = restore_deactivate;
   SAFE_FREE_UNBIND_TO (count, Qnil);
   return nbytes;
 }
@@ -5961,9 +5955,7 @@ send_process (Lisp_Object proc, const char *buf, ptrdiff_t len,
 	      send_process (proc, "", 0, Qt);
 	      coding->mode &= CODING_MODE_LAST_BLOCK;
 	    }
-	  setup_coding_system (raw_text_coding_system
-			       (Vlast_coding_system_used),
-			       coding);
+	  setup_coding_system (raw_text_coding_system (Vlast_coding_system_used), coding);
 	  coding->src_multibyte = 0;
 	}
     }
@@ -6923,18 +6915,10 @@ deliver_child_signal (int sig)
 }
 
 static Lisp_Object
-exec_sentinel_error_handler (Lisp_Object error_val)
+exec_sentinel_error_handler (Lisp_Object error_val, ptrdiff_t, Lisp_Object *)
 {
-  /* Make sure error_val is a cons cell, as all the rest of error
-     handling expects that, and will barf otherwise.  */
-  if (!CONSP (error_val))
-    error_val = Fcons (Qerror, error_val);
   cmd_error_internal (error_val, "error in process sentinel: ");
-  Vinhibit_quit = Qt;
-  update_echo_area ();
-  if (process_error_pause_time > 0)
-    Fsleep_for (make_fixnum (process_error_pause_time), Qnil);
-  return Qt;
+  return error_handler_common ();
 }
 
 static void
@@ -6949,13 +6933,18 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
   specbind (Qinhibit_quit, Qt);
   specbind (Qlast_nonmenu_event, Qt);
 
-  internal_condition_case_1 (read_process_output_call,
-			     list3 (p->sentinel, proc, reason),
+  Lisp_Object *args;
+  USE_SAFE_ALLOCA;
+  SAFE_ALLOCA_LISP (args, 3);
+  args[0] = p->sentinel;
+  args[1] = proc;
+  args[2] = reason;
+  internal_condition_case_n (read_process_output_call, 3, args,
 			     !NILP (Vdebug_on_error) ? Qnil : Qerror,
 			     exec_sentinel_error_handler);
 
   Vdeactivate_mark = restore_deactivate;
-  unbind_to (count, Qnil);
+  SAFE_FREE_UNBIND_TO (count, Qnil);
 }
 
 /* Report all recent events of a change in process status
@@ -7570,16 +7559,6 @@ open_channel_for_module (Lisp_Object process)
 #endif
 }
 
-Lisp_Object
-call_process_filter (Lisp_Object process, Lisp_Object string)
-{
-  CHECK_PROCESS (process);
-  return internal_condition_case_1 (read_process_output_call,
-				    list3 (XPROCESS (process)->filter, process, string),
-				    NILP (Vdebug_on_error) ? Qerror : Qnil,
-				    read_process_output_error_handler);
-}
-
 /* The name "init_process" was already taken by Mach.  */
 void
 init_process_emacs (int sockfd)
@@ -7800,7 +7779,7 @@ amounts of data in one go.
 
 On GNU/Linux systems, the value should not exceed
 /proc/sys/fs/pipe-max-size.  See pipe(7) manpage for details.  */);
-  read_process_output_max = 4096;
+  read_process_output_max = 65536;
 
   DEFVAR_INT ("process-error-pause-time", process_error_pause_time,
 	      doc: /* The number of seconds to pause after handling process errors.

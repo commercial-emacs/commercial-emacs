@@ -299,7 +299,6 @@ extern void reap_thread_processes (const struct thread_state *);
 extern void dissociate_controlling_tty (void);
 
 extern int open_channel_for_module (Lisp_Object);
-extern Lisp_Object call_process_filter (Lisp_Object, Lisp_Object);
 
 INLINE_HEADER_END
 
