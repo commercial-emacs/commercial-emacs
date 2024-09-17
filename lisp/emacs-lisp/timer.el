@@ -173,12 +173,16 @@ SECS may be a fraction."
 
 (defsubst timer-activate (timer &optional _triggered-p _reuse-cell)
   "Install TIMER."
+  (unless (threadp (timer--thread timer))
+    (setf (timer--thread timer) (current-thread)))
   (timer--check timer)
   (cl-pushnew timer timer-list))
 
 (defsubst timer-activate-when-idle (timer &optional _dont-wait _reuse-cell)
   "Install idle TIMER"
   (setf (timer--idle-delay timer) 'idle)
+  (unless (threadp (timer--thread timer))
+    (setf (timer--thread timer) (current-thread)))
   (timer--check timer)
   (cl-pushnew timer timer-idle-list))
 
