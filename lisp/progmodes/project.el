@@ -223,8 +223,7 @@ project instance and do not adjust recently used projects."
         (prog1 pr
           (project-remember-project pr))
       (prog1 (cons 'transient directory)
-        (project--remove-from-project-list
-         directory "Project `%s' not found; removed from list")))))
+        (project--remove-from-project-list directory nil)))))
 
 ;;;###autoload
 (defun project-current (&optional maybe-prompt directory)
@@ -1671,18 +1670,19 @@ With some possible metadata (to be decided).")
 
 (defun project--write-project-list ()
   "Save `project--list' in `project-list-file'."
-  (let ((filename project-list-file))
-    (with-temp-buffer
-      (insert ";;; -*- lisp-data -*-\n")
-      (let ((print-length nil)
-            (print-level nil))
-        (pp (mapcar (lambda (elem)
-                      (let ((name (car elem)))
-                        (list (if (file-remote-p name) name
-                                (expand-file-name name)))))
-                    project--list)
-            (current-buffer)))
-      (write-region nil nil filename nil 'silent))))
+  (unless (bound-and-true-p ert--running-tests)
+    (let ((filename project-list-file))
+      (with-temp-buffer
+        (insert ";;; -*- lisp-data -*-\n")
+        (let ((print-length nil)
+              (print-level nil))
+          (pp (mapcar (lambda (elem)
+                        (let ((name (car elem)))
+                          (list (if (file-remote-p name) name
+                                  (expand-file-name name)))))
+                      project--list)
+              (current-buffer)))
+        (write-region nil nil filename nil 'silent)))))
 
 (defsubst project--most-recent-project ()
   (or (project-current)
@@ -1707,29 +1707,38 @@ has changed, and NO-WRITE is nil."
       (setq project--list (delq extant project--list))
       (push (list dir) project--list))
     ;; Decided against writing to disk to update most recent project.
-    (when (and (not extant)
-               (not (bound-and-true-p ert--running-tests)))
+    (unless extant
       (project--write-project-list))))
 
-(defun project--remove-from-project-list (project-root report-message)
+(defun project--remove-from-project-list (project-root confirm)
   "Remove directory PROJECT-ROOT of a missing project from the project list.
 If the directory was in the list before the removal, save the
 result in `project-list-file'.  Announce the project's removal
 from the list using REPORT-MESSAGE, which is a format string
 passed to `message' as its first argument."
-  (when-let ((ent (assoc (abbreviate-file-name project-root) project--list)))
-    (setq project--list (delq ent project--list))
-    (message report-message project-root)
-    (project--write-project-list)))
+  (if-let ((ent (assoc (abbreviate-file-name project-root) project--list))
+           (killed-p (or (not (file-exists-p project-root))
+                         (with-temp-buffer
+                           (let* ((default-directory project-root)
+                                  (to-delete (project-current)))
+                             (project-kill-buffers (not confirm))
+                             (cl-some #'buffer-live-p
+                                      (project-buffers to-delete)))))))
+      (progn
+        (setq project--list (delq ent project--list))
+        (message "Removed project %s" project-root)
+        (project--write-project-list))
+    (message "Kept project %s" project-root)))
 
 ;;;###autoload
-(defun project-forget-project (project-root)
+(defun project-forget-project (project-root &optional confirm)
   "Remove directory PROJECT-ROOT from the project list.
 PROJECT-ROOT is the root directory of a known project listed in
-the project list."
-  (interactive (list (funcall project-prompter)))
-  (project--remove-from-project-list
-   project-root "Project `%s' removed from known projects"))
+the project list.  To prevent `project-buffers' from immediately
+reinserting the project, kill open buffers associated
+with PROJECT-ROOT unless CONFIRM directs otherwise."
+  (interactive (list (funcall project-prompter) t))
+  (project--remove-from-project-list project-root confirm))
 
 (defun project--prev-buffer (predicate)
   "Return previous buffer satisfying PREDICATE which takes buffer."
