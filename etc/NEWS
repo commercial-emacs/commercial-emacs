@@ -1637,11 +1637,300 @@ available.
 ** Java-ts mode
 
 +++
-*** New user option 'java-ts-mode-enable-doxygen'.
-By default, this is nil, and the Doxygen comment blocks in Java source
-are highlighted like other comments.  When non-nil, Doxygen comment
-blocks are syntax-highlighted if the Doxygen grammar library is
-available.
+*** New user option 'Man-support-remote-systems'.
+This option controls whether the man page is formatted on the remote
+system when the current buffer's default-directory is remote.  You can
+invoke the 'man' command with a prefix argument to countermand the
+value of this option for the current invocation of 'man'.
+
+** DocView
+
+---
+*** New user option 'doc-view-mpdf-use-svg'.
+If non-nil, DocView uses SVG images to display PDF documents.  The
+default is non-nil if your system supports display of SVG images.
+
+---
+*** New face 'doc-view-svg-face'.
+This replaces 'doc-view-svg-foreground' and 'doc-view-svg-background'.
+If you don't like the colors produced by the default definition of
+this new face when DocView displays documents, customize this face to
+restore the colors you were used to, or to get colors more to your
+liking.
+
+---
+*** DocView buffers now display a new tool bar.
+This tool bar contains options for searching and navigating within the
+document, replacing the incompatible items for incremental search and
+editing within the default tool bar displayed in the past.
+
+** Shortdoc
+
++++
+*** New function 'shortdoc-function-examples'.
+This function returns examples of use of a given Emacs Lisp function
+from the available shortdoc information.
+
++++
+*** New function 'shortdoc-help-fns-examples-function'.
+This function inserts into the current buffer examples of use of a
+given Emacs Lisp function, which it gleans from the shortdoc
+information.  If you want 'describe-function' ('C-h f') to insert
+examples of using the function into regular "*Help*" buffers, add the
+following to your init file:
+
+    (add-hook 'help-fns-describe-function-functions
+              #'shortdoc-help-fns-examples-function)
+
+** Package
+
+---
+*** New user option 'package-vc-register-as-project'.
+When non-nil, 'package-vc-install' and 'package-vc-checkout' will
+automatically register every package they install as a project, that you
+can quickly select using 'project-switch-project' ('C-x p p').  Default
+is t.
+
+---
+*** New user option 'package-vc-allow-build-commands'.
+Controls for which packages Emacs runs extra build commands when
+installing directly from the package VCS repository.
+
+---
+*** New command 'package-vc-log-incoming'.
+This commands displays incoming changes for a VC package without
+modifying the current checkout.
+
+---
+*** New command to start an inferior Emacs loading only specific packages.
+The new command 'package-isolate' will start a new Emacs process, as
+a sub-process of Emacs where you invoke the command, in a way that
+causes the new process to load only some of the installed packages.
+The command prompts for the packages to activate in this
+sub-process, and is intended for testing Emacs and/or the packages
+in a clean environment.
+
+** Flymake
+
++++
+*** New user option 'flymake-indicator-type'.
+This controls which error indicator type Flymake should use in the
+current buffer.  Depending on your preference, this can either use
+fringes or margins for indicating errors, the default is 'margins'.
+
++++
+*** New user option 'flymake-margin-indicators-string'.
+It controls, for each error type, the string and its face to display as
+the margin indicator.
+
++++
+*** New user option 'flymake-autoresize-margins'.
+If non-nil (the default), Flymake will resize the margins when
+'flymake-mode' is turned on or off.
+Only relevant if 'flymake-indicator-type' is set to 'margins'.
+
++++
+*** New user option 'flymake-margin-indicator-position'.
+It controls whether to use margins for margin indicators, and which
+margin (left or right) to use.  Default is to use the left margin.
+
++++
+*** New user option 'flymake-show-diagnostics-at-end-of-line'.
+When non-nil, Flymake shows summarized descriptions of diagnostics at
+the end of the line.  Depending on your preference, this can either be
+distracting and easily confused with actual code, or a significant
+early aid that relieves you from moving the buffer or reaching for the
+mouse to consult an error message.  Default is nil.
+
+** Flyspell
+
++++
+*** New user option 'flyspell-check-changes'.
+When non-nil, Flyspell mode spell-checks only words that you edited; it
+does not check unedited words just because you move point across them.
+Default is nil.
+
+---
+** JS mode.
+The binding 'M-.' has been removed from the major mode keymaps in
+'js-mode' and 'js-ts-mode', having it default to the global binding
+which calls 'xref-find-definitions'.  If the previous one worked
+better for you, use 'define-key' in your init script to bind
+'js-find-symbol' to that combination again.
+
+---
+** Json mode.
+'js-json-mode' does not derive from 'js-mode' any more so as not
+to confuse tools like Eglot or YASnippet into thinking that those
+buffers contain Javascript code.
+
+** Python mode
+
+---
+*** New user option 'python-indent-block-paren-deeper'.
+If non-nil, increase the indentation of the lines inside parens in a
+header of a block when they are indented to the same level as the body
+of the block, producing:
+
+    if (some_expression
+            and another_expression):
+        do_something()
+
+instead of:
+
+    if (some_expression
+        and another_expression):
+        do_something()
+
+Default is nil.
+
+---
+*** New user option 'python-interpreter-args'.
+This allows the user to specify command line arguments to the non
+interactive Python interpreter specified by 'python-interpreter'.
+
+---
+*** New function 'python-shell-send-block'.
+It sends the python block delimited by 'python-nav-beginning-of-block'
+and 'python-nav-end-of-block' to the inferior Python process.
+
+** Inferior Python mode
+
+---
+*** Default value of 'python-shell-compilation-regexp-alist' is changed.
+Support for Python's ExceptionGroup has been added, so in the Python
+shell, the line indicating the source of an error in the error messages
+from ExceptionGroup will be recognized as well.
+
+** Eldoc
+
+---
+*** 'eldoc' no longer truncates to a single line by default.
+Previously, the entire docstring was not available to eldoc, which made
+'eldoc-echo-area-use-multiline-p' ineffective.  The old behavior may be
+kept by customizing 'eldoc-echo-area-use-multiline-p'.
+
+---
+** Scheme mode.
+Scheme mode now handles the regular expression literal '#/regexp/' that
+is available in some Scheme implementations.
+Also, it should now handle nested sexp-comments.
+
+** Use package
+
++++
+*** New ':vc' keyword.
+This keyword enables the user to install packages using package-vc.el.
+
++++
+*** New user option 'use-package-vc-prefer-newest'.
+If non-nil, always install the newest commit of a package when using the
+':vc' keyword rather than its stable release.  Default is nil.
+
+** Gnus
+
++++
+*** New backend 'nnfeed'.
+This allows backend developers to easily create new backends for web
+feeds, as inheriting backends of 'nnfeed'.
+
++++
+*** New backend 'nnatom'.
+This allow users to add Atom Syndication Format feeds to Gnus as
+servers.
+
+*** The 'nnweb-type' option 'gmane' has been removed.
+The gmane.org website is, sadly, down since a number of years with no
+prospect of it coming back.  Therefore, it is no longer valid to set
+the server variable 'nnweb-type' to 'gmane'.
+
+---
+*** New user option 'gnus-mode-line-logo'.
+This allows the user to either disable the display of any logo or
+specify which logo will be displayed as part of the
+buffer-identification in the mode-line of Gnus buffers.
+
+---
+*** 'gnus-summary-limit-to-age' now counts days since midnight.
+"Less than 1 day" now means "since last midnight", rather than "less
+than 24 hours old".
+
+** Rmail
+
+---
+*** New commands for reading mailing lists.
+The new Rmail commands 'rmail-mailing-list-post',
+'rmail-mailing-list-unsubscribe', 'rmail-mailing-list-help', and
+'rmail-mailing-list-archive' allow, respectively, posting to,
+unsubscribing from, requesting help about, and browsing the archives
+of, the mailing list from which the current email message was
+delivered.
+
+** Dictionary
+
+---
+*** New user option 'dictionary-search-interface'.
+Controls how the 'dictionary-search' command prompts for and displays
+dictionary definitions.  Customize this user option to 'help' to have
+'dictionary-search' display definitions in a "*Help*" buffer and
+provide dictionary-based minibuffer completion for word selection.
+Default is nil, which means to use a "*Dictionary*" buffer.
+
+---
+*** New user option 'dictionary-read-word-prompt'.
+This allows the user to customize the prompt that is used by
+'dictionary-search' when asking for a word to search in the
+dictionaries.
+
+---
+*** New user option 'dictionary-display-definition-function'.
+This allows the user to customize the way in which 'dictionary-search'
+displays word definitions.  If non-nil, this user option should be set
+to a function that displays a word definition obtained from a
+dictionary server.  The new function
+'dictionary-display-definition-in-help-buffer' can be used to display
+the definition in a "*Help*" buffer, instead of the default
+"*Dictionary*" buffer.
+
+---
+*** New user option 'dictionary-read-word-function'.
+This allows the user to customize the way in which 'dictionary-search'
+prompts for a word to search in the dictionary.  This user option
+should be set to a function that lets the user select a word and
+returns it as a string.  The new function
+'dictionary-completing-read-word' can be used to prompt with
+completion based on dictionary matches.
+
+---
+*** New user option 'dictionary-read-dictionary-function'.
+This allows the user to customize the way in which 'dictionary-search'
+prompts for a dictionary to search in.  This user option should be set
+to a function that lets the user select a dictionary and returns its
+name as a string.  The new function
+'dictionary-completing-read-dictionary' can be used to prompt with
+completion based on dictionaries that the server supports.
+
+---
+*** The default value of 'dictionary-tooltip-dictionary' has changed.
+The new default value is t, which means use the same dictionary as the
+value of 'dictionary-default-dictionary'.  The previous default value
+was nil, which effectively disabled 'dictionary-tooltip-mode', even if
+the mode was turned on.
+
+** Pp
+
++++
+*** New 'pp-default-function' user option replaces 'pp-use-max-width'.
+Its default value is 'pp-fill', a new default pretty-printing function,
+which tries to obey 'fill-column'.
+
+---
+*** 'pp-to-string' takes an additional PP-FUNCTION argument.
+This argument specifies the prettifying algorithm to use.
+
+---
+*** 'pp' and 'pp-to-string' now always include a terminating newline.
+In the past they included a terminating newline in most cases but not all.
 
 ** Emacs Lisp mode
 
