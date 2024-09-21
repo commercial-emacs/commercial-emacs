@@ -40,6 +40,23 @@ No external library is required.  The '--with-json' configure option has
 been removed.  'json-available-p' now always returns non-nil and is only
 kept for compatibility.
 
+---
+** Emacs now defaults to the ossaudio library for sound on NetBSD and OpenBSD.
+Previously, configure used ALSA libraries if installed on the system
+when configured '--with-sound=yes' (which is the default), with fallback
+to libossaudio.  The libossaudio library included with the base system
+is now used even if ALSA is found to avoid relying on external packages
+and to resolve potential incompatibilities between GNU/Linux and *BSD
+versions of ALSA.  Use '--with-sound=alsa' to build with ALSA on these
+operating systems instead.
+
+---
+** New configuration option '--disable-gc-mark-trace'.
+This disables the GC mark trace buffer for about 5 % better garbage
+collection performance.  Doing so may make it more difficult for Emacs
+developers to help finding GC-related bugs that you run into, which is
+why it the mark trace buffer is enabled by default.
+
 
 * Startup Changes in Emacs 30.1
 
