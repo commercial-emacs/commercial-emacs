@@ -694,7 +694,7 @@ class declarations.")
            "reload" "unichr" "unicode" "xrange" "apply" "buffer" "coerce"
            "intern"
            ;; Python 3:
-           "ascii" "breakpoint" "bytearray" "bytes" "exec"
+           "aiter" "anext" "ascii" "breakpoint" "bytearray" "bytes" "exec"
            ;; Special attributes:
            ;; https://docs.python.org/3/reference/datamodel.html
            "__annotations__" "__closure__" "__code__"
