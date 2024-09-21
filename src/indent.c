@@ -2183,7 +2183,7 @@ buffer, whether or not it is currently displayed in some window.  */)
     }
   else
     {
-      ptrdiff_t it_start, it_overshoot_count = 0;
+      ptrdiff_t it_start, overshoot = 0;
       bool overshoot_handled = false;
       bool disp_string_at_start_p = false;
       int vpos_init = 0;
@@ -2213,25 +2213,30 @@ buffer, whether or not it is currently displayed in some window.  */)
       first_x = it.first_visible_x;
       it_start = IT_CHARPOS (it);
 
-      if (it.cmp_it.id >= 0)
-	it_overshoot_count = 0;
-      else if (it.method == GET_FROM_STRING)
+      if (it.cmp_it.id < 0)
 	{
-	  const char *s = SSDATA (it.string);
-	  const char *e = s + SBYTES (it.string);
-	  disp_string_at_start_p =
-	    (it.area == TEXT_AREA)
-	    && it.string_from_display_prop_p
-	    && (it.sp > 0 && it.stack[it.sp - 1].method == GET_FROM_BUFFER);
-	  while (s < e)
-	    if (*s++ == '\n')
-	      it_overshoot_count++;
-	  if (!it_overshoot_count)
-	    it_overshoot_count = -1;
+	  if (it.method == GET_FROM_STRING)
+	    {
+	      const char *s = SSDATA (it.string);
+	      const char *e = s + SBYTES (it.string);
+	      disp_string_at_start_p =
+		it.area == TEXT_AREA
+		&& it.string_from_display_prop_p
+		&& it.sp > 0
+		&& it.stack[it.sp - 1].method == GET_FROM_BUFFER;
+	      while (s < e)
+		if (*s++ == '\n')
+		  ++overshoot;
+	      if (overshoot == 0)
+		overshoot = -1;
+	    }
+	  else if (it.method == GET_FROM_STRETCH)
+	    overshoot = 0;
+	  else if (it.method == GET_FROM_IMAGE && it.image_id >= 0)
+	    overshoot = 0;
+	  else
+	    overshoot = 1;
 	}
-      else
-	it_overshoot_count =
-	  (it.method != GET_FROM_IMAGE && it.method != GET_FROM_STRETCH);
 
       if (start_x_given)
 	{
@@ -2240,7 +2245,7 @@ buffer, whether or not it is currently displayed in some window.  */)
 	}
       else
 	{
-	  /* Not reseating starts IT->current_x at 0, while PT is some x > 0.  */
+	  /* Scan from start of line containing PT.  */
 	  reseat_preceding_line_start (&it);
 	  it.current_x = it.hpos = 0;
 	}
@@ -2248,9 +2253,8 @@ buffer, whether or not it is currently displayed in some window.  */)
       if (IT_CHARPOS (it) != PT)
         {
           ptrdiff_t target =
-	    (disp_string_at_start_p && FETCH_BYTE (IT_BYTEPOS (it)) != '\n')
-	    /* Back off to avoid overshooting.  */
-            ? PT - 1
+	    disp_string_at_start_p && FETCH_BYTE (IT_BYTEPOS (it)) != '\n'
+            ? PT - 1 /* Back off to avoid overshooting.  */
             : PT;
           move_it_forward (&it, target, -1, MOVE_TO_POS, NULL);
         }
@@ -2258,32 +2262,35 @@ buffer, whether or not it is currently displayed in some window.  */)
       if (IT_CHARPOS (it) > it_start)
 	{
 	  /* EZ overshoot whack-a-mole.  */
-	  if (it_overshoot_count < 0
+	  if (overshoot < 0
 	      && it.method == GET_FROM_BUFFER
 	      && it.c == '\n')
-	    it_overshoot_count = 1;
-	  else if (it_overshoot_count == 1 && it.vpos == 0
+	    {
+	      overshoot = 1;
+	    }
+	  else if (overshoot == 1
+		   && it.vpos == 0
 		   && it.current_x < it.last_visible_x)
 	    {
 	      /* Screen line unchanged so no backtrack needed.
 		 PT potentially within a composition.  */
-	      it_overshoot_count = 0;
+	      overshoot = 0;
 	    }
 	  else if (disp_string_at_start_p && it.vpos > 0)
 	    {
 	      /* Multi-line display string.  */
-	      it_overshoot_count = it.vpos;
+	      overshoot = it.vpos;
 	    }
 
 	  /* We might overshoot if lines are truncated and point lies
 	     beyond the right margin of the window.  */
 	  if (it.line_wrap == TRUNCATE
 	      && it.current_x >= it.last_visible_x
-	      && it_overshoot_count == 0
+	      && overshoot == 0
 	      && it.vpos > 0)
-	    it_overshoot_count = 1;
-	  if (it_overshoot_count > 0)
-	    move_it_dvpos (&it, -it_overshoot_count);
+	    overshoot = 1;
+	  if (overshoot > 0)
+	    move_it_dvpos (&it, -overshoot);
 
 	  overshoot_handled = true;
 	}
@@ -2328,10 +2335,11 @@ buffer, whether or not it is currently displayed in some window.  */)
 	  if (nlines > 1)
 	    move_it_dvpos (&it, nlines - 1);
 	}
-      else	/* it_start == ZV */
+      else
 	{
 	  /* EZ special cased this in b544ab5.
 	     Will have to inspect wtf he was thinking.  */
+	  eassert (it_start == ZV);
 	  it.vpos = it.current_y = 0;
 	  move_it_dvpos (&it, nlines);
 	  if (IT_CHARPOS (it) == CHARPOS (pt) && CHARPOS (pt) == it_start)

@@ -255,6 +255,10 @@ width of display property."
   "Test line-up and line-down in presence of display string."
   (skip-unless (not noninteractive))
   (xdisp-tests--visible-buffer
+   (save-excursion
+     (insert (propertize "a" 'display "bbb\nccc\ndddd\n")))
+   (should (= 3 (vertical-motion 1))))
+  (xdisp-tests--visible-buffer
    (insert (mapconcat #'number-to-string (number-sequence 1 5) "") "\n")
    (save-excursion (insert "_this\n"))
    (add-text-properties (point) (1+ (point))

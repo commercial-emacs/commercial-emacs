@@ -8917,7 +8917,13 @@ move_it_forward (struct it *it, ptrdiff_t to_charpos, int op_to, int op,
 	{
 	  /* Tall glyphs: must go line by line.  */
 	  if (op_to <= it->vpos) /* yes, less-than-equal */
-	    skip = MOVE_POS_MATCH_OR_ZV;
+	    {
+	      /* Move off middle of display string.  */
+	      if (it->method == GET_FROM_STRING && IT_STRING_CHARPOS (*it) != 0)
+		move_it_forward (it, IT_CHARPOS (*it) + it->string_from_display_prop_p,
+				 -1, MOVE_TO_POS, NULL);
+	      skip = MOVE_POS_MATCH_OR_ZV;
+	    }
 	  else
 	    {
 	      skip = emulate_display_sline (it, to_charpos, -1, op & MOVE_TO_POS);
