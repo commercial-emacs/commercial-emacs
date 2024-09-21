@@ -59,7 +59,6 @@
   (require 'ido))
 
 (defvar ido-cur-list)
-(defvar electric-layout-rules)
 (declare-function ido-mode "ido" (&optional arg))
 
 ;;; Constants
