@@ -763,9 +763,10 @@ sign in chained assignment."
            ;; Python 3:
            "BlockingIOError" "BrokenPipeError" "ChildProcessError"
            "ConnectionAbortedError" "ConnectionError" "ConnectionRefusedError"
-           "ConnectionResetError" "FileExistsError" "FileNotFoundError"
-           "InterruptedError" "IsADirectoryError" "NotADirectoryError"
-           "PermissionError" "ProcessLookupError" "RecursionError"
+           "ConnectionResetError" "EncodingWarning" "FileExistsError"
+           "FileNotFoundError" "InterruptedError" "IsADirectoryError"
+           "NotADirectoryError" "ModuleNotFoundError" "PermissionError"
+           "ProcessLookupError" "PythonFinalizationError" "RecursionError"
            "ResourceWarning" "StopAsyncIteration" "TimeoutError"
            ;; OS specific
            "VMSError" "WindowsError"
