@@ -2544,6 +2544,8 @@ by code compiled with Emacs < 21:
 
 * Incompatible Lisp Changes in Emacs 31.1
 
+** Nested backquotes are not supported any more in Pcase patterns.
+
 ** The 'rx' category name 'chinese-two-byte' must now be spelled correctly.
 An old alternative name (without the first 'e') has been removed.
 
