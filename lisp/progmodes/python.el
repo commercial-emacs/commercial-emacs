@@ -273,8 +273,15 @@
 (autoload 'comint-mode "comint")
 (autoload 'help-function-arglist "help-fns")
 
+(defconst python--auto-mode-alist-regexp
+  (rx "." (or "py"
+              "pth"                     ; Python Path Configuration File
+              "pyi"                     ; Python Stub File (PEP 484)
+              "pyw")                    ; MS-Windows specific extension
+      eos))
+
 ;;;###autoload
-(add-to-list 'auto-mode-alist (cons (purify-if-dumping "\\.py[iw]?\\'") 'python-mode))
+(add-to-list 'auto-mode-alist (cons python--auto-mode-alist-regexp 'python-mode))
 ;;;###autoload
 (add-to-list 'interpreter-mode-alist (cons (purify-if-dumping "python[0-9.]*") 'python-mode))
 
