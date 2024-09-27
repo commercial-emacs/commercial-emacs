@@ -101,20 +101,18 @@
 ;;; Code:
 
 (require 'esh-util)
-(require 'eldoc)
 (require 'esh-arg)
 (require 'esh-proc)
 (require 'esh-module)
 (require 'esh-io)
 (require 'esh-ext)
+
+(require 'eldoc)
 (require 'generator)
+(require 'pcomplete)
 
 (eval-when-compile
-  (require 'cl-lib)
-  (require 'pcomplete))
-
-(declare-function pcomplete--here "pcomplete"
-		  (&optional form stub paring form-only))
+  (require 'cl-lib))
 
 (defgroup eshell-cmd nil
   "Executing an Eshell command is as simple as typing it in and \
@@ -795,9 +793,6 @@ this grossness will be made to disappear by using `call/cc'..."
      (error
       (eshell-errorn (error-message-string err))
       (eshell-close-handles 1))))
-
-(defvar eshell-output-handle)           ;Defined in esh-io.el.
-(defvar eshell-error-handle)            ;Defined in esh-io.el.
 
 (defmacro eshell-with-copied-handles (object &optional steal-p)
   "Duplicate current I/O handles, so OBJECT works with its own copy.
