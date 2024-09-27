@@ -509,7 +509,8 @@ NAME is the name of the test case."
   "Test that Eshell reports an error when trying to background a nil command."
   (with-temp-eshell
     (eshell-match-command-output "echo hi & &"
-                                 "\\`Empty command before `&'\n")
+                                 "\\`Empty command before `&'\n"
+                                 nil :ignore-errors)
     ;; Make sure the next Eshell prompt has the original input so the
     ;; user can fix it.
     (should (equal (buffer-substring eshell-last-output-end (point))
