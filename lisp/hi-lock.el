@@ -868,8 +868,7 @@ Apply the previous patterns after reverting the buffer."
             (hi-lock-mode 1))
           (setq rehighlight t))
         ;; When using hi-lock overlays, then need to update them
-        (unless (and font-lock-mode (font-lock-specified-p major-mode)
-                     (not hi-lock-use-overlays))
+        (when (or hi-lock-use-overlays (not font-lock-mode))
           (hi-lock-unface-buffer t)
           (setq rehighlight t))
         (when rehighlight
