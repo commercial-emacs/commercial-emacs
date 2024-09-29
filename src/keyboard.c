@@ -4336,7 +4336,6 @@ timer_check (void)
       Lisp_Object timers = Fcopy_sequence (*lists[i]);
       FOR_EACH_TAIL (timers)
 	{
-	  struct timespec time;
 	  Lisp_Object *vec;
 	  CHECK_VECTOR (XCAR (timers));
 	  vec = XVECTOR (XCAR (timers))->contents;
@@ -4348,18 +4347,19 @@ timer_check (void)
 	    {
 	      if (NILP (vec[0])) /* not yet triggered */
 		{
-		  if (list4_to_timespec (vec[1], vec[2], vec[3], vec[8], &time))
+		  struct timespec spec = list4_to_timespec (vec[1], vec[2], vec[3], vec[8]);
+		  if (timespec_valid_p (spec))
 		    {
 		      /* Trigger when:
 			 For ordinary timer, now is at or past trigger time.
 			 For idle timer, idled duration at or past threshold.  */
-		      if (timespec_cmp (bogey, time) >= 0)
+		      if (timespec_cmp (bogey, spec) >= 0)
 			{
 			  trigger_timer (XCAR (timers));
 			}
 		      else
 			{
-			  struct timespec diff = timespec_sub (time, bogey);
+			  struct timespec diff = timespec_sub (spec, bogey);
 			  if (!timespec_valid_p (until_next)
 			      || timespectod (diff) < timespectod (until_next))
 			    until_next = diff;

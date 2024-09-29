@@ -502,7 +502,7 @@ ticks_hz_to_timespec (Lisp_Object ticks, Lisp_Object hz)
      yielding quotient Q (tv_sec) and remainder NS (tv_nsec).
      Return an invalid timespec if Q does not fit in time_t.
      For speed, prefer fixnum arithmetic if it works.  */
-  if (FASTER_TIMEFNS && BASE_EQ (hz, timespec_hz))
+  if (FASTER_TIMEFNS && EQ (hz, timespec_hz))
     {
       if (FIXNUMP (ticks))
 	{
@@ -514,7 +514,7 @@ ticks_hz_to_timespec (Lisp_Object ticks, Lisp_Object hz)
 	}
       ns = mpz_fdiv_q_ui (*q, *xbignum_val (ticks), TIMESPEC_HZ);
     }
-  else if (FASTER_TIMEFNS && BASE_EQ (hz, make_fixnum (1)))
+  else if (FASTER_TIMEFNS && EQ (hz, make_fixnum (1)))
     {
       ns = 0;
       if (FIXNUMP (ticks))
