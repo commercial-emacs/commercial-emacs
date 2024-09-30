@@ -3101,7 +3101,7 @@ lookup_image (struct frame *f, Lisp_Object spec, int face_id)
       size_t len = strlen (font_family) + 1;
       img->face_font_family = xmalloc (len);
       memcpy (img->face_font_family, font_family, len);
-      img->load_failed_p = ! img->type->load_img (f, img);
+      img->load_failed_p = !img->type->load_img (f, img);
 
       /* If we can't load the image, and we don't have a width and
 	 height, use some arbitrary width and height so that we can
