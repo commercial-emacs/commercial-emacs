@@ -10089,9 +10089,9 @@ minibuffer, but don't quit the completions window."
           (completion-no-auto-exit (if no-exit t completion-no-auto-exit))
           (choice
            (if choose-completion-deselect-if-after
-               (or (get-text-property (posn-point (event-start event))
-                                      'completion--string)
-                   (error "No completion here"))
+               (if-let ((str (get-text-property (posn-point (event-start event)) 'completion--string)))
+                   (substring-no-properties str)
+                 (error "No completion here"))
            (save-excursion
              (goto-char (posn-point (event-start event)))
              (let (beg)
@@ -10106,7 +10106,8 @@ minibuffer, but don't quit the completions window."
                (setq beg (or (previous-single-property-change
                               beg 'completion--string)
                              beg))
-               (get-text-property beg 'completion--string))))))
+               (substring-no-properties
+                (get-text-property beg 'completion--string)))))))
 
       (unless (buffer-live-p buffer)
         (error "Destination buffer is dead"))

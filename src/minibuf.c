@@ -564,8 +564,7 @@ If the current buffer is not a minibuffer, return its entire contents.  */)
 
    DEFALT specifies the default value for the sake of history commands.
 
-   If ALLOW_PROPS or `minibuffer-allow-text-properties' (possibly
-   buffer-local) is non-nil, do not throw away text properties.
+   If ALLOW_PROPS, do not throw away text properties.
 
    if INHERIT_INPUT_METHOD, the minibuffer inherits the
    current input method.  */
@@ -929,7 +928,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 
   /* Make minibuffer contents into a string.  */
   Fset_buffer (minibuffer);
-  if (allow_props || minibuffer_allow_text_properties)
+  if (allow_props)
     val = Fminibuffer_contents ();
   else
     val = Fminibuffer_contents_no_properties ();
@@ -1322,8 +1321,7 @@ Sixth arg DEFAULT-VALUE, if non-nil, should be a string, which is used
 Seventh arg INHERIT-INPUT-METHOD, if non-nil, means the minibuffer inherits
  the current input method and the setting of `enable-multibyte-characters'.
 
-If the variable `minibuffer-allow-text-properties' is non-nil
- (either let-bound or buffer-local in the minibuffer),
+If the variable `minibuffer-allow-text-properties' is non-nil,
  then the string which is returned includes whatever text properties
  were present in the minibuffer.  Otherwise the value has no text properties.
 
@@ -2450,10 +2448,9 @@ basic completion functions like `try-completion' and `all-completions'.  */);
   DEFVAR_BOOL ("minibuffer-allow-text-properties",
 	       minibuffer_allow_text_properties,
 	       doc: /* Non-nil means `read-from-minibuffer' should not discard text properties.
-The value could be let-bound or buffer-local in the minibuffer.
-This also affects `read-string', or any of the functions that do
-minibuffer input with completion, but it does not affect `read-minibuffer'
-that always discards text properties.  */);
+This also affects `read-string', but it does not affect `read-minibuffer',
+`read-no-blanks-input', or any of the functions that do minibuffer input
+with completion; they always discard text properties.  */);
   minibuffer_allow_text_properties = 0;
 
   DEFVAR_LISP ("minibuffer-prompt-properties", Vminibuffer_prompt_properties,
