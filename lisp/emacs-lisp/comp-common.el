@@ -418,11 +418,9 @@ those primitives unnecessary in case of function redefinition/advice."
   "Name of the native-compiler log buffer.")
 
 (cl-defun comp-log (data &optional (level 1) quoted)
-  "Log DATA at LEVEL.
-LEVEL is a number from 1-3, and defaults to 1; if it is less
-than `native-comp-verbose', do nothing.  If `noninteractive', log
-with `message'.  Otherwise, log with `comp-log-to-buffer'."
-  (when (>= native-comp-verbose level)
+  "Log DATA if LEVEL is at or under `native-comp-verbose'.
+If `noninteractive', use `message' else `comp-log-to-buffer'."
+  (when (<= level native-comp-verbose)
     (if noninteractive
         (cl-typecase data
           (atom (message "%s" data))
