@@ -74,7 +74,6 @@ OMIT_GNULIB_MODULE_secure_getenv = true
 OMIT_GNULIB_MODULE_signal-h = true
 OMIT_GNULIB_MODULE_signbit = true
 OMIT_GNULIB_MODULE_size_max = true
-OMIT_GNULIB_MODULE_stdio = true
 OMIT_GNULIB_MODULE_stdlib = true
 OMIT_GNULIB_MODULE_stpncpy = true
 OMIT_GNULIB_MODULE_sys_select = true
