@@ -85,3 +85,4 @@ OMIT_GNULIB_MODULE_utimens = true
 OMIT_GNULIB_MODULE_utimensat = true
 OMIT_GNULIB_MODULE_xsize = true
 OMIT_GNULIB_MODULE_cloexec = true
+OMIT_GNULIB_MODULE_fopen_gnu = true

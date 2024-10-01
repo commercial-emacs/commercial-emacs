@@ -215,10 +215,6 @@ print_errno_message (int errnum)
 #endif
 }
 
-#ifndef _GL_ATTRIBUTE_FORMAT_PRINTF_STANDARD
-#error "wtf"
-#endif
-
 static void _GL_ATTRIBUTE_FORMAT_PRINTF_STANDARD (3, 0) _GL_ARG_NONNULL ((3))
 error_tail (int status, int errnum, const char *message, va_list args,
             unsigned int mode_flags)
