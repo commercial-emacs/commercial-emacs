@@ -215,7 +215,7 @@ print_errno_message (int errnum)
 #endif
 }
 
-static void  __attribute__ ((__format__ (__printf__, 3, 0))) __attribute__ ((__nonnull__ 3))
+static void  __attribute__ ((__format__ (__printf__, 3, 0))) __attribute__ ((__nonnull__ (3)))
 error_tail (int status, int errnum, const char *message, va_list args,
             unsigned int mode_flags)
 {
