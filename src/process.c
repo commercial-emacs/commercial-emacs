@@ -121,6 +121,10 @@ static struct rlimit nofile_limit;
 #endif
 #endif
 
+#ifdef WINDOWSNT
+#include "signal.h" /* for SIG2STR_MAX */
+#endif
+
 #if defined HAVE_GETADDRINFO_A || defined HAVE_GNUTLS
 /* This is 0.1s in nanoseconds. */
 #define ASYNC_RETRY_NSEC 100000000
