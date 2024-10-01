@@ -418,14 +418,18 @@ file_has_aclinfo (char const *name, struct stat const *sb,
       /* Linux, FreeBSD, Mac OS X, IRIX, Tru64, Cygwin >= 2.5 */
       int ret;
 
-      if (HAVE_ACL_EXTENDED_FILE) /* Linux */
+      if (HAVE_ACL_EXTENDED_FILE)
         {
-          /* On Linux, acl_extended_file is an optimized function: It only
+          /* acl_extended_file is an optimized function: It only
              makes two calls to getxattr(), one for ACL_TYPE_ACCESS, one for
              ACL_TYPE_DEFAULT.  */
-          ret = (flags & ACL_SYMLINK_FOLLOW)
+#  if HAVE_ACL_TYPE_EXTENDED /* Mac OS X */
+          ret = acl_extended_file (name);
+#  else
+	  ret = (flags & ACL_SYMLINK_FOLLOW)
 	    ? acl_extended_file (name)
 	    : acl_extended_file_nofollow (name);
+#  endif
         }
       else /* FreeBSD, Mac OS X, IRIX, Tru64, Cygwin >= 2.5 */
         {
