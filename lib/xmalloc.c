@@ -30,7 +30,7 @@
 #include <string.h>
 
 static void * _GL_ATTRIBUTE_PURE
-nonnull (void *p)
+check_nonnull (void *p)
 {
   if (!p)
     xalloc_die ();
@@ -42,13 +42,13 @@ nonnull (void *p)
 void *
 xmalloc (size_t s)
 {
-  return nonnull (malloc (s));
+  return check_nonnull (malloc (s));
 }
 
 void *
 ximalloc (idx_t s)
 {
-  return nonnull (imalloc (s));
+  return check_nonnull (imalloc (s));
 }
 
 char *
@@ -72,7 +72,7 @@ xrealloc (void *p, size_t s)
 void *
 xirealloc (void *p, idx_t s)
 {
-  return nonnull (irealloc (p, s));
+  return check_nonnull (irealloc (p, s));
 }
 
 /* Change the size of an allocated block of memory P to an array of N
@@ -90,7 +90,7 @@ xreallocarray (void *p, size_t n, size_t s)
 void *
 xireallocarray (void *p, idx_t n, idx_t s)
 {
-  return nonnull (ireallocarray (p, n, s));
+  return check_nonnull (ireallocarray (p, n, s));
 }
 
 /* Allocate an array of N objects, each with S bytes of memory,
@@ -295,13 +295,13 @@ xizalloc (idx_t s)
 void *
 xcalloc (size_t n, size_t s)
 {
-  return nonnull (calloc (n, s));
+  return check_nonnull (calloc (n, s));
 }
 
 void *
 xicalloc (idx_t n, idx_t s)
 {
-  return nonnull (icalloc (n, s));
+  return check_nonnull (icalloc (n, s));
 }
 
 /* Clone an object P of size S, with error checking.  There's no need

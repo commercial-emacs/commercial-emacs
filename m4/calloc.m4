@@ -1,9 +1,9 @@
-# calloc.m4 serial 31
-
-# Copyright (C) 2004-2024 Free Software Foundation, Inc.
-# This file is free software; the Free Software Foundation
-# gives unlimited permission to copy and/or distribute it,
-# with or without modifications, as long as this notice is preserved.
+# calloc.m4
+# serial 34
+dnl Copyright (C) 2004-2024 Free Software Foundation, Inc.
+dnl This file is free software; the Free Software Foundation
+dnl gives unlimited permission to copy and/or distribute it,
+dnl with or without modifications, as long as this notice is preserved.
 
 # Written by Jim Meyering.
 
@@ -58,6 +58,11 @@ AC_DEFUN([gl_FUNC_CALLOC_GNU],
 [
   AC_REQUIRE([gl_STDLIB_H_DEFAULTS])
   AC_REQUIRE([gl_FUNC_CALLOC_POSIX])
+
+  dnl Through the dependency on module extensions-aix, _LINUX_SOURCE_COMPAT
+  dnl gets defined already before this macro gets invoked.  This helps
+  dnl if !(__VEC__ || __AIXVEC), and doesn't hurt otherwise.
+
   REPLACE_CALLOC_FOR_CALLOC_GNU="$REPLACE_CALLOC_FOR_CALLOC_POSIX"
   if test $REPLACE_CALLOC_FOR_CALLOC_GNU = 0; then
     _AC_FUNC_CALLOC_IF([], [REPLACE_CALLOC_FOR_CALLOC_GNU=1])

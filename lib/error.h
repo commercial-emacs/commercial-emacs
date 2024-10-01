@@ -24,18 +24,21 @@
    or error_at_line(...) invocations.  */
 
 /* The include_next requires a split double-inclusion guard.  */
-#if 1
+#if 1 && !defined __MINGW32__
 # include_next <error.h>
 #endif
 
 #ifndef _GL_ERROR_H
 #define _GL_ERROR_H
 
-/* This file uses _GL_ATTRIBUTE_ALWAYS_INLINE, _GL_ATTRIBUTE_FORMAT,
-  _GL_ATTRIBUTE_MAYBE_UNUSED.  */
+/* This file uses _GL_ATTRIBUTE_ALWAYS_INLINE, _GL_ATTRIBUTE_COLD,
+   _GL_ATTRIBUTE_FORMAT, _GL_ATTRIBUTE_MAYBE_UNUSED.  */
 #if !_GL_CONFIG_H_INCLUDED
  #error "Please include config.h first."
 #endif
+
+/* Get va_list.  */
+#include <stdarg.h>
 
 /* Get 'unreachable'.  */
 #include <stddef.h>
@@ -139,11 +142,27 @@
 # define _GL_EXTERN_C extern
 #endif
 
-/* _GL_FUNCDECL_RPL (func, rettype, parameters_and_attributes);
+/* _GL_EXTERN_C_FUNC declaration;
+   performs the declaration of a function with C linkage.  */
+#if defined __cplusplus
+# define _GL_EXTERN_C_FUNC extern "C"
+#else
+/* In C mode, omit the 'extern' keyword, because attributes in bracket syntax
+   are not allowed between 'extern' and the return type (see gnulib-common.m4).
+ */
+# define _GL_EXTERN_C_FUNC
+#endif
+
+/* _GL_FUNCDECL_RPL (func, rettype, parameters, [attributes]);
    declares a replacement function, named rpl_func, with the given prototype,
    consisting of return type, parameters, and attributes.
-   Example:
-     _GL_FUNCDECL_RPL (open, int, (const char *filename, int flags, ...)
+   Although attributes are optional, the comma before them is required
+   for portability to C17 and earlier.  The attribute _GL_ATTRIBUTE_NOTHROW,
+   if needed, must be placed after the _GL_FUNCDECL_RPL invocation,
+   at the end of the declaration.
+   Examples:
+     _GL_FUNCDECL_RPL (free, void, (void *ptr), ) _GL_ATTRIBUTE_NOTHROW;
+     _GL_FUNCDECL_RPL (open, int, (const char *filename, int flags, ...),
                                   _GL_ARG_NONNULL ((1)));
 
    Note: Attributes, such as _GL_ATTRIBUTE_DEPRECATED, are supported in front
@@ -152,20 +171,24 @@
      [[...]] extern "C" <declaration>;
    is invalid syntax in C++.)
  */
-#define _GL_FUNCDECL_RPL(func,rettype,parameters_and_attributes) \
-  _GL_FUNCDECL_RPL_1 (rpl_##func, rettype, parameters_and_attributes)
-#define _GL_FUNCDECL_RPL_1(rpl_func,rettype,parameters_and_attributes) \
-  _GL_EXTERN_C rettype rpl_func parameters_and_attributes
+#define _GL_FUNCDECL_RPL(func,rettype,parameters,...) \
+  _GL_FUNCDECL_RPL_1 (rpl_##func, rettype, parameters, __VA_ARGS__)
+#define _GL_FUNCDECL_RPL_1(rpl_func,rettype,parameters,...) \
+  _GL_EXTERN_C_FUNC __VA_ARGS__ rettype rpl_func parameters
 
-/* _GL_FUNCDECL_SYS (func, rettype, parameters_and_attributes);
+/* _GL_FUNCDECL_SYS (func, rettype, parameters, [attributes]);
    declares the system function, named func, with the given prototype,
    consisting of return type, parameters, and attributes.
-   Example:
-     _GL_FUNCDECL_SYS (open, int, (const char *filename, int flags, ...)
-                                  _GL_ARG_NONNULL ((1)));
+   Although attributes are optional, the comma before them is required
+   for portability to C17 and earlier.  The attribute _GL_ATTRIBUTE_NOTHROW,
+   if needed, must be placed after the _GL_FUNCDECL_RPL invocation,
+   at the end of the declaration.
+   Examples:
+     _GL_FUNCDECL_SYS (getumask, mode_t, (void), ) _GL_ATTRIBUTE_NOTHROW;
+     _GL_FUNCDECL_SYS (posix_openpt, int, (int flags), _GL_ATTRIBUTE_NODISCARD);
  */
-#define _GL_FUNCDECL_SYS(func,rettype,parameters_and_attributes) \
-  _GL_EXTERN_C rettype func parameters_and_attributes
+#define _GL_FUNCDECL_SYS(func,rettype,parameters,...) \
+  _GL_EXTERN_C_FUNC __VA_ARGS__ rettype func parameters
 
 /* _GL_CXXALIAS_RPL (func, rettype, parameters);
    declares a C++ alias called GNULIB_NAMESPACE::func
@@ -343,7 +366,7 @@
     _GL_WARN_ON_USE (func, \
                      "The symbol ::" #func " refers to the system function. " \
                      "Use " #namespace "::" #func " instead.")
-# elif __GNUC__ >= 3 && GNULIB_STRICT_CHECKING
+# elif (__GNUC__ >= 3 || defined __clang__) && GNULIB_STRICT_CHECKING
 #  define _GL_CXXALIASWARN_2(func,namespace) \
      extern __typeof__ (func) func
 # else
@@ -430,7 +453,8 @@ extern "C" {
 #  define error rpl_error
 # endif
 _GL_FUNCDECL_RPL (error, void,
-                  (int __status, int __errnum, const char *__format, ...)
+                  (int __status, int __errnum, const char *__format, ...),
+                  _GL_ATTRIBUTE_COLD
                   _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 3, 4)));
 _GL_CXXALIAS_RPL (error, void,
                   (int __status, int __errnum, const char *__format, ...));
@@ -442,7 +466,8 @@ _GL_CXXALIAS_RPL (error, void,
 #else
 # if ! 1
 _GL_FUNCDECL_SYS (error, void,
-                  (int __status, int __errnum, const char *__format, ...)
+                  (int __status, int __errnum, const char *__format, ...),
+                  _GL_ATTRIBUTE_COLD
                   _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 3, 4)));
 # endif
 _GL_CXXALIAS_SYS (error, void,
@@ -455,7 +480,7 @@ _GL_CXXALIAS_SYS (error, void,
 #    pragma GCC diagnostic ignored "-Wattributes"
 _GL_ATTRIBUTE_MAYBE_UNUSED
 static void
-_GL_ATTRIBUTE_ALWAYS_INLINE
+_GL_ATTRIBUTE_ALWAYS_INLINE _GL_ATTRIBUTE_COLD
 _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 3, 4))
 _gl_inline_error (int __status, int __errnum, const char *__format, ...)
 {
@@ -485,7 +510,8 @@ _GL_CXXALIASWARN (error);
 # endif
 _GL_FUNCDECL_RPL (error_at_line, void,
                   (int __status, int __errnum, const char *__filename,
-                   unsigned int __lineno, const char *__format, ...)
+                   unsigned int __lineno, const char *__format, ...),
+                  _GL_ATTRIBUTE_COLD
                   _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 5, 6)));
 _GL_CXXALIAS_RPL (error_at_line, void,
                   (int __status, int __errnum, const char *__filename,
@@ -499,7 +525,8 @@ _GL_CXXALIAS_RPL (error_at_line, void,
 # if ! 1
 _GL_FUNCDECL_SYS (error_at_line, void,
                   (int __status, int __errnum, const char *__filename,
-                   unsigned int __lineno, const char *__format, ...)
+                   unsigned int __lineno, const char *__format, ...),
+                  _GL_ATTRIBUTE_COLD
                   _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 5, 6)));
 # endif
 _GL_CXXALIAS_SYS (error_at_line, void,
@@ -513,7 +540,7 @@ _GL_CXXALIAS_SYS (error_at_line, void,
 #    pragma GCC diagnostic ignored "-Wattributes"
 _GL_ATTRIBUTE_MAYBE_UNUSED
 static void
-_GL_ATTRIBUTE_ALWAYS_INLINE
+_GL_ATTRIBUTE_ALWAYS_INLINE _GL_ATTRIBUTE_COLD
 _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_ERROR, 5, 6))
 _gl_inline_error_at_line (int __status, int __errnum, const char *__filename,
                           unsigned int __lineno, const char *__format, ...)
@@ -533,6 +560,44 @@ _gl_inline_error_at_line (int __status, int __errnum, const char *__filename,
 # endif
 #endif
 _GL_CXXALIASWARN (error_at_line);
+
+/* Print a message with 'vfprintf (stderr, FORMAT, ARGS)';
+   if ERRNUM is nonzero, follow it with ": " and strerror (ERRNUM).
+   If STATUS is nonzero, terminate the program with 'exit (STATUS)'.
+   Use the globals error_print_progname and error_message_count similarly
+   to error().  */
+
+extern void verror (int __status, int __errnum, const char *__format,
+                    va_list __args)
+     _GL_ATTRIBUTE_COLD
+     _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_STANDARD, 3, 0));
+#ifndef _GL_NO_INLINE_ERROR
+# ifndef verror
+#  define verror(status, ...) \
+     __gl_error_call (verror, status, __VA_ARGS__)
+#  define GNULIB_defined_verror 1
+# endif
+#endif
+
+/* Print a message with 'vfprintf (stderr, FORMAT, ARGS)';
+   if ERRNUM is nonzero, follow it with ": " and strerror (ERRNUM).
+   If STATUS is nonzero, terminate the program with 'exit (STATUS)'.
+   If FNAME is not NULL, prepend the message with "FNAME:LINENO:".
+   Use the globals error_print_progname, error_message_count, and
+   error_one_per_line similarly to error_at_line().  */
+
+extern void verror_at_line (int __status, int __errnum, const char *__fname,
+                            unsigned int __lineno, const char *__format,
+                            va_list __args)
+     _GL_ATTRIBUTE_COLD
+     _GL_ATTRIBUTE_FORMAT ((_GL_ATTRIBUTE_SPEC_PRINTF_STANDARD, 5, 0));
+#ifdef _GL_NO_INLINE_ERROR
+# ifndef verror_at_line
+#  define verror_at_line(status, ...) \
+     __gl_error_call (verror_at_line, status, __VA_ARGS__)
+#  define GNULIB_defined_verror_at_line 1
+# endif
+#endif
 
 /* If NULL, error will flush stdout, then print on stderr the program
    name, a colon and a space.  Otherwise, error will call this

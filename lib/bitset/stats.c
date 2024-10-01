@@ -115,7 +115,7 @@ bitset_percent_histogram_print (FILE *file, const char *name, const char *msg,
   if (!total)
     return;
 
-  fprintf (file, "%s %s", name, msg);
+  fprintf (file, "%s %s\n", name, msg);
   for (unsigned i = 0; i < n_bins; i++)
     fprintf (file, "%.0f-%.0f%%\t%8u (%5.1f%%)\n",
              i * 100.0 / n_bins,
@@ -147,23 +147,23 @@ bitset_log_histogram_print (FILE *file, const char *name, const char *msg,
   /* 2 * ceil (log10 (2) * (N - 1)) + 1.  */
   unsigned max_width = 2 * (unsigned) (0.30103 * (n_bins - 1) + 0.9999) + 1;
 
-  fprintf (file, "%s %s", name, msg);
+  fprintf (file, "%s %s\n", name, msg);
   {
     unsigned i;
     for (i = 0; i < 2; i++)
       fprintf (file, "%*d\t%8u (%5.1f%%)\n",
-               (int)max_width, (int)i, bins[i], 100.0 * bins[i] / total);
+	       (int)max_width, (int)i, bins[i], 100.0 * bins[i] / total);
 
     for (; i < n_bins - 1; i++)
       fprintf (file, "%*lu-%lu\t%8u (%5.1f%%)\n",
-               (int)(max_width - ((unsigned) (0.30103 * (i) + 0.9999) + 1)),
+	       (int)(max_width - ((unsigned) (0.30103 * (i) + 0.9999) + 1)),
                1UL << (i - 1),
                (1UL << i) - 1,
                bins[i],
                (100.0 * bins[i]) / total);
 
     fprintf (file, "%*lu-...\t%8u (%5.1f%%)\n",
-             (int)(max_width - ((unsigned) (0.30103 * (i) + 0.9999) + 1)),
+	     (int)(max_width - ((unsigned) (0.30103 * (i) + 0.9999) + 1)),
              1UL << (i - 1),
              bins[i],
              (100.0 * bins[i]) / total);
@@ -195,13 +195,13 @@ bitset_stats_print_1 (FILE *file, const char *name,
 
   fprintf (file, _("%u bitset_lists\n"), stats->lists);
 
-  bitset_log_histogram_print (file, name, _("count log histogram\n"),
+  bitset_log_histogram_print (file, name, _("count log histogram"),
                               BITSET_LOG_COUNT_BINS, stats->list_counts);
 
-  bitset_log_histogram_print (file, name, _("size log histogram\n"),
+  bitset_log_histogram_print (file, name, _("size log histogram"),
                               BITSET_LOG_SIZE_BINS, stats->list_sizes);
 
-  bitset_percent_histogram_print (file, name, _("density histogram\n"),
+  bitset_percent_histogram_print (file, name, _("density histogram"),
                                   BITSET_DENSITY_BINS, stats->list_density);
 }
 
@@ -213,10 +213,13 @@ bitset_stats_print (FILE *file, MAYBE_UNUSED bool verbose)
   if (!bitset_stats_info)
     return;
 
-  fprintf (file, _("Bitset statistics:\n\n"));
+  fprintf (file, "%s\n\n", _("Bitset statistics:"));
 
   if (bitset_stats_info->runs > 1)
-    fprintf (file, _("Accumulated runs = %u\n"), bitset_stats_info->runs);
+    {
+      fprintf (file, _("Accumulated runs = %u"), bitset_stats_info->runs);
+      fputc ('\n', file);
+    }
 
   for (int i = 0; i < BITSET_TYPE_NUM; i++)
     bitset_stats_print_1 (file, bitset_type_names[i],
@@ -258,12 +261,19 @@ bitset_stats_read (const char *file_name)
                  1, file) != 1)
         {
           if (ferror (file))
-            perror (_("cannot read stats file"));
+            fprintf (stderr, "%s\n", _("cannot read stats file"));
           else
-            fprintf (stderr, _("bad stats file size\n"));
+            fprintf (stderr, "%s\n", _("bad stats file size"));
         }
       if (fclose (file) != 0)
-        perror (_("cannot read stats file"));
+        {
+#if defined _WIN32 && !defined __CYGWIN__
+          fprintf (stderr, "%s\n", _("cannot read stats file"));
+#else
+          /* fclose() sets errno.  */
+          perror (_("cannot read stats file"));
+#endif
+        }
     }
   bitset_stats_info_data.runs++;
 }

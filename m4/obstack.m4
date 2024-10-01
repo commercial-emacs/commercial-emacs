@@ -1,9 +1,11 @@
-# See if we need to provide obstacks.
-
+# obstack.m4
+# serial 1
 dnl Copyright 1996-2024 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
+
+# See if we need to provide obstacks.
 
 dnl Autoconf's AC_FUNC_OBSTACK is marked obsolete since version 2.70.
 dnl We provide our own macro here.
@@ -45,4 +47,25 @@ AC_DEFUN([gl_FUNC_OBSTACK],
     GL_GENERATE_OBSTACK_H=false
   fi
   AC_SUBST([REPLACE_OBSTACK])
+
+  dnl Test whether a 'ptrdiff_t' has at least as many bits as a pointer.
+  AC_CACHE_CHECK([whether ptrdiff_t is at least as large as a pointer],
+    [gl_cv_ptrdiff_t_wide_enough],
+    [AC_COMPILE_IFELSE(
+       [AC_LANG_PROGRAM(
+          [[#include <stddef.h>
+            typedef int check[2 * (sizeof (ptrdiff_t) >= sizeof (void *)) - 1];
+           ]],
+          [[]])],
+       [gl_cv_ptrdiff_t_wide_enough=yes],
+       [gl_cv_ptrdiff_t_wide_enough=no])
+    ])
+  if test $gl_cv_ptrdiff_t_wide_enough = yes; then
+    SMALL_PTRDIFF_T=0
+  else
+    SMALL_PTRDIFF_T=1
+  fi
+  dnl SMALL_PTRDIFF_T is expected to be 1 only on old / exotic platforms
+  dnl such as Windows 3.1 and AS/400.
+  AC_SUBST([SMALL_PTRDIFF_T])
 ])

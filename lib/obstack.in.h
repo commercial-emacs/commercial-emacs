@@ -133,17 +133,19 @@
 # define _OBSTACK_CAST(type, expr) (expr)
 #endif
 
-/* If B is the base of an object addressed by P, return the result of
-   aligning P to the next multiple of A + 1.  B and P must be of type
-   char *.  A + 1 must be a power of 2.
+/* __PTR_ALIGN(B, P, A) returns the result of aligning P to the next multiple
+   of A + 1.  B must be the base of an object addressed by P.  B and P must be
+   of type char *.  A + 1 must be a power of 2.
    If ptrdiff_t is narrower than a pointer (e.g., the AS/400), play it
    safe and compute the alignment relative to B.  Otherwise, use the
    faster strategy of computing the alignment through uintptr_t.  */
-
-#define __PTR_ALIGN(B, P, A) \
-  (sizeof (ptrdiff_t) < sizeof (void *) \
-   ? (B) + (((P) - (B) + (A)) & ~(A))   \
-   : (P) + ((- (uintptr_t) (P)) & (A)))
+#if @SMALL_PTRDIFF_T@
+# define __PTR_ALIGN(B, P, A) \
+   ((B) + (((P) - (B) + (A)) & ~(A)))
+#else
+# define __PTR_ALIGN(B, P, A) \
+   ((P) + ((- (uintptr_t) (P)) & (A)))
+#endif
 
 #ifndef __attribute_pure__
 # define __attribute_pure__ _GL_ATTRIBUTE_PURE

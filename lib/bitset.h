@@ -36,6 +36,11 @@
 #include "bitset/base.h"
 #include "obstack.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /* Attributes used to select a bitset implementation.  */
 enum bitset_attr {BITSET_FIXED = 1,    /* Bitset size fixed.  */
                   BITSET_VARIABLE = 2, /* Bitset size variable.  */
@@ -397,5 +402,10 @@ void debug_bitset (bitset);
 
 /* Function to debug bitset stats from debugger.  */
 void debug_bitset_stats (void);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _GL_BITSET_H  */

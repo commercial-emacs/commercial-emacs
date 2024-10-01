@@ -856,13 +856,13 @@ decode_time_components (Lisp_Object high, Lisp_Object low,
 	      }
 	    };
 
-	  if (BASE_EQ (hz, trillion))
+	  if (EQ (hz, trillion))
 	    {
 	      int_fast64_t million = 1000000;
 	      v |= ckd_mul (&iticks, iticks, TRILLION);
 	      v |= ckd_add (&iticks, iticks, us * million + ps);
 	    }
-	  else if (BASE_EQ (hz, make_fixnum (1000000)))
+	  else if (EQ (hz, make_fixnum (1000000)))
 	    {
 	      v |= ckd_mul (&iticks, iticks, 1000000);
 	      v |= ckd_add (&iticks, iticks, us);
@@ -883,7 +883,7 @@ decode_time_components (Lisp_Object high, Lisp_Object low,
   mpz_add (*s, *s, *bignum_integer (&mpz[0], low));
   mpz_addmul_ui (*s, *bignum_integer (&mpz[0], high), 1 << LO_TIME_BITS);
 
-  if (BASE_EQ (hz, trillion))
+  if (EQ (hz, trillion))
     {
       #if FASTER_TIMEFNS && TRILLION <= ULONG_MAX
 	unsigned long i = us;
@@ -895,7 +895,7 @@ decode_time_components (Lisp_Object high, Lisp_Object low,
 	mpz_addmul (mpz[0], *s, ztrillion);
       #endif
     }
-  else if (BASE_EQ (hz, make_fixnum (1000000)))
+  else if (EQ (hz, make_fixnum (1000000)))
     {
       mpz_set_ui (mpz[0], us);
       mpz_addmul_ui (mpz[0], *s, 1000000);
