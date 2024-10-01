@@ -20,8 +20,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-22.04]
-        gearing: [alt-x]
+        os: [ubuntu-latest]
+        gearing: [standard]
     steps:
     - run: |
         git config --global core.autocrlf false
