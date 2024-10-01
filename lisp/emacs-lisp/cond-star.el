@@ -128,7 +128,7 @@ ATOM (meaning any other kind of non-list not described above)
   matches datum if the form EXP is true.
   EXP can refer to symbols bound earlier in the pattern."
   (ignore datum)
-  (byte-compile-warn-x pattern "`match*' used other than as a `cond*' condition"))
+  (byte-compile-warn "`match*' used other than as a `cond*' condition"))
 
 (defun cond*-non-exit-clause-p (clause)
   "If CLAUSE, a cond* clause, is a non-exit clause, return t."
@@ -259,7 +259,7 @@ This is used for conditional exit clauses."
           ((eq pat-type 'match*)
            (cond*-match condition true-exps uncondit-clauses iffalse))
           (t
-           ;; Ordinary Lixp expression is the condition 
+           ;; Ordinary Lixp expression is the condition
            (if rest
                ;; A nonfinal exiting clause.
                ;; If condition succeeds, run the TRUE-EXPS.
@@ -290,7 +290,7 @@ as in `cond*-condition'."
   (when (or (null matchexp) (null (cdr-safe matchexp))
             (null (cdr-safe (cdr matchexp)))
             (cdr-safe (cdr (cdr matchexp))))
-    (byte-compile-warn-x matchexp "Malformed (match* ...) expression"))
+    (byte-compile-warn "Malformed (match* ...) expression"))
   (let* (raw-result
          (pattern (nth 1 matchexp))
          (data (nth 2 matchexp))
@@ -311,7 +311,7 @@ as in `cond*-condition'."
     ;; and the pattern bound some variables,
     ;; copy their values into special aliases
     ;; to be copied back at the start of the unonditional clauses.
-    (when (and uncondit-clauses true-exps 
+    (when (and uncondit-clauses true-exps
                (car raw-result))
       (dolist (bound-var (car raw-result))
         (push `(setq ,(gensym "ua") ,(car bound-var)) store-value-swap-outs)
@@ -346,7 +346,7 @@ as in `cond*-condition'."
     ;; always run the UNCONDIT-CLAUSES.
     (if uncondit-clauses
         (setq expression
-              `(progn ,expression 
+              `(progn ,expression
                       (cond*-bind-pattern-syms
                        ,(if retrieve-value-swap-outs
                             ;; If we saved the bindings' values after the
@@ -437,7 +437,7 @@ whether SUBPAT (as well as the subpatterns that contain/precede it) matches,"
              (if inside-or
                  (let (alias-gensym)
                    (if this-alias
-                       ;; Inside `or' subpattern, if this symbol already 
+                       ;; Inside `or' subpattern, if this symbol already
                        ;; has an alias for backtracking, just use that.
                        ;; This means the symbol was matched
                        ;; in a previous arm of the `or'.
@@ -464,7 +464,7 @@ whether SUBPAT (as well as the subpatterns that contain/precede it) matches,"
         ((not (consp subpat))
          (cons bindings `(equal ,subpat ,data)))
         ((not (consp (cdr subpat)))
-         (byte-compile-warn-x subpat "%s subpattern with malformed or missing arguments" (car subpat)))
+         (byte-compile-warn "%s subpattern with malformed or missing arguments" (car subpat)))
         ;; Regular expressions specified as list structure.
         ;; (rx REGEXP VARS...)
         ((eq (car subpat) 'rx)
@@ -475,10 +475,10 @@ whether SUBPAT (as well as the subpatterns that contain/precede it) matches,"
                (cons bindings match-exp)
              ;; There are variables to bind to the matched substrings.
              (if (> (length vars) 10)
-                 (byte-compile-warn-x vars "Too many variables specified for matched substrings"))
+                 (byte-compile-warn "Too many variables specified for matched substrings"))
              (dolist (elt vars)
                (unless (symbolp elt)
-                 (byte-compile-warn-x vars "Non-symbol %s given as name for matched substring" elt)))
+                 (byte-compile-warn "Non-symbol %s given as name for matched substring" elt)))
              ;; Bind these variables to nil, before the pattern.
              (setq bindings (nconc (mapcar 'list vars) bindings))
              ;; Make the expressions to set the variables.
@@ -512,7 +512,7 @@ whether SUBPAT (as well as the subpatterns that contain/precede it) matches,"
          (let ((i 0) expressions)
            ;; Check for bad structure of SUBPAT here?
            (dolist (this-elt (cdr subpat))
-             (let ((result 
+             (let ((result
                     (cond*-subpat this-elt cdr-ignore bindings inside-or backtrack-aliases `(nth ,i ,data))))
                (setq bindings (car result))
                (push `(consp ,(if (zerop i) data `(nthcdr ,i ,data)))
@@ -538,7 +538,7 @@ whether SUBPAT (as well as the subpatterns that contain/precede it) matches,"
                 (length (length elts))
                 expressions (i 0))
            (dolist (elt elts)
-             (let* ((result 
+             (let* ((result
                      (cond*-subpat elt cdr-ignore
                                    bindings inside-or backtrack-aliases `(aref ,i ,data))))
                (setq i (1+ i))
@@ -558,7 +558,7 @@ whether SUBPAT (as well as the subpatterns that contain/precede it) matches,"
          (let (expressions)
            ;; Check for bad structure of SUBPAT here?
            (dolist (this-elt (cdr subpat))
-             (let ((result 
+             (let ((result
                     (cond*-subpat this-elt cdr-ignore bindings inside-or backtrack-aliases data)))
                (setq bindings (car result))
                (push (cdr result) expressions)))
@@ -575,7 +575,7 @@ whether SUBPAT (as well as the subpatterns that contain/precede it) matches,"
              (let* ((bindings bindings-before-or)
                     bindings-to-clear expression
                     result)
-               (setq result 
+               (setq result
                      (cond*-subpat this-elt cdr-ignore bindings t backtrack-aliases data))
                (setq bindings (car result))
                (setq expression (cdr result))
@@ -623,7 +623,7 @@ whether SUBPAT (as well as the subpatterns that contain/precede it) matches,"
         ((functionp (car subpat))
          ;; Without this, nested constrained variables just work.
          (unless (symbolp (cadr subpat))
-           (byte-compile-warn-x subpat "Complex pattern nested in constrained variable pattern"))
+           (byte-compile-warn "Complex pattern nested in constrained variable pattern"))
          (let* ((rest-args (cddr subpat))
                 ;; Process VAR to get a binding for it.
                 (result (cond*-subpat (cadr subpat) cdr-ignore bindings inside-or backtrack-aliases data))
@@ -638,14 +638,14 @@ whether SUBPAT (as well as the subpatterns that contain/precede it) matches,"
         ((eq (car subpat) 'constrain)
          ;; Without this, nested constrained variables just work.
          (unless (symbolp (cadr subpat))
-           (byte-compile-warn-x subpat "Complex pattern nested in constrained variable pattern"))
+           (byte-compile-warn "Complex pattern nested in constrained variable pattern"))
          ;; Process VAR to get a binding for it.
          (let ((result (cond*-subpat (cadr subpat) cdr-ignore bindings inside-or backtrack-aliases data)))
            (cons (car result)
                  ;; This is the test condition.
                  (cond*-bind-around (car result) (nth 2 subpat)))))
-        (t 
-         (byte-compile-warn-x subpat "Undefined pattern type `%s' in `cond*'" (car subpat)))))
+        (t
+         (byte-compile-warn "Undefined pattern type `%s' in `cond*'" (car subpat)))))
 
 ;;; Subroutines of cond*-subpat.
 
@@ -661,7 +661,7 @@ whether SUBPAT (as well as the subpatterns that contain/precede it) matches,"
 This operates naively and errs on the side of overinclusion,
 and does not distinguish function names from variable names.
 That is safe for the purpose this is used for."
-  (cond ((symbolp exp) 
+  (cond ((symbolp exp)
          (let ((which (assq exp bindings)))
            (if which (list which))))
         ((listp exp)
@@ -702,6 +702,3 @@ That is safe for the purpose this is used for."
       (cons (car args)
             (cond*-un-backquote-list* (cdr args)))
     (mapcar (lambda (x) (list 'quote x)) (cadr (car args)))))
-
-
-
