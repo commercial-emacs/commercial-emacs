@@ -24,7 +24,7 @@
    or error_at_line(...) invocations.  */
 
 /* The include_next requires a split double-inclusion guard.  */
-#if 1 && !defined __MINGW32__
+#if 1
 # include_next <error.h>
 #endif
 
