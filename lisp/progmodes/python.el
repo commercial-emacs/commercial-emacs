@@ -5003,10 +5003,8 @@ def __FFAP_get_module_path(objstr):
   "Buffer name used for check commands."
   :type 'string)
 
-(defvar python-check-custom-command nil
+(defvar-local python-check-custom-command nil
   "Internal use.")
-;; XXX: Avoid `defvar-local' for compat with Emacs<24.3
-(make-variable-buffer-local 'python-check-custom-command)
 
 (defsubst python--check-default ()
   (or python-check-custom-command
