@@ -122,7 +122,10 @@ static struct rlimit nofile_limit;
 #endif
 
 #ifdef WINDOWSNT
-#include "signal.h" /* for SIG2STR_MAX */
+#ifndef SIG2STR_MAX
+/* gnulib signal.in.h */
+#define SIG2STR_MAX (5 + 1 + 10 + 1 + 2)
+#endif
 #endif
 
 #if defined HAVE_GETADDRINFO_A || defined HAVE_GNUTLS
