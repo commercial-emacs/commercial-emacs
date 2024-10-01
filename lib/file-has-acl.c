@@ -423,10 +423,9 @@ file_has_aclinfo (char const *name, struct stat const *sb,
           /* On Linux, acl_extended_file is an optimized function: It only
              makes two calls to getxattr(), one for ACL_TYPE_ACCESS, one for
              ACL_TYPE_DEFAULT.  */
-          ret = ((flags & ACL_SYMLINK_FOLLOW
-                  ? acl_extended_file
-                  : acl_extended_file_nofollow)
-                 (name));
+          ret = (flags & ACL_SYMLINK_FOLLOW)
+	    ? acl_extended_file (name)
+	    : acl_extended_file_nofollow (name);
         }
       else /* FreeBSD, Mac OS X, IRIX, Tru64, Cygwin >= 2.5 */
         {
