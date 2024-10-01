@@ -33,7 +33,13 @@ orig_fopen (const char *filename, const char *mode)
 }
 
 /* Specification.  */
-#include "stdio.h"
+#ifdef __osf__
+/* Write "stdio.h" here, not <stdio.h>, otherwise OSF/1 5.1 DTK cc eliminates
+   this include because of the preliminary #include <stdio.h> above.  */
+# include "stdio.h"
+#else
+# include <stdio.h>
+#endif
 
 #include <errno.h>
 #include <fcntl.h>
