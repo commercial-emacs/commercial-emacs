@@ -2979,6 +2979,13 @@ This variable should be set by multi-langauge major modes before calling
 'treesit-major-mode-setup', in order for tree-sitter integration
 functionalities to operate correctly.
 
+---
+** New function 'shell-command-do-open'.
+This lets a Lisp program access the core functionality of the
+'dired-do-open' command.  It opens a file or files using an external
+program, choosing the program according to the operating system's
+conventions.
+
 
 * Changes in Emacs 31.1 on Non-Free Operating Systems
 
