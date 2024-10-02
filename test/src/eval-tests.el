@@ -316,4 +316,13 @@ expressions works for identifiers starting with period."
         (should (eq 'default-value (default-value 'eval-tests/buffer-local-var)))
         (should (eq 'default-value eval-tests/buffer-local-var))))))
 
+(ert-deftest eval-bad-specbind ()
+  (should-error (eval '(let (((a b) 23)) (+ 1 2)) t)
+                :type 'wrong-type-argument)
+  (should-error (eval '(let* (((a b) 23)) (+ 1 2)) t)
+                :type 'wrong-type-argument)
+  (should-error (eval '(condition-case (a b) (+ 1 2) (:success 'ok)))
+                :type 'wrong-type-argument)
+  (should-error (eval '(funcall '(lambda ((a b) 3.15) 84) 5 4))))
+
 ;;; eval-tests.el ends here
