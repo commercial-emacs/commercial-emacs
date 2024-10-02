@@ -5979,7 +5979,7 @@ enum defined_WINDOWSNT { defined_WINDOWSNT = false };
    then xbacktrace could fail.  Similarly for the other enums and
    their values.  Some non-GCC compilers don't like these constructs.  */
 #ifdef __GNUC__
-union
+extern union enums_for_gdb
 {
   enum CHARTAB_SIZE_BITS CHARTAB_SIZE_BITS;
   enum char_table_specials char_table_specials;
