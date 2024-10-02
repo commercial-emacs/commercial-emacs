@@ -565,7 +565,7 @@ NAME is the name of the test case."
   (with-temp-eshell
     (let ((starting-process-list (process-list)))
       (eshell-match-command-output "nonexist | *cat"
-                                   "\\`nonexist: command not found\n")
+                                   "\\`nonexist: command not found\n" nil :ignore)
       (eshell-wait-for-subprocess t)
       (should (equal (process-list) starting-process-list)))))
 
