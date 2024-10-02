@@ -271,14 +271,11 @@ module_decode_utf_8 (const char *str, ptrdiff_t len)
       module_out_of_memory (env);					\
       return retval;							\
     }									\
-  emacs_env *env_volatile = env;					\
   struct handler *internal_cleanup                                      \
   __attribute__ ((cleanup (module_pop_exception_stack)))		\
     = internal_handler;                                                 \
-  if (sys_setjmp (internal_handler->jmp))				\
+  if (sys_setjmp (internal_cleanup->jmp))                               \
     {									\
-      emacs_env *env = env_volatile;					\
-      struct handler *internal_handler = internal_cleanup;		\
       module_handle_nonlocal_exit (env,                                 \
                                    internal_cleanup->nonlocal_exit,     \
                                    internal_cleanup->val);              \
