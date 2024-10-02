@@ -1016,6 +1016,16 @@ It should return the formatted tab group name to display in the tab bar."
   :group 'tab-bar
   :version "28.1")
 
+(defcustom tab-bar-show-inactive-group-tabs nil
+  "Show tabs even if they are in inactive groups."
+  :type 'boolean
+  :initialize #'custom-initialize-default
+  :set (lambda (sym val)
+         (set-default sym val)
+         (force-mode-line-update))
+  :group 'tab-bar
+  :version "31.1")
+
 (defun tab-bar-tab-group-format-default (tab i &optional current-p)
   (propertize
    (concat (if (and tab-bar-tab-hints
@@ -1067,16 +1077,6 @@ when the tab is current.  Return the result as a keymap."
              (interactive)
              (tab-bar-select-tab ,i))))
       :help "Click to visit group"))))
-
-(defcustom tab-bar-show-inactive-group-tabs nil
-  "Show tabs even if they are in inactive groups."
-  :type 'boolean
-  :initialize #'custom-initialize-default
-  :set (lambda (sym val)
-         (set-default sym val)
-         (force-mode-line-update))
-  :group 'tab-bar
-  :version "31.1")
 
 (defun tab-bar-format-tabs-groups ()
   "Produce tabs for the tab bar grouped according to their groups."
