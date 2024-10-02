@@ -1549,7 +1549,7 @@
    `(progn
       (require 'foo nil nil)
       (if (fboundp 'diminish)
-          (diminish 'foo "bar")))))
+	  (diminish 'foo "bar")))))
 
 (ert-deftest use-package-test-normalize/:delight ()
   (should (equal `((foo-mode nil foo))
