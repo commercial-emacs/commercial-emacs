@@ -540,8 +540,7 @@ NAME is the name of the test case."
   (let ((text-quoting-style 'grave))
     (with-temp-eshell
      (eshell-match-command-output "echo hi & &"
-                                  "\\`Empty command before `&'\n"
-                                  nil :ignore-errors)
+                                  "\\`Empty command before `&'\n")
      ;; Make sure the next Eshell prompt has the original input so the
      ;; user can fix it.
      (should (equal (buffer-substring eshell-last-output-end (point))

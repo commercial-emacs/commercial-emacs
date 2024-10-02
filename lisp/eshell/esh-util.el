@@ -4,7 +4,7 @@
 
 ;; Author: John Wiegley <johnw@gnu.org>
 
-;; This file is NOT part of GNU Emacs.
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -459,8 +459,7 @@ Prepend remote identification of `default-directory', if any."
                (string-prefix-p "//" filename))
       (setq index 2))
     (while (< index len)
-      (when (and (eq (aref filename index) ?/)
-                 (not (get-text-property index 'escaped filename)))
+      (when (eq (aref filename index) ?/)
         (push (if (= curr-start index) "/"
                 (substring filename curr-start (1+ index)))
               parts)
