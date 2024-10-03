@@ -539,11 +539,11 @@ mark_one_thread (struct thread_state *thread)
 
   mark_memory (thread->m_stack_bottom, stack_top);
 
-  for (size_t count = exception_stack_count (current_thread);
+  for (size_t count = exception_stack_count (thread);
        count > 0;
        --count)
     {
-      struct handler *handler = current_thread->exception_stack_bottom + count - 1;
+      struct handler *handler = thread->exception_stack_bottom + count - 1;
       mark_object (&handler->what);
       mark_object (&handler->val);
     }

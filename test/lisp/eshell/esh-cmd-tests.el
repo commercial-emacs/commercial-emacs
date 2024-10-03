@@ -540,7 +540,7 @@ NAME is the name of the test case."
   (let ((text-quoting-style 'grave))
     (with-temp-eshell
      (eshell-match-command-output "echo hi & &"
-                                  "\\`Empty command before `&'\n" nil :ignore)
+                                  "\\`Empty command before `&'\n")
      ;; Make sure the next Eshell prompt has the original input so the
      ;; user can fix it.
      (should (equal (buffer-substring eshell-last-output-end (point))
@@ -565,7 +565,7 @@ NAME is the name of the test case."
   (with-temp-eshell
     (let ((starting-process-list (process-list)))
       (eshell-match-command-output "nonexist | *cat"
-                                   "\\`nonexist: command not found\n" nil :ignore)
+                                   "\\`nonexist: command not found\n" nil)
       (eshell-wait-for-subprocess t)
       (should (equal (process-list) starting-process-list)))))
 

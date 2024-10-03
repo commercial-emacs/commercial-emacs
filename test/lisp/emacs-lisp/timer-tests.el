@@ -70,7 +70,6 @@
 
 (ert-deftest timer-test-debug-on-error-0 ()
   "Set the trap."
-  :expected-result :failed
   (setq timer-test-debug-on-error-timer
         (run-at-time nil timer-test-debug-on-error-delay
                      (lambda ()
@@ -81,7 +80,6 @@
 
 (ert-deftest timer-test-debug-on-error-1 ()
   "Recover when `debug-on-error' leaves timer-event-handler in limbo."
-  (should debug-on-error)
   (unwind-protect
       (progn
         (sit-for (* timer-test-debug-on-error-delay 3) t)

@@ -1699,7 +1699,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
   }
 
   struct handler *handler = NULL;
-  for (int height = exception_stack_count (current_thread);
+  for (size_t height = exception_stack_count (current_thread);
        height > 0 && handler == NULL;
        --height)
     {
@@ -1743,7 +1743,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data)
 		: (SYMBOLP (error_symbol) || !NILP (data))
 		? Fcons (error_symbol, data)
 		: error_symbol;
-	      const int from_top = exception_stack_count (current_thread) - height;
+	      const size_t from_top = exception_stack_count (current_thread) - height;
 	      /* +1 for HANDLER_BIND_SKIP itself */
 	      push_exception (make_fixnum (from_top
 					   + XFIXNUM (XCAR (handler->val))
