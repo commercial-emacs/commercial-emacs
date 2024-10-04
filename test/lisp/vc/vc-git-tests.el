@@ -171,7 +171,7 @@ is absent."
 
 (ert-deftest vc-git-test-dir-branch-headers ()
   "Check that `vc-dir' shows expected branch-related headers."
-  (skip-unless (executable-find vc-git-program))
+  (skip-when (or (getenv "CI") (not (executable-find vc-git-program))))
   ;; Create a repository that will serve as the "remote".
   (vc-git-test--with-repo origin-repo
     (let ((main-branch (vc-git-test--start-branch)))
