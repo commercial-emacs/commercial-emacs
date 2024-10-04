@@ -1321,7 +1321,7 @@ usage: (condition-case VAR BODYFORM &rest HANDLERS)  */)
   return internal_lisp_condition_case (var, bodyform, clauses);
 }
 
-DEFUN ("handler-bind-1", Fhandler_bind_1, Shandler_bind_1, 1, MANY, 0,
+DEFUN ("handler--bind", Fhandler_bind_1, Shandler_bind_1, 1, MANY, 0,
        doc: /* Run BODYFUN with bespoke error handlers.
 If an error matching one of CONDITIONS (a list of symbols) is raised
 during BODYFUN (a function with no arguments), call the associated HANDLER

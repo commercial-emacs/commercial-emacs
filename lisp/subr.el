@@ -7146,13 +7146,13 @@ or return normally.  If a handler returns normally, the search for an
 error handler continues from where it left off."
   ;; FIXME: Completion support as in `condition-case'?
   (declare (indent 1) (debug ((&rest (sexp form)) body)))
-  (let ((args '()))
+  (let (args)
     (dolist (cond+handler handlers)
       (let ((handler (car (cdr cond+handler)))
             (conds (car cond+handler)))
         (push `',(ensure-list conds) args)
         (push handler args)))
-    `(handler-bind-1 (lambda () ,@body) ,@(nreverse args))))
+    `(handler--bind (lambda () ,@body) ,@(nreverse args))))
 
 (defmacro with-memoization (place &rest code)
   "Return the value of CODE and stash it in PLACE.
