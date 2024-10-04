@@ -1174,7 +1174,7 @@ The predicate is the logical-AND of:
           `'(,(cadr upata) . ,(cadr upatd))
         `(and ,@(when (eq (car qpat) '\`)
                   `((guard ,(macroexp-warn-and-return
-                             "Nested ` are not supported" t nil nil qpat))))
+                             "Nested ` are not supported" t))))
               (pred consp)
               (app car-safe ,upata)
               (app cdr-safe ,upatd)))))
