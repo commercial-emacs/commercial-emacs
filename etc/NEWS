@@ -2135,6 +2135,9 @@ exist.  If "python" points to Python 2 on your system, you now have to
 customize these variables to "python3" if you want to use Python 3
 instead.
 
+---
+*** Support 'electric-layout-mode'.
+
 
 * Incompatible Lisp Changes in Emacs 30.1
 
