@@ -9774,7 +9774,7 @@ value of t adds all their heights.  */)
 }
 
 DEFUN ("buffer-text-pixel-size", Fbuffer_text_pixel_size, Sbuffer_text_pixel_size, 0, 4, 0,
-       doc: /* Return the dimensions of whole text of BUFFER-OR-NAME in WINDOW.
+       doc: /* Return size of whole text of BUFFER-OR-NAME in WINDOW.
 BUFFER-OR-NAME must specify a live buffer or the name of a live buffer
 and defaults to the current buffer.  WINDOW must be a live window and
 defaults to the selected one.  The return value is a cons of the maximum

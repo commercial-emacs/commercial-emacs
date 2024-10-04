@@ -384,12 +384,10 @@ buffer when possible, instead of creating a new one on each call."
            (work-buffer--release ,work-buffer))))))
 
 ;;;###autoload
-(defun string-pixel-width (string)
+(defun string-pixel-width (string &optional buffer)
   "Return the width of STRING in pixels.
-
-If you call this function to measure pixel width of a string
-with embedded newlines, it returns the width of the widest
-substring that does not include newlines."
+If BUFFER is non-nil, use the face remappings from that buffer when
+determining the width."
   (declare (important-return-value t))
   (if (zerop (length string))
       0
