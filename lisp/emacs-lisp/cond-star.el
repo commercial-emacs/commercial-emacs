@@ -70,7 +70,7 @@ are passed along to the rest of the clauses in this `cond*' construct.
 \\[match*\\] for documentation of the patterns for use in `match*'."
   (cond*-convert clauses))
 
-(defmacro match* (pattern datum)
+(defmacro match* (_pattern datum)
   "This specifies matching DATUM against PATTERN.
 It is not really a Lisp function, and it is meaningful
 only in the CONDITION of a `cond*' clause.
