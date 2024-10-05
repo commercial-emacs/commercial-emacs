@@ -1979,20 +1979,19 @@ This function updates the list whenever `syntax-propertize' runs, and
 stores it in the buffer-local variable `tex-expl-region-list'.  The list
 will always be nil when the buffer visits an expl3 file, for example, an
 expl3 class or package, where the entire file uses expl3 syntax."
-  (unless syntax-ppss--updated-cache;; Stop forward search running twice.
-    (setq tex-expl-region-list nil)
-    ;; Leaving this test here allows users to set `tex-expl-buffer-p'
-    ;; independently of the mode's automatic detection of an expl3 file.
-    (unless tex-expl-buffer-p
-      (goto-char (point-min))
-      (let ((case-fold-search nil))
-        (while (tex-search-noncomment
-                (search-forward "\\ExplSyntaxOn" nil t))
-          (let ((new-beg (point))
-                (new-end (or (tex-search-noncomment
-                              (search-forward "\\ExplSyntaxOff" nil t))
-                             (point-max))))
-            (push (cons new-beg new-end) tex-expl-region-list)))))))
+  (setq tex-expl-region-list nil)
+  ;; Leaving this test here allows users to set `tex-expl-buffer-p'
+  ;; independently of the mode's automatic detection of an expl3 file.
+  (unless tex-expl-buffer-p
+    (goto-char (point-min))
+    (let ((case-fold-search nil))
+      (while (tex-search-noncomment
+              (search-forward "\\ExplSyntaxOn" nil t))
+        (let ((new-beg (point))
+              (new-end (or (tex-search-noncomment
+                            (search-forward "\\ExplSyntaxOff" nil t))
+                           (point-max))))
+          (push (cons new-beg new-end) tex-expl-region-list))))))
 
 
 ;;; Invoking TeX in an inferior shell.
@@ -4049,7 +4048,7 @@ There might be text before point."
               (setq tex--old-syntax-function syntax-propertize-function))
             (setq-local syntax-propertize-function
                         tex--xref-syntax-fun)
-            (syntax-ppss-flush-cache (point-min)))))
+            (syntax-ppss-invalidate-cache (point-min)))))
       (unwind-protect
           (xref-backend-references nil identifier)
         (when (or end beg)
@@ -4058,7 +4057,7 @@ There might be text before point."
               (when buffer-file-truename
                 (setq-local syntax-propertize-function
                             tex--old-syntax-function)
-                (syntax-ppss-flush-cache (point-min))))))))))
+                (syntax-ppss-invalidate-cache (point-min))))))))))
 
 (make-obsolete-variable 'tex-mode-load-hook
                         "use `with-eval-after-load' instead." "28.1")
