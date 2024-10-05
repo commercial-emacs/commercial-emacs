@@ -4661,7 +4661,8 @@ Also see `switch-to-prev-buffer-skip-regexp'."
   "Buffers that `switch-to-prev-buffer' and `switch-to-next-buffer' should skip.
 The value can either be a regexp or a list of regexps.  Buffers whose
 names match these regexps are skipped by `switch-to-prev-buffer'
-and `switch-to-next-buffer'.
+and `switch-to-next-buffer', unless there's no other buffer to
+switch to.
 
 Also see `switch-to-prev-buffer-skip'."
   :type '(choice regexp
