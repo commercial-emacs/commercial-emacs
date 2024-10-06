@@ -90,7 +90,7 @@ See `unload-eshell'.")
 
 (ert-deftest eshell-test-unload/all-modules ()
   "Test unloading Eshell with every extension module."
-  (skip-when (featurep 'native-compile)) ;segfaults sadly, dunno why
+  (skip-when (and (getenv "CI") (featurep 'native-compile))) ;segv mystery
   (require 'esh-module)
   (let ((eshell-modules-list (eshell-subgroups 'eshell-module)))
     (load-eshell))
