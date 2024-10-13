@@ -530,8 +530,8 @@ lisp_free (struct thread_state *thr, void *block)
 {
   if (block && !pdumper_address_p (block))
     {
-      free (block);
       mem_delete (mem_find (thr, block), &THREAD_FIELD (thr, m_mem_root));
+      free (block);
     }
 }
 
