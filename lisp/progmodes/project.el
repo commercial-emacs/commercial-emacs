@@ -1786,7 +1786,7 @@ It's also possible to enter an arbitrary directory not in the list."
          (default (when-let ((prev-buffer
                               (project--prev-buffer
                                (lambda (buffer)
-                                 (when buffer
+                                 (when (buffer-live-p buffer)
                                    (with-current-buffer buffer
                                      (when-let ((project (project-current)))
                                        (not (equal from project)))))))))

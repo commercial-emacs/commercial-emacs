@@ -34230,62 +34230,48 @@ cancel_hourglass (void)
     }
 }
 
-/* Return a correction to be applied to G->pixel_width when it is
-   displayed in MOUSE_FACE.  This is needed for the first and the last
-   glyphs of text inside a face with :box when it is displayed with
-   MOUSE_FACE that has a different or no :box attribute.
-   ORIGINAL_FACE is the face G was originally drawn in, and MOUSE_FACE
-   is the face it will be drawn in now.  ROW is the G's glyph row and
-   W is its window.  */
+/* Correct G->pixel_width for an ORIGINAL_FACE replaced by MOUSE_FACE
+   containing a different :box attribute.  ROW is the G's glyph row
+   and W is its window.  */
 static int
 adjust_glyph_width_for_mouse_face (struct glyph *g, struct glyph_row *row,
 				   struct window *w,
 				   struct face *original_face,
 				   struct face *mouse_face)
 {
-  int sum = 0;
+  int offset = 0;
 
-  bool do_left_box_p = g->left_box_line_p;
-  bool do_right_box_p = g->right_box_line_p;
+  const int img_w = g->type == IMAGE_GLYPH
+    ? IMAGE_FROM_ID (WINDOW_XFRAME (w), g->u.img_id)->width
+    : 0;
 
-  /* This is required because we test some parameters of the image
-     slice before applying the box in produce_image_glyph.  */
-  if (g->type == IMAGE_GLYPH)
+  if (g->left_box_line_p)
     {
-      if (!row->reversed_p)
-	{
-	  struct image *img = IMAGE_FROM_ID (WINDOW_XFRAME (w),
-					     g->u.img_id);
-	  do_left_box_p = g->left_box_line_p &&
-	    g->slice.img.x == 0;
-	  do_right_box_p = g->right_box_line_p &&
-	    g->slice.img.x + g->slice.img.width == img->width;
-	}
-      else
-	{
-	  struct image *img = IMAGE_FROM_ID (WINDOW_XFRAME (w),
-					     g->u.img_id);
-	  do_left_box_p = g->left_box_line_p &&
-	    g->slice.img.x + g->slice.img.width == img->width;
-	  do_right_box_p = g->right_box_line_p &&
-	    g->slice.img.x == 0;
-	}
+      offset += max (0, mouse_face->box_vertical_line_width);
+      if (img_w)
+	if (row->reversed_p
+	    ? img_w == g->slice.img.x + g->slice.img.width
+	    : 0 == g->slice.img.x)
+	  /* Subtract glyph's left box line since image slice params
+	     were tested before applying the box in
+	     produce_image_glyphs(). */
+	  offset -= max (0, original_face->box_vertical_line_width);
     }
 
-  /* If the glyph has a left box line, subtract it from the offset.  */
-  if (do_left_box_p)
-    sum -= max (0, original_face->box_vertical_line_width);
-  /* Likewise with the right box line, as there may be a
-     box there as well.  */
-  if (do_right_box_p)
-    sum -= max (0, original_face->box_vertical_line_width);
-  /* Now add the line widths from the new face.  */
-  if (g->left_box_line_p)
-    sum += max (0, mouse_face->box_vertical_line_width);
   if (g->right_box_line_p)
-    sum += max (0, mouse_face->box_vertical_line_width);
+    {
+      offset += max (0, mouse_face->box_vertical_line_width);
+      if (img_w)
+	if (row->reversed_p
+	    ? 0 == g->slice.img.x
+	    : img_w == g->slice.img.x + g->slice.img.width)
+	  /* Subtract glyph's right box line since image slice params
+	     were tested before applying the box in
+	     produce_image_glyphs(). */
+	  offset -= max (0, original_face->box_vertical_line_width);
+    }
 
-  return sum;
+  return offset;
 }
 
 /* Get the offset due to mouse-highlight to apply before drawing
