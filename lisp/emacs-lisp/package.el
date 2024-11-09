@@ -2409,7 +2409,7 @@ PKG should be either a symbol or a `package-desc' object."
 
 ;;;###autoload
 (defun package-recompile-all (&optional nprocs)
-  "Recompile installed packages.  NPROCS defaults to 1.
+  "Recompile installed packages.  NPROCS defaults to `num-processors'.
 Blocks until compilation started for all packages."
   (interactive "p")
   (unless (fixnump nprocs)
