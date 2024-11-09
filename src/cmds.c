@@ -137,9 +137,11 @@ go to its beginning.  */)
 
   ptrdiff_t shortage = count - (count <= 0) - counted;
   if (shortage != 0)
-    shortage -= (count <= 0 ? -1
-		  : (BEGV < ZV && PT != opoint
-		     && FETCH_BYTE (PT_BYTE - 1) != '\n'));
+    shortage -= (count <= 0
+		 ? -1
+		 : (BEGV < ZV
+		    && PT != opoint
+		    && FETCH_BYTE (PT_BYTE - 1) != '\n'));
   return (excessive
 	  ? CALLN (Fplus, make_fixnum (shortage - count), n)
 	  : make_fixnum (shortage));

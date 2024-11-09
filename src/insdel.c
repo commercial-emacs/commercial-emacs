@@ -794,7 +794,7 @@ insert_1_both (const char *string,
   /* Record deletion of the surrounding text that combines with
      the insertion.  This, together with recording the insertion,
      will add up to the right stuff in the undo list.  */
-  record_insert (PT, nchars);
+  undo_push_insert (PT, nchars);
   modiff_incr (&MODIFF);
   CHARS_MODIFF = MODIFF;
 
@@ -927,7 +927,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
     emacs_abort ();
 #endif
 
-  record_insert (PT, nchars);
+  undo_push_insert (PT, nchars);
   modiff_incr (&MODIFF);
   CHARS_MODIFF = MODIFF;
 
@@ -1018,7 +1018,7 @@ insert_from_gap (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
      prepare_to_modify_buffer was already called by the deletion part
      of this dance.  */
   invalidate_buffer_caches (current_buffer, GPT, GPT);
-  record_insert (GPT, nchars);
+  undo_push_insert (GPT, nchars);
   modiff_incr (&MODIFF);
   CHARS_MODIFF = MODIFF;
 
@@ -1151,7 +1151,7 @@ insert_from_buffer_1 (struct buffer *buf,
     emacs_abort ();
 #endif
 
-  record_insert (PT, nchars);
+  undo_push_insert (PT, nchars);
   modiff_incr (&MODIFF);
   CHARS_MODIFF = MODIFF;
 
@@ -1246,8 +1246,8 @@ adjust_after_replace (ptrdiff_t from, ptrdiff_t from_byte,
 			       from + len, from_byte + len_byte, false);
 
   if (nchars_del > 0)
-    record_delete (from, prev_text, false);
-  record_insert (from, len);
+    undo_push_delete (from, prev_text, false);
+  undo_push_insert (from, len);
 
   offset_intervals (current_buffer, from, len - nchars_del);
 
@@ -1410,8 +1410,8 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
      the markers before and after this text separate.  */
   if (!NILP (deletion))
     {
-      record_insert (from + SCHARS (deletion), inschars);
-      record_delete (from, deletion, false);
+      undo_push_insert (from + SCHARS (deletion), inschars);
+      undo_push_delete (from, deletion, false);
     }
 
   GAP_SIZE -= outgoing_insbytes;
@@ -1800,7 +1800,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
 
   /* Record marker adjustments, and text deletion into undo
      history.  */
-  record_delete (from, deletion, true);
+  undo_push_delete (from, deletion, true);
 
   /* Relocate all markers pointing into the new, larger gap to point
      at the end of the text before the gap.  */
@@ -1855,8 +1855,7 @@ modify_text (ptrdiff_t start, ptrdiff_t end)
   prepare_to_modify_buffer (start, end, NULL);
 
   BUF_COMPUTE_UNCHANGED (current_buffer, start - 1, end);
-  if (MODIFF <= SAVE_MODIFF)
-    record_first_change ();
+  undo_push_maiden ();
   modiff_incr (&MODIFF);
   CHARS_MODIFF = MODIFF;
 

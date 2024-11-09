@@ -86,8 +86,7 @@ modify_text_properties (Lisp_Object buffer, Lisp_Object start, Lisp_Object end)
   prepare_to_modify_buffer_1 (b, e, NULL);
 
   BUF_COMPUTE_UNCHANGED (buf, b - 1, e);
-  if (MODIFF <= SAVE_MODIFF)
-    record_first_change ();
+  undo_push_maiden ();
   modiff_incr (&MODIFF);
 
   bset_point_before_scroll (current_buffer, Qnil);
@@ -332,7 +331,7 @@ set_properties (Lisp_Object properties, INTERVAL interval, Lisp_Object object)
 	if (!EQ (property_value (properties, XCAR (sym)),
 		  XCAR (value)))
 	  {
-	    record_property_change (interval->position, LENGTH (interval),
+	    undo_push_property (interval->position, LENGTH (interval),
 				    XCAR (sym), XCAR (value),
 				    object);
 	  }
@@ -344,7 +343,7 @@ set_properties (Lisp_Object properties, INTERVAL interval, Lisp_Object object)
 	   sym = XCDR (value))
 	if (EQ (property_value (interval->plist, XCAR (sym)), Qunbound))
 	  {
-	    record_property_change (interval->position, LENGTH (interval),
+	    undo_push_property (interval->position, LENGTH (interval),
 				    XCAR (sym), Qnil,
 				    object);
 	  }
@@ -391,7 +390,7 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 	  changed = true;
 	  if (BUFFERP (object))
 	    /* For undo purposes.  */
-	    record_property_change (interval->position, LENGTH (interval),
+	    undo_push_property (interval->position, LENGTH (interval),
 				    sym1, Fcar (this_cdr), object);
 	  if ((BUFFERP (object) || STRINGP (object))
 	      && NILP (Fminibufferp (buf, Qnil))
@@ -503,7 +502,7 @@ remove_properties (Lisp_Object plist, Lisp_Object list, INTERVAL i, Lisp_Object 
       while (CONSP (current_plist) && EQ (sym, XCAR (current_plist)))
 	{
 	  if (BUFFERP (object))
-	    record_property_change (i->position, LENGTH (i),
+	    undo_push_property (i->position, LENGTH (i),
 				    sym, XCAR (XCDR (current_plist)),
 				    object);
 
@@ -519,7 +518,7 @@ remove_properties (Lisp_Object plist, Lisp_Object list, INTERVAL i, Lisp_Object 
 	  if (CONSP (this) && EQ (sym, XCAR (this)))
 	    {
 	      if (BUFFERP (object))
-		record_property_change (i->position, LENGTH (i),
+		undo_push_property (i->position, LENGTH (i),
 					sym, XCAR (XCDR (this)), object);
 
 	      Fsetcdr (XCDR (tail2), XCDR (XCDR (this)));

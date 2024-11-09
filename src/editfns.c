@@ -2401,7 +2401,7 @@ Both characters must have the same length of multi-byte form.  */)
 	  else
 	    {
 	      if (NILP (noundo))
-		record_change (pos, 1);
+		undo_push_insdel (pos, 1);
 	      for (i = 0; i < len; i++) *p++ = tostr[i];
 #ifdef HAVE_TREE_SITTER
 	      tree_sitter_record_change (pos, pos + 1, BUFFER_TO_SITTER (pos + 1), pos + 1);
@@ -2603,7 +2603,7 @@ It returns the number of characters changed.  */)
 		}
 	      else
 		{
-		  record_change (pos, 1);
+		  undo_push_insdel (pos, 1);
 		  while (str_len-- > 0)
 		    *p++ = *str++;
 		  signal_after_change (pos, 1, 1);
@@ -4301,7 +4301,7 @@ ring.  */)
   if (end1 == start2)		/* adjacent regions */
     {
       modify_text (start1, end2);
-      record_change (start1, len1 + len2);
+      undo_push_insdel (start1, len1 + len2);
 
       tmp_interval1 = copy_intervals (cur_intv, start1, len1);
       tmp_interval2 = copy_intervals (cur_intv, start2, len2);
@@ -4358,8 +4358,8 @@ ring.  */)
 	  USE_SAFE_ALLOCA;
 
           modify_text (start1, end2);
-          record_change (start1, len1);
-          record_change (start2, len2);
+          undo_push_insdel (start1, len1);
+          undo_push_insdel (start2, len2);
           tmp_interval1 = copy_intervals (cur_intv, start1, len1);
           tmp_interval2 = copy_intervals (cur_intv, start2, len2);
 
@@ -4391,7 +4391,7 @@ ring.  */)
 	  USE_SAFE_ALLOCA;
 
           modify_text (start1, end2);
-          record_change (start1, (end2 - start1));
+          undo_push_insdel (start1, (end2 - start1));
           tmp_interval1 = copy_intervals (cur_intv, start1, len1);
           tmp_interval_mid = copy_intervals (cur_intv, end1, len_mid);
           tmp_interval2 = copy_intervals (cur_intv, start2, len2);
@@ -4422,7 +4422,7 @@ ring.  */)
         {
 	  USE_SAFE_ALLOCA;
 
-          record_change (start1, (end2 - start1));
+          undo_push_insdel (start1, (end2 - start1));
           modify_text (start1, end2);
 
           tmp_interval1 = copy_intervals (cur_intv, start1, len1);

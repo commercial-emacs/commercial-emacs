@@ -539,17 +539,17 @@ casify_region (enum case_action flag, Lisp_Object b, Lisp_Object e)
     return end;
   modify_text (start, end);
   prepare_casing_context (&ctx, flag, true);
-  record_delete (start, make_buffer_string (start, end, true), false);
+  undo_push_delete (start, make_buffer_string (start, end, true), false);
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     {
-      record_insert (start, end - start);
+      undo_push_insert (start, end - start);
       added = do_casify_unibyte_region (&ctx, &start, &end);
     }
   else
     {
       ptrdiff_t len = end - start, ostart = start;
       added = do_casify_multibyte_region (&ctx, &start, &end);
-      record_insert (ostart, len + added);
+      undo_push_insert (ostart, len + added);
     }
 
   if (start >= 0)

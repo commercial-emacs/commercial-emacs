@@ -7357,8 +7357,7 @@ decode_coding (struct coding_system *coding)
 	 disables the recording of the first change to the undo_list.
 	 Therefore we check for first change here and record it via
 	 record_first_change if needed.  */
-      if (MODIFF <= SAVE_MODIFF)
-	record_first_change ();
+      undo_push_maiden ();
 
       undo_list = BVAR (current_buffer, undo_list);
       bset_undo_list (current_buffer, Qt);
@@ -7471,7 +7470,7 @@ decode_coding (struct coding_system *coding)
   if (BUFFERP (coding->dst_object))
     {
       bset_undo_list (current_buffer, undo_list);
-      record_insert (coding->dst_pos, coding->produced_char);
+      undo_push_insert (coding->dst_pos, coding->produced_char);
     }
 
   SAFE_FREE ();

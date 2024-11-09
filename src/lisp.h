@@ -4811,13 +4811,13 @@ extern void syms_of_macros (void);
 
 /* Defined in undo.c.  */
 extern void truncate_undo_list (struct buffer *);
-extern void record_insert (ptrdiff_t, ptrdiff_t);
-extern void record_delete (ptrdiff_t, Lisp_Object, bool);
-extern void record_first_change (void);
-extern void record_change (ptrdiff_t, ptrdiff_t);
-extern void record_property_change (ptrdiff_t, ptrdiff_t,
-				    Lisp_Object, Lisp_Object,
-                                    Lisp_Object);
+extern void undo_push_insert (ptrdiff_t, ptrdiff_t);
+extern void undo_push_delete (ptrdiff_t, Lisp_Object, bool);
+extern void undo_push_maiden (void);
+extern void undo_push_insdel (ptrdiff_t, ptrdiff_t);
+extern void undo_push_property (ptrdiff_t, ptrdiff_t,
+				Lisp_Object, Lisp_Object,
+				Lisp_Object);
 extern void syms_of_undo (void);
 
 /* Defined in textprop.c.  */
