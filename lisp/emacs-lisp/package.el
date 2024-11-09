@@ -2413,7 +2413,7 @@ PKG should be either a symbol or a `package-desc' object."
 Blocks until compilation started for all packages."
   (interactive "p")
   (unless (fixnump nprocs)
-    (setq nprocs 1))
+    (setq nprocs (num-processors)))
   (let ((run (make-temp-name "recompile-")))
     (pcase-dolist (`(_ ,pkg-desc) package-alist)
       (if (<= nprocs 1)
