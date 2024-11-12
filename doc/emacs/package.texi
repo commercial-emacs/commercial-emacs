@@ -49,6 +49,7 @@ Manual}.
 * Package Statuses::     Which statuses a package can have.
 * Package Installation:: Options for package installation.
 * Package Files::        Where packages are installed.
+* Fetching Package Sources::  Managing packages directly from source.
 @end menu
 
 @node Package Menu

@@ -1569,24 +1569,16 @@ cannot specify any other buffer.  This function returns @code{nil}.
 
   As editing continues, undo lists get longer and longer.  To prevent
 them from using up all available memory space, garbage collection trims
-them back to size limits you can set.  (For this purpose, the size
-of an undo list measures the cons cells that make up the list, plus the
-strings of deleted text.)  Three variables control the range of acceptable
-sizes: @code{undo-limit}, @code{undo-strong-limit} and
-@code{undo-outer-limit}.  In these variables, size is counted as the
-number of bytes occupied, which includes both saved text and other
-data.
+them back to size limits you can set.  (For this purpose, the size of an
+undo list measures the cons cells that make up the list, plus the
+strings of deleted text.)  Three variables control the range of
+acceptable sizes: @code{undo-limit} and @code{undo-outer-limit}.  In
+these variables, size is counted as the number of bytes occupied, which
+includes both saved text and other data.
 
 @defopt undo-limit
 This is the soft limit for the acceptable size of an undo list.  The
 change group at which this size is exceeded is the last one kept.
-@end defopt
-
-@defopt undo-strong-limit
-This is the upper limit for the acceptable size of an undo list.  The
-change group at which this size is exceeded is discarded itself (along
-with all older change groups).  There is one exception: the very latest
-change group is only discarded if it exceeds @code{undo-outer-limit}.
 @end defopt
 
 @defopt undo-outer-limit

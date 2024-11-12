@@ -3378,36 +3378,29 @@ the minibuffer contents."
 (define-obsolete-function-alias 'advertised-undo 'undo "23.2")
 
 (defconst undo-equiv-table (make-hash-table :test 'eq :weakness t)
-  "Table mapping redo records to the corresponding undo one.
-A redo record for an undo in region maps to `undo-in-region'.
-A redo record for ordinary undo maps to the following (earlier) undo.
-A redo record that undoes to the beginning of the undo list maps to t.
-In the rare case where there are (erroneously) consecutive nil's in
-`buffer-undo-list', `undo' maps the previous valid undo record to
-`empty', if the previous record is a redo record, `undo' doesn't change
-its mapping.
+  "Maps a redo to its corresponding undo.
+Exercising an undo pushes onto the undo stack the inverse of that undo.
+To simultaneously add and subtract confusion, we call this undo-undo a
+redo.
 
-To be clear, a redo record is just an undo record, the only difference
-is that it is created by an undo command (instead of an ordinary buffer
-edit).  Since a record used to undo ordinary change is called undo
-record, a record used to undo an undo is called redo record.
+A redo undoing the entire undo list maps to t (what?).
 
-`undo' uses this table to make sure the previous command is `undo'.
+A redo beneath an empty batch (two consecutive undo boundaries)
+cancels the redo (what?).
+
+`undo' uses this table to ensure the previous command is `undo'.
 `undo-redo' uses this table to set the correct `pending-undo-list'.
 
-When you undo, `pending-undo-list' shrinks and `buffer-undo-list'
-grows, and Emacs maps the tip of `buffer-undo-list' to the tip of
-`pending-undo-list' in this table.
+After undo of [insert y],
 
-For example, consider this undo list where each node represents an
-undo record: if we undo from 4, `pending-undo-list' will be at 3,
-`buffer-undo-list' at 5, and 5 will map to 3.
+buffer-undo-list (stack): [redo insert y]
+                          [insert y]
+                          [insert x]
 
-    |
-    3  5
-    | /
-    |/
-    4")
+pending-undo-list:        [insert x]
+
+undo-equiv-table:         [redo insert y] => [insert x]
+")
 
 (defvar undo-in-region nil
   "Non-nil if `pending-undo-list' is not just a tail of `buffer-undo-list'.")
@@ -3418,8 +3411,8 @@ undo record: if we undo from 4, `pending-undo-list' will be at 3,
   :group 'undo)
 
 (defvar pending-undo-list nil
-  "Within a run of consecutive undo commands, list remaining to be undone.
-If t, we undid all the way to the end of it.")
+  "Remaining items within an undo run.  Why a tertiary state `t'
+should indicate completion instead of `nil' is anyone's guess.")
 
 (defun undo--last-change-was-undo-p (undo-list)
   (while (and (consp undo-list) (eq (car undo-list) nil))
@@ -3430,10 +3423,7 @@ If t, we undid all the way to the end of it.")
   "Undo some previous changes.
 Repeat this command to undo more changes.
 A numeric ARG serves as a repeat count.
-
-In Transient Mark mode when the mark is active, undo changes only within
-the current region.  Similarly, when not in Transient Mark mode, just \\[universal-argument]
-as an argument limits undo to changes within the current region."
+When a region is active, undo changes only within its range."
   (interactive "*P")
   ;; Make last-command indicate for the next command that this was an undo.
   ;; That way, another undo will undo more.
@@ -3475,7 +3465,7 @@ as an argument limits undo to changes within the current region."
     ;; If we got this far, the next command should be a consecutive undo.
     (setq this-command 'undo)
     ;; Check to see whether we're hitting a redo record, and if
-    ;; so, ask the user whether she wants to skip the redo/undo pair.
+    ;; so, ask the user whether he wants to skip the redo/undo pair.
     (let ((equiv (gethash pending-undo-list undo-equiv-table)))
       (or (eq (selected-window) (minibuffer-window))
 	  (setq message (format "%s%s"
@@ -3992,29 +3982,10 @@ with < or <= based on USE-<."
 	     '(0 . 0)))
     '(0 . 0)))
 
-;;; Default undo-boundary addition
-;;
-;; This section adds a new undo-boundary at either after a command is
-;; called or in some cases on a timer called after a change is made in
-;; any buffer.
-(defvar-local undo-auto--last-boundary-cause nil
-  "Describe the cause of the last `undo-boundary'.
-
-If `explicit', the last boundary was caused by an explicit call to
-`undo-boundary', that is one not called by the code in this
-section.
-
-If it is equal to `timer', then the last boundary was inserted
-by `undo-auto--boundary-timer'.
-
-If it is equal to `command', then the last boundary was inserted
-automatically after a command, that is by the code defined in
-this section.
-
-If it is equal to a list, then the last boundary was inserted by
-an amalgamating command.  The car of the list is the number of
-times an amalgamating command has been called, and the cdr are the
-buffers that were changed during the last command.")
+;; This section adds a new undo-boundary after a command
+;; or timer-activated.
+(defvar-local undo--times-buffers nil
+  "(NTIMES . BUFFERS) where buffers is a list.")
 
 (defvar undo-auto-current-boundary-timer nil
   "Current timer which will run `undo-auto--boundary-timer' or nil.
@@ -4030,23 +4001,22 @@ by `undo-auto-amalgamate'." )
   "Return non-nil if `buffer-undo-list' needs a boundary at the start."
   (car-safe buffer-undo-list))
 
-(defun undo-auto--last-boundary-amalgamating-number ()
+(defun undo--amalgamating-number ()
   "Return the number of amalgamating last commands or nil.
 Amalgamating commands are, by default, either
 `self-insert-command' and `delete-char', but can be any command
 that calls `undo-auto-amalgamate'."
-  (car-safe undo-auto--last-boundary-cause))
+  (car-safe undo--times-buffers))
 
 (defun undo-auto--ensure-boundary (cause)
   "Add an `undo-boundary' to the current buffer if needed.
 REASON describes the reason that the boundary is being added; see
-`undo-auto--last-boundary-cause' for more information."
-  (when (and
-         (undo-auto--needs-boundary-p))
+`undo--times-buffers' for more information."
+  (when (undo-auto--needs-boundary-p)
     (let ((last-amalgamating
-           (undo-auto--last-boundary-amalgamating-number)))
+           (undo--amalgamating-number)))
       (undo-boundary)
-      (setq undo-auto--last-boundary-cause
+      (setq undo--times-buffers
             (if (eq 'amalgamate cause)
                 (cons
                  (if last-amalgamating (1+ last-amalgamating) 0)
@@ -4056,7 +4026,7 @@ REASON describes the reason that the boundary is being added; see
 (defun undo-auto--boundaries (cause)
   "Check recently changed buffers and add a boundary if necessary.
 REASON describes the reason that the boundary is being added; see
-`undo-auto--last-boundary-cause' for more information."
+`undo--times-buffers' for more information."
   ;; (Bug #23785) All commands should ensure that there is an undo
   ;; boundary whether they have changed the current buffer or not.
   (when (eq cause 'command)
@@ -4103,7 +4073,7 @@ have been made.  By default `self-insert-command' and
 function could be called by any command wishing to have this
 behavior."
   (let ((last-amalgamating-count
-         (undo-auto--last-boundary-amalgamating-number)))
+         (undo--amalgamating-number)))
     (setq undo-auto--this-command-amalgamating t)
     (when last-amalgamating-count
       (if (and (< last-amalgamating-count amalgamating-undo-limit)
@@ -4111,7 +4081,7 @@ behavior."
           ;; Amalgamate all buffers that have changed.
           ;; This may be needed for example if some *-change-functions
           ;; reflected these changes in some other buffer.
-          (dolist (b (cdr undo-auto--last-boundary-cause))
+          (dolist (b (cdr undo--times-buffers))
             (when (buffer-live-p b)
               (with-current-buffer
                   b
@@ -4122,7 +4092,7 @@ behavior."
                   ;; The head of `buffer-undo-list' is nil.
                   (setq buffer-undo-list
                         (cdr buffer-undo-list))))))
-        (setq undo-auto--last-boundary-cause 0)))))
+        (setq undo--times-buffers 0)))))
 
 (defun undo-auto--undoable-change ()
   "Called after every undoable buffer change."

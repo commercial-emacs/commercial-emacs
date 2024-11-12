@@ -3842,7 +3842,6 @@ user can undo the change normally."
 	   ;; Don't truncate any undo data in the middle of this.
 	   (undo-outer-limit nil)
 	   (undo-limit most-positive-fixnum)
-	   (undo-strong-limit most-positive-fixnum)
 	   (,success nil))
        (unwind-protect
 	   (progn
@@ -3871,8 +3870,7 @@ When undo is disabled this behaves like `progn'."
            ;; undo step: we want to mimic the behavior we'd get if the
            ;; undo-boundaries were never added in the first place.
            (undo-outer-limit nil)
-           (undo-limit most-positive-fixnum)
-           (undo-strong-limit most-positive-fixnum))
+           (undo-limit most-positive-fixnum))
        (unwind-protect
            (progn
              (activate-change-group ,handle)
@@ -3902,7 +3900,7 @@ As long as this handle is still in use, do not call functions
 which edit the undo list: if it no longer contains its current
 value, Emacs will not be able to cancel the change group.  This
 includes any \"amalgamating\" commands, such as `delete-char',
-which call `undo-auto-amalgamate'.
+which call `undo-amalgamate'.
 
 The handle records only the specified buffer.  To make a multibuffer
 change group, call this function once for each buffer you want to

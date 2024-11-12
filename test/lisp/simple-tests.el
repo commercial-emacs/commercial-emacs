@@ -84,14 +84,14 @@ mark there."
             simple-test-mark-tag
             (buffer-substring-no-properties (mark) (point-max))))))
 
-
+
 ;;; `count-words'
 (ert-deftest simple-test-count-words-bug-41761 ()
   (with-temp-buffer
     (dotimes (_i 10) (insert (propertize "test " 'field (cons nil nil))))
     (should (= (count-words (point-min) (point-max)) 10))))
 
-
+
 ;;; `count-lines'
 
 (ert-deftest simple-test-count-lines ()
@@ -116,7 +116,7 @@ mark there."
     (insert "あ\nい\nう\nえ\nお\n")
     (should (= (count-lines (point) (point)) 0))))
 
-
+
 ;;; `execute-extended-command'
 
 (ert-deftest simple-execute-extended-command--shorter ()
@@ -133,7 +133,7 @@ mark there."
                      "dis-n"
                    "di-n"))))
 
-
+
 ;;; `transpose-sexps'
 (defmacro simple-test--transpositions (&rest body)
   (declare (indent 0)
@@ -152,7 +152,7 @@ mark there."
   (should (equal (simple-test--transpositions (transpose-sexps -2))
                  '("(s1) (s4)" . " (s2) (s3) (s5)"))))
 
-
+
 ;;; `newline'
 (ert-deftest newline ()
   (should-error (newline -1))
@@ -203,7 +203,7 @@ mark there."
                    (newline 1 'interactive))
                  '("(a b\n   " . "c d)"))))
 
-
+
 ;;; `open-line'
 (ert-deftest open-line ()
   (should-error (open-line -1))
@@ -309,7 +309,7 @@ mark there."
           (should (= x 0)))
       (remove-hook 'post-self-insert-hook inc))))
 
-
+
 ;;; `delete-indentation'
 
 (ert-deftest simple-delete-indentation-no-region ()
@@ -446,7 +446,7 @@ See bug#35036."
     (should (equal (simple-test--buffer-substrings)
                    '("> first" . " second > third > fourth ")))))
 
-
+
 ;;; `delete-trailing-whitespace'
 (ert-deftest simple-delete-trailing-whitespace--bug-21766 ()
   "Test bug#21766: delete-whitespace sometimes deletes non-whitespace."
@@ -482,7 +482,7 @@ See bug#35036."
       (should (equal ?\s (char-syntax ?\f)))
       (should (equal ?\s (char-syntax ?\n))))))
 
-
+
 ;;; undo tests
 
 (defun simple-tests--exec (cmds)
@@ -748,26 +748,7 @@ C-/                     ;; undo
        (point-min)
        (point-max))))))
 
-(ert-deftest missing-record-point-in-undo ()
-  "Check point is being restored correctly.
 
-See Bug#21722."
-  (should
-   (= 5
-      (with-temp-buffer
-       (generate-new-buffer " *temp*")
-       (emacs-lisp-mode)
-       (setq buffer-undo-list nil)
-       (insert "(progn (end-of-line) (insert \"hello\"))")
-       (beginning-of-line)
-       (forward-char 4)
-       (undo-boundary)
-       (eval-defun nil)
-       (undo-boundary)
-       (undo)
-       (point)))))
-
-
 ;;; `eval-expression'
 
 (ert-deftest eval-expression-print-format-sym ()
@@ -847,7 +828,7 @@ See Bug#21722."
       (command-execute "" t))
     (should (= (length command-history) history-length))))
 
-
+
 ;;; `line-number-at-pos'
 
 (ert-deftest line-number-at-pos-in-widen-buffer ()
@@ -898,7 +879,7 @@ See Bug#21722."
     (should (equal (line-number-at-pos 5) 3))
     (should (equal (line-number-at-pos 7) 4))))
 
-
+
 ;;; Auto fill.
 
 (ert-deftest auto-fill-mode-no-break-before-length-of-fill-prefix ()
@@ -912,7 +893,7 @@ See Bug#21722."
     (do-auto-fill)
     (should (string-equal (buffer-string) "foo bar"))))
 
-
+
 ;;; Shell command.
 
 (ert-deftest simple-tests-async-shell-command-30280 ()
@@ -960,7 +941,7 @@ See Bug#21722."
           (when process (delete-process process))
           (when buffer (kill-buffer buffer)))))))
 
-
+
 ;;; Tests for shell-command-dont-erase-buffer
 
 (defmacro with-shell-command-dont-erase-buffer (str output-buffer-is-current &rest body)
@@ -1059,7 +1040,7 @@ See Bug#21722."
       (yank-in-context)
       (buffer-string))
     "echo 'f'\\''bar'\\''oo'")))
-
+
 ;;; Tests for `zap-to-char'
 
 (defmacro with-zap-to-char-test (original result &rest body)
@@ -1081,7 +1062,6 @@ See Bug#21722."
     (with-zap-to-char-test "abcdeCXYZ" "XYZ"
       (zap-to-char 1 ?C 'interactive))))
 
-
 ;;; Tests for `kill-whole-line'
 
 (declare-function org-fold-hide-sublevels "org-fold" (levels))

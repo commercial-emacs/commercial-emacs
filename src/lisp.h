@@ -4810,7 +4810,7 @@ extern void init_macros (void);
 extern void syms_of_macros (void);
 
 /* Defined in undo.c.  */
-extern void truncate_undo_list (struct buffer *);
+extern void undo_truncate (struct buffer *);
 extern void undo_push_insert (ptrdiff_t, ptrdiff_t);
 extern void undo_push_delete (ptrdiff_t, Lisp_Object, bool);
 extern void undo_push_maiden (void);

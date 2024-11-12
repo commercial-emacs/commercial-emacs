@@ -596,7 +596,6 @@ Leaving \"Default\" unchecked is equivalent with specifying a default of
                function))
 	     ;; undo.c
 	     (undo-limit undo integer "27.1")
-	     (undo-strong-limit undo integer "27.1")
 	     (undo-outer-limit undo
 			       (choice integer
 				       (const :tag "No limit"

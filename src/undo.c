@@ -24,8 +24,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "keyboard.h"
 
+#define UNDO_BOUNDARY Qnil
+
 /* The undo entry (t . modtime) marks the initial change to a previously
    unmodified buffer.  */
+
 void
 undo_push_maiden (void)
 {
@@ -41,36 +44,13 @@ undo_push_maiden (void)
     }
 }
 
-/* Mark POINT_BEFORE_LAST_COMMAND_OR_UNDO for restoration unless it's
-   already equal to BEG, the imminent restoration point.  */
-static void
-undo_push_point (ptrdiff_t beg)
-{
-  const bool on_boundary = !CONSP (BVAR (current_buffer, undo_list))
-    || NILP (CAR (BVAR (current_buffer, undo_list)));
-
-  undo_push_maiden ();
-
-  if (on_boundary
-      && point_before_last_command_or_undo != beg
-      && buffer_before_last_command_or_undo == current_buffer)
-    bset_undo_list (current_buffer,
-		    Fcons (make_fixnum (point_before_last_command_or_undo),
-			   BVAR (current_buffer, undo_list)));
-}
-
-/* Record an insertion that just happened or is about to happen,
-   for LENGTH characters at position BEG.
-   (It is possible to record an insertion before or after the fact
-   because we don't need to record the contents.)  */
-
 void
 undo_push_insert (ptrdiff_t beg, ptrdiff_t length)
 {
   if (!EQ (BVAR (current_buffer, undo_list), Qt))
     {
       Lisp_Object lbeg, lend;
-      undo_push_point (beg);
+      undo_push_maiden ();
 
       /* If this is following another insertion and consecutive with it
 	 in the buffer, combine the two.  */
@@ -95,11 +75,8 @@ undo_push_insert (ptrdiff_t beg, ptrdiff_t length)
     }
 }
 
-/* Record the fact that markers in the region of FROM, TO are about to
-   be adjusted.  This is done only when a marker points within text
-   being deleted, because that's the only case where an automatic
-   marker adjustment won't be inverted automatically by undoing the
-   buffer modification.  */
+/* Necessary only when markers point within deleted text (adjustment
+   occurs automatically in other contexts).  */
 
 static void
 undo_push_markers (ptrdiff_t from, ptrdiff_t to)
@@ -130,16 +107,13 @@ undo_push_markers (ptrdiff_t from, ptrdiff_t to)
     }
 }
 
-/* Record that a deletion is about to take place, of the characters in
-   STRING, at location BEG.  Optionally record adjustments for markers
-   in the region STRING occupies in the current buffer.  */
 void
 undo_push_delete (ptrdiff_t beg, Lisp_Object string, bool record_markers)
 {
   if (!EQ (BVAR (current_buffer, undo_list), Qt))
     {
       Lisp_Object sbeg;
-      undo_push_point (beg);
+      undo_push_maiden ();
 
       if (PT == beg + SCHARS (string))
 	XSETINT (sbeg, -beg);
@@ -157,9 +131,7 @@ undo_push_delete (ptrdiff_t beg, Lisp_Object string, bool record_markers)
     }
 }
 
-/* Record that a replacement is about to take place,
-   for LENGTH characters at location BEG.
-   The replacement must not change the number of characters.  */
+/* The replacement must not change the number of characters.  */
 
 void
 undo_push_insdel (ptrdiff_t beg, ptrdiff_t length)
@@ -176,14 +148,14 @@ undo_push_property (ptrdiff_t beg, ptrdiff_t length,
 		    Lisp_Object prop, Lisp_Object value,
 		    Lisp_Object buffer)
 {
-  Lisp_Object lbeg, lend, entry;
   struct buffer *buf = XBUFFER (buffer);
   if (!EQ (BVAR (buf, undo_list), Qt))
     {
+      Lisp_Object lbeg, lend, entry;
       undo_push_maiden ();
       XSETINT (lbeg, beg);
       XSETINT (lend, beg + length);
-      entry = Fcons (Qnil, Fcons (prop, Fcons (value, Fcons (lbeg, lend))));
+      entry = Fcons (UNDO_BOUNDARY, Fcons (prop, Fcons (value, Fcons (lbeg, lend))));
       bset_undo_list (current_buffer,
 		      Fcons (entry, BVAR (current_buffer, undo_list)));
     }
@@ -195,103 +167,73 @@ DEFUN ("undo-boundary", Fundo_boundary, Sundo_boundary, 0, 0, 0,
 {
   if (!EQ (BVAR (current_buffer, undo_list), Qt))
     {
-      Lisp_Object tem = Fcar (BVAR (current_buffer, undo_list));
-      if (!NILP (tem))
+      if (CONSP (BVAR (current_buffer, undo_list))
+	  /* Avoid shit like "nil nil" in undo stack.  */
+	  && !EQ (UNDO_BOUNDARY, XCAR (BVAR (current_buffer, undo_list))))
 	bset_undo_list (current_buffer,
-			Fcons (Qnil, BVAR (current_buffer, undo_list)));
-
-      Fset (Qundo_auto__last_boundary_cause, Qexplicit);
-      point_before_last_command_or_undo = PT;
-      buffer_before_last_command_or_undo = current_buffer;
+			Fcons (UNDO_BOUNDARY, BVAR (current_buffer, undo_list)));
     }
   return Qnil;
 }
 
-/* During gc, trim undo lists to within `undo-limit' bytes.
-   An auxiliary `undo-outer-limit-function' accommodates
-   a custom trimming algo.  */
+/* During gc, ensure undo stack stays within `undo-limit' bytes.  */
 
 void
-truncate_undo_list (struct buffer *b)
+undo_truncate (struct buffer *b)
 {
-  intmax_t size_so_far = 0;
-  Lisp_Object prev = Qnil, list = BVAR (b, undo_list), next = list;
+  intmax_t size = 0;
+  Lisp_Object keep = Qnil, kill = BVAR (b, undo_list);
 
-  /* prevent undo-outer-limit-function recursing into gc.  */
+  /* prevent `undo-outer-limit-function' recursing into gc.  */
   specpdl_ref count = inhibit_garbage_collection ();
 
   record_unwind_current_buffer ();
   set_buffer_internal (b);
 
-  if (CONSP (next) && NILP (XCAR (next)))
-    {
-      /* Skip past initial undo boundary, if any.  */
-      size_so_far += sizeof (struct Lisp_Cons);
-      prev = next;
-      next = XCDR (next);
-    }
+  /* Skip to first non-trivial element.  */
+  FOR_EACH_TAIL (kill)
+    if (!EQ (XCAR (kill), UNDO_BOUNDARY))
+      break;
 
-  /* Iterate until first undo boundary */
-  while (CONSP (next) && !NILP (XCAR (next)))
+  bool topmost = true;
+  FOR_EACH_TAIL (kill)
     {
-      Lisp_Object elt = XCAR (next);
-      size_so_far += sizeof (struct Lisp_Cons);
+      Lisp_Object elt = XCAR (kill);
+      if (EQ (elt, UNDO_BOUNDARY))
+	{
+	  if (topmost)
+	    {
+	      /* `undo-outer-limit' controls the size of the topmost undo.  */
+	      topmost = false;
+	      if (INTEGERP (Vundo_outer_limit)
+		  && !NILP (Vundo_outer_limit_function))
+		{
+		  intmax_t undo_outer_limit;
+		  integer_to_intmax (Vundo_outer_limit, &undo_outer_limit);
+		  if (size > undo_outer_limit
+		      && !NILP (call1 (Vundo_outer_limit_function, make_int (size))))
+		    break; /* !!! */
+		}
+	    }
+
+	  if (size > undo_limit)
+	    {
+	      eassume (!NILP (keep));
+	      XSETCDR (keep, Qnil);
+	      break; /* !!! */
+	    }
+	}
+
+      size += sizeof (struct Lisp_Cons);
       if (CONSP (elt))
 	{
-	  size_so_far += sizeof (struct Lisp_Cons);
+	  size += sizeof (struct Lisp_Cons);
 	  if (STRINGP (XCAR (elt)))
-	    size_so_far += (sizeof (struct Lisp_String) - 1
-			    + SCHARS (XCAR (elt)));
+	    size += (sizeof (struct Lisp_String) - 1 + SCHARS (XCAR (elt)));
 	}
-      prev = next;
-      next = XCDR (next);
+      keep = kill;
     }
 
-  /* We're at the first undo boundary.  Apply the special function
-     (typically `undo-outer-limit-truncate') if applicable.  */
-  if (!NILP (Vundo_outer_limit_function) && INTEGERP (Vundo_outer_limit))
-    {
-      intmax_t undo_outer_limit;
-      if ((integer_to_intmax (Vundo_outer_limit, &undo_outer_limit)
-	   ? size_so_far > undo_outer_limit
-	   : NILP (Fnatnump (Vundo_outer_limit)))
-	  && !NILP (call1 (Vundo_outer_limit_function, make_int (size_so_far))))
-	goto out;
-    }
-
-  for (Lisp_Object last_boundary = prev; CONSP (next); )
-    {
-      Lisp_Object elt = XCAR (next);
-      if (NILP (elt)) /* undo boundary */
-	{
-	  if (size_so_far > undo_strong_limit)
-	    {
-	      /* Silly RMS safety measure.  */
-	      XSETCDR (last_boundary, Qnil);
-	      break;
-	    }
-	  else if (size_so_far > undo_limit)
-	    {
-	      XSETCDR (prev, Qnil);
-	      break;
-	    }
-	  else
-	    last_boundary = prev;
-	}
-
-      size_so_far += sizeof (struct Lisp_Cons);
-      if (CONSP (elt))
-	{
-	  size_so_far += sizeof (struct Lisp_Cons);
-	  if (STRINGP (XCAR (elt)))
-	    size_so_far += (sizeof (struct Lisp_String) - 1
-			    + SCHARS (XCAR (elt)));
-	}
-      prev = next;
-      next = XCDR (next);
-    }
-
- out:
   unbind_to (count, Qnil);
 }
 
@@ -299,8 +241,6 @@ void
 syms_of_undo (void)
 {
   DEFSYM (Qinhibit_read_only, "inhibit-read-only");
-  DEFSYM (Qundo_auto__last_boundary_cause, "undo-auto--last-boundary-cause");
-  DEFSYM (Qexplicit, "explicit");
 
   /* Marker for function call undo list elements.  */
   DEFSYM (Qapply, "apply");
@@ -316,18 +256,6 @@ value, the earlier commands that came before it are forgotten.
 The size is counted as the number of bytes occupied,
 which includes both saved text and other data.  */);
   undo_limit = 160000;
-
-  DEFVAR_INT ("undo-strong-limit", undo_strong_limit,
-	      doc: /* Don't keep more than this much size of undo information.
-This limit is applied when garbage collection happens.
-When a previous command increases the total undo list size past this
-value, that command and the earlier commands that came before it are forgotten.
-However, the most recent buffer-modifying command's undo info
-is never discarded for this reason.
-
-The size is counted as the number of bytes occupied,
-which includes both saved text and other data.  */);
-  undo_strong_limit = 240000;
 
   DEFVAR_LISP ("undo-outer-limit", Vundo_outer_limit,
 	      doc: /* Outer limit on size of undo information for one command.

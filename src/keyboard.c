@@ -208,8 +208,6 @@ Lisp_Object unread_switch_frame;
 static ptrdiff_t last_non_minibuf_size;
 
 uintmax_t num_input_events;
-ptrdiff_t point_before_last_command_or_undo;
-struct buffer *buffer_before_last_command_or_undo;
 
 /* Value of num_nonmacro_input_events as of last auto save.  */
 static intmax_t last_auto_save;
@@ -1223,10 +1221,6 @@ command_loop (void)
 
           /* Adjust undo-boundaries for previous command.  */
           call0 (Qundo_auto__add_boundary);
-
-          /* Record point and buffer for undo.  */
-          point_before_last_command_or_undo = PT;
-          buffer_before_last_command_or_undo = current_buffer;
 
           /* Execute the command.  */
           call1 (Qcommand_execute, Vthis_command);

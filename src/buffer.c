@@ -1340,23 +1340,16 @@ No argument or nil as argument means use current buffer as BUFFER.  */)
 
 DEFUN ("buffer-modified-p", Fbuffer_modified_p, Sbuffer_modified_p,
        0, 1, 0,
-       doc: /* Return non-nil if BUFFER was modified since its file was last read or saved.
-No argument or nil as argument means use current buffer as BUFFER.
-
-If BUFFER was autosaved since it was last modified, this function
-returns the symbol `autosaved'.  */)
+       doc: /* Return non-nil if BUFFER was modified since last saved.
+Returns the symbol \\='autosaved if BUFFER was autosaved since last modified.  */)
   (Lisp_Object buffer)
 {
   struct buffer *b = BUFFERP (buffer) ? XBUFFER (buffer) : current_buffer;
-  if (BUF_SAVE_MODIFF (b) < BUF_MODIFF (b))
-    {
-      if (BUF_AUTOSAVE_MODIFF (b) == BUF_MODIFF (b))
-	return Qautosaved;
-      else
-	return Qt;
-    }
-  else
-    return Qnil;
+  return BUF_SAVE_MODIFF (b) >= BUF_MODIFF (b)
+    ? Qnil
+    : BUF_AUTOSAVE_MODIFF (b) == BUF_MODIFF (b)
+    ? Qautosaved
+    : Qt;
 }
 
 DEFUN ("force-mode-line-update", Fforce_mode_line_update,
@@ -1703,7 +1696,7 @@ compact_buffer (struct buffer *buffer)
       && BUF_COMPACT (buffer) != BUF_MODIFF (buffer))
     {
       if (!EQ (BVAR(buffer, undo_list), Qt)) /* undo not disabled.  */
-	truncate_undo_list (buffer);
+	undo_truncate (buffer);
 
       if (!buffer->text->inhibit_shrinking)
 	{
