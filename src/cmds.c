@@ -234,9 +234,6 @@ because it respects values of `delete-active-region' and `overwrite-mode'.  */)
 
   CHECK_FIXNUM (n);
 
-  if (eabs (XFIXNUM (n)) < 2)
-    call0 (Qundo_auto_amalgamate);
-
   pos = PT + XFIXNUM (n);
   if (NILP (killflag))
     {
@@ -286,19 +283,13 @@ a non-nil value for the inserted character.  At the end, it runs
   if (XFIXNUM (n) < 0)
     error ("Negative repetition argument %"pI"d", XFIXNUM (n));
 
-  if (XFIXNAT (n) < 2)
-    call0 (Qundo_auto_amalgamate);
-
   /* Barf if the key that invoked this was not a character.  */
   if (!CHARACTERP (c))
-    bitch_at_user ();
+    complain ();
   else
     {
-      int character = translate_char (Vtranslation_table_for_input,
-				      XFIXNUM (c));
-      int val = internal_self_insert (character, XFIXNAT (n));
-      if (val == 2)
-	Fset (Qundo_auto__this_command_amalgamating, Qnil);
+      int tchar = translate_char (Vtranslation_table_for_input, XFIXNUM (c));
+      internal_self_insert (tchar, XFIXNAT (n));
       frame_make_pointer_invisible (SELECTED_FRAME ());
     }
 
@@ -508,11 +499,6 @@ void
 syms_of_cmds (void)
 {
   DEFSYM (Qinternal_auto_fill, "internal-auto-fill");
-
-  DEFSYM (Qundo_auto_amalgamate, "undo-auto-amalgamate");
-  DEFSYM (Qundo_auto__this_command_amalgamating,
-          "undo-auto--this-command-amalgamating");
-
   DEFSYM (Qkill_forward_chars, "kill-forward-chars");
 
   /* A possible value for a buffer's overwrite-mode variable.  */

@@ -46,14 +46,6 @@ wait this many seconds after Emacs becomes idle before doing an update."
   :group 'display
   :version "22.1")
 
-(defvar amalgamating-undo-limit 20
-  "The maximum number of changes to possibly amalgamate when undoing changes.
-The `undo' command will normally consider \"similar\" changes
-(like inserting characters) to be part of the same change.  This
-is called \"amalgamating\" the changes.  This variable says what
-the maximum number of changes considered is when amalgamating.  A
-value of 1 means that nothing is amalgamated.")
-
 (defgroup killing nil
   "Killing and yanking commands."
   :group 'editing)
@@ -3982,134 +3974,6 @@ with < or <= based on USE-<."
 	     '(0 . 0)))
     '(0 . 0)))
 
-;; This section adds a new undo-boundary after a command
-;; or timer-activated.
-(defvar-local undo--times-buffers nil
-  "(NTIMES . BUFFERS) where buffers is a list.")
-
-(defvar undo-auto-current-boundary-timer nil
-  "Current timer which will run `undo-auto--boundary-timer' or nil.
-
-If set to non-nil, this will effectively disable the timer.")
-
-(defvar undo-auto--this-command-amalgamating nil
-  "Non-nil if `this-command' should be amalgamated.
-This variable is set to nil by `undo-auto--boundaries' and is set
-by `undo-auto-amalgamate'." )
-
-(defun undo-auto--needs-boundary-p ()
-  "Return non-nil if `buffer-undo-list' needs a boundary at the start."
-  (car-safe buffer-undo-list))
-
-(defun undo--amalgamating-number ()
-  "Return the number of amalgamating last commands or nil.
-Amalgamating commands are, by default, either
-`self-insert-command' and `delete-char', but can be any command
-that calls `undo-auto-amalgamate'."
-  (car-safe undo--times-buffers))
-
-(defun undo-auto--ensure-boundary (cause)
-  "Add an `undo-boundary' to the current buffer if needed.
-REASON describes the reason that the boundary is being added; see
-`undo--times-buffers' for more information."
-  (when (undo-auto--needs-boundary-p)
-    (let ((last-amalgamating
-           (undo--amalgamating-number)))
-      (undo-boundary)
-      (setq undo--times-buffers
-            (if (eq 'amalgamate cause)
-                (cons
-                 (if last-amalgamating (1+ last-amalgamating) 0)
-                 undo-auto--undoably-changed-buffers)
-              cause)))))
-
-(defun undo-auto--boundaries (cause)
-  "Check recently changed buffers and add a boundary if necessary.
-REASON describes the reason that the boundary is being added; see
-`undo--times-buffers' for more information."
-  ;; (Bug #23785) All commands should ensure that there is an undo
-  ;; boundary whether they have changed the current buffer or not.
-  (when (eq cause 'command)
-    (add-to-list 'undo-auto--undoably-changed-buffers (current-buffer)))
-  (dolist (b undo-auto--undoably-changed-buffers)
-    (when (buffer-live-p b)
-      (with-current-buffer b
-        (undo-auto--ensure-boundary cause))))
-  (setq undo-auto--undoably-changed-buffers nil))
-
-(defun undo-auto--boundary-timer ()
-  "Timer function run by `undo-auto-current-boundary-timer'."
-  (setq undo-auto-current-boundary-timer nil)
-  (undo-auto--boundaries 'timer))
-
-(defun undo-auto--boundary-ensure-timer ()
-  "Ensure that the `undo-auto-current-boundary-timer' is set."
-  (unless undo-auto-current-boundary-timer
-    (setq undo-auto-current-boundary-timer
-          (run-at-time 10 nil #'undo-auto--boundary-timer))))
-
-(defvar undo-auto--undoably-changed-buffers nil
-  "List of buffers that have changed recently.
-
-This list is maintained by `undo-auto--undoable-change' and
-`undo-auto--boundaries' and can be affected by changes to their
-default values.")
-
-(defun undo-auto--add-boundary ()
-  "Add an `undo-boundary' in appropriate buffers."
-  (undo-auto--boundaries
-   (let ((amal undo-auto--this-command-amalgamating))
-     (setq undo-auto--this-command-amalgamating nil)
-     (if amal
-         'amalgamate
-       'command))))
-
-(defun undo-auto-amalgamate ()
-  "Amalgamate undo if necessary.
-This function can be called before an amalgamating command.  It
-removes the previous `undo-boundary' if a series of such calls
-have been made.  By default `self-insert-command' and
-`delete-char' are the only amalgamating commands, although this
-function could be called by any command wishing to have this
-behavior."
-  (let ((last-amalgamating-count
-         (undo--amalgamating-number)))
-    (setq undo-auto--this-command-amalgamating t)
-    (when last-amalgamating-count
-      (if (and (< last-amalgamating-count amalgamating-undo-limit)
-               (eq this-command last-command))
-          ;; Amalgamate all buffers that have changed.
-          ;; This may be needed for example if some *-change-functions
-          ;; reflected these changes in some other buffer.
-          (dolist (b (cdr undo--times-buffers))
-            (when (buffer-live-p b)
-              (with-current-buffer
-                  b
-                (when (and (consp buffer-undo-list)
-                           ;; `car-safe' doesn't work because
-                           ;; `buffer-undo-list' need not be a list!
-                           (null (car buffer-undo-list)))
-                  ;; The head of `buffer-undo-list' is nil.
-                  (setq buffer-undo-list
-                        (cdr buffer-undo-list))))))
-        (setq undo--times-buffers 0)))))
-
-(defun undo-auto--undoable-change ()
-  "Called after every undoable buffer change."
-  (unless (memq (current-buffer) undo-auto--undoably-changed-buffers)
-    (let ((bufs undo-auto--undoably-changed-buffers))
-      ;; Drop dead buffers from the list, to avoid memory leak in
-      ;; (while t (with-temp-buffer (setq buffer-undo-list nil) (insert "a")))
-      (while bufs
-        (let ((next (cdr bufs)))
-          (if (or (buffer-live-p (car bufs)) (null next))
-              (setq bufs next)
-            (setcar bufs (car next))
-            (setcdr bufs (cdr next))))))
-    (push (current-buffer) undo-auto--undoably-changed-buffers))
-  (undo-auto--boundary-ensure-timer))
-;; End auto-boundary section
-
 (defun undo-amalgamate-change-group (handle)
   "Amalgamate changes in change-group since HANDLE.
 Remove all undo boundaries between the state of HANDLE and now.
@@ -4143,7 +4007,6 @@ HANDLE is as returned by `prepare-change-group'."
             (when (consp elt)
               (setcar elt old-car)
               (setcdr elt old-cdr))))))))
-
 
 (defcustom undo-ask-before-discard nil
   "If non-nil ask about discarding undo info for the current command.
@@ -5680,9 +5543,6 @@ argument should still be a \"useful\" string for such uses."
     (if interprogram-cut-function
         (funcall interprogram-cut-function string))))
 
-;; It has been argued that this should work like `self-insert-command'
-;; which merges insertions in `buffer-undo-list' in groups of 20
-;; (hard-coded in `undo-auto-amalgamate').
 (defcustom kill-append-merge-undo nil
   "Amalgamate appending kills with the last kill for undo.
 When non-nil, appending or prepending text to the last kill makes

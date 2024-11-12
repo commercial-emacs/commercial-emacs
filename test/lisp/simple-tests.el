@@ -646,30 +646,6 @@ See bug#35036."
   (should
    undo-auto-current-boundary-timer))
 
-(ert-deftest undo-auto--boundaries-added ()
-  ;; The change in the buffer should have caused addition
-  ;; to undo-auto--undoably-changed-buffers.
-  (should
-   (with-temp-buffer
-     (setq buffer-undo-list nil)
-     (insert "hello")
-     (member (current-buffer) undo-auto--undoably-changed-buffers)))
-  ;; The head of buffer-undo-list should be the insertion event, and
-  ;; therefore not nil
-  (should
-   (with-temp-buffer
-     (setq buffer-undo-list nil)
-     (insert "hello")
-     (car buffer-undo-list)))
-  ;; Now the head of the buffer-undo-list should be a boundary and so
-  ;; nil. We have to call auto-boundary explicitly because we are out
-  ;; of the command loop
-  (should-not
-   (with-temp-buffer
-     (setq buffer-undo-list nil)
-     (insert "hello")
-     (undo-auto--boundaries 'test))))
-
 ;; Test for a regression introduced by undo-auto--boundaries changes.
 ;; https://lists.gnu.org/r/emacs-devel/2015-11/msg01652.html
 (defun undo-test-kill-c-a-then-undo ()

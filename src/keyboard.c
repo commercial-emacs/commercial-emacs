@@ -730,9 +730,6 @@ recursive_edit (void)
   specbind (Qinhibit_redisplay, Qnil);
   redisplaying_p = false;
 
-  /* Insulate undo boundaries outside recursive edit (Bug#23632), */
-  specbind (Qundo_auto__undoably_changed_buffers, Qnil);
-
 #ifdef HAVE_STACK_OVERFLOW_HANDLING
   /* At least on GNU/Linux, saving signal mask is important here.  */
   if (sigsetjmp (return_to_command_loop, 1) != 0)
@@ -1020,7 +1017,7 @@ Default value of `command-error-function'.  */)
 	     from being created, so continuing as normal is better in
 	     that case, as long as the daemon has actually finished
 	     initialization. */
-	  || (!(IS_DAEMON && !DAEMON_RUNNING) && FRAME_INITIAL_P (sf))
+	  || ((!IS_DAEMON || DAEMON_RUNNING) && FRAME_INITIAL_P (sf))
 	  || noninteractive))
     {
       print_error_message (data, Qexternal_debugging_output, SSDATA (context));
@@ -1031,17 +1028,13 @@ Default value of `command-error-function'.  */)
     {
       clear_message (1, 0);
       message_log_maybe_newline ();
-
       if (is_minibuffer_quit)
-	{
-	  Fding (Qt);
-	}
+	Fding (Qt);
       else
 	{
 	  Fdiscard_input ();
-	  bitch_at_user ();
+	  complain ();
 	}
-
       print_error_message (data, Qt, SSDATA (context));
     }
   return Qnil;
@@ -1210,7 +1203,6 @@ command_loop (void)
 	{
 #ifdef HAVE_WINDOW_SYSTEM
           specpdl_ref scount = SPECPDL_INDEX ();
-
           if (display_hourglass_p
               && NILP (Vexecuting_kbd_macro))
             {
@@ -1218,10 +1210,6 @@ command_loop (void)
               start_hourglass ();
             }
 #endif
-
-          /* Adjust undo-boundaries for previous command.  */
-          call0 (Qundo_auto__add_boundary);
-
           /* Execute the command.  */
           call1 (Qcommand_execute, Vthis_command);
 
@@ -11694,10 +11682,6 @@ syms_of_keyboard (void)
 
   /* Hook run after the region is selected.  */
   DEFSYM (Qpost_select_region_hook, "post-select-region-hook");
-
-  DEFSYM (Qundo_auto__add_boundary, "undo-auto--add-boundary");
-  DEFSYM (Qundo_auto__undoably_changed_buffers,
-          "undo-auto--undoably-changed-buffers");
 
   DEFSYM (Qdelayed_warnings_hook, "delayed-warnings-hook");
   DEFSYM (Qfunction_key, "function-key");

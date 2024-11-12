@@ -1862,18 +1862,6 @@ modify_text (ptrdiff_t start, ptrdiff_t end)
   bset_point_before_scroll (current_buffer, Qnil);
 }
 
-/* Signal that we are about to make a change that may result in new
-   undo information.
- */
-static void
-run_undoable_change (void)
-{
-  if (EQ (BVAR (current_buffer, undo_list), Qt))
-    return;
-
-  call0 (Qundo_auto__undoable_change);
-}
-
 /* Check that it is okay to modify the buffer between START and END,
    which are char positions.
 
@@ -1906,8 +1894,6 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
   if (pdumper_address_p (BEG_ADDR))
     enlarge_buffer_text (current_buffer, 0);
   eassert (!pdumper_address_p (BEG_ADDR));
-
-  run_undoable_change();
 
   bset_redisplay (current_buffer);
 
@@ -2197,7 +2183,6 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
 void
 syms_of_insdel (void)
 {
-  DEFSYM (Qundo_auto__undoable_change, "undo-auto--undoable-change");
   DEFVAR_BOOL ("inhibit-modification-hooks", inhibit_modification_hooks,
 	       doc: /* Non-nil means don't run any of the hooks that respond to buffer changes.
 This affects `before-change-functions' and `after-change-functions',

@@ -5932,21 +5932,17 @@ Also, unless an argument is given,
 terminate any keyboard macro currently executing.  */)
   (Lisp_Object arg)
 {
-  if (!NILP (arg))
-    {
-      if (noninteractive)
-	putchar (07);
-      else
-	ring_bell (XFRAME (selected_frame));
-    }
+  if (NILP (arg))
+    complain ();
+  else if (noninteractive)
+    putchar (07);
   else
-    bitch_at_user ();
-
+    ring_bell (XFRAME (selected_frame));
   return Qnil;
 }
 
 void
-bitch_at_user (void)
+complain (void)
 {
   if (noninteractive)
     putchar (07);
