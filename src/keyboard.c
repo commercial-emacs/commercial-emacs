@@ -1210,7 +1210,10 @@ command_loop (void)
               start_hourglass ();
             }
 #endif
-          /* Execute the command.  */
+	  /* conclude undo amalgamation, if any. */
+	  if (!EQ (Vthis_command, KVAR (current_kboard, Vlast_command)))
+	    Fundo_boundary ();
+
           call1 (Qcommand_execute, Vthis_command);
 
 #ifdef HAVE_WINDOW_SYSTEM

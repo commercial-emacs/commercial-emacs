@@ -1834,7 +1834,7 @@ markers).  If OBJECT is a string, START and END are 0-based indices into it.  */
     /* historical: vacuous match with nil VALUE.  */
     ret = start;
   for (const ptrdiff_t s = XFIXNUM (start), e = XFIXNUM (end);
-       i != NULL && i->position >= e;
+       i != NULL && i->position < e;
        i = next_interval (i))
     {
       if (EQ (textget (i->plist, property), value))
@@ -1864,7 +1864,7 @@ markers).  If OBJECT is a string, START and END are 0-based indices into it.  */
     /* historical: vacuous unmatch with non-nil VALUE.  */
     ret = start;
   for (const ptrdiff_t s = XFIXNUM (start), e = XFIXNUM (end);
-       i != NULL && i->position >= e;
+       i != NULL && i->position < e;
        i = next_interval (i))
     {
       if (!EQ (textget (i->plist, property), value))

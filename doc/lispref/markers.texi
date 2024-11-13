@@ -27,45 +27,21 @@ deleted, so that it stays with the two characters on either side of it.
 @node Overview of Markers
 @section Overview of Markers
 
-  A marker specifies a buffer and a position in that buffer.  A
-marker can be used to represent a position in functions that
-require one, just as an integer could be used.  In that case, the
-marker's buffer is normally ignored.  Of course, a marker used in this
-way usually points to a position in the buffer that the function
-operates on, but that is entirely the programmer's responsibility.
-@xref{Positions}, for a complete description of positions.
-
-  A marker has three attributes: the marker position, the marker
-buffer, and the insertion type.  The marker position is an integer
-that is equivalent (at a given time) to the marker as a position in
-that buffer.  But the marker's position value can change during
-the life of the marker, and often does.  Insertion and deletion of
-text in the buffer relocate the marker.  The idea is that a marker
-positioned between two characters remains between those two characters
-despite insertion and deletion elsewhere in the buffer.  Relocation
-changes the integer equivalent of the marker.
+  Markers represent character positions invariant to insertions and
+deletions elsewhere in the buffer.  A marker between two characters
+remains so despite changes outside their span.
 
 @cindex marker relocation
-  Deleting text around a marker's position leaves the marker between the
-characters immediately before and after the deleted text.  Inserting
-text at the position of a marker normally leaves the marker either in
-front of or after the new text, depending on the marker's @dfn{insertion
-type} (@pxref{Marker Insertion Types})---unless the insertion is done
-with @code{insert-before-markers} (@pxref{Insertion}).
-
-@cindex marker garbage collection
-  Insertion and deletion in a buffer must check all the markers and
-relocate them if necessary.  This slows processing in a buffer with a
-large number of markers.  For this reason, it is a good idea to make a
-marker point nowhere if you are sure you don't need it any more.
-Markers that can no longer be accessed are eventually removed
-(@pxref{Garbage Collection}).
+  Emacs automatically updates marker positions after each buffer change.
+Given their upkeep, markers should be used sparingly.  Markers can be
+shunted to point to void and will get garbage collected.  Inserted text
+at a marker position shifts the marker left or right depending on the
+marker's @dfn{insertion type} (@pxref{Marker Insertion Types})---unless
+the insertion is done with @code{insert-before-markers}
+(@pxref{Insertion}).
 
 @cindex markers as numbers
-  Because it is common to perform arithmetic operations on a marker
-position, most of these operations (including @code{+} and
-@code{-}) accept markers as arguments.  In such cases, the marker
-stands for its current position.
+  Markers can be added and subtracted just like normal character positions.
 
 Here are examples of creating markers, setting markers, and moving point
 to markers:

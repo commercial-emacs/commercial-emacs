@@ -3874,11 +3874,10 @@ Once you finish the group, don't use the handle again--don't try to
 finish the same group twice.  For a simple example of correct use, see
 the source code of `atomic-change-group'.
 
-As long as this handle is still in use, do not call functions
-which edit the undo list: if it no longer contains its current
-value, Emacs will not be able to cancel the change group.  This
-includes any \"amalgamating\" commands, such as `delete-char',
-which call `undo-amalgamate'.
+As long as this handle is still in use, do not call functions which edit
+the undo list: if it no longer contains its current value, Emacs will
+not be able to cancel the change group.  This includes any amalgamating
+commands, such as `delete-char' and `self-insert-command'.
 
 The handle records only the specified buffer.  To make a multibuffer
 change group, call this function once for each buffer you want to

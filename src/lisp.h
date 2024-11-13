@@ -2558,42 +2558,22 @@ struct Lisp_Marker
 {
   union vectorlike_header header;
 
-  /* This is the buffer that the marker points into, or 0 if it points nowhere.
-     Note: a chain of markers can contain markers pointing into different
-     buffers (the chain is per buffer_text rather than per buffer, so it's
-     shared between indirect buffers).  */
-  /* This is used for (other than NULL-checking):
-     - Fmarker_buffer
-     - Fset_marker: check eq(oldbuf, newbuf) to avoid unchain+rechain.
-     - unchain_marker: to find the list from which to unchain.
-     - Fkill_buffer: to only unchain the markers of current indirect buffer.
-     */
   struct buffer *buffer;
 
-  /* This flag is temporarily used in the functions
-     decode/encode_coding_object to record that the marker position
-     must be adjusted after the conversion.  */
+  /* A dirty bit for decode/encode_coding_object (hack).  */
   bool_bf need_adjustment : 1;
-  /* True means normal insertion at the marker's position
-     leaves the marker after the inserted text.  */
+
+  /* Push marker after insertion if true, leave alone otherwise. */
   bool_bf insertion_type : 1;
 
-  /* The remaining fields are meaningless in a marker that
-     does not point anywhere.  */
-
-  /* For markers that point somewhere,
-     this is used to chain of all the markers in a given buffer.
-     The chain does not preserve markers from garbage collection;
-     instead, markers are removed from the chain when freed by GC.  */
-  /* We could remove it and use an array in buffer_text instead.
-     That would also allow us to preserve it ordered.  */
+  /* Point to next marker in BUFFER.  Note NEXT could reference an
+     indirect buffer of BUFFER.  */
   struct Lisp_Marker *next;
-  /* This is the char position where the marker points.  */
+
   ptrdiff_t charpos;
-  /* This is the byte position.
-     It's mostly used as a charpos<->bytepos cache (i.e. it's not directly
-     used to implement the functionality of markers, but rather to (ab)use
-     markers as a cache for char<->byte mappings).  */
+
+  /* While BYTEPOS isn't necessary for marker functionality, it's been
+     abused as an auxiliary cache of char-byte mappings.  */
   ptrdiff_t bytepos;
 } GCALIGNED_STRUCT;
 

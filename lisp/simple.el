@@ -3412,16 +3412,13 @@ should indicate completion instead of `nil' is anyone's guess.")
   (gethash undo-list undo-equiv-table))
 
 (defun undo (&optional arg)
-  "Undo some previous changes.
-Repeat this command to undo more changes.
-A numeric ARG serves as a repeat count.
-When a region is active, undo changes only within its range."
+  "Undo ARG number of times."
   (interactive "*P")
-  (let* ((modified (buffer-modified-p))
+  (let* ((was-modified (buffer-modified-p))
 	 (base-buffer (or (buffer-base-buffer) (current-buffer)))
 	 (recent-save (with-current-buffer base-buffer
 			(recent-auto-save-p)))
-         ;; Inhibit an immediately subsequent undo-in-region
+         ;; Inhibit an undo-in-region immediately following
          (inhibit-region (when (symbolp last-command)
                            (get last-command 'undo-inhibit-region)))
 	 message)
@@ -3430,7 +3427,7 @@ When a region is active, undo changes only within its range."
               ;; a timer or filter intervened
 	      (and (not (eq pending-undo-list t))
 		   (not (undo--last-change-was-undo-p buffer-undo-list))))
-      ;; break the undo chain
+      ;; Then break the undo chain.
       (setq undo-in-region
 	    (and (or (region-active-p) (and arg (not (numberp arg))))
                  (not inhibit-region)))
@@ -3439,7 +3436,6 @@ When a region is active, undo changes only within its range."
 	(undo-start))
       ;; get rid of initial undo boundary
       (undo-more 1))
-    ;; If we got this far, the next command should be a consecutive undo.
     (setq this-command 'undo)
     ;; Check to see whether we're hitting a redo record, and if
     ;; so, ask the user whether he wants to skip the redo/undo pair.
@@ -3460,8 +3456,7 @@ When a region is active, undo changes only within its range."
     ;; record to the following undos.
     ;; I don't know how to do that in the undo-in-region case.
     (let ((list buffer-undo-list))
-      ;; Strip any leading undo boundaries there might be, like we do
-      ;; above when checking.
+      ;; Strip any leading undo boundaries
       (while (null (car list))
 	(setq list (cdr list)))
       (puthash list
@@ -3478,8 +3473,8 @@ When a region is active, undo changes only within its range."
 	       undo-equiv-table))
     ;; Don't specify a position in the undo record for the undo command.
     ;; Instead, undoing this should move point to where the change is.
-    (let (prev
-          (tail buffer-undo-list))
+    (let ((tail buffer-undo-list)
+          prev)
       (while (car tail)
 	(when (integerp (car tail))
 	  (let ((pos (car tail)))
@@ -3496,11 +3491,9 @@ When a region is active, undo changes only within its range."
 	      (setq tail (cdr tail)))
 	    (setq tail nil)))
 	(setq prev tail tail (cdr tail))))
-    ;; Record what the current undo list says,
-    ;; so the next command can tell if the buffer was modified in between.
-    (and modified (not (buffer-modified-p))
-	 (with-current-buffer base-buffer
-	   (delete-auto-save-file-if-necessary recent-save)))
+    (when (and was-modified (not (buffer-modified-p)))
+      (with-current-buffer base-buffer
+	(delete-auto-save-file-if-necessary recent-save)))
     (when message
       (message "%s" message))))
 
