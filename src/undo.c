@@ -24,10 +24,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "keyboard.h"
 
-#define UNDO_BOUNDARY Qnil
-
-/* The undo entry (t . modtime) marks the initial change to a previously
-   unmodified buffer.  */
+/* If an undo run rewinds back to the so-called maiden undo entry, then
+   `set-buffer-modified-p' to nil provided nothing changed on disk.  */
 
 void
 undo_push_maiden (void)
@@ -56,8 +54,7 @@ undo_push_insert (ptrdiff_t beg, ptrdiff_t length)
 	 in the buffer, combine the two.  */
       if (CONSP (BVAR (current_buffer, undo_list)))
 	{
-	  Lisp_Object elt;
-	  elt = XCAR (BVAR (current_buffer, undo_list));
+	  Lisp_Object elt = XCAR (BVAR (current_buffer, undo_list));
 	  if (CONSP (elt)
 	      && FIXNUMP (XCAR (elt))
 	      && FIXNUMP (XCDR (elt))
@@ -72,6 +69,7 @@ undo_push_insert (ptrdiff_t beg, ptrdiff_t length)
       XSETINT (lend, beg + length);
       bset_undo_list (current_buffer,
 		      Fcons (Fcons (lbeg, lend), BVAR (current_buffer, undo_list)));
+      Fundo_boundary ();
     }
 }
 
@@ -128,6 +126,7 @@ undo_push_delete (ptrdiff_t beg, Lisp_Object string, bool record_markers)
 
       bset_undo_list (current_buffer,
 		      Fcons (Fcons (string, sbeg), BVAR (current_buffer, undo_list)));
+      Fundo_boundary ();
     }
 }
 
@@ -155,7 +154,8 @@ undo_push_property (ptrdiff_t beg, ptrdiff_t length,
       undo_push_maiden ();
       XSETINT (lbeg, beg);
       XSETINT (lend, beg + length);
-      entry = Fcons (UNDO_BOUNDARY, Fcons (prop, Fcons (value, Fcons (lbeg, lend))));
+      /* (nil PROP VAL BEG . END) undoes a prop change.  */
+      entry = Fcons (Qnil, Fcons (prop, Fcons (value, Fcons (lbeg, lend))));
       bset_undo_list (current_buffer,
 		      Fcons (entry, BVAR (current_buffer, undo_list)));
     }

@@ -10119,7 +10119,7 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
 
       /* We called insert_1_both above with its 5th argument (PREPARE)
 	 false, which prevents insert_1_both from calling
-	 prepare_to_modify_buffer, which in turns prevents us from
+	 prepare_modify_buffer, which in turns prevents us from
 	 incrementing windows_or_buffers_changed even if `*Messages*` is
 	 shown in some window.  So we must manually set
 	 windows_or_buffers_changed here to make up for that.  */

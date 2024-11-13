@@ -335,6 +335,8 @@ enum { MAX_PER_BUFFER_VARS = (1 << 6) };
 enum { NONEXISTENT_MODTIME_NSECS = -1 };
 enum { UNKNOWN_MODTIME_NSECS = -2 };
 
+#define UNDO_BOUNDARY Qnil
+
 /* A PVEC_BUFFER Lisp object.  See FOR_EACH_PER_BUFFER_OBJECT_AT
    before updating.*/
 

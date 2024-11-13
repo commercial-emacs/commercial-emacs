@@ -8098,7 +8098,7 @@ decode_coding_object (struct coding_system *coding,
 	  saved_pt = PT, saved_pt_byte = PT_BYTE;
 	  TEMP_SET_PT_BOTH (from, from_byte);
 	  current_buffer->text->inhibit_shrinking = true;
-	  prepare_to_modify_buffer (from, to, NULL);
+	  prepare_modify_buffer (from, to, NULL, true);
 	  del_range_2 (from, from_byte, to, to_byte, false);
 	  coding->src_pos = -chars;
 	  coding->src_pos_byte = -bytes;
@@ -8129,7 +8129,7 @@ decode_coding_object (struct coding_system *coding,
 	{
 	  struct buffer *current = current_buffer;
 	  set_buffer_internal (XBUFFER (dst_object));
-	  prepare_to_modify_buffer (PT, PT, NULL);
+	  prepare_modify_buffer (PT, PT, NULL, true);
 	  set_buffer_internal (current);
 	}
       code_conversion_save (0, 0);
@@ -8364,9 +8364,9 @@ encode_coding_object (struct coding_system *coding,
       if (same_buffer)
 	{
 	  saved_pt = PT, saved_pt_byte = PT_BYTE;
-	  /* Run 'prepare_to_modify_buffer' by hand because we don't want
+	  /* Run 'prepare_modify_buffer' by hand because we don't want
 	     to run the after-change hooks yet.  */
-	  prepare_to_modify_buffer (from, to, &from);
+	  prepare_modify_buffer (from, to, &from, true);
 	  coding->src_object = del_range_2 (from, CHAR_TO_BYTE (from),
 					    to, CHAR_TO_BYTE (to),
 					    true);
@@ -8401,7 +8401,7 @@ encode_coding_object (struct coding_system *coding,
 	  struct buffer *current = current_buffer;
 
 	  set_buffer_internal (XBUFFER (dst_object));
-	  prepare_to_modify_buffer (PT, PT, NULL);
+	  prepare_modify_buffer (PT, PT, NULL, true);
 	  coding->dst_pos = PT;
 	  coding->dst_pos_byte = PT_BYTE;
 	  move_gap (coding->dst_pos, coding->dst_pos_byte);

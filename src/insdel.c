@@ -529,7 +529,7 @@ copy_text (const unsigned char *from_addr, unsigned char *to_addr,
    it never converts between single-byte and multibyte.
 
    DO NOT use this for the contents of a Lisp string or a Lisp buffer!
-   prepare_to_modify_buffer could relocate the text.  */
+   prepare_modify_buffer could relocate the text.  */
 
 void
 insert (const char *string, ptrdiff_t nbytes)
@@ -758,7 +758,7 @@ detect_bidi (struct buffer *buf, const unsigned char *string, ptrdiff_t nbytes)
    starting at STRING.  INHERIT non-zero means inherit the text
    properties from neighboring characters; zero means inserted text
    will have no text properties.  PREPARE non-zero means call
-   prepare_to_modify_buffer, which checks that the region is not
+   prepare_modify_buffer, which checks that the region is not
    read-only, and calls before-change-function and any modification
    properties the text may have.  BEFORE_MARKERS non-zero means adjust
    all markers that point at the insertion place to point after it.  */
@@ -778,7 +778,7 @@ insert_1_both (const char *string,
     /* Do this before moving and increasing the gap,
        because the before-change hooks might move the gap
        or make it smaller.  */
-    prepare_to_modify_buffer (PT, PT, NULL);
+    prepare_modify_buffer (PT, PT, NULL, true);
 
   if (PT != GPT)
     move_gap (PT, PT_BYTE);
@@ -903,7 +903,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
   /* Do this before moving and increasing the gap,
      because the before-change hooks might move the gap
      or make it smaller.  */
-  prepare_to_modify_buffer (PT, PT, NULL);
+  prepare_modify_buffer (PT, PT, NULL, true);
 
   if (PT != GPT)
     move_gap (PT, PT_BYTE);
@@ -1013,9 +1013,9 @@ insert_from_gap (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     nchars = nbytes;
 
-  /* No need to call prepare_to_modify_buffer, since this is called
+  /* No need to call prepare_modify_buffer, since this is called
      from places that replace some region with a different text, so
-     prepare_to_modify_buffer was already called by the deletion part
+     prepare_modify_buffer was already called by the deletion part
      of this dance.  */
   invalidate_buffer_caches (current_buffer, GPT, GPT);
   undo_push_insert (GPT, nchars);
@@ -1111,7 +1111,7 @@ insert_from_buffer_1 (struct buffer *buf,
   /* Do this before moving and increasing the gap,
      because the before-change hooks might move the gap
      or make it smaller.  */
-  prepare_to_modify_buffer (PT, PT, NULL);
+  prepare_modify_buffer (PT, PT, NULL, true);
 
   if (PT != GPT)
     move_gap (PT, PT_BYTE);
@@ -1288,7 +1288,7 @@ adjust_after_insert (ptrdiff_t from, ptrdiff_t from_byte,
 }
 
 /* Replace the text from character positions FROM to TO with NEW,
-   If PREPARE, call prepare_to_modify_buffer.
+   If PREPARE, call prepare_modify_buffer.
    If INHERIT, the newly inserted text should inherit text properties
    from the surrounding non-deleted text.
    If ADJUST_MATCH_DATA, then adjust the match data before calling
@@ -1324,7 +1324,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   if (prepare)
     {
       ptrdiff_t range_length = to - from;
-      prepare_to_modify_buffer (from, to, &from);
+      prepare_modify_buffer (from, to, &from, true);
       to = from + range_length;
     }
 
@@ -1483,7 +1483,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
    If MARKERS, relocate markers.
 
    Unlike most functions at this level, never call
-   prepare_to_modify_buffer and never call signal_after_change.  */
+   prepare_modify_buffer and never call signal_after_change.  */
 
 void
 replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
@@ -1642,7 +1642,7 @@ safe_del_range (ptrdiff_t from, ptrdiff_t to)
 				    safe_del_range_2));
 }
 
-/* Like del_range; PREPARE says whether to call prepare_to_modify_buffer.
+/* Like del_range; PREPARE says whether to call prepare_modify_buffer.
    RET_STRING says to return the deleted text. */
 
 Lisp_Object
@@ -1663,7 +1663,7 @@ del_range_1 (ptrdiff_t from, ptrdiff_t to, bool prepare, bool ret_string)
   if (prepare)
     {
       ptrdiff_t range_length = to - from;
-      prepare_to_modify_buffer (from, to, &from);
+      prepare_modify_buffer (from, to, &from, true);
       to = min (ZV, from + range_length);
     }
 
@@ -1698,7 +1698,7 @@ del_range_byte (ptrdiff_t from_byte, ptrdiff_t to_byte)
   {
     ptrdiff_t old_from = from, old_to = Z - to;
     ptrdiff_t range_length = to - from;
-    prepare_to_modify_buffer (from, to, &from);
+    prepare_modify_buffer (from, to, &from, true);
     to = from + range_length;
 
     if (old_from != from)
@@ -1742,7 +1742,7 @@ del_range_both (ptrdiff_t from, ptrdiff_t from_byte,
     {
       ptrdiff_t old_from = from, old_to = Z - to;
       ptrdiff_t range_length = to - from;
-      prepare_to_modify_buffer (from, to, &from);
+      prepare_modify_buffer (from, to, &from, true);
       to = from + range_length;
 
       if (old_from != from)
@@ -1852,8 +1852,7 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
 void
 modify_text (ptrdiff_t start, ptrdiff_t end)
 {
-  prepare_to_modify_buffer (start, end, NULL);
-
+  prepare_modify_buffer (start, end, NULL, true);
   BUF_COMPUTE_UNCHANGED (current_buffer, start - 1, end);
   undo_push_maiden ();
   modiff_incr (&MODIFF);
@@ -1877,22 +1876,22 @@ modify_text (ptrdiff_t start, ptrdiff_t end)
 */
 
 void
-prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
-			    ptrdiff_t *preserve_ptr)
+prepare_modify_buffer (ptrdiff_t start, ptrdiff_t end,
+		       ptrdiff_t *preserve_ptr, bool invalidate_caches)
 {
-  struct buffer *base_buffer;
   Lisp_Object temp;
 
   XSETFASTINT (temp, start);
   if (!NILP (BVAR (current_buffer, read_only)))
     Fbarf_if_buffer_read_only (temp);
 
-  /* If we're about to modify a buffer the contents of which come from
-     a dump file, copy the contents to private storage first so we
-     don't take a COW fault on the buffer text and keep it around
-     forever.  */
   if (pdumper_address_p (BEG_ADDR))
-    enlarge_buffer_text (current_buffer, 0);
+    {
+      /* If the buffer's text comes from dump, first copy it to private
+	 storage to avoid a COW fault that would keep the text around
+	 forever.  */
+      enlarge_buffer_text (current_buffer, 0);
+    }
   eassert (!pdumper_address_p (BEG_ADDR));
 
   bset_redisplay (current_buffer);
@@ -1901,8 +1900,8 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
     {
       if (preserve_ptr)
 	{
-	  Lisp_Object preserve_marker;
-	  preserve_marker = Fcopy_marker (make_fixnum (*preserve_ptr), Qnil);
+	  Lisp_Object preserve_marker
+	    = Fcopy_marker (make_fixnum (*preserve_ptr), Qnil);
 	  verify_interval_modification (current_buffer, start, end);
 	  *preserve_ptr = marker_position (preserve_marker);
 	  unchain_marker (XMARKER (preserve_marker));
@@ -1911,44 +1910,34 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
 	verify_interval_modification (current_buffer, start, end);
     }
 
-  if (inhibit_modification_hooks)
-    return;
+  if (!inhibit_modification_hooks)
+    {
+      struct buffer *base_buffer = current_buffer->base_buffer
+	? current_buffer->base_buffer
+	: current_buffer;
 
-  /* For indirect buffers, use the base buffer.  */
-  base_buffer = current_buffer->base_buffer
-    ? current_buffer->base_buffer
-    : current_buffer;
+      if (!NILP (BVAR (base_buffer, file_truename))
+	  /* Make binding buffer-file-name to nil effective.  */
+	  && !NILP (BVAR (base_buffer, filename))
+	  && SAVE_MODIFF >= MODIFF)
+	Flock_file (BVAR (base_buffer, file_truename));
 
-  if (!NILP (BVAR (base_buffer, file_truename))
-      /* Make binding buffer-file-name to nil effective.  */
-      && !NILP (BVAR (base_buffer, filename))
-      && SAVE_MODIFF >= MODIFF)
-    Flock_file (BVAR (base_buffer, file_truename));
+      if (!NILP (BVAR (current_buffer, mark_active))
+	  && XMARKER (BVAR (current_buffer, mark))->buffer
+	  && NILP (Vsaved_region_selection)
+	  && (EQ (Vselect_active_regions, Qonly)
+	      ? EQ (CAR_SAFE (Vtransient_mark_mode), Qonly)
+	      : (!NILP (Vselect_active_regions)
+		 && !NILP (Vtransient_mark_mode))))
+	/* If `select-active-regions', save the region text.  */
+	Vsaved_region_selection = call1 (Vregion_extract_function, Qnil);
 
-  if (!NILP (BVAR (current_buffer, mark_active))
-      && XMARKER (BVAR (current_buffer, mark))->buffer
-      && NILP (Vsaved_region_selection)
-      && (EQ (Vselect_active_regions, Qonly)
-	  ? EQ (CAR_SAFE (Vtransient_mark_mode), Qonly)
-	  : (!NILP (Vselect_active_regions)
-	     && !NILP (Vtransient_mark_mode))))
-    /* If `select-active-regions' is non-nil, save the region text.  */
-    Vsaved_region_selection
-      = call1 (Vregion_extract_function, Qnil);
+      signal_before_change (start, end, preserve_ptr);
+      Fset (Qdeactivate_mark, Qt);
 
-  signal_before_change (start, end, preserve_ptr);
-  Fset (Qdeactivate_mark, Qt);
-}
-
-/* Like above, but called when we know that the buffer text
-   will be modified and region caches should be invalidated.  */
-
-void
-prepare_to_modify_buffer (ptrdiff_t start, ptrdiff_t end,
-			  ptrdiff_t *preserve_ptr)
-{
-  prepare_to_modify_buffer_1 (start, end, preserve_ptr);
-  invalidate_buffer_caches (current_buffer, start, end);
+      if (invalidate_caches)
+	invalidate_buffer_caches (current_buffer, start, end);
+    }
 }
 
 /* Invalidate the caches maintained by the buffer BUF, if any, for the

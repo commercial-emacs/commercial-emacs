@@ -4461,7 +4461,7 @@ by calling `format-decode', which see.  */)
 
           /* This binding is to avoid ask-user-about-supersession-threat
 	     being called in insert_from_buffer or del_range_bytes (via
-	     prepare_to_modify_buffer).
+	     prepare_modify_buffer).
              AFAICT we could avoid ask-user-about-supersession-threat by setting
              current_buffer->modtime earlier, but we could still end up calling
              ask-user-about-supersession-threat if the file is modified while
@@ -4676,7 +4676,7 @@ by calling `format-decode', which see.  */)
 	  && !NILP (BVAR (current_buffer, filename))
 	  && SAVE_MODIFF >= MODIFF)
 	we_locked_file = true;
-      prepare_to_modify_buffer (PT, PT, NULL);
+      prepare_modify_buffer (PT, PT, NULL, true);
     }
 
   /* If REPLACE is Qunbound, buffer contents are being replaced with

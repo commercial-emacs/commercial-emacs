@@ -638,7 +638,7 @@ usage: (json-insert OBJECT &rest ARGS)  */)
   json_out_t jo;
   json_serialize (&jo, args[0], nargs - 1, args + 1);
 
-  prepare_to_modify_buffer (PT, PT, NULL);
+  prepare_modify_buffer (PT, PT, NULL, true);
   move_gap (PT, PT_BYTE);
   if (GAP_SIZE < jo.size)
     make_gap (jo.size - GAP_SIZE);

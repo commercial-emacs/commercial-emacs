@@ -82,15 +82,12 @@ modify_text_properties (Lisp_Object buffer, Lisp_Object start, Lisp_Object end)
   struct buffer *buf = XBUFFER (buffer), *old = current_buffer;
 
   set_buffer_internal (buf);
-
-  prepare_to_modify_buffer_1 (b, e, NULL);
-
+  /* text unmodified, so do not invalidate_buffer_caches here. */
+  prepare_modify_buffer (b, e, NULL, false);
   BUF_COMPUTE_UNCHANGED (buf, b - 1, e);
   undo_push_maiden ();
   modiff_incr (&MODIFF);
-
   bset_point_before_scroll (current_buffer, Qnil);
-
   set_buffer_internal (old);
 }
 
@@ -1252,7 +1249,7 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
 	  || interval->position != prev_pos)
 	{
 	  /* EZ weak sauce: goto retry if interval pulled from under
-	     us, e.g., prepare_to_modify_buffer -> lock_file -> redisplay ->
+	     us, e.g., prepare_modify_buffer -> lock_file -> redisplay ->
 	     add_text_properties, and hope it doesn't happen again.
 	     (Bug#13743)
 	  */
@@ -1627,7 +1624,7 @@ Use `set-text-properties' if you want to remove all text properties.  */)
       modify_text_properties (object, start, end);
       /* If someone called us recursively as a side effect of
 	 modify_text_properties, and changed the intervals behind our back
-	 (could happen if lock_file, called by prepare_to_modify_buffer,
+	 (could happen if lock_file, called by prepare_modify_buffer,
 	 triggers redisplay, and that calls add-text-properties again
 	 in the same buffer), we cannot continue with I, because its
 	 data changed.  So we restart the interval analysis anew.  */
@@ -1865,30 +1862,24 @@ the current buffer), START and END are buffer positions (integers or
 markers).  If OBJECT is a string, START and END are 0-based indices into it.  */)
   (Lisp_Object start, Lisp_Object end, Lisp_Object property, Lisp_Object value, Lisp_Object object)
 {
-  register INTERVAL i;
-  register ptrdiff_t s, e;
-
+  Lisp_Object ret = Qnil;
   if (NILP (object))
     XSETBUFFER (object, current_buffer);
-  i = validate_interval_range (object, &start, &end, soft);
-  if (!i)
-    return (NILP (value) || EQ (start, end)) ? Qnil : start;
-  s = XFIXNUM (start);
-  e = XFIXNUM (end);
-
-  while (i)
+  INTERVAL i = validate_interval_range (object, &start, &end, soft);
+  if (i == NULL && !NILP (value) && !EQ (start, end))
+    /* if no interval but input reasonable, return START.  */
+    ret = start;
+  for (const ptrdiff_t s = XFIXNUM (start), e = XFIXNUM (end);
+       i != NULL && i->position >= e;
+       i = next_interval (i))
     {
-      if (i->position >= e)
-	break;
       if (!EQ (textget (i->plist, property), value))
 	{
-	  if (i->position > s)
-	    s = i->position;
-	  return make_fixnum (s);
+	  ret = make_fixnum (max (i->position, s));
+	  break;
 	}
-      i = next_interval (i);
     }
-  return Qnil;
+  return ret;
 }
 
 

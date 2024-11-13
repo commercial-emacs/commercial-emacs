@@ -52,7 +52,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    (Note: Since the redisplay code needs similar information on
    modified regions of the buffer, we can use the code that helps out
    redisplay as a guide to where we need to add our own code to
-   invalidate our cache.  prepare_to_modify_buffer seems to be the
+   invalidate our cache.  prepare_modify_buffer seems to be the
    central spot.)
 
    Note that the cache code itself never mentions newlines

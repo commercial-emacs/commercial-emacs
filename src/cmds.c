@@ -231,10 +231,9 @@ because it respects values of `delete-active-region' and `overwrite-mode'.  */)
   (Lisp_Object n, Lisp_Object killflag)
 {
   EMACS_INT pos;
-
   CHECK_FIXNUM (n);
-
   pos = PT + XFIXNUM (n);
+
   if (NILP (killflag))
     {
       if (XFIXNUM (n) < 0)
@@ -253,9 +252,14 @@ because it respects values of `delete-active-region' and `overwrite-mode'.  */)
 	}
     }
   else
-    {
-      call1 (Qkill_forward_chars, n);
-    }
+    call1 (Qkill_forward_chars, n);
+
+  /* amalgamate next undo by removing current boundary.  */
+  if (CONSP (BVAR (current_buffer, undo_list))
+      && EQ (UNDO_BOUNDARY, XCAR (BVAR (current_buffer, undo_list))))
+    bset_undo_list (current_buffer,
+		    XCDR (BVAR (current_buffer, undo_list)));
+
   return Qnil;
 }
 
@@ -289,7 +293,14 @@ a non-nil value for the inserted character.  At the end, it runs
   else
     {
       int tchar = translate_char (Vtranslation_table_for_input, XFIXNUM (c));
-      internal_self_insert (tchar, XFIXNAT (n));
+      if (2 != internal_self_insert (tchar, XFIXNAT (n)))
+	{
+	  /* amalgamate next undo by removing current boundary.  */
+	  if (CONSP (BVAR (current_buffer, undo_list))
+	      && EQ (UNDO_BOUNDARY, XCAR (BVAR (current_buffer, undo_list))))
+	    bset_undo_list (current_buffer,
+			    XCDR (BVAR (current_buffer, undo_list)));
+	}
       frame_make_pointer_invisible (SELECTED_FRAME ());
     }
 

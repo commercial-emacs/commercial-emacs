@@ -824,7 +824,7 @@ A printed representation of an object is text which describes that object.  */)
   if (SBYTES (object) == SCHARS (object))
     STRING_SET_UNIBYTE (object);
 
-  /* Note that this won't make prepare_to_modify_buffer call
+  /* Note that this won't make prepare_modify_buffer call
      ask-user-about-supersession-threat because this buffer
      does not visit a file.  */
   Ferase_buffer ();
