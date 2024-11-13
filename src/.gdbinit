@@ -1369,6 +1369,8 @@ if hasattr(gdb, 'printing'):
                                         build_pretty_printer (), True)
 end
 
+set debuginfod enabled off
+
 # GDB mishandles indentation with leading tabs when feeding it to Python.
 # Local Variables:
 # indent-tabs-mode: nil

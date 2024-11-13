@@ -1934,10 +1934,9 @@ prepare_modify_buffer (ptrdiff_t start, ptrdiff_t end,
 
       signal_before_change (start, end, preserve_ptr);
       Fset (Qdeactivate_mark, Qt);
-
-      if (invalidate_caches)
-	invalidate_buffer_caches (current_buffer, start, end);
     }
+  if (invalidate_caches)
+    invalidate_buffer_caches (current_buffer, start, end);
 }
 
 /* Invalidate the caches maintained by the buffer BUF, if any, for the

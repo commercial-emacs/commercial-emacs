@@ -1826,30 +1826,24 @@ the current buffer), START and END are buffer positions (integers or
 markers).  If OBJECT is a string, START and END are 0-based indices into it.  */)
   (Lisp_Object start, Lisp_Object end, Lisp_Object property, Lisp_Object value, Lisp_Object object)
 {
-  register INTERVAL i;
-  register ptrdiff_t e, pos;
-
+  Lisp_Object ret = Qnil;
   if (NILP (object))
     XSETBUFFER (object, current_buffer);
-  i = validate_interval_range (object, &start, &end, soft);
-  if (!i)
-    return (!NILP (value) || EQ (start, end) ? Qnil : start);
-  e = XFIXNUM (end);
-
-  while (i)
+  INTERVAL i = validate_interval_range (object, &start, &end, soft);
+  if (i == NULL && !EQ (start, end) && NILP (value))
+    /* historical: vacuous match with nil VALUE.  */
+    ret = start;
+  for (const ptrdiff_t s = XFIXNUM (start), e = XFIXNUM (end);
+       i != NULL && i->position >= e;
+       i = next_interval (i))
     {
-      if (i->position >= e)
-	break;
       if (EQ (textget (i->plist, property), value))
 	{
-	  pos = i->position;
-	  if (pos < XFIXNUM (start))
-	    pos = XFIXNUM (start);
-	  return make_fixnum (pos);
+	  ret = make_fixnum (max (i->position, s));
+	  break;
 	}
-      i = next_interval (i);
     }
-  return Qnil;
+  return ret;
 }
 
 DEFUN ("text-property-not-all", Ftext_property_not_all,
@@ -1866,8 +1860,8 @@ markers).  If OBJECT is a string, START and END are 0-based indices into it.  */
   if (NILP (object))
     XSETBUFFER (object, current_buffer);
   INTERVAL i = validate_interval_range (object, &start, &end, soft);
-  if (i == NULL && !NILP (value) && !EQ (start, end))
-    /* if no interval but input reasonable, return START.  */
+  if (i == NULL && !EQ (start, end) && !NILP (value))
+    /* historical: vacuous unmatch with non-nil VALUE.  */
     ret = start;
   for (const ptrdiff_t s = XFIXNUM (start), e = XFIXNUM (end);
        i != NULL && i->position >= e;
