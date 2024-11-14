@@ -82,8 +82,7 @@ modify_text_properties (Lisp_Object buffer, Lisp_Object start, Lisp_Object end)
   struct buffer *buf = XBUFFER (buffer), *old = current_buffer;
 
   set_buffer_internal (buf);
-  /* text unmodified, so do not invalidate_buffer_caches here. */
-  prepare_modify_buffer (b, e, NULL, false);
+  prepare_modify_buffer (b, e, NULL, false /* text unmodified */);
   BUF_COMPUTE_UNCHANGED (buf, b - 1, e);
   undo_push_maiden ();
   modiff_incr (&MODIFF);

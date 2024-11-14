@@ -73,8 +73,9 @@ undo_push_insert (ptrdiff_t beg, ptrdiff_t length)
     }
 }
 
-/* Necessary only when markers point within deleted text (adjustment
-   occurs automatically in other contexts).  */
+/* Store the marker's charpos at deletion time for proper restoration
+   after reinstating deleted text.  For insertions and deletions
+   exclusive of the marker, ordinary marker updates suffice.  */
 
 static void
 undo_push_markers (ptrdiff_t from, ptrdiff_t to)
@@ -86,19 +87,13 @@ undo_push_markers (ptrdiff_t from, ptrdiff_t to)
 
       if (from <= charpos && charpos <= to)
         {
-          /* insertion_type nil markers will end up at the beginning of
-             the re-inserted text after undoing a deletion, and must be
-             adjusted to move them to the correct place.
-
-             insertion_type t markers will automatically move forward
-             upon re-inserting the deleted text, so we have to arrange
-             for them to move backward to the correct position.  */
-	  ptrdiff_t adjustment = (m->insertion_type ? to : from) - charpos;
-          if (adjustment)
+          /* insertion_type t/f follows/precedes re-inserted text.  */
+	  ptrdiff_t offset = (m->insertion_type ? to : from) - charpos;
+          if (offset)
             {
 	      Lisp_Object marker = make_lisp_ptr (m, Lisp_Vectorlike);
               bset_undo_list (current_buffer,
-			      Fcons (Fcons (marker, make_fixnum (adjustment)),
+			      Fcons (Fcons (marker, make_fixnum (offset)),
 				     BVAR (current_buffer, undo_list)));
             }
         }
@@ -118,9 +113,6 @@ undo_push_delete (ptrdiff_t beg, Lisp_Object string, bool record_markers)
       else
 	XSETFASTINT (sbeg, beg);
 
-      /* primitive-undo assumes marker adjustments are recorded
-	 immediately before the deletion is recorded.  See bug 16818
-	 discussion.  */
       if (record_markers)
 	undo_push_markers (beg, beg + SCHARS (string));
 

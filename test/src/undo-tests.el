@@ -154,18 +154,15 @@
           (insert "Evenses")
         (insert "Oddses")))
     (undo-boundary)
-    (should
-     ;; Avoid string-equal because ERT will save the `buffer-string'
-     ;; to the explanation.  Using `not' will record nil or non-nil.
-     (not
-      (null
-       (string-equal (buffer-string)
-                     (progn
-                       (flush-lines "oddses" (point-min) (point-max))
-                       (undo-boundary)
-                       (undo)
-                       (undo)
-                       (buffer-string))))))))
+    (should-not
+     ;; Using "should-not null" instead of "should" to avoid long
+     ;; buffer-string in explanation.
+     (null (string-equal (buffer-string)
+                         (progn
+                           (flush-lines "oddses" (point-min) (point-max))
+                           (undo-boundary)
+                           (undo)
+                           (buffer-string)))))))
 
 (ert-deftest undo-test5 ()
   "Test basic redoing with \\[undo] command."

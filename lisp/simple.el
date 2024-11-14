@@ -26,6 +26,19 @@
 ;; A grab-bag of basic Emacs commands not specifically related to some
 ;; major mode or to file-handling.
 
+;;; Undos:
+
+;; The undo stack (buffer-undo-list) ever only grows.  Exercising an
+;; undo does not pop the stack but rather pushes the stack top's
+;; inverse.  Rather than refer to this entry as an "undo-undo", we call it
+;; a "redo", a term that surely adds as much confusion as it seeks to
+;; reduce.
+
+;; The initial undo engenders a pending-undo-list which is a snapshot of
+;; the prevailing buffer-undo-list.  Any consecutive undo's iterate down
+;; the pending-undo-list while pushing their inverses onto
+;; buffer-undo-list.
+
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
@@ -71,7 +84,7 @@ used as the escape.
 
 This variable is used by the `yank-in-context' command.")
 
-
+
 ;;; next-error support framework
 
 (defgroup next-error nil
@@ -528,7 +541,7 @@ buffer causes automatic display of the corresponding source code location."
       (next-error 0)
       (set-buffer (window-buffer))
       (recenter-top-bottom arg))))
-
+
 ;;;
 
 (defun fundamental-mode ()
@@ -1337,7 +1350,7 @@ doing any other command before the next \\[cycle-spacing]."
                 (error "Don't know how to handle action %S" action)))))
           (setf (plist-get cycle-spacing--context :last-action)
                 action))))))
-
+
 (defun beginning-of-buffer (&optional arg)
   "Move point to the beginning of the buffer.
 With numeric arg N, put point N/10 of the way from the beginning.
@@ -1547,7 +1560,7 @@ that uses or sets the mark."
   ;; This is really `point-min' in most cases, but if we're in the
   ;; minibuffer, this is at the end of the prompt.
   (goto-char (minibuffer-prompt-end)))
-
+
 ;; Counting lines, one way or another.
 
 (defcustom goto-line-history-local nil
@@ -1922,7 +1935,7 @@ in *Help* buffer.  See also the command `describe-char'."
 			 (buffer-substring-no-properties (point) (1+ (point))))
 		     (single-key-description char))
 		   bidi-fixer encoding-msg pos total percent col hscroll))))))
-
+
 ;; Initialize read-expression-map.  It is defined at C level.
 (defvar-keymap read-expression-map
   :parent minibuffer-local-map
@@ -2813,7 +2826,7 @@ This will, by default, use `y-or-n-p', but if VERBOSE,
   (put command 'disabled
        (list 'query (not (not verbose)) query)))
 
-
+
 (defvar minibuffer-history nil
   "Default minibuffer history list.
 This is used for all minibuffer input
@@ -3217,7 +3230,7 @@ Return 0 if current buffer is not a minibuffer."
   ;; Return the width of everything before the field at the end of
   ;; the buffer; this should be 0 for normal buffers.
   (1- (minibuffer-prompt-end)))
-
+
 ;; isearch minibuffer history
 (add-hook 'minibuffer-setup-hook 'minibuffer-history-isearch-setup)
 
@@ -3340,7 +3353,7 @@ in the search status stack."
 Go to the history element by the absolute history position HIST-POS."
   (goto-history-element hist-pos))
 
-
+
 (add-hook 'minibuffer-setup-hook 'minibuffer-error-initialize)
 
 (defun minibuffer-error-initialize ()
@@ -3365,15 +3378,12 @@ the minibuffer contents."
     (minibuffer-message (apply #'propertize (format " [%s%s]" context string)
                                minibuffer-prompt-properties))))
 
-
-;Put this on C-x u, so we can force that rather than C-_ into startup msg
+
+;; Put this on C-x u, so we can force that rather than C-_ into startup msg
 (define-obsolete-function-alias 'advertised-undo 'undo "23.2")
 
 (defconst undo-equiv-table (make-hash-table :test 'eq :weakness t)
-  "Maps a redo to its corresponding undo.
-Exercising an undo pushes onto the undo stack the inverse of that undo.
-To simultaneously add and subtract confusion, we call this undo-undo a
-redo.
+  "Maps a redo to its pending-undo-list.
 
 A redo undoing the entire undo list maps to t (what?).
 
@@ -3408,7 +3418,7 @@ should indicate completion instead of `nil' is anyone's guess.")
 
 (defun undo--last-change-was-undo-p (undo-list)
   (while (and (consp undo-list) (null (car undo-list)))
-    (setq undo-list (cdr undo-list)))
+    (setq undo-list (cdr undo-list))) ;burn off boundaries
   (gethash undo-list undo-equiv-table))
 
 (defun undo (&optional arg)
@@ -3525,9 +3535,9 @@ Interactively, ARG is the prefix numeric argument and defaults to 1."
                 (primitive-undo (or arg 1) ul)))
              (new-pul (undo--last-change-was-undo-p new-ul)))
         (message "Redo%s" (if undo-in-region " in region" ""))
-        (setq this-command 'undo)
-        (setq pending-undo-list new-pul)
-        (setq buffer-undo-list new-ul))
+        (setq this-command 'undo
+              pending-undo-list new-pul
+              buffer-undo-list new-ul))
     (user-error "No undone changes to redo")))
 
 (defvar undo-in-progress nil
@@ -3643,9 +3653,6 @@ Some change-hooks test this variable to do something different.")
           (`(,(and marker (pred markerp)) . ,(and offset (pred integerp)))
            (warn "Encountered %S entry in undo list with no matching (TEXT . POS) entry"
                  next)
-           ;; Even though these elements are not expected in the undo
-           ;; list, adjust them to be conservative for the 24.4
-           ;; release.  (Bug#16818)
            (when (marker-buffer marker)
              (set-marker marker
                          (- marker offset)
@@ -4025,7 +4032,7 @@ which is defined in the `warnings' library.\n")
 		     :warning)
     (setq buffer-undo-list nil)
     t))
-
+
 ;;;; Shell commands
 
 (defconst shell-command-buffer-name "*Shell Command Output*"
@@ -4981,7 +4988,7 @@ File name handlers might not support pty association, if PROGRAM is nil."
   (let ((fh (find-file-name-handler default-directory 'start-file-process)))
     (if fh (apply fh 'start-file-process name buffer program program-args)
       (apply 'start-process name buffer program program-args))))
-
+
 ;;;; Process menu
 
 (defvar tabulated-list-format)
@@ -5117,7 +5124,7 @@ see other processes running on the system, use `list-system-processes'."
     (tabulated-list-print))
   (display-buffer buffer)
   nil)
-
+
 ;;;; Prefix commands
 
 (setq prefix-command--needs-update nil)
@@ -5284,7 +5291,7 @@ These commands include \\[set-mark-command] and \\[start-kbd-macro]."
                            (t
                             digit))))
   (universal-argument--mode))
-
+
 
 (defvar filter-buffer-substring-functions nil
   "This variable is a wrapper hook around `buffer-substring--filter'.
@@ -5373,7 +5380,7 @@ If it is difficult to tell whether Emacs or some other program
 provided the current string, it is probably good enough to return
 nil if the string is equal (according to `string=') to the last
 text Emacs provided.")
-
+
 
 
 ;;;; The kill ring data structure.
@@ -5968,7 +5975,7 @@ the text properties."
 	(setq start (point))
 	(setq line-end (min end (line-end-position))))
       substr)))
-
+
 ;; Yanking.
 
 (defcustom yank-handled-properties
@@ -6326,7 +6333,7 @@ When called from Lisp, insert STRING like `insert-for-yank' does."
       (goto-char (prog1 (mark t)
                    (set-marker (mark-marker) (point) (current-buffer))))))
 
-
+
 ;; Some kill commands.
 
 ;; Internal subroutine of delete-char
@@ -6630,7 +6637,7 @@ via the menu bar, and pays no attention to the menu-bar's frame."
         (kill-buffer (current-buffer))
       (abort-recursive-edit))))
 
-
+
 (defun insert-buffer (buffer)
   "Insert after point the contents of BUFFER.
 Puts mark after the inserted text.
@@ -6708,7 +6715,7 @@ START and END specify the portion of the current buffer to be copied."
       (erase-buffer)
       (save-excursion
 	(insert-buffer-substring oldbuf start end)))))
-
+
 (define-error 'mark-inactive (purify-if-dumping "The mark is not active now"))
 
 (defvar activate-mark-hook nil
@@ -7367,7 +7374,7 @@ copies of BOGEY."
                        (buffer-name buffer))))
           (goto-char position))
       (setq global-mark-ring rotated-ring))))
-
+
 (defcustom next-line-add-newlines nil
   "If non-nil, `next-line' inserts newline to avoid `end of buffer' error."
   :type 'boolean
@@ -8194,7 +8201,7 @@ a buffer-local setting."
 	     (substitute-command-keys
 	      "(use \\[set-goal-column] with an arg to unset it)")))
   nil)
-
+
 ;;; Editing based on visual lines, as opposed to logical lines.
 
 (defun end-of-visual-line (&optional n)
@@ -8388,7 +8395,7 @@ variables `truncate-lines' and `truncate-partial-width-windows'."
 (define-globalized-minor-mode global-visual-line-mode
   visual-line-mode turn-on-visual-line-mode)
 
-
+
 (defun transpose-chars (arg)
   "Interchange characters around point, moving forward one character.
 With prefix arg ARG, effect is to take character before point
@@ -8548,7 +8555,7 @@ negative) objects, leaving point after the current object."
       (goto-char (+ boundary len1))
       (delete-region (point) (+ (point) len2))
       (set-marker boundary nil))))
-
+
 (defun backward-word (&optional arg)
   "Move backward until encountering the beginning of a word.
 With argument ARG, do this that many times.
@@ -8707,7 +8714,7 @@ treated as delimiting words.  See this command's namesake in Info node
   (let ((start (point)))
     (forward-unix-word (- arg) "\\\\/\s\f\n\r\t\v")
     (kill-region start (point))))
-
+
 (defcustom fill-prefix nil
   "String for filling to insert at front of new line, or nil for none."
   :type '(choice (const :tag "None" nil)
@@ -8919,7 +8926,7 @@ Just \\[universal-argument] as argument means to use the current column."
       (error "set-fill-column requires an explicit argument")
     (message "Fill column set to %d (was %d)" arg fill-column)
     (setq fill-column arg)))
-
+
 (defun set-selective-display (arg)
   "Set `selective-display' to ARG; clear it if no arg.
 When the value of `selective-display' is a number > 0,
@@ -9083,7 +9090,7 @@ For more details, see Info node `(emacs) Auto Save'."
   ;; turn it back on.
   (and (< buffer-saved-size 0)
        (setq buffer-saved-size 0)))
-
+
 (defgroup paren-blinking nil
   "Blinking matching of parens and expressions."
   :prefix "blink-matching-"
@@ -9323,7 +9330,7 @@ More precisely, a char with closeparen syntax is self-inserted.")
           ;; `sit-for'. That's also the reason it get a `priority' prop
           ;; of 100.
           'append)
-
+
 ;; This executes C-g typed while Emacs is waiting for a command.
 ;; Quitting out of a program does not go through here;
 ;; that happens in the maybe_quit function at the C code level.
@@ -9390,7 +9397,7 @@ specification for `play-sound'."
     (push 'sound sound)
     (play-sound sound)))
 
-
+
 (defcustom read-mail-command 'rmail
   "Your preference for a mail reading package.
 This is used by some keybindings that support reading mail.
@@ -9556,7 +9563,7 @@ To disable this warning, set `compose-mail-user-agent-warnings' to nil."
 		'switch-to-buffer-other-frame yank-action send-actions
 		return-action))
 
-
+
 (defvar set-variable-value-history nil
   "History of values entered with `set-variable'.
 
@@ -9641,7 +9648,7 @@ makes it easier to edit it."
   ;; Force a thorough redisplay for the case that the variable
   ;; has an effect on the display, like `tab-width' has.
   (force-mode-line-update))
-
+
 ;; Define the major mode for lists of completions.
 
 (defvar completion-list-mode-map
@@ -10203,7 +10210,7 @@ to move point between completions.\n\n")))))))
   (interactive)
   (when (active-minibuffer-window)
     (select-window (active-minibuffer-window))))
-
+
 ;;; Support keyboard commands to turn on various modifiers.
 
 ;; These functions -- which are not commands -- each add one modifier
@@ -10268,7 +10275,7 @@ PREFIX is the string that represents this modifier in an event type symbol."
 (define-key function-key-map [?\C-x ?@ ?a] 'event-apply-alt-modifier)
 (define-key function-key-map [?\C-x ?@ ?S] 'event-apply-shift-modifier)
 (define-key function-key-map [?\C-x ?@ ?c] 'event-apply-control-modifier)
-
+
 ;;;; Keypad support.
 
 ;; Make the keypad keys act like ordinary typing keys.  If people add
@@ -10299,7 +10306,7 @@ PREFIX is the string that represents this modifier in an event type symbol."
    (return ?\C-m)
    (escape ?\e)
    ))
-
+
 ;;;;
 ;;;; forking a twin copy of a buffer.
 ;;;;
@@ -10478,7 +10485,7 @@ Returns the newly created indirect buffer."
     (when display-flag
       (switch-to-buffer-other-window buffer norecord))))
 
-
+
 ;;; Handling of Backspace and Delete keys.
 
 (defcustom normal-erase-is-backspace 'maybe
@@ -10611,7 +10618,7 @@ See also `normal-erase-is-backspace'."
 	(message "Delete key deletes %s"
 		 (if (eq 1 (terminal-parameter nil 'normal-erase-is-backspace))
 		     "forward" "backward")))))
-
+
 (defvar vis-mode-saved-buffer-invisibility-spec nil
   "Saved value of `buffer-invisibility-spec' when Visible mode is on.")
 
@@ -10662,7 +10669,7 @@ and setting it to nil."
                 buffer-invisibility-spec)
     (setq buffer-invisibility-spec nil)))
 
-
+
 (defvar messages-buffer-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map special-mode-map)
@@ -10682,7 +10689,7 @@ If it does not exist, create it and switch it to `messages-buffer-mode'."
         (messages-buffer-mode)
         (current-buffer))))
 
-
+
 ;; Minibuffer prompt stuff.
 
 ;;(defun minibuffer-prompt-modification (start end)
@@ -10703,7 +10710,7 @@ If it does not exist, create it and switch it to `messages-buffer-mode'."
 ;;  (list 'modification-hooks '(minibuffer-prompt-modification)
 ;;	'insert-in-front-hooks '(minibuffer-prompt-insertion)))
 
-
+
 ;;;; Problematic external packages.
 
 ;; rms says this should be done by specifying symbols that define
@@ -10734,7 +10741,7 @@ warning using STRING as the message.")
              (display-warning package (nth 3 list) :warning)))
     (error nil)))
 
-
+
 ;;; Generic dispatcher commands
 
 ;; Macro `define-alternatives' can be used to create generic commands.
@@ -10832,7 +10839,7 @@ contains the list of implementations currently supported for this command."
                            "No implementation selected for command `%s'"
                            command-name)))))))
 
-
+
 ;;; Functions for changing capitalization that Do What I Mean
 (defun upcase-dwim (arg)
   "Upcase words in the region, if active; if not, upcase word at point.
@@ -10973,7 +10980,7 @@ killed."
   "Change value in PLIST of PROP to VAL, comparing with `equal'."
   (declare (obsolete plist-put "29.1"))
   (plist-put plist prop val #'equal))
-
+
 
 ;; Indent Filter mode.  When enabled, this minor mode filters all
 ;; killed text to remove leading indentation.

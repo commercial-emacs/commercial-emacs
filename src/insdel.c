@@ -1793,14 +1793,11 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
     emacs_abort ();
 #endif
 
-  if (ret_string || !EQ (BVAR (current_buffer, undo_list), Qt))
-    deletion = make_buffer_string_both (from, from_byte, to, to_byte, 1);
-  else
-    deletion = Qnil;
+  deletion = (ret_string || !EQ (BVAR (current_buffer, undo_list), Qt))
+    ? make_buffer_string_both (from, from_byte, to, to_byte, 1)
+    : Qnil;
 
-  /* Record marker adjustments, and text deletion into undo
-     history.  */
-  undo_push_delete (from, deletion, true);
+  undo_push_delete (from, deletion, true /* and markers */);
 
   /* Relocate all markers pointing into the new, larger gap to point
      at the end of the text before the gap.  */
