@@ -3385,23 +3385,17 @@ the minibuffer contents."
 (defconst undo-equiv-table (make-hash-table :test 'eq :weakness t)
   "Maps a redo to its pending-undo-list.
 
-A redo undoing the entire undo list maps to t (what?).
+In the following example, the table effectively collapses an undo-redo
+chain by mapping back to the shortest pending-undo-list.
 
-A redo beneath an empty batch (two consecutive undo boundaries)
-cancels the redo (what?).
+Commands                     buffer-undo-list     pending-undo-list
+--------   ----------------------------------     -----------------
+x                                      undo-x
+y                               undo-y undo-x
+undo                     redo-y undo-y undo-x                undo-x
+redo              undo-y redo-y undo-y undo-x         undo-y undo-x
+undo       redo-y undo-y redo-y undo-y undo-x                undo-x
 
-`undo' uses this table to ensure the previous command is `undo'.
-`undo-redo' uses this table to set the correct `pending-undo-list'.
-
-After undo of [insert y],
-
-buffer-undo-list (stack): [redo insert y]
-                          [insert y]
-                          [insert x]
-
-pending-undo-list:        [insert x]
-
-undo-equiv-table:         [redo insert y] => [insert x]
 ")
 
 (defvar undo-in-region nil
@@ -3413,8 +3407,9 @@ undo-equiv-table:         [redo insert y] => [insert x]
   :group 'undo)
 
 (defvar pending-undo-list nil
-  "Remaining items within an undo run.  Why a tertiary state `t'
-should indicate completion instead of `nil' is anyone's guess.")
+  "Remaining items within an undo run.
+This is a tertiary variable.  A null value means outside the undo run
+state.  A `t' value indicates undo run exhausted.")
 
 (defun undo--last-change-was-undo-p (undo-list)
   (while (and (consp undo-list) (null (car undo-list)))
@@ -3424,7 +3419,7 @@ should indicate completion instead of `nil' is anyone's guess.")
 (defun undo (&optional arg)
   "Undo ARG number of times."
   (interactive "*P")
-  (let* ((was-modified (buffer-modified-p))
+  (let* ((orig-modified (buffer-modified-p))
 	 (base-buffer (or (buffer-base-buffer) (current-buffer)))
 	 (recent-save (with-current-buffer base-buffer
 			(recent-auto-save-p)))
@@ -3432,32 +3427,32 @@ should indicate completion instead of `nil' is anyone's guess.")
          (inhibit-region (when (symbolp last-command)
                            (get last-command 'undo-inhibit-region)))
 	 message)
-    (setq this-command 'undo-start)
-    (when (or (not (eq last-command 'undo))
+    (when (or (not (eq last-command this-command))
               ;; a timer or filter intervened
 	      (and (not (eq pending-undo-list t))
 		   (not (undo--last-change-was-undo-p buffer-undo-list))))
-      ;; Then break the undo chain.
+      ;; Then start a new run.
       (setq undo-in-region
 	    (and (or (region-active-p) (and arg (not (numberp arg))))
                  (not inhibit-region)))
-      (if undo-in-region
-	  (undo-start (region-beginning) (region-end))
-	(undo-start))
-      ;; get rid of initial undo boundary
+      (condition-case err
+          (if undo-in-region
+	      (undo-start (region-beginning) (region-end))
+	    (undo-start))
+        (error
+         ;; prevent next toplevel command from being a
+         ;; consecutive undo by perturbing `this-command'
+         (setq this-command 'undo-start)
+         (signal (car err) (cdr err))))
       (undo-more 1))
-    (setq this-command 'undo)
-    ;; Check to see whether we're hitting a redo record, and if
-    ;; so, ask the user whether he wants to skip the redo/undo pair.
     (let ((equiv (gethash pending-undo-list undo-equiv-table)))
       (unless (eq (selected-window) (minibuffer-window))
 	(setq message (concat (if (or undo-no-redo (not equiv)) "Undo" "Redo")
-                              (if undo-in-region " in region" ""))))
+                              (when undo-in-region " in region"))))
       (when (and (consp equiv) undo-no-redo)
-	;; The equiv entry might point to another redo record if we have done
-	;; undo-redo-undo-redo-... so skip to the very last equiv.
-	(while (let ((next (gethash equiv undo-equiv-table)))
-		 (if next (setq equiv next))))
+	;; Skip to end of undo-redo-undo-redo chain.
+	(while (when-let ((next (gethash equiv undo-equiv-table)))
+		 (setq equiv next)))
 	(setq pending-undo-list (if (consp equiv) equiv t))))
     (undo-more (if (numberp arg) (prefix-numeric-value arg) 1))
     ;; Record the fact that the just-generated undo records come from an
@@ -3476,7 +3471,7 @@ should indicate completion instead of `nil' is anyone's guess.")
                 ;; consecutive nils are erroneously in undo list.  It
                 ;; has to map to _something_ so that the next `undo'
                 ;; command recognizes that the previous command is
-                ;; `undo' and doesn't break the undo chain.
+                ;; `undo' and doesn't break the undo run.
                 ((eq list pending-undo-list)
                  (or (gethash list undo-equiv-table) 'empty))
                 (t pending-undo-list))
@@ -3500,8 +3495,9 @@ should indicate completion instead of `nil' is anyone's guess.")
 		(setq prev tail))
 	      (setq tail (cdr tail)))
 	    (setq tail nil)))
-	(setq prev tail tail (cdr tail))))
-    (when (and was-modified (not (buffer-modified-p)))
+	(setq prev tail
+              tail (cdr tail))))
+    (when (and orig-modified (not (buffer-modified-p)))
       (with-current-buffer base-buffer
 	(delete-auto-save-file-if-necessary recent-save)))
     (when message
@@ -3545,24 +3541,25 @@ Interactively, ARG is the prefix numeric argument and defaults to 1."
 Some change-hooks test this variable to do something different.")
 
 (defun undo-more (n)
-  "Undo back N undo-boundaries."
+  "Assume undo-start state, and undo back N boundaries."
   (unless (listp pending-undo-list)
     (user-error (concat "No further undo information"
                         (if undo-in-region " for region" ""))))
   (let ((undo-in-progress t))
     (setq pending-undo-list (or (primitive-undo n pending-undo-list)
+                                ;; sentinel `t' means finished (nil
+                                ;; means outside undo-start state)
                                 t))))
 
 (defun primitive-undo (n list)
   "Undo the first N records from LIST, return remaining list."
-  (let ((arg n)
-        (inhibit-read-only t)
-        (oldlist buffer-undo-list)
+  (let ((inhibit-read-only t)
+        (orig-list buffer-undo-list)
         did-apply next)
-    (while (> arg 0)
-      (while (setq next (pop list))   ;Exit inner loop at undo boundary.
-        ;; Handle an integer by setting point to that value.
+    (dotimes (_i n)
+      (while (setq next (pop list))   ;inner loop per undo boundary
         (pcase next
+          ;; Element INTEGER sets point.
           ((pred integerp) (goto-char next))
           ;; Element (t . TIME) records previous modtime.
           (`(t . ,time)
@@ -3595,24 +3592,24 @@ Some change-hooks test this variable to do something different.")
            (delete-region beg end))
           ;; Element (apply FUN . ARGS) means call FUN to undo.
           (`(apply . ,fun-args)
-           (let ((currbuff (current-buffer)))
-             (if (integerp (car fun-args))
-                 ;; Long format: (apply DELTA START END FUN . ARGS).
-                 (pcase-let* ((`(,delta ,start ,end ,fun . ,args) fun-args)
-                              (start-mark (copy-marker start nil))
-                              (end-mark (copy-marker end t)))
-                   (when (or (> (point-min) start) (< (point-max) end))
-                     (error "Changes to be undone are outside visible portion of buffer"))
-                   (apply fun args) ;; Use `save-current-buffer'?
-                   ;; Check that the function did what the entry
-                   ;; said it would do.
-                   (unless (and (= start start-mark)
-                                (= (+ delta end) end-mark))
-                     (error "Changes to be undone by function different from announced"))
-                   (set-marker start-mark nil)
-                   (set-marker end-mark nil))
-               (apply fun-args))
-             (unless (eq currbuff (current-buffer))
+           (let ((orig-buf (current-buffer)))
+             (if (not (integerp (car fun-args)))
+                 (apply fun-args)
+               ;; Long format: (apply DELTA START END FUN . ARGS).
+               (pcase-let* ((`(,delta ,start ,end ,fun . ,args) fun-args)
+                            (start-mark (copy-marker start nil))
+                            (end-mark (copy-marker end t)))
+                 (when (or (> (point-min) start) (< (point-max) end))
+                   (error "Changes to be undone are outside visible portion of buffer"))
+                 (apply fun args) ;; Use `save-current-buffer'?
+                 ;; Check that the function did what the entry
+                 ;; said it would do.
+                 (unless (and (= start start-mark)
+                              (= (+ delta end) end-mark))
+                   (error "Changes to be undone by function different from announced"))
+                 (set-marker start-mark nil)
+                 (set-marker end-mark nil)))
+             (unless (eq orig-buf (current-buffer))
                (error "Undo function switched buffer"))
              (setq did-apply t)))
           ;; Element (STRING . POS) means STRING was deleted.
@@ -3657,39 +3654,22 @@ Some change-hooks test this variable to do something different.")
              (set-marker marker
                          (- marker offset)
                          (marker-buffer marker))))
-          (_ (error "Unrecognized entry in undo list %S" next))))
-      (setq arg (1- arg)))
-    ;; Make sure an apply entry produces at least one undo entry,
-    ;; so the test in `undo' for continuing an undo series
-    ;; will work right.
-    (if (and did-apply
-             (eq oldlist buffer-undo-list))
-        (setq buffer-undo-list
-              (cons (list 'apply 'cdr nil) buffer-undo-list))))
+          (_ (error "Unrecognized entry in undo list %S" next)))))
+    (when (and did-apply (eq orig-list buffer-undo-list))
+      ;; add dummy entry to satisfy check in `undo' (the fuq?)
+      (setq buffer-undo-list
+            (cons (list 'apply 'cdr nil) buffer-undo-list))))
   list)
 
-;; Deep copy of a list
-(defun undo-copy-list (list)
-  "Make a copy of undo list LIST."
-  (mapcar 'undo-copy-list-1 list))
-
-(defun undo-copy-list-1 (elt)
-  (if (consp elt)
-      (cons (car elt) (undo-copy-list-1 (cdr elt)))
-    elt))
-
 (defun undo-start (&optional beg end)
-  "Set `pending-undo-list' to the front of the undo list.
-The next call to `undo-more' will undo the most recently made change.
-If BEG and END are specified, then undo only elements
-that apply to text between BEG and END are used; other undo elements
-are ignored.  If BEG and END are nil, all undo elements are used."
+  "Commence undo run.
+Indicate state by setting `pending-undo-list' to the undo list."
   (if (eq buffer-undo-list t)
-      (user-error "No undo information in this buffer"))
-  (setq pending-undo-list
-	(if (and beg end (not (= beg end)))
-	    (undo-make-selective-list (min beg end) (max beg end))
-	  buffer-undo-list)))
+      (user-error "No undo information in this buffer")
+    (setq pending-undo-list
+	  (if (and beg end (not (= beg end)))
+	      (undo-make-selective-list (min beg end) (max beg end))
+	    buffer-undo-list))))
 
 ;; The positions given in elements of the undo list are the positions
 ;; as of the time that element was recorded to undo history.  In
