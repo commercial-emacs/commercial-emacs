@@ -3459,13 +3459,13 @@ state.  A `t' value indicates undo run exhausted.")
     ;; undo operation--that is, they are redo records.
     ;; In the ordinary, non-region case, map the redo
     ;; record to the following undos.
-    ;; I don't know how to do that in the undo-in-region case.
     (let ((list buffer-undo-list))
       ;; Strip any leading undo boundaries
       (while (null (car list))
 	(setq list (cdr list)))
       (puthash list
                (cond
+                ;; give up for undo-in-region
                 (undo-in-region 'undo-in-region)
                 ;; Prevent identity mapping.  This can happen if
                 ;; consecutive nils are erroneously in undo list.  It
@@ -3544,7 +3544,7 @@ Some change-hooks test this variable to do something different.")
   "Assume undo-start state, and undo back N boundaries."
   (unless (listp pending-undo-list)
     (user-error (concat "No further undo information"
-                        (if undo-in-region " for region" ""))))
+                        (when undo-in-region " for region"))))
   (let ((undo-in-progress t))
     (setq pending-undo-list (or (primitive-undo n pending-undo-list)
                                 ;; sentinel `t' means finished (nil
