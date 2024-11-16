@@ -3411,7 +3411,10 @@ undo       redo-y undo-y redo-y undo-y undo-x                undo-x
 This is a tertiary variable.  A null value means outside the undo run
 state.  A `t' value indicates undo run exhausted.")
 
-(defun undo--last-change-was-undo-p (undo-list)
+(define-obsolete-function-alias 'undo--last-change-was-undo-p 'undo--redo-p "31.1")
+
+(defun undo--redo-p (undo-list)
+  "Return suitable `pending-undo-list' if UNDO-LIST is redoing."
   (while (and (consp undo-list) (null (car undo-list)))
     (setq undo-list (cdr undo-list))) ;burn off boundaries
   (gethash undo-list undo-equiv-table))
@@ -3427,23 +3430,17 @@ state.  A `t' value indicates undo run exhausted.")
          (inhibit-region (when (symbolp last-command)
                            (get last-command 'undo-inhibit-region)))
 	 message)
-    (when (or (not (eq last-command this-command))
+    (when (or (not (eq last-command 'undo))
               ;; a timer or filter intervened
 	      (and (not (eq pending-undo-list t))
-		   (not (undo--last-change-was-undo-p buffer-undo-list))))
+		   (not (undo--redo-p buffer-undo-list))))
       ;; Then start a new run.
       (setq undo-in-region
 	    (and (or (region-active-p) (and arg (not (numberp arg))))
                  (not inhibit-region)))
-      (condition-case err
-          (if undo-in-region
-	      (undo-start (region-beginning) (region-end))
-	    (undo-start))
-        (error
-         ;; prevent next toplevel command from being a
-         ;; consecutive undo by perturbing `this-command'
-         (setq this-command 'undo-start)
-         (signal (car err) (cdr err))))
+      (if undo-in-region
+	  (undo-start (region-beginning) (region-end))
+	(undo-start))
       (undo-more 1))
     (let ((equiv (gethash pending-undo-list undo-equiv-table)))
       (unless (eq (selected-window) (minibuffer-window))
@@ -3522,14 +3519,14 @@ Contrary to `undo', this will not redo a previous undo."
   "Undo the last ARG undos, i.e., redo the last ARG changes.
 Interactively, ARG is the prefix numeric argument and defaults to 1."
   (interactive "*p")
-  (if (undo--last-change-was-undo-p buffer-undo-list)
+  (if (undo--redo-p buffer-undo-list)
       (let* ((ul buffer-undo-list)
              (new-ul
               (let ((undo-in-progress t))
-                (while (and (consp ul) (eq (car ul) nil))
+                (while (and (consp ul) (null (car ul)))
                   (setq ul (cdr ul)))
                 (primitive-undo (or arg 1) ul)))
-             (new-pul (undo--last-change-was-undo-p new-ul)))
+             (new-pul (undo--redo-p new-ul)))
         (message "Redo%s" (if undo-in-region " in region" ""))
         (setq this-command 'undo
               pending-undo-list new-pul

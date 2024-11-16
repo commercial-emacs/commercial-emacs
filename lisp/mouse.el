@@ -558,7 +558,7 @@ Some context functions add menu items below the separator."
       `(menu-item ,(if (region-active-p) "Undo in Region" "Undo") undo
                   :help "Undo last edits")))
   (when (and (not buffer-read-only)
-             (undo--last-change-was-undo-p buffer-undo-list))
+             (undo--redo-p buffer-undo-list))
     (define-key-after menu [undo-redo]
       `(menu-item (if undo-in-region "Redo in Region" "Redo") undo-redo
                   :help "Redo last undone edits")))

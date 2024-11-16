@@ -584,7 +584,7 @@
     (bindings--define-key menu [undo-redo]
       '(menu-item "Redo" undo-redo
                   :enable (and (not buffer-read-only)
-                           (undo--last-change-was-undo-p buffer-undo-list))
+                           (undo--redo-p buffer-undo-list))
                   :help "Redo last undone edits"))
 
     (bindings--define-key menu [undo]
