@@ -3415,8 +3415,6 @@ state.  A `t' value indicates undo run exhausted.")
 
 (defun undo--redo-p (undo-list)
   "Return suitable `pending-undo-list' if UNDO-LIST is redoing."
-  (while (and (consp undo-list) (null (car undo-list)))
-    (setq undo-list (cdr undo-list))) ;burn off boundaries
   (gethash undo-list undo-equiv-table))
 
 (defun undo (&optional arg)
@@ -3430,7 +3428,7 @@ state.  A `t' value indicates undo run exhausted.")
          (inhibit-region (when (symbolp last-command)
                            (get last-command 'undo-inhibit-region)))
 	 message)
-    (when (or (not (eq last-command 'undo))
+    (when (or (not (memq last-command '(undo undo-redo)))
               ;; a timer or filter intervened
 	      (and (not (eq pending-undo-list t))
 		   (not (undo--redo-p buffer-undo-list))))
@@ -3440,8 +3438,7 @@ state.  A `t' value indicates undo run exhausted.")
                  (not inhibit-region)))
       (if undo-in-region
 	  (undo-start (region-beginning) (region-end))
-	(undo-start))
-      (undo-more 1))
+	(undo-start)))
     (let ((equiv (gethash pending-undo-list undo-equiv-table)))
       (unless (eq (selected-window) (minibuffer-window))
 	(setq message (concat (if (or undo-no-redo (not equiv)) "Undo" "Redo")
@@ -3457,9 +3454,6 @@ state.  A `t' value indicates undo run exhausted.")
     ;; In the ordinary, non-region case, map the redo
     ;; record to the following undos.
     (let ((list buffer-undo-list))
-      ;; Strip any leading undo boundaries
-      (while (null (car list))
-	(setq list (cdr list)))
       (puthash list
                (cond
                 ;; give up for undo-in-region
@@ -3517,20 +3511,14 @@ Contrary to `undo', this will not redo a previous undo."
 
 (defun undo-redo (&optional arg)
   "Undo the last ARG undos, i.e., redo the last ARG changes.
-Interactively, ARG is the prefix numeric argument and defaults to 1."
+Don't do this."
   (interactive "*p")
   (if (undo--redo-p buffer-undo-list)
-      (let* ((ul buffer-undo-list)
-             (new-ul
-              (let ((undo-in-progress t))
-                (while (and (consp ul) (null (car ul)))
-                  (setq ul (cdr ul)))
-                (primitive-undo (or arg 1) ul)))
-             (new-pul (undo--redo-p new-ul)))
+      (progn
         (message "Redo%s" (if undo-in-region " in region" ""))
-        (setq this-command 'undo
-              pending-undo-list new-pul
-              buffer-undo-list new-ul))
+        (setq buffer-undo-list (let ((undo-in-progress t))
+                                 (primitive-undo (or arg 1) buffer-undo-list))
+              pending-undo-list (undo--redo-p buffer-undo-list)))
     (user-error "No undone changes to redo")))
 
 (defvar undo-in-progress nil
@@ -3553,7 +3541,7 @@ Some change-hooks test this variable to do something different.")
   (let ((inhibit-read-only t)
         (orig-list buffer-undo-list)
         did-apply next)
-    (dotimes (_i n)
+    (dotimes (_i (+ n (if (null (car list)) 1 0))) ;1+ for initial boundary
       (while (setq next (pop list))   ;inner loop per undo boundary
         (pcase next
           ;; Element INTEGER sets point.
