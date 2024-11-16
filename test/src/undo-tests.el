@@ -93,31 +93,27 @@
   (with-temp-buffer
     (buffer-enable-undo)
     (undo-boundary)
-    (insert "This")
+    (insert "This") ;step 1
     (undo-boundary)
-    (erase-buffer)
+    (erase-buffer) ;step 2
     (undo-boundary)
-    (insert "That")
-    (undo-boundary)
-    (forward-word -1)
-    (undo-boundary)
-    (insert "With ")
+    (insert "That") ;step 3
     (undo-boundary)
     (forward-word -1)
+    (insert "With ") ;step 4 "With That"
     (undo-boundary)
-    (kill-word 1)
+    (forward-word -1)
+    (kill-word 1) ;step 5 " That"
     (undo-boundary)
-    (facemenu-add-face 'bold (point-min) (point-max))
-    (undo-boundary)
+    (facemenu-add-face 'bold (point-min) (point-max)) ;step 6
     (set-buffer-multibyte (not enable-multibyte-characters))
-    (undo-boundary)
     (should
      (string-equal (buffer-string)
                    (progn
-                     (undo)
-                     (undo-more 4)
-                     (undo)
-                     ;(undo-more -4)
+                     (undo) ;step 5
+                     (undo-more 4) ;step 1
+                     (undo) ;step 2
+                     (undo-more 3) ;step 5
                      (buffer-string))))))
 
 (ert-deftest undo-test2 ()
@@ -125,44 +121,44 @@
   (with-temp-buffer
     (buffer-enable-undo)
     (undo-boundary)
-    (insert "One")
+    (insert "One") ;step 1
     (undo-boundary)
-    (insert " Zero")
+    (insert " Zero") ;step 2
     (undo-boundary)
     (push-mark nil t)
-    (delete-region (save-excursion
-                     (forward-word -1)
-                     (point)) (point))
+    (delete-region (save-excursion (forward-word -1) (point)) ;step 3
+                   (point))
     (undo-boundary)
     (beginning-of-line)
-    (insert "Zero")
+    (insert "Zero") ;step 4
     (undo-boundary)
-    (undo)
+    (undo) ;step 3
     (should
      (string-equal (buffer-string)
                    (progn
-                     (undo-more 2)
-                     (undo)
-                     (buffer-string))))))
+                     (undo-more 2) ;step 1
+                     (undo) ;step 2
+                     (undo-more 1) ;step 3
+                     (buffer-string)))))
 
-(ert-deftest undo-test4 ()
-  "Test \\[undo] of \\[flush-lines]."
-  (with-temp-buffer
-    (buffer-enable-undo)
-    (dotimes (i 1048576)
-      (if (zerop (% i 2))
-          (insert "Evenses")
-        (insert "Oddses")))
-    (undo-boundary)
-    (should-not
-     ;; Using "should-not null" instead of "should" to avoid long
-     ;; buffer-string in explanation.
-     (null (string-equal (buffer-string)
-                         (progn
-                           (flush-lines "oddses" (point-min) (point-max))
-                           (undo-boundary)
-                           (undo)
-                           (buffer-string)))))))
+  (ert-deftest undo-test4 ()
+    "Test \\[undo] of \\[flush-lines]."
+    (with-temp-buffer
+      (buffer-enable-undo)
+      (dotimes (i 1048576)
+        (if (zerop (% i 2))
+            (insert "Evenses")
+          (insert "Oddses")))
+      (undo-boundary)
+      (should-not
+       ;; Using "should-not null" instead of "should" to avoid long
+       ;; buffer-string in explanation.
+       (null (string-equal (buffer-string)
+                           (progn
+                             (flush-lines "oddses" (point-min) (point-max))
+                             (undo-boundary)
+                             (undo)
+                             (buffer-string))))))))
 
 (ert-deftest undo-test5 ()
   "Test basic redoing with \\[undo] command."
