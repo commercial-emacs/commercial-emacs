@@ -10946,7 +10946,6 @@ killed."
   (declare (obsolete plist-put "29.1"))
   (plist-put plist prop val #'equal))
 
-
 ;; Indent Filter mode.  When enabled, this minor mode filters all
 ;; killed text to remove leading indentation.
 

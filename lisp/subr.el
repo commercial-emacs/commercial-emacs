@@ -3827,14 +3827,7 @@ like) while `y-or-n-p' is running)."
   "Like `progn' but perform BODY as an atomic change group.
 This means that if BODY exits abnormally,
 all of its changes to the current buffer are undone.
-This works regardless of whether undo is enabled in the buffer.
-
-Do not call functions which edit the undo list within BODY; see
-`prepare-change-group'.
-
-This mechanism is transparent to ordinary use of undo;
-if undo is enabled in the buffer and BODY succeeds, the
-user can undo the change normally."
+This works regardless of whether undo is enabled in the buffer."
   (declare (indent 0) (debug t))
   (let ((handle (make-symbol "--change-group-handle--"))
 	(success (make-symbol "--change-group-success--")))
@@ -3858,74 +3851,44 @@ user can undo the change normally."
 	   (cancel-change-group ,handle))))))
 
 (defun prepare-change-group (&optional buffer)
-  "Return a handle for the current buffer's state, for a change group.
-If you specify BUFFER, make a handle for BUFFER's state instead.
+  "Return so-called handle of the form (BUFFER . BUFFER-UNDO-LIST).
 
-Pass the handle to `activate-change-group' afterward to initiate
-the actual changes of the change group.
+Pass the handle to `activate-change-group' afterward to effect the
+actual changes, then in an `unwind-protect' clause, call either
+`accept-change-group' or `cancel-change-group' (according to the desired
+logic).  Don't use handle afterwards.
 
-To finish the change group, call either `accept-change-group' or
-`cancel-change-group' passing the same handle as argument.  Call
-`accept-change-group' to accept the changes in the group as final;
-call `cancel-change-group' to undo them all.  You should use
-`unwind-protect' to make sure the group is always finished.  The call
-to `activate-change-group' should be inside the `unwind-protect'.
-Once you finish the group, don't use the handle again--don't try to
-finish the same group twice.  For a simple example of correct use, see
-the source code of `atomic-change-group'.
+For an example, see `atomic-change-group'.
 
-As long as this handle is still in use, do not call functions which edit
-the undo list: if it no longer contains its current value, Emacs will
-not be able to cancel the change group.  This includes any amalgamating
-commands, such as `delete-char' and `self-insert-command'.
-
-The handle records only the specified buffer.  To make a multibuffer
-change group, call this function once for each buffer you want to
-cover, then use `nconc' to combine the returned values, like this:
+The handle records only BUFFER.  To make a multibuffer change group, do:
 
   (nconc (prepare-change-group buffer-1)
          (prepare-change-group buffer-2))
 
-You can then activate that multibuffer change group with a single
-call to `activate-change-group' and finish it with a single call
-to `accept-change-group' or `cancel-change-group'."
-
+Then proceed with activation and conclusion as in the single buffer
+case (with single calls for each)."
   (if buffer
       (list (cons buffer (with-current-buffer buffer buffer-undo-list)))
     (list (cons (current-buffer) buffer-undo-list))))
 
 (defun activate-change-group (handle)
-  "Activate a change group made with `prepare-change-group' (which see)."
+  "Activate a change group made with `prepare-change-group'."
   (dolist (elt handle)
     (with-current-buffer (car elt)
-      (if (eq buffer-undo-list t)
-	  (setq buffer-undo-list nil)
-	;; Add a boundary to make sure the upcoming changes won't be
-	;; merged/combined with any previous changes (bug#33341).
-	;; We're not supposed to introduce a real (visible)
-        ;; `undo-boundary', tho, so we have to push something else
-        ;; that acts like a boundary w.r.t preventing merges while
-	;; being harmless.
-        ;; We use for that an "empty insertion", but in order to be harmless,
-        ;; it has to be at a harmless position.  Currently only
-        ;; insertions are ever merged/combined, so we use such a "boundary"
-        ;; only when the last change was an insertion and we use the position
-        ;; of the last insertion.
-        (when (numberp (car-safe (car buffer-undo-list)))
-          (push (cons (caar buffer-undo-list) (caar buffer-undo-list))
-                buffer-undo-list))))))
+      (setq buffer-undo-list nil))))
 
 (defun accept-change-group (handle)
-  "Finish a change group made with `prepare-change-group' (which see).
-This finishes the change group by accepting its changes as final."
+  "Commit changes, prepend `buffer-undo-list' onto (cdr HANDLE)."
   (dolist (elt handle)
     (with-current-buffer (car elt)
       (if (eq (cdr elt) t)
-	  (setq buffer-undo-list t)))))
+          (setq buffer-undo-list t)
+        (setq buffer-undo-list
+              ;; make change-group undo-contiguous
+              `(nil ,@(delq nil buffer-undo-list) . ,(cdr elt)))))))
 
 (defun cancel-change-group (handle)
-  "Finish a change group made with `prepare-change-group' (which see).
-This finishes the change group by reverting all of its changes."
+  "Revert all changes.  Overwrought junk by RMS."
   (dolist (elt handle)
     (with-current-buffer (car elt)
       (setq elt (cdr elt))
@@ -3935,25 +3898,22 @@ This finishes the change group by reverting all of its changes."
 	(widen)
 	(let ((old-car (car-safe elt))
 	      (old-cdr (cdr-safe elt))
-	      ;; Use `pending-undo-list' temporarily since `undo-more' needs
-	      ;; it, but restore it afterwards so as not to mess with an
-	      ;; ongoing sequence of `undo's.
-	      (pending-undo-list
-	       ;; Use `buffer-undo-list' unconditionally (bug#39680).
-	       buffer-undo-list))
+	      (pending-undo-list buffer-undo-list))
           (unwind-protect
               (progn
-                ;; Temporarily truncate the undo log at ELT.
+                ;; pending-undo-list is (change-group . ELT)
+                ;; where ELT is pre-change-group buffer-undo-list,
+                ;; Set ELT to (nil . nil) so that
+                ;; pending-undo-list becomes (change-group nil)
                 (when (consp elt)
-                  (setcar elt nil) (setcdr elt nil))
-                ;; Make sure there's no confusion.
+                  (setcar elt nil)
+                  (setcdr elt nil))
                 (when (and (consp elt) (not (eq elt (last pending-undo-list))))
                   (error "Undoing to some unrelated state"))
                 ;; Undo it all.
                 (save-excursion
                   (while (listp pending-undo-list) (undo-more 1)))
-                ;; Revert the undo info to what it was when we grabbed
-                ;; the state.
+                ;; ELT reverts to (cdr handle) in unwind-protect coda
                 (setq buffer-undo-list elt))
             ;; Reset the modified cons cell ELT to its original content.
             (when (consp elt)
