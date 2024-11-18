@@ -944,9 +944,8 @@ See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=19350."
       (insert "c\n")
       (accept-change-group g))
     (should (equal (buffer-string) "0\nb\nc\n"))
-    (undo-boundary)
     (undo)
-    (should (equal (buffer-string) ""))))
+    (should (equal (buffer-string) "0\n"))))
 
 (defvar subr--ordered nil)
 

@@ -1579,8 +1579,7 @@ invokes the command before that, etc."
     ;; the viper-after-change-undo-hook removes itself after the 1st invocation
     (add-hook 'viper-undo-functions #'viper-after-change-undo-hook nil 'local)
 
-    (undo-start)
-    (undo-more 2)
+    (undo)
     ;;(setq undo-beg-posn (or undo-beg-posn (point))
     ;;    undo-end-posn (or undo-end-posn (point)))
     ;;(setq undo-beg-posn (or undo-beg-posn before-undo-pt)

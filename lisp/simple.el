@@ -3396,15 +3396,12 @@ the minibuffer contents."
 ;; Put this on C-x u, so we can force that rather than C-_ into startup msg
 (define-obsolete-function-alias 'advertised-undo 'undo "23.2")
 
-(defconst redo-to-pending-undo (make-hash-table :test 'eq :weakness t)
-  "Maps a redo to its pending-undo-list.
+(defconst lists-seen-after-undo (make-hash-table :test 'eq :weakness t)
+  "The table referred to in Commentary.
 
-The key is an undo-list suffix that at one point was the resulting
-`buffer-undo-list' of an `undo'.  In a subsequent `undo', the the
-resulting `pending-undo-list''s presence in the table means a previous
-`undo' also got us here, and therefore the current `undo' is a redo.
+It maps a post-undo `buffer-undo-list' to its `pending-undo-list'.
 
-In the following example, the table effectively collapses an undo-redo
+In the following example, the table effectively collapses an undo/redo
 chain by mapping back to the shortest pending-undo-list.
 
 Commands                     buffer-undo-list     pending-undo-list
@@ -3446,37 +3443,34 @@ state.  A `t' value indicates undo run exhausted.")
     (when (or (not (memq last-command '(undo undo-redo)))
               ;; a timer or filter is undoing
 	      (and (not (eq pending-undo-list t))
-		   (not (gethash buffer-undo-list redo-to-pending-undo))))
+		   (not (gethash buffer-undo-list lists-seen-after-undo))))
       ;; Then start a new run.
       (setq undo-in-region
 	    (and (or (region-active-p) (and arg (not (numberp arg))))
                  (not inhibit-region)))
       (if undo-in-region
 	  (undo-start (region-beginning) (region-end))
-	(undo-start))
-      (unless (gethash buffer-undo-list redo-to-pending-undo)
-        (message "the fuq %S" pending-undo-list)))
+	(undo-start)))
 
-    (let ((equiv (gethash pending-undo-list redo-to-pending-undo)))
+    (let ((equiv (gethash pending-undo-list lists-seen-after-undo)))
       (unless (eq (selected-window) (minibuffer-window))
 	(setq message (concat (if (or undo-no-redo (not equiv)) "Undo" "Redo")
                               (when undo-in-region " in region"))))
       (when (and (consp equiv) undo-no-redo)
 	;; Skip to end of undo-redo-undo-redo chain.
-	(while (when-let ((next (gethash equiv redo-to-pending-undo)))
+	(while (when-let ((next (gethash equiv lists-seen-after-undo)))
 		 (setq equiv next)))
 	(setq pending-undo-list (if (consp equiv) equiv t))))
+
     (undo-more (if (numberp arg) (prefix-numeric-value arg) 1))
 
-    ;; buffer-undo-list got longer, pending-undo-list got smaller
     (let ((key buffer-undo-list))
       (puthash key (cond (undo-in-region  ;give up
                           'undo-in-region)
-                         ((eq key pending-undo-list)
-                          (or (gethash key redo-to-pending-undo) 'empty))
                          (t
                           pending-undo-list))
-	       redo-to-pending-undo))
+	       lists-seen-after-undo))
+
     ;; Don't specify a position in the undo record for the undo command.
     ;; Instead, undoing this should move point to where the change is.
     (let ((tail buffer-undo-list)
@@ -3520,18 +3514,22 @@ Contrary to `undo', this will not redo a previous undo."
   (let ((undo-no-redo t)) (undo arg)))
 
 (defun undo-redo (&optional arg)
-  "Undo the last ARG undos, i.e., redo the last ARG changes.
+  "Irrevocably reverts state as if last ARG undos never happened.
+Subsequent M-x undo do not see inverses for this command.
+
 Don't do this."
   (interactive "*p")
-  (if (gethash buffer-undo-list redo-to-pending-undo)
-      (progn
-        (message "Redo%s" (if undo-in-region " in region" ""))
-        (message "the faq %S" buffer-undo-list)
-
-        (setq buffer-undo-list (let ((undo-in-progress t))
-                                 (primitive-undo (or arg 1) buffer-undo-list))
-              pending-undo-list (gethash buffer-undo-list redo-to-pending-undo))
-        (message "the faq2 %S" buffer-undo-list))
+  (if (gethash buffer-undo-list lists-seen-after-undo)
+      ;; An extant key means first elements are redo's (see Commentary).
+      (let* ((undo-in-progress t)
+             (popped (primitive-undo (or arg 1) buffer-undo-list)))
+        ;; set buffer-undo-list to boundary before POPPED.
+        (message (concat "Redo" (when undo-in-region " in region")))
+        (while (and (consp buffer-undo-list)
+                    (not (eq popped (cdr buffer-undo-list))))
+          (setq buffer-undo-list (cdr buffer-undo-list)))
+        ;; force undo run state to this timeline
+        (setq pending-undo-list (gethash buffer-undo-list lists-seen-after-undo)))
     (user-error "No undone changes to redo")))
 
 (defvar undo-in-progress nil
@@ -3539,14 +3537,14 @@ Don't do this."
 Some change-hooks test this variable to do something different.")
 
 (defun undo-more (n)
-  "Assume undo-start state, and undo back N boundaries."
+  "Assume undo run state, and undo back N boundaries."
   (unless (listp pending-undo-list)
     (user-error (concat "No further undo information"
                         (when undo-in-region " for region"))))
   (let ((undo-in-progress t))
     (setq pending-undo-list (or (primitive-undo n pending-undo-list)
                                 ;; sentinel `t' means finished (nil
-                                ;; means outside undo-start state)
+                                ;; means outside run state)
                                 t))))
 
 (defun primitive-undo (n list)
@@ -3742,8 +3740,8 @@ list can be applied to the current buffer."
         undo-elt)
     (while ulist
       (when undo-no-redo
-        (while (consp (gethash ulist redo-to-pending-undo))
-          (setq ulist (gethash ulist redo-to-pending-undo))))
+        (while (consp (gethash ulist lists-seen-after-undo))
+          (setq ulist (gethash ulist lists-seen-after-undo))))
       (setq undo-elt (car ulist))
       (cond
        ((null undo-elt)
