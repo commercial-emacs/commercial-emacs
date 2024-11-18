@@ -484,45 +484,67 @@ See bug#35036."
 
 
 ;;; undo tests
+(defmacro simple-test-undo-with-switched-buffer (buffer &rest body)
+  (declare (indent 1) (debug t))
+  (let ((before-buffer (make-symbol "before-buffer")))
+    `(let ((,before-buffer (current-buffer)))
+       (unwind-protect
+           (progn
+             (switch-to-buffer ,buffer)
+             ,@body)
+         (switch-to-buffer ,before-buffer)))))
 
-(defun simple-tests--exec (cmds)
-  (dolist (cmd cmds)
-    (setq last-command this-command)
-    (setq this-command cmd)
-    (run-hooks 'pre-command-hook)
-    (command-execute cmd)
-    (run-hooks 'post-command-hook)
-    (undo-boundary)))
+(defun simple-tests--exec (&rest args)
+  (let* ((compares (let ((command-p t)
+                         ret)
+                     (dolist (arg args)
+                       (if command-p
+                           (setq command-p nil)
+                         (if (stringp arg)
+                             (progn
+                               (setq command-p t)
+                               (push arg ret))
+                           (push nil ret))))
+                     (nreverse ret)))
+         (buffer (current-buffer))
+         (commands (seq-filter #'symbolp args))
+         (post-command-hook
+          (list (lambda ()
+                  (when (memq this-command commands)
+                    (when (car compares)
+                      (should (equal (car compares)
+                                     (with-current-buffer buffer
+                                       (buffer-string)))))
+                    (setq compares (cdr compares)))))))
+    (execute-kbd-macro
+     (read-kbd-macro
+      (mapconcat (lambda (s) (concat "M-x " (symbol-name s) " RET"))
+                 commands "\n")))
+    (unless post-command-hook ;safe_run_hooks nulls on error
+      (should nil))))
 
 (ert-deftest simple-tests--undo ()
-  (with-temp-buffer
-    (buffer-enable-undo)
+  (simple-test-undo-with-switched-buffer
+      "foo"
     (dolist (x '("a" "b" "c" "d" "e"))
       (insert x)
       (undo-boundary))
     (should (equal (buffer-string) "abcde"))
-    (simple-tests--exec '(undo undo))
-    (should (equal (buffer-string) "abc"))
-    (simple-tests--exec '(backward-char undo))
-    (should (equal (buffer-string) "abcd"))
-    (simple-tests--exec '(undo))
-    (should (equal (buffer-string) "abcde"))
-    (simple-tests--exec '(backward-char undo undo))
-    (should (equal (buffer-string) "abc"))
-    (simple-tests--exec '(backward-char undo-redo))
-    (should (equal (buffer-string) "abcd"))
-    (simple-tests--exec '(undo))
-    (should (equal (buffer-string) "abc"))
-    (simple-tests--exec '(backward-char undo-redo undo-redo))
-    (should (equal (buffer-string) "abcde"))
-    (simple-tests--exec '(undo undo))
-    (should (equal (buffer-string) "abc"))
-    (simple-tests--exec '(backward-char undo-only undo-only))
-    (should (equal (buffer-string) "a"))
-    (simple-tests--exec '(backward-char undo-redo undo-redo))
-    (should (equal (buffer-string) "abc"))
-    (simple-tests--exec '(backward-char undo-redo undo-redo))
-    (should (equal (buffer-string) "abcde"))))
+    (simple-tests--exec
+     'undo 'undo
+     "abc"
+     'backward-char 'undo
+     "abcd"
+     'undo
+     "abcde"
+     'backward-char 'undo 'undo
+     "abc"
+     'backward-char 'undo-redo
+     "abcd"
+     'undo
+     "abc"
+)
+))
 
 (ert-deftest simple-tests--undo-in-region ()
   ;; Test undo/redo in region.
@@ -565,7 +587,7 @@ See bug#35036."
     (setq lst (cdr lst)))
   lst)
 
-(ert-deftest simple-tests--undo-equiv-table ()
+(ert-deftest simple-tests--redo-to-pending-undo ()
   (with-temp-buffer
     (buffer-enable-undo)
     (transient-mark-mode)
@@ -576,18 +598,18 @@ See bug#35036."
                  ul-hash-table)
         (undo-boundary))
       (should (equal (buffer-string) "abc"))
-      ;; Tests mappings in `undo-equiv-table'.
+      ;; Tests mappings in `redo-to-pending-undo'.
       (simple-tests--exec '(undo))
       (should (equal (buffer-string) "ab"))
       (should (eq (gethash (simple-tests--sans-leading-nil
                             buffer-undo-list)
-                           undo-equiv-table)
+                           redo-to-pending-undo)
                   (gethash "b" ul-hash-table)))
       (simple-tests--exec '(backward-char undo))
       (should (equal (buffer-string) "abc"))
       (should (eq (gethash (simple-tests--sans-leading-nil
                             buffer-undo-list)
-                           undo-equiv-table)
+                           redo-to-pending-undo)
                   (gethash "c" ul-hash-table)))
       ;; Undo in region should map to 'undo-in-region.
       (simple-tests--exec '(backward-char
@@ -597,7 +619,7 @@ See bug#35036."
       (should (equal (buffer-string) "ab"))
       (should (eq (gethash (simple-tests--sans-leading-nil
                             buffer-undo-list)
-                           undo-equiv-table)
+                           redo-to-pending-undo)
                   'undo-in-region))
       ;; The undo that undoes to the beginning should map to t.
       (deactivate-mark 'force)
@@ -607,7 +629,7 @@ See bug#35036."
       (should (equal (buffer-string) ""))
       (should (eq (gethash (simple-tests--sans-leading-nil
                             buffer-undo-list)
-                           undo-equiv-table)
+                           redo-to-pending-undo)
                   t))
       ;; Erroneous nil undo should map to 'empty.
       (insert "a")
@@ -617,7 +639,7 @@ See bug#35036."
       (should (equal (buffer-string) "a"))
       (should (eq (gethash (simple-tests--sans-leading-nil
                             buffer-undo-list)
-                           undo-equiv-table)
+                           redo-to-pending-undo)
                   'empty))
       ;; But if the previous record is a redo record, its mapping
       ;; shouldn't change.
@@ -638,7 +660,7 @@ See bug#35036."
       ;; The previous redo record shouldn't map to empty.
       (should (equal (gethash (simple-tests--sans-leading-nil
                                buffer-undo-list)
-                              undo-equiv-table)
+                              redo-to-pending-undo)
                      (gethash "e" ul-hash-table))))))
 
 ;; Test for a regression introduced by undo-auto--boundaries changes.
@@ -687,16 +709,6 @@ See bug#35036."
   (should
    (= 6
       (undo-test-point-after-forward-kill))))
-
-(defmacro simple-test-undo-with-switched-buffer (buffer &rest body)
-  (declare (indent 1) (debug t))
-  (let ((before-buffer (make-symbol "before-buffer")))
-    `(let ((,before-buffer (current-buffer)))
-       (unwind-protect
-           (progn
-             (switch-to-buffer ,buffer)
-             ,@body)
-         (switch-to-buffer ,before-buffer)))))
 
 ;; This tests for a regression in emacs 25.0 see bug #23632
 (ert-deftest simple-test-undo-extra-boundary-in-tex ()

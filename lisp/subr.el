@@ -3838,14 +3838,9 @@ This works regardless of whether undo is enabled in the buffer."
 	   (,success nil))
        (unwind-protect
 	   (progn
-	     ;; This is inside the unwind-protect because
-	     ;; it enables undo if that was disabled; we need
-	     ;; to make sure that it gets disabled again.
 	     (activate-change-group ,handle)
 	     (prog1 ,(macroexp-progn body)
 	       (setq ,success t)))
-	 ;; Either of these functions will disable undo
-	 ;; if it was disabled before.
 	 (if ,success
 	     (accept-change-group ,handle)
 	   (cancel-change-group ,handle))))))
@@ -3888,37 +3883,16 @@ case (with single calls for each)."
               `(nil ,@(delq nil buffer-undo-list) . ,(cdr elt)))))))
 
 (defun cancel-change-group (handle)
-  "Revert all changes.  Overwrought junk by RMS."
+  "Revert all changes."
   (dolist (elt handle)
     (with-current-buffer (car elt)
-      (setq elt (cdr elt))
-      (save-restriction
-	;; Widen buffer temporarily so if the buffer was narrowed within
-	;; the body of `atomic-change-group' all changes can be undone.
-	(widen)
-	(let ((old-car (car-safe elt))
-	      (old-cdr (cdr-safe elt))
-	      (pending-undo-list buffer-undo-list))
-          (unwind-protect
-              (progn
-                ;; pending-undo-list is (change-group . ELT)
-                ;; where ELT is pre-change-group buffer-undo-list,
-                ;; Set ELT to (nil . nil) so that
-                ;; pending-undo-list becomes (change-group nil)
-                (when (consp elt)
-                  (setcar elt nil)
-                  (setcdr elt nil))
-                (when (and (consp elt) (not (eq elt (last pending-undo-list))))
-                  (error "Undoing to some unrelated state"))
-                ;; Undo it all.
-                (save-excursion
-                  (while (listp pending-undo-list) (undo-more 1)))
-                ;; ELT reverts to (cdr handle) in unwind-protect coda
-                (setq buffer-undo-list elt))
-            ;; Reset the modified cons cell ELT to its original content.
-            (when (consp elt)
-              (setcar elt old-car)
-              (setcdr elt old-cdr))))))))
+      (save-excursion
+        (save-restriction
+	  (widen)
+	  (unwind-protect
+              (let ((pending-undo-list buffer-undo-list))
+                (while (listp pending-undo-list) (undo-more 1)))
+            (setq buffer-undo-list (cdr elt))))))))
 
 ;;;; Display-related functions.
 
