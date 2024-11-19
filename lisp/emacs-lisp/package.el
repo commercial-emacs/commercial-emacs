@@ -2411,9 +2411,7 @@ PKG should be either a symbol or a `package-desc' object."
 (defun package-recompile-all (&optional nprocs)
   "Recompile installed packages.  NPROCS defaults to `num-processors'.
 Blocks until compilation started for all packages."
-  (interactive "p")
-  (unless (fixnump nprocs)
-    (setq nprocs (num-processors)))
+  (interactive (list (num-processors)))
   (let ((run (make-temp-name "recompile-")))
     (pcase-dolist (`(_ ,pkg-desc) package-alist)
       (if (<= nprocs 1)
