@@ -49,7 +49,7 @@
 
 ;; The resulting buffer-undo-list from any given M-x undo is recorded in
 ;; a table.  If a subsequent M-x undo results in a `pending-undo-list'
-;; appearing in the table, then its first elements must be an
+;; appearing in the table, then its first elements must be
 ;; inverse-of-inverse's (redos) since the earlier M-x undo's first
 ;; order of business was to prepend them.
 

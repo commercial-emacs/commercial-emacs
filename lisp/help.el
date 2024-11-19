@@ -2217,8 +2217,10 @@ Return VALUE."
                   (run-hooks 'temp-buffer-window-setup-hook)))
          (help-make-xrefs (current-buffer))
          ;; Do after buffer made in case `temp-buffer-resize-mode' enabled
-         (help-window-setup (temp-buffer-window-show (current-buffer)
-                                                     '(nil . ((some-window . mru)))))))))
+         (help-window-setup
+          (temp-buffer-window-show
+           (current-buffer)
+           '((display-buffer-use-some-window) . ((some-window . mru)))))))))
 
 ;; Called from C, on encountering `help-char' when reading a char.
 ;; Don't print to *Help*; that would clobber Help history.
