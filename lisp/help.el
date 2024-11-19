@@ -2220,7 +2220,8 @@ Return VALUE."
          (help-window-setup
           (temp-buffer-window-show
            (current-buffer)
-           '((display-buffer-use-some-window) . ((some-window . mru)))))))))
+           (when (> (length (window-list)) 1)
+             '((display-buffer-use-some-window) . ((some-window . mru))))))))))
 
 ;; Called from C, on encountering `help-char' when reading a char.
 ;; Don't print to *Help*; that would clobber Help history.

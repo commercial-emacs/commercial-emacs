@@ -479,6 +479,26 @@ C-b		undefined\n"
                   (propertize "foo \\[save-buffer]" 'face 'bold))
                  (propertize "foo C-x C-s" 'face 'bold))))
 
+(ert-deftest help-tests-help-window ()
+  "Avoid clobbering focus."
+  (should (= 1 (length (window-list))))
+  (ignore-errors (kill-buffer (help-buffer)))
+  (let ((owin (selected-window))
+        nwin)
+    (with-current-buffer "*scratch*"
+      (describe-function #'help)
+      (should (equal (buffer-name) "*scratch*"))
+      (should (= 2 (length (window-list))))
+      (should (eq (selected-window) owin))
+      (other-window 1)
+      (setq nwin (selected-window))
+      (should (equal (buffer-name) (help-buffer)))
+      (switch-to-buffer "*scratch*")
+      (describe-function #'car)
+      (should (equal (buffer-name) "*scratch*"))
+      (should (eq (selected-window) nwin))
+      (kill-buffer (help-buffer)))))
+
 (provide 'help-tests)
 
 ;;; help-tests.el ends here
