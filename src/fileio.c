@@ -6128,23 +6128,12 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
 
   if (STRINGP (Vauto_save_list_file_name))
     {
-      Lisp_Object listfile;
-
-      listfile = Fexpand_file_name (Vauto_save_list_file_name, Qnil);
-
-      /* Don't try to create the directory when shutting down Emacs,
-         because creating the directory might signal an error, and
-         that would leave Emacs in a strange state.  */
-      if (!NILP (Vrun_hooks))
-	{
-	  Lisp_Object dir;
-	  dir = file_name_directory (listfile);
-	  if (NILP (Ffile_directory_p (dir)))
-	    internal_condition_case_1 (do_auto_save_make_dir,
-				       dir, Qt,
-				       do_auto_save_eh);
-	}
-
+      Lisp_Object listfile = Fexpand_file_name (Vauto_save_list_file_name, Qnil);
+      Lisp_Object dir = file_name_directory (listfile);
+      if (NILP (Ffile_directory_p (dir)))
+	internal_condition_case_1 (do_auto_save_make_dir,
+				   dir, Qt,
+				   do_auto_save_eh);
       stream = emacs_fopen (SSDATA (listfile), "w");
     }
 

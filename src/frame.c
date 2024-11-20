@@ -2112,7 +2112,7 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
      frame is a tooltip.  FORCE is set to `noelisp' when handling
      a disconnect from the terminal, so we don't dare call Lisp
      code.  */
-  if (NILP (Vrun_hooks) || is_tooltip_frame)
+  if (is_tooltip_frame)
     ;
   else if (EQ (force, Qnoelisp))
     pending_funcalls
@@ -2423,7 +2423,7 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
     update_mode_lines = 15;
 
   /* Now run the post-deletion hooks.  */
-  if (NILP (Vrun_hooks) || is_tooltip_frame)
+  if (is_tooltip_frame)
     ;
   else if (EQ (force, Qnoelisp))
     pending_funcalls

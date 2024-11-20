@@ -517,15 +517,15 @@ See also `find-buffer-visiting'.  */)
   return Qnil;
 }
 
-/* Run buffer-list-update-hook if Vrun_hooks is non-nil and BUF does
-   not have buffer hooks inhibited.  */
-
 static void
 run_buffer_list_update_hook (struct buffer *buf)
 {
   eassert (buf);
-  if (!(NILP (Vrun_hooks) || buf->inhibit_buffer_hooks))
-    call1 (Vrun_hooks, Qbuffer_list_update_hook);
+  if (!buf->inhibit_buffer_hooks)
+    {
+      Lisp_Object args [] = { Qbuffer_list_update_hook };
+      Frun_hooks (1, args);
+    }
 }
 
 DEFUN ("get-buffer-create", Fget_buffer_create, Sget_buffer_create, 1, 2, 0,
@@ -3420,8 +3420,12 @@ for the rear of the overlay advance when text is inserted there
 
   if (MARKERP (beg) && !EQ (Fmarker_buffer (beg), buffer))
     signal_error ("Marker points into wrong buffer", beg);
-  if (MARKERP (end) && !EQ (Fmarker_buffer (end), buffer))
+  else if (MARKERP (end) && !EQ (Fmarker_buffer (end), buffer))
     signal_error ("Marker points into wrong buffer", end);
+  else if (!NILP (on_enter) && !FUNCTIONP (on_enter))
+    signal_error ("Enter callback must be a function", on_enter);
+  else if (!NILP (on_exit) && !FUNCTIONP (on_exit))
+    signal_error ("Exit callback must be a function", on_exit);
 
   CHECK_FIXNUM_COERCE_MARKER (beg);
   CHECK_FIXNUM_COERCE_MARKER (end);

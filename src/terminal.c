@@ -386,9 +386,7 @@ but if the second argument FORCE is non-nil, you may do so. */)
 	error ("Attempt to delete the sole active display terminal");
     }
 
-  if (NILP (Vrun_hooks))
-    ;
-  else if (EQ (force, Qnoelisp))
+  if (EQ (force, Qnoelisp))
     pending_funcalls
       = Fcons (list3 (Qrun_hook_with_args,
 		      Qdelete_terminal_functions, terminal),

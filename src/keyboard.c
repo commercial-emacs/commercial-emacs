@@ -1061,7 +1061,7 @@ command_loop (void)
 
   if (NILP (Vmemory_full))
     {
-      if (!NILP (Vpost_command_hook) && !NILP (Vrun_hooks))
+      if (!NILP (Vpost_command_hook))
 	safe_run_hooks (Qpost_command_hook);
 
       if (!NILP (echo_area_buffer[0]))
@@ -1250,8 +1250,7 @@ command_loop (void)
       else
 	cancel_echoing ();
 
-      if (!NILP (BVAR (current_buffer, mark_active))
-	  && !NILP (Vrun_hooks))
+      if (!NILP (BVAR (current_buffer, mark_active)))
 	{
 	  if (EQ (Vtransient_mark_mode, Qidentity))
 	    Vtransient_mark_mode = Qnil;

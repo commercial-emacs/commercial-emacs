@@ -37,11 +37,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    (FUN . ODEF) for a defun, (0 . OFEATURES) for a provide.  */
 Lisp_Object Vautoload_queue;
 
-/* This holds either the symbol `run-hooks' or nil.
-   It is nil at an early stage of startup, and when Emacs
-   is shutting down.  */
-Lisp_Object Vrun_hooks;
-
 /* These would ordinarily be static, but they need to be visible to GDB.  */
 bool xbacktrace_valid_p (union specbinding *) EXTERNALLY_VISIBLE;
 Lisp_Object *xbacktrace_args (union specbinding *) EXTERNALLY_VISIBLE;
@@ -219,7 +214,6 @@ init_eval_once (void)
 {
   /* Don't forget to update docs (lispref node "Eval").  */
   max_lisp_eval_depth = 1600;
-  Vrun_hooks = Qnil;
   pdumper_do_now_and_after_load (init_eval_once_for_pdumper);
 }
 
@@ -2679,9 +2673,8 @@ run_hook_with_args (ptrdiff_t nargs, Lisp_Object *args,
 {
   Lisp_Object sym, val, ret = Qnil;
 
-  /* If we are dying or still initializing,
-     don't do anything--it would probably crash if we tried.  */
-  if (NILP (Vrun_hooks))
+  /* A longtime RMS thing.  Don't run hooks during pdump.  */
+  if (!initialized)
     return Qnil;
 
   sym = args[0];
@@ -4088,9 +4081,6 @@ Don't set this unless you're sure that can't happen.  */);
 
   staticpro (&Vautoload_queue);
   Vautoload_queue = Qnil;
-
-  staticpro (&Vrun_hooks);
-  Vrun_hooks = intern_c_string ("run-hooks");
 
   staticpro (&Qcatch_all_memory_full);
   /* Make sure Qcatch_all_memory_full is a unique object.  We could

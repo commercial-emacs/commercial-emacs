@@ -4343,17 +4343,9 @@ extern void mark_lread (void);
 
 /* Defined in eval.c.  */
 extern Lisp_Object Vautoload_queue;
-extern Lisp_Object Vrun_hooks;
 extern Lisp_Object inhibit_lisp_code;
 extern bool signal_quit_p (Lisp_Object);
 
-/* To run a normal hook, use the appropriate function from the list below.
-   The calling convention:
-
-   if (!NILP (Vrun_hooks))
-     call1 (Vrun_hooks, Qmy_funny_hook);
-
-   should no longer be used.  */
 extern void run_hook (Lisp_Object);
 extern void run_hook_with_args_2 (Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object run_hook_with_args (ptrdiff_t nargs, Lisp_Object *args,

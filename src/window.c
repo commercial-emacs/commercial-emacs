@@ -3686,9 +3686,7 @@ run_window_configuration_change_hook (struct frame *f)
     = Fdefault_value (Qwindow_configuration_change_hook);
   XSETFRAME (frame, f);
 
-  if (NILP (Vrun_hooks)
-      || !f->can_set_window_size
-      || !f->after_make_frame)
+  if (!f->can_set_window_size || !f->after_make_frame)
     return;
 
   /* Use the right buffer.  Matters when running the local hooks.  */
@@ -7544,7 +7542,7 @@ the return value is nil.  Otherwise the value is t.  */)
 
   SAFE_FREE ();
 
-  if (!NILP (Vrun_hooks) && FUNCTIONP (window_restore_killed_buffer_windows))
+  if (FUNCTIONP (window_restore_killed_buffer_windows))
     safe_calln (window_restore_killed_buffer_windows,
 		frame, kept_windows, Qconfiguration);
 

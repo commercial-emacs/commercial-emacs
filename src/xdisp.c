@@ -3553,7 +3553,6 @@ handle_fontified_prop (struct it *it)
       && it->s == NULL
       && !NILP (Vfontification_functions)
       && !(input_was_pending && redisplay_skip_fontification_on_input)
-      && !NILP (Vrun_hooks)
       && (pos = make_fixnum (IT_CHARPOS (*it)),
 	  prop = Fget_char_property (pos, Qfontified, Qnil),
 	  NILP (prop) && IT_CHARPOS (*it) < Z))
@@ -11285,10 +11284,7 @@ echo_area_display (bool update_frame_p)
 #endif
 	    }
 
-	  if (window_height_changed_p
-	      /* Don't do this if Emacs is shutting down.  Redisplay
-	         needs to run hooks.  */
-	      && !NILP (Vrun_hooks))
+	  if (window_height_changed_p)
 	    {
 	      /* Must update other windows.  Likewise as in other
 		 cases, don't let this update be interrupted by
@@ -14599,8 +14595,7 @@ redisplay_internal (void)
       clear_garbaged_frames ();
     }
 
-  if (!NILP (Vrun_hooks))
-    run_window_change_functions ();
+  run_window_change_functions ();
 
   if (windows_or_buffers_changed && !update_mode_lines)
     update_mode_lines = (windows_or_buffers_changed == REDISPLAY_SOME

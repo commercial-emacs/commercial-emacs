@@ -2816,9 +2816,6 @@ DEFUN ("program-version", Fprogram_version, Sprogram_version, 0, 0, 0,
 void
 shut_down_emacs (int sig, Lisp_Object stuff)
 {
-  /* Prevent running of hooks from now on.  */
-  Vrun_hooks = Qnil;
-
   /* Don't update display from now on.  */
   Vinhibit_redisplay = Qt;
 
