@@ -2651,13 +2651,13 @@ make_misc_ptr (void *a)
 
 Lisp_Object
 build_overlay (bool front_advance, bool rear_advance,
-               Lisp_Object plist)
+               Lisp_Object plist, Lisp_Object on_enter, Lisp_Object on_exit)
 {
   struct Lisp_Overlay *p = ALLOCATE_PSEUDOVECTOR (struct Lisp_Overlay, plist,
 						  PVEC_OVERLAY);
   Lisp_Object overlay = make_lisp_ptr (p, Lisp_Vectorlike);
   struct itree_node *node = xmalloc (sizeof (*node));
-  itree_node_init (node, front_advance, rear_advance, overlay);
+  itree_node_init (node, front_advance, rear_advance, overlay, on_enter, on_exit);
   p->interval = node;
   p->buffer = NULL;
   set_overlay_plist (overlay, plist);
@@ -4328,6 +4328,8 @@ mark_overlays (struct itree_node *node)
   if (node)
     {
       mark_object (&node->data);
+      mark_object (&node->on_enter);
+      mark_object (&node->on_exit);
       mark_overlays (node->left);
       mark_overlays (node->right);
     }

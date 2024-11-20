@@ -975,6 +975,8 @@ test_setup_gap_node (ptrdiff_t begin, ptrdiff_t end,
   itree_init (&gap_tree);
   gap_node.front_advance = front_advance;
   gap_node.rear_advance = rear_advance;
+  gap_node.on_enter = Qnil;
+  gap_node.on_exit = Qnil;
   itree_insert (&gap_tree, &gap_node, begin, end);
 }
 

@@ -431,7 +431,8 @@ itree_validate (struct itree_tree *tree, struct itree_node *node)
 void
 itree_node_init (struct itree_node *node,
 		 bool front_advance, bool rear_advance,
-		 Lisp_Object data)
+		 Lisp_Object data, Lisp_Object on_enter,
+		 Lisp_Object on_exit)
 {
   node->parent = NULL;
   node->left = NULL;
@@ -441,6 +442,8 @@ itree_node_init (struct itree_node *node,
   node->front_advance = front_advance;
   node->rear_advance = rear_advance;
   node->data = data;
+  node->on_enter = on_enter;
+  node->on_exit = on_exit;
 }
 
 /* Return NODE's begin value, computing it if necessary. */

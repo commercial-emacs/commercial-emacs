@@ -661,8 +661,10 @@ copy_overlays (struct buffer *from, struct buffer *to)
     {
       Lisp_Object ov = node->data;
       Lisp_Object copy = build_overlay (node->front_advance,
-                                        node->rear_advance,
-                                        Fcopy_sequence (OVERLAY_PLIST (ov)));
+					node->rear_advance,
+					Fcopy_sequence (OVERLAY_PLIST (ov)),
+					node->on_enter,
+					node->on_exit);
       add_buffer_overlay (to, XOVERLAY (copy), node->begin, node->end);
     }
 }
@@ -3390,7 +3392,7 @@ DEFUN ("overlayp", Foverlayp, Soverlayp, 1, 1, 0,
   return (OVERLAYP (object) ? Qt : Qnil);
 }
 
-DEFUN ("make-overlay", Fmake_overlay, Smake_overlay, 2, 5, 0,
+DEFUN ("make-overlay", Fmake_overlay, Smake_overlay, 2, 7, 0,
        doc: /* Create a new overlay with range BEG to END in BUFFER and return it.
 If omitted, BUFFER defaults to the current buffer.
 BEG and END may be integers or markers.
@@ -3401,7 +3403,8 @@ The fifth arg REAR-ADVANCE, if non-nil, makes the marker
 for the rear of the overlay advance when text is inserted there
 \(which means the text *is* included in the overlay).  */)
   (Lisp_Object beg, Lisp_Object end, Lisp_Object buffer,
-   Lisp_Object front_advance, Lisp_Object rear_advance)
+   Lisp_Object front_advance, Lisp_Object rear_advance,
+   Lisp_Object on_enter, Lisp_Object on_exit)
 {
   Lisp_Object ov;
   struct buffer *b;
@@ -3431,13 +3434,11 @@ for the rear of the overlay advance when text is inserted there
 
   ptrdiff_t obeg = clip_to_bounds (BUF_BEG (b), XFIXNUM (beg), BUF_Z (b));
   ptrdiff_t oend = clip_to_bounds (obeg, XFIXNUM (end), BUF_Z (b));
-  ov = build_overlay (!NILP (front_advance),
-                      !NILP (rear_advance), Qnil);
+  ov = build_overlay (!NILP (front_advance), !NILP (rear_advance),
+		      Qnil, on_enter, on_exit);
   add_buffer_overlay (b, XOVERLAY (ov), obeg, oend);
 
-  /* We don't need to redisplay the region covered by the overlay, because
-     the overlay has no properties at the moment.  */
-
+  /* No redisplay needed as overlay births with no properties.  */
   return ov;
 }
 

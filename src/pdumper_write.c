@@ -1526,6 +1526,8 @@ dump_interval_node (struct dump_context *ctx, struct itree_node *node)
   DUMP_FIELD_COPY (&out, node, red);
   DUMP_FIELD_COPY (&out, node, rear_advance);
   DUMP_FIELD_COPY (&out, node, front_advance);
+  write_field_lisp_object (ctx, &out, node, &node->on_enter, WEIGHT_STRONG);
+  write_field_lisp_object (ctx, &out, node, &node->on_exit, WEIGHT_STRONG);
   dump_off offset = finish_object (ctx, &out, sizeof (out));
   if (node->parent)
     remember_fixup_ptr (ctx, offset + DUMP_OFFSETOF (struct itree_node, parent),

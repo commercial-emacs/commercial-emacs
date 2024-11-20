@@ -189,8 +189,7 @@ properties."
                 (let ((overlay (make-overlay
                                 (or .overlay-beg 2)
                                 (or .overlay-end 4)
-                                nil
-                                advance advance)))
+                                nil advance advance)))
                   (overlay-tests-start-recording-modification-hooks overlay)
 
                   ;; Modify the buffer, possibly inducing calls to the
@@ -524,7 +523,7 @@ should evaporate overlays in both."
 ;; Test if trying to make an overlay signals conditions.
 (deftest-make-overlay-2 A ()            wrong-number-of-arguments)
 (deftest-make-overlay-2 B (1)           wrong-number-of-arguments)
-(deftest-make-overlay-2 C (1 2 3 4 5 6) wrong-number-of-arguments)
+(deftest-make-overlay-2 C (1 2 3 4 5 6 7 8) wrong-number-of-arguments)
 (deftest-make-overlay-2 D ("1")         wrong-number-of-arguments)
 (deftest-make-overlay-2 E ("1" "2")     wrong-type-argument)
 (deftest-make-overlay-2 F (1 2 "b")     wrong-type-argument)

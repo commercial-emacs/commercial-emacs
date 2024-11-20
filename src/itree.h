@@ -92,6 +92,8 @@ struct itree_node
   bool_bf red : 1;
   bool_bf rear_advance : 1;     /* Same as for marker and overlays.  */
   bool_bf front_advance : 1;    /* Same as for marker and overlays.  */
+  Lisp_Object on_enter;         /* Callback on enter.  */
+  Lisp_Object on_exit;          /* Callback on exit.  */
 };
 
 struct itree_tree
@@ -109,7 +111,8 @@ enum itree_order
     ITREE_POST_ORDER,
   };
 
-extern void itree_node_init (struct itree_node *, bool, bool, Lisp_Object);
+extern void itree_node_init (struct itree_node *, bool, bool, Lisp_Object,
+			     Lisp_Object, Lisp_Object);
 extern ptrdiff_t itree_node_begin (struct itree_tree *, struct itree_node *);
 extern ptrdiff_t itree_node_end (struct itree_tree *, struct itree_node *);
 extern void itree_node_set_region (struct itree_tree *, struct itree_node *,

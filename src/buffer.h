@@ -1177,7 +1177,7 @@ extern void fix_overlays_before (struct buffer *, ptrdiff_t, ptrdiff_t);
 extern void mmap_set_vars (bool);
 extern void restore_buffer (Lisp_Object);
 extern void set_buffer_if_live (Lisp_Object);
-extern Lisp_Object build_overlay (bool, bool, Lisp_Object);
+extern Lisp_Object build_overlay (bool, bool, Lisp_Object, Lisp_Object, Lisp_Object);
 
 /* Arrange to go back to the original buffer after the next
    call to unbind_to if the original buffer is still alive.  */
@@ -1416,6 +1416,18 @@ INLINE bool
 OVERLAY_FRONT_ADVANCE_P (Lisp_Object ov)
 {
   return XOVERLAY (ov)->interval->front_advance;
+}
+
+INLINE Lisp_Object
+OVERLAY_ON_ENTER (Lisp_Object ov)
+{
+  return XOVERLAY (ov)->interval->on_enter;
+}
+
+INLINE Lisp_Object
+OVERLAY_ON_EXIT (Lisp_Object ov)
+{
+  return XOVERLAY (ov)->interval->on_exit;
 }
 
 #define PER_BUFFER_VAR_OFFSET(VAR) \
