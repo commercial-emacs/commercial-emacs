@@ -1201,6 +1201,7 @@ command_loop (void)
 	call0 (Qundefined);
       else
 	{
+	  Lisp_Object ante;
 #ifdef HAVE_WINDOW_SYSTEM
           specpdl_ref scount = SPECPDL_INDEX ();
           if (display_hourglass_p
@@ -1214,7 +1215,29 @@ command_loop (void)
 	  if (!EQ (Vthis_command, KVAR (current_kboard, Vlast_command)))
 	    Fundo_boundary ();
 
+	  ante = BVAR (current_buffer, undo_list);
+
           call1 (Qcommand_execute, Vthis_command);
+
+	  if (!EQ (ante, BVAR (current_buffer, undo_list))
+	      && CONSP (ante)
+	      && CONSP (BVAR (current_buffer, undo_list)))
+	    {
+	      /* Ensure executed command yields one undo grouping.  XCDR
+		 because initial undo boundary is fine, it's only
+		 intervening ones we want to delete.  */
+	      Lisp_Object tail = XCDR (BVAR (current_buffer, undo_list)),
+		prev = BVAR (current_buffer, undo_list);
+	      FOR_EACH_TAIL (tail)
+		{
+		  if (EQ (tail, ante))
+		    break;
+		  else if (EQ (UNDO_BOUNDARY, (XCAR (tail))))
+		    XSETCDR (prev, XCDR (tail));
+		  else
+		    prev = tail;
+		}
+	    }
 
 #ifdef HAVE_WINDOW_SYSTEM
           unbind_to (scount, Qnil);
