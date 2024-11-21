@@ -158,17 +158,14 @@ By convention, this is a list of symbols where each symbol stands for the
                          (point-min)))
              (start (min oldpos point))
              (end (max oldpos point)))
-        (unless (or (null old) (eq (marker-buffer oldposmark) (current-buffer)))
+        (when (and old (not (eq (marker-buffer oldposmark) (current-buffer))))
           ;; `window' does not display the same buffer any more!
           (setcdr old nil))
-        (if (or (and (null new) (null (cdr old)))
-                (and (eq new (cdr old))
-                     (eq (next-single-char-property-change
-                          start 'cursor-sensor-functions nil end)
-                         end)))
-            ;; Clearly nothing to do.
-            nil
-          ;; Maybe something to do.  Let's see exactly what needs to run.
+        (when (and (or new (cdr old))
+                   (or (not (eq new (cdr old)))
+                       (not (eq (next-single-char-property-change
+                                 start 'cursor-sensor-functions nil end)
+                                end))))
           (let* ((missing-p
                   (lambda (f)
                     "Non-nil if F is missing somewhere between START and END."

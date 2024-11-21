@@ -60,6 +60,16 @@ struct buffer buffer_slot_defaults;
 struct buffer buffer_slot_map;
 struct buffer buffer_slot_symbols;
 
+static struct proximity
+{
+  struct {
+    ptrdiff_t beg, end;
+  } preceding;
+  struct {
+    ptrdiff_t beg, end;
+  } following;
+} proximity;
+
 #define PER_BUFFER_SYMBOL(OFFSET) \
   (*(Lisp_Object *)((OFFSET) + (char *) &buffer_slot_symbols))
 
@@ -4652,6 +4662,8 @@ init_buffer_once (void)
   Fset_buffer (Fget_buffer_create (build_pure_c_string ("*scratch*"), Qnil));
 
   inhibit_modification_hooks = false;
+
+  (void) proximity;
 }
 
 void

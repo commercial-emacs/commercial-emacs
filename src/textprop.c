@@ -325,11 +325,11 @@ set_properties (Lisp_Object properties, INTERVAL interval, Lisp_Object object)
 	   PLIST_ELT_P (sym, value);
 	   sym = XCDR (value))
 	if (!EQ (property_value (properties, XCAR (sym)),
-		  XCAR (value)))
+		 XCAR (value)))
 	  {
 	    undo_push_property (interval->position, LENGTH (interval),
-				    XCAR (sym), XCAR (value),
-				    object);
+				XCAR (sym), XCAR (value),
+				object);
 	  }
 
       /* For each new property that has no value at all in the old plist,
@@ -340,8 +340,8 @@ set_properties (Lisp_Object properties, INTERVAL interval, Lisp_Object object)
 	if (EQ (property_value (interval->plist, XCAR (sym)), Qunbound))
 	  {
 	    undo_push_property (interval->position, LENGTH (interval),
-				    XCAR (sym), Qnil,
-				    object);
+				XCAR (sym), Qnil,
+				object);
 	  }
     }
 
@@ -387,7 +387,7 @@ add_properties (Lisp_Object plist, INTERVAL interval, Lisp_Object object,
 	  if (BUFFERP (object))
 	    /* For undo purposes.  */
 	    undo_push_property (interval->position, LENGTH (interval),
-				    sym1, Fcar (this_cdr), object);
+				sym1, Fcar (this_cdr), object);
 	  if ((BUFFERP (object) || STRINGP (object))
 	      && NILP (Fminibufferp (buf, Qnil))
 	      && XBUFFER (buf)->text->monospace)
@@ -499,8 +499,8 @@ remove_properties (Lisp_Object plist, Lisp_Object list, INTERVAL i, Lisp_Object 
 	{
 	  if (BUFFERP (object))
 	    undo_push_property (i->position, LENGTH (i),
-				    sym, XCAR (XCDR (current_plist)),
-				    object);
+				sym, XCAR (XCDR (current_plist)),
+				object);
 
 	  current_plist = XCDR (XCDR (current_plist));
 	  changed = true;
@@ -515,8 +515,7 @@ remove_properties (Lisp_Object plist, Lisp_Object list, INTERVAL i, Lisp_Object 
 	    {
 	      if (BUFFERP (object))
 		undo_push_property (i->position, LENGTH (i),
-					sym, XCAR (XCDR (this)), object);
-
+				    sym, XCAR (XCDR (this)), object);
 	      Fsetcdr (XCDR (tail2), XCDR (XCDR (this)));
 	      changed = true;
 	    }
