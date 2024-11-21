@@ -254,12 +254,6 @@ because it respects values of `delete-active-region' and `overwrite-mode'.  */)
   else
     call1 (Qkill_forward_chars, n);
 
-  /* amalgamate next undo by removing current boundary.  */
-  if (CONSP (BVAR (current_buffer, undo_list))
-      && EQ (UNDO_BOUNDARY, XCAR (BVAR (current_buffer, undo_list))))
-    bset_undo_list (current_buffer,
-		    XCDR (BVAR (current_buffer, undo_list)));
-
   return Qnil;
 }
 
@@ -293,14 +287,8 @@ a non-nil value for the inserted character.  At the end, it runs
   else
     {
       int tchar = translate_char (Vtranslation_table_for_input, XFIXNUM (c));
-      if (2 != internal_self_insert (tchar, XFIXNAT (n)))
-	{
-	  /* amalgamate next undo by removing current boundary.  */
-	  if (CONSP (BVAR (current_buffer, undo_list))
-	      && EQ (UNDO_BOUNDARY, XCAR (BVAR (current_buffer, undo_list))))
-	    bset_undo_list (current_buffer,
-			    XCDR (BVAR (current_buffer, undo_list)));
-	}
+      if (2 == internal_self_insert (tchar, XFIXNAT (n)))
+	Fundo_boundary ();
       frame_make_pointer_invisible (SELECTED_FRAME ());
     }
 

@@ -3429,6 +3429,14 @@ state.  A `t' value indicates undo run exhausted.")
 
 (define-obsolete-function-alias 'undo--last-change-was-undo-p nil "31.1")
 
+(defun undo--seen-list ()
+  (let ((key buffer-undo-list))
+    (puthash key (cond (undo-in-region  ;give up
+			'undo-in-region)
+                       (t
+                        pending-undo-list))
+	     lists-seen-after-undo)))
+
 (defun undo (&optional arg)
   "Undo ARG number of times."
   (interactive "*P")
@@ -3463,13 +3471,6 @@ state.  A `t' value indicates undo run exhausted.")
 	(setq pending-undo-list (if (consp equiv) equiv t))))
 
     (undo-more (if (numberp arg) (prefix-numeric-value arg) 1))
-
-    (let ((key buffer-undo-list))
-      (puthash key (cond (undo-in-region  ;give up
-                          'undo-in-region)
-                         (t
-                          pending-undo-list))
-	       lists-seen-after-undo))
 
     ;; Don't specify a position in the undo record for the undo command.
     ;; Instead, undoing this should move point to where the change is.
@@ -3523,7 +3524,7 @@ Don't do this."
       ;; An extant key means first elements are redo's (see Commentary).
       (let* ((undo-in-progress t)
              (popped (primitive-undo (or arg 1) buffer-undo-list)))
-        ;; set buffer-undo-list to boundary before POPPED.
+        ;; set buffer-undo-list to boundary preceding POPPED.
         (message (concat "Redo" (when undo-in-region " in region")))
         (while (and (consp buffer-undo-list)
                     (not (eq popped (cdr buffer-undo-list))))

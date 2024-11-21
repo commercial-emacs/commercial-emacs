@@ -945,7 +945,7 @@ See https://debbugs.gnu.org/cgi/bugreport.cgi?bug=19350."
       (accept-change-group g))
     (should (equal (buffer-string) "0\nb\nc\n"))
     (undo)
-    (should (equal (buffer-string) "0\n"))))
+    (should (equal (buffer-string) ""))))
 
 (defvar subr--ordered nil)
 

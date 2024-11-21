@@ -1201,7 +1201,6 @@ command_loop (void)
 	call0 (Qundefined);
       else
 	{
-	  Lisp_Object ante;
 #ifdef HAVE_WINDOW_SYSTEM
           specpdl_ref scount = SPECPDL_INDEX ();
           if (display_hourglass_p
@@ -1211,33 +1210,22 @@ command_loop (void)
               start_hourglass ();
             }
 #endif
-	  /* conclude undo amalgamation, if any. */
+	  /* Conclude undo amalgamation, if any.  */
 	  if (!EQ (Vthis_command, KVAR (current_kboard, Vlast_command)))
 	    Fundo_boundary ();
 
-	  ante = BVAR (current_buffer, undo_list);
-
           call1 (Qcommand_execute, Vthis_command);
 
-	  if (!EQ (ante, BVAR (current_buffer, undo_list))
-	      && CONSP (ante)
-	      && CONSP (BVAR (current_buffer, undo_list)))
-	    {
-	      /* Ensure executed command yields one undo grouping.  XCDR
-		 because initial undo boundary is fine, it's only
-		 intervening ones we want to delete.  */
-	      Lisp_Object tail = XCDR (BVAR (current_buffer, undo_list)),
-		prev = BVAR (current_buffer, undo_list);
-	      FOR_EACH_TAIL (tail)
-		{
-		  if (EQ (tail, ante))
-		    break;
-		  else if (EQ (UNDO_BOUNDARY, (XCAR (tail))))
-		    XSETCDR (prev, XCDR (tail));
-		  else
-		    prev = tail;
-		}
-	    }
+	  if (!EQ (Vthis_command, Qself_insert_command)
+	      && !EQ (Vthis_command, Qdelete_char)
+	      && !EQ (Vthis_command, Qnewline))
+	    Fundo_boundary ();
+
+	  if (CONSP (BVAR (current_buffer, undo_list))
+	      && (EQ (Vthis_command, Qundo)
+		  || EQ (Vthis_command, Qundo_only)))
+	    /* An undo lookup table dating back to RMS.  */
+	    call0 (Qundo__seen_list);
 
 #ifdef HAVE_WINDOW_SYSTEM
           unbind_to (scount, Qnil);
@@ -12278,6 +12266,11 @@ avoid making Emacs unresponsive while the user types.
 See also `pre-command-hook'.  */);
   Vpost_command_hook = Qnil;
 
+  DEFSYM (Qdelete_char, "delete-char");
+  DEFSYM (Qnewline, "newline");
+  DEFSYM (Qundo, "undo");
+  DEFSYM (Qundo_only, "undo-only");
+  DEFSYM (Qundo__seen_list, "undo--seen-list");
   DEFSYM (Qecho_area_clear_hook, "echo-area-clear-hook");
   DEFSYM (Qtouchscreen_begin, "touchscreen-begin");
   DEFSYM (Qtouchscreen_end, "touchscreen-end");

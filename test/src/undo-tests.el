@@ -112,8 +112,7 @@
                    (progn
                      (undo) ;step 5
                      (undo-more 4) ;step 1
-                     (undo) ;step 2
-                     (undo-more 3) ;step 5
+                     (undo) ;step 5
                      (buffer-string))))))
 
 (ert-deftest undo-test2 ()

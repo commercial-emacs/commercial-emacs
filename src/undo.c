@@ -69,7 +69,6 @@ undo_push_insert (ptrdiff_t beg, ptrdiff_t length)
       XSETINT (lend, beg + length);
       bset_undo_list (current_buffer,
 		      Fcons (Fcons (lbeg, lend), BVAR (current_buffer, undo_list)));
-      Fundo_boundary ();
     }
 }
 
@@ -118,7 +117,6 @@ undo_push_delete (ptrdiff_t beg, Lisp_Object string, bool record_markers)
 
       bset_undo_list (current_buffer,
 		      Fcons (Fcons (string, sbeg), BVAR (current_buffer, undo_list)));
-      Fundo_boundary ();
     }
 }
 

@@ -327,8 +327,8 @@
     ;; `type-of' on them will cause Emacs to abort.  Calling
     ;; `garbage-collect' will also abort if it finds any reachable
     ;; freed objects.
-    (should (eq (type-of (car (nth 1 (cdr buffer-undo-list)))) 'marker))
-    (should (eq (type-of (car (nth 2 (cdr buffer-undo-list)))) 'marker))
+    (should (eq (type-of (car (nth 1 buffer-undo-list))) 'marker))
+    (should (eq (type-of (car (nth 2 buffer-undo-list))) 'marker))
     (garbage-collect)))
 
 (ert-deftest delete-region-undo-markers-2 ()
@@ -352,8 +352,8 @@
     ;; `type-of' on them will cause Emacs to abort.  Calling
     ;; `garbage-collect' will also abort if it finds any reachable
     ;; freed objects.
-    (should (eq (type-of (car (nth 3 (cdr buffer-undo-list)))) 'marker))
-    (should (eq (type-of (car (nth 4 (cdr buffer-undo-list)))) 'marker))
+    (should (eq (type-of (car (nth 3 buffer-undo-list))) 'marker))
+    (should (eq (type-of (car (nth 4 buffer-undo-list))) 'marker))
     (garbage-collect)))
 
 (ert-deftest format-bignum ()
