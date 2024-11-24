@@ -155,7 +155,7 @@ DEFUN ("undo-boundary", Fundo_boundary, Sundo_boundary, 0, 0, 0,
        doc: /* Mark the end of the current undo batch.  */)
   (void)
 {
-  undo_amalgamating = Qnil;
+  undo_amalgamating = false;
   if (!EQ (BVAR (current_buffer, undo_list), Qt))
     {
       if (CONSP (BVAR (current_buffer, undo_list))

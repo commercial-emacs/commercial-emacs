@@ -4630,7 +4630,7 @@ extern void discard_mouse_events (void);
 void handle_sigio (int);
 #endif
 extern Lisp_Object pending_funcalls;
-extern Lisp_Object undo_amalgamating;
+extern bool undo_amalgamating;
 extern bool detect_input_pending (void);
 extern bool detect_input_pending_ignore_squeezables (void);
 extern bool detect_input_pending_run_timers (bool);

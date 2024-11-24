@@ -235,7 +235,7 @@ because it respects values of `delete-active-region' and `overwrite-mode'.  */)
   pos = PT + XFIXNUM (n);
 
   if (eabs (XFIXNUM (n)) < 2)
-    undo_amalgamating = Qt;
+    undo_amalgamating = true;
 
   if (NILP (killflag))
     {
@@ -285,7 +285,7 @@ a non-nil value for the inserted character.  At the end, it runs
     error ("Negative repetition argument %"pI"d", XFIXNUM (n));
 
   if (XFIXNAT (n) < 2)
-    undo_amalgamating = Qt;
+    undo_amalgamating = true;
 
   /* Barf if the key that invoked this was not a character.  */
   if (!CHARACTERP (c))
