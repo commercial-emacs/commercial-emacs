@@ -1044,6 +1044,7 @@ enum { READ_KEY_ELTS = 30 };
 static int read_key_sequence (Lisp_Object *, Lisp_Object,
                               bool, bool, bool, bool);
 static void adjust_point_for_property (ptrdiff_t, bool);
+Lisp_Object undo_amalgamating;
 
 static Lisp_Object
 command_loop (void)
@@ -1216,9 +1217,7 @@ command_loop (void)
 
           call1 (Qcommand_execute, Vthis_command);
 
-	  if (!EQ (Vthis_command, Qself_insert_command)
-	      && !EQ (Vthis_command, Qdelete_char)
-	      && !EQ (Vthis_command, Qnewline))
+	  if (NILP (undo_amalgamating))
 	    Fundo_boundary ();
 
 	  if (CONSP (BVAR (current_buffer, undo_list))
@@ -11647,6 +11646,9 @@ syms_of_keyboard (void)
 {
   pending_funcalls = Qnil;
   staticpro (&pending_funcalls);
+
+  undo_amalgamating = Qnil;
+  staticpro (&undo_amalgamating);
 
   Vlispy_mouse_stem = build_pure_c_string ("mouse");
   staticpro (&Vlispy_mouse_stem);
