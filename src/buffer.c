@@ -60,16 +60,6 @@ struct buffer buffer_slot_defaults;
 struct buffer buffer_slot_map;
 struct buffer buffer_slot_symbols;
 
-static struct proximity
-{
-  struct {
-    ptrdiff_t beg, end;
-  } preceding;
-  struct {
-    ptrdiff_t beg, end;
-  } following;
-} proximity;
-
 #define PER_BUFFER_SYMBOL(OFFSET) \
   (*(Lisp_Object *)((OFFSET) + (char *) &buffer_slot_symbols))
 
@@ -1027,12 +1017,12 @@ set_overlays_multibyte (bool multibyte)
                  && !CHAR_HEAD_P (FETCH_BYTE (end)))
             end++;
           itree_node_set_region (tree, node, BYTE_TO_CHAR (begin),
-                                    BYTE_TO_CHAR (end));
+				 BYTE_TO_CHAR (end));
         }
       else
         {
           itree_node_set_region (tree, node, CHAR_TO_BYTE (node->begin),
-                                    CHAR_TO_BYTE (node->end));
+				 CHAR_TO_BYTE (node->end));
         }
     }
   SAFE_FREE ();
@@ -1060,6 +1050,8 @@ reset_buffer (register struct buffer *b)
   bset_auto_save_file_name (b, Qnil);
   bset_read_only (b, Qnil);
   b->overlays = NULL;
+  b->proximity.preceding.beg = b->proximity.following.beg = PTRDIFF_MAX;
+  b->proximity.preceding.end = b->proximity.following.end = PTRDIFF_MIN;
   bset_mark_active (b, Qnil);
   bset_point_before_scroll (b, Qnil);
   bset_file_format (b, Qnil);
@@ -2943,7 +2935,7 @@ overlays_at (ptrdiff_t pos, bool extend,
 }
 
 ptrdiff_t
-next_overlay_change (ptrdiff_t pos)
+next_overlay_change (ptrdiff_t pos, Lisp_Object predicate)
 {
   ptrdiff_t next = ZV;
   struct itree_node *node;
@@ -2969,21 +2961,38 @@ next_overlay_change (ptrdiff_t pos)
 }
 
 ptrdiff_t
-previous_overlay_change (ptrdiff_t pos)
+previous_overlay_change (ptrdiff_t pos, Lisp_Object predicate)
 {
-  struct itree_node *node;
-  ptrdiff_t prev = BEGV;
-
-  ITREE_FOREACH (node, current_buffer->overlays, prev, pos, DESCENDING)
+  ptrdiff_t ret = BEGV; // ret gets bigger and bigger
+  struct itree_node *last = NULL;
+  struct itree_iterator iter, *iter_p
+    = itree_iterator_start (&iter,
+			    current_buffer->overlays,
+			    ret, pos, ITREE_DESCENDING);
+  for (;;)
     {
-      if (node->end < pos)
-        prev = node->end;
+      for (struct itree_node *node = itree_iterator_next (iter_p);
+	   node != NULL;
+	   node = itree_iterator_next (iter_p))
+	{
+	  last = node;
+	  ret = (node->end < pos)
+	    ? node->end
+	    : max (ret, node->begin);
+	  itree_iterator_narrow (iter_p, ret, pos);
+	}
+      if (last == NULL
+	  || NILP (predicate)
+	  || !NILP (Ffuncall (predicate, &last->data)))
+	break;
       else
-        prev = max (prev, node->begin);
-      ITREE_FOREACH_NARROW (prev, pos);
+	{
+	  /* last && predicate && NILP (predicate (last)) */
+	  // I've marched to best, but now must iterate
+	  // backwards.
+	}
     }
-
-  return prev;
+  return ret;
 }
 
 /* Return true if there exists an overlay with a non-nil
@@ -3535,7 +3544,7 @@ buffer.  */)
     }
   else
     itree_node_set_region (b->overlays, XOVERLAY (overlay)->interval,
-                              n_beg, n_end);
+			   n_beg, n_end);
 
   /* If the overlay has changed buffers, do a thorough redisplay.  */
   if (!EQ (buffer, obuffer))
@@ -3666,6 +3675,23 @@ OVERLAY.  */)
   return Fcopy_sequence (OVERLAY_PLIST (overlay));
 }
 
+DEFUN ("overlay-on-enter", Foverlay_on_enter, Soverlay_on_enter, 1, 1, 0,
+       doc: /* Return the on-enter function of OVERLAY.  */)
+  (Lisp_Object overlay)
+{
+  CHECK_OVERLAY (overlay);
+
+  return OVERLAY_ON_ENTER (overlay);
+}
+
+DEFUN ("overlay-on-exit", Foverlay_on_exit, Soverlay_on_exit, 1, 1, 0,
+       doc: /* Return the on-enter function of OVERLAY.  */)
+  (Lisp_Object overlay)
+{
+  CHECK_OVERLAY (overlay);
+
+  return OVERLAY_ON_EXIT (overlay);
+}
 
 DEFUN ("overlays-at", Foverlays_at, Soverlays_at, 1, 2, 0,
        doc: /* Return a list of the overlays that contain the character at POS.
@@ -3748,26 +3774,26 @@ The resulting list of overlays is in an arbitrary unpredictable order.  */)
 }
 
 DEFUN ("next-overlay-change", Fnext_overlay_change, Snext_overlay_change,
-       1, 1, 0,
+       1, 2, 0,
        doc: /* Return the next position after POS where an overlay starts or ends.
 If there are no overlay boundaries from POS to (point-max),
 the value is (point-max).  */)
-  (Lisp_Object pos)
+  (Lisp_Object pos, Lisp_Object predicate)
 {
   CHECK_FIXNUM_COERCE_MARKER (pos);
 
   if (!buffer_has_overlays ())
     return make_fixnum (ZV);
 
-  return make_fixnum (next_overlay_change (XFIXNUM (pos)));
+  return make_fixnum (next_overlay_change (XFIXNUM (pos), predicate));
 }
 
 DEFUN ("previous-overlay-change", Fprevious_overlay_change,
-       Sprevious_overlay_change, 1, 1, 0,
+       Sprevious_overlay_change, 1, 2, 0,
        doc: /* Return the previous position before POS where an overlay starts or ends.
 If there are no overlay boundaries from (point-min) to POS,
 the value is (point-min).  */)
-  (Lisp_Object pos)
+  (Lisp_Object pos, Lisp_Object predicate)
 {
 
   CHECK_FIXNUM_COERCE_MARKER (pos);
@@ -3775,7 +3801,7 @@ the value is (point-min).  */)
   if (!buffer_has_overlays ())
     return make_fixnum (BEGV);
 
-  return make_fixnum (previous_overlay_change (XFIXNUM (pos)));
+  return make_fixnum (previous_overlay_change (XFIXNUM (pos), predicate));
 }
 
 /* These functions are for debugging overlays.  */
@@ -4662,8 +4688,6 @@ init_buffer_once (void)
   Fset_buffer (Fget_buffer_create (build_pure_c_string ("*scratch*"), Qnil));
 
   inhibit_modification_hooks = false;
-
-  (void) proximity;
 }
 
 void
@@ -5734,6 +5758,8 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
   defsubr (&Soverlay_end);
   defsubr (&Soverlay_buffer);
   defsubr (&Soverlay_properties);
+  defsubr (&Soverlay_on_enter);
+  defsubr (&Soverlay_on_exit);
   defsubr (&Soverlays_at);
   defsubr (&Soverlays_in);
   defsubr (&Snext_overlay_change);

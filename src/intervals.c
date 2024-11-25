@@ -1991,27 +1991,18 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
       && (!intervals_equal (from, to)
 	  || !intervals_equal (fromprev, toprev)))
     {
-      Lisp_Object leave_after, leave_before, enter_after, enter_before;
-
-      if (fromprev)
-	leave_before = textget (fromprev->plist, Qpoint_left);
-      else
-	leave_before = Qnil;
-
-      if (from)
-	leave_after = textget (from->plist, Qpoint_left);
-      else
-	leave_after = Qnil;
-
-      if (toprev)
-	enter_before = textget (toprev->plist, Qpoint_entered);
-      else
-	enter_before = Qnil;
-
-      if (to)
-	enter_after = textget (to->plist, Qpoint_entered);
-      else
-	enter_after = Qnil;
+      Lisp_Object leave_before = fromprev
+	? textget (fromprev->plist, Qpoint_left)
+	: Qnil;
+      Lisp_Object leave_after = from
+	? textget (from->plist, Qpoint_left)
+	: Qnil;
+      Lisp_Object enter_before = toprev
+	? textget (toprev->plist, Qpoint_entered)
+	: Qnil;
+      Lisp_Object enter_after = to
+	? textget (to->plist, Qpoint_entered)
+	: Qnil;
 
       if (!EQ (leave_before, enter_before) && !NILP (leave_before))
       	call2 (leave_before, make_fixnum (old_position),
@@ -2019,13 +2010,44 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
       if (!EQ (leave_after, enter_after) && !NILP (leave_after))
       	call2 (leave_after, make_fixnum (old_position),
       	       make_fixnum (charpos));
-
       if (!EQ (enter_before, leave_before) && !NILP (enter_before))
       	call2 (enter_before, make_fixnum (old_position),
       	       make_fixnum (charpos));
       if (!EQ (enter_after, leave_after) && !NILP (enter_after))
       	call2 (enter_after, make_fixnum (old_position),
       	       make_fixnum (charpos));
+    }
+
+  /* Adjust overlay proximity cache. */
+  if (have_overlays)
+    {
+      if (current_buffer->proximity.following.beg <= PT
+	  && PT < current_buffer->proximity.following.end)
+	{
+	  Lisp_Object olays = Foverlays_at (PT, Qnil);
+	  FOR_EACH_TAIL (olays)
+	    {
+
+	    }
+	}
+      else if (current_buffer->proximity.preceding.beg <= PT
+	       && PT < current_buffer->proximity.preceding.end)
+	{
+	}
+      else if (current_buffer->proximity.preceding.end <= PT
+	       && PT < current_buffer->proximity.following.beg)
+	{
+	  // all good in the hood.
+	}
+      else
+	{
+	  for (Lisp_Object following = Fnext_overlay_change (PT);
+	       OVERLAYP (following) && OVERLAY_ON_ENTER (following);
+	       following =
+	    preceding = Fprevious_overlay_change (PT);
+
+	  // call overlays_at.  establish new proximity.
+	}
     }
 }
 

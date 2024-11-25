@@ -24,38 +24,24 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /*
    Intervals of the form [BEGIN, END), are stored as nodes inside a RB
-   tree, ordered by BEGIN.  The core operation of this tree (besides
-   insert, remove, etc.) is finding all intervals intersecting with
-   some given interval.  In order to perform this operation
-   efficiently, every node stores a third value called LIMIT. (See
-   https://en.wikipedia.org/wiki/Interval_tree#Augmented_tree and its
-   source Introduction to Algorithms, Cormen et al. .)
+   tree, ordered by BEGIN.  The core operation finds all nodes
+   intersecting a given interval argument.  We follow Cormen et al
+   https://en.wikipedia.org/wiki/Interval_tree#Augmented_tree and
+   introduce an auxiliary node attribute LIMIT.
 
    ==== Finding intervals ====
 
-   If we search for all intervals intersecting with (X, Y], we look at
-   some node and test whether
+   In finding all intersecting nodes of (X, Y], should
 
    NODE.BEGIN > Y
 
-   Due to the invariant of the search tree, we know, that we may
-   safely prune NODE's right subtree if this test succeeds, since all
-   intervals begin strictly after Y.
-
-   But we can not make such an assumptions about the left tree, since
-   all we know is that the intervals in this subtree must start before
-   or at NODE.BEGIN.  So we can't tell, whether they end before X or
-   not.  To solve this problem we add another attribute to each node,
-   called LIMIT.
-
-   The LIMIT of a node is the largest END value occurring in the nodes
-   subtree (including the node itself).  Thus, we may look at the left
-   child of some NODE and test whether
+   then we can prune NODE's right subtree whose intervals begin strictly
+   after Y.  The node attribute LIMIT is the largest END value within
+   the node's subtree (inclusive of itself).  Should
 
    NODE.left.LIMIT < X
 
-   and this tells us, if all intervals in the left subtree of NODE end
-   before X and if they can be pruned.
+   then we can prune NODE's left subtree whose intervals end before X.
 
    Conversely, if this inequality is false, the left subtree must
    contain at least one intersecting interval, giving a resulting time
@@ -98,18 +84,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
    ==== Adjusting intervals ====
 
-   Since this data-structure will be used for overlays in an Emacs
-   buffer, a second core operation is the ability to insert and delete
-   gaps in the tree.  This models the insertion and deletion of text
-   in a buffer and the effects it may have on the positions of
-   overlays.
+   A secondary operation is inserting and deleting gaps akin to
+   inserting and deleting buffer text.
 
-   Consider this: Something gets inserted at position P into a buffer
-   and assume that all overlays occur strictly after P.  Ordinarily,
-   we would have to iterate all overlays and increment their BEGIN and
-   END values accordingly (the insertion of text pushes them back).
-   In order to avoid this, we introduce yet another node attribute,
-   called OFFSET.
+   Ordinarily, inserting text would necessitate bumping the BEGIN and
+   END values of overlays after the insertion point.  To avoid this
+   onerous bookkeeping, we introduce yet another node attribute OFFSET.
 
    The OFFSET of some subtree, represented by its root, is the
    amount of shift that needs to be applied to its BEGIN, END and
@@ -361,11 +341,9 @@ itree_inherit_offset (uintmax_t otick, struct itree_node *node)
       return;
     }
 
-  /* Offsets can be inherited from dirty nodes (with out of date
-     otick) during removal, since we do not travel down from the root
-     in that case.  In this case rotations are performed on
-     potentially "dirty" nodes, where we only need to make sure the
-     *local* offsets are zero.  */
+  /* Removal does not traverse down the root, so offsets could inherit
+     from dirty nodes (those with out-of-date otick).  Rotations
+     would only need to ensure *local* offsets are zero.  */
 
   if (node->offset)
     {
@@ -378,9 +356,6 @@ itree_inherit_offset (uintmax_t otick, struct itree_node *node)
 	node->right->offset += node->offset;
       node->offset = 0;
     }
-  /* The only thing that matters about `otick` is whether it's equal to
-     that of the tree.  We could also "blindly" inherit from parent->otick,
-     but we need to tree's `otick` anyway for when there's no parent.  */
   if (node->parent == NULL || node->parent->otick == otick)
     node->otick = otick;
 }
@@ -516,7 +491,7 @@ itree_size (struct itree_tree *tree)
 
 static void
 itree_rotate_left (struct itree_tree *tree,
-			   struct itree_node *node)
+		   struct itree_node *node)
 {
   eassert (node->right != NULL);
 
@@ -920,8 +895,8 @@ itree_total_offset (struct itree_node *node)
    Requires both nodes to be using the same effective `offset`.  */
 static void
 itree_replace_child (struct itree_tree *tree,
-			     struct itree_node *source,
-			     struct itree_node *dest)
+		     struct itree_node *source,
+		     struct itree_node *dest)
 {
   eassert (tree && dest != NULL);
   eassert (source == NULL
@@ -946,8 +921,8 @@ itree_replace_child (struct itree_tree *tree,
    effective `offset`. */
 static void
 itree_transplant (struct itree_tree *tree,
-			  struct itree_node *source,
-			  struct itree_node *dest)
+		  struct itree_node *source,
+		  struct itree_node *dest)
 {
   itree_replace_child (tree, source, dest);
   source->left = dest->left;
@@ -1191,13 +1166,13 @@ itree_delete_gap (struct itree_tree *tree,
  * | Iterator
  * +=======================================================================+ */
 
-/* Return true, if NODE's interval intersects with [BEGIN, END).
-   Note: We always include empty nodes at BEGIN (and not at END),
-   but if BEGIN==END, then we don't include non-empty nodes starting
-   at BEGIN or ending at END.  This seems to match the behavior of the
-   old overlays code but it's not clear if it's The Right Thing
-   (e.g. it breaks the expectation that if NODE1 is included, then
-   a NODE2 strictly bigger than NODE1 should also be included).  */
+/* Return true, if NODE's interval intersects with [BEGIN, END).  Empty
+   nodes (NODE->BEGIN == NODE->END) intersect only at BEGIN.  For an
+   empty range (BEGIN == END), nodes starting at BEGIN or ending at END
+   do not intersect.  This seems to match the behavior of the old
+   overlays code but it's not clear if it's The Right Thing (e.g. it
+   breaks the expectation that if NODE1 is included, then a NODE2
+   strictly bigger than NODE1 should also be included).  */
 
 static inline bool
 itree_node_intersects (const struct itree_node *node,
@@ -1254,7 +1229,7 @@ itree_iter_next_in_subtree (struct itree_node *node,
       if (node->begin > iter->end)
         return NULL;  /* No more nodes within begin..end.  */
       return node;
-
+      break;
     case ITREE_DESCENDING:
       next = node->left;
       if (!next
@@ -1275,11 +1250,11 @@ itree_iter_next_in_subtree (struct itree_node *node,
                  && (next = node->right))
             {
               itree_inherit_offset (iter->otick, next),
-              node = next;
+		node = next;
             }
         }
       return node;
-
+      break;
     case ITREE_PRE_ORDER:
       next = node->left;
       if (next
@@ -1307,9 +1282,9 @@ itree_iter_next_in_subtree (struct itree_node *node,
                   return next;
                 }
             }
-          }
+	}
       return NULL;
-
+      break;
     case ITREE_POST_ORDER:
       next = node->parent;
       if (!next || next->right == node)
@@ -1329,9 +1304,10 @@ itree_iter_next_in_subtree (struct itree_node *node,
                  && (itree_inherit_offset (iter->otick, next), true)))
         node = next;
       return node;
-
+      break;
     default:
-    emacs_abort ();
+      emacs_abort ();
+      break;
     }
 }
 
@@ -1372,6 +1348,7 @@ itree_iterator_first_node (struct itree_tree *tree,
           break;
         default:
           emacs_abort ();
+	  break;
         }
     }
   return node;
@@ -1390,12 +1367,9 @@ itree_iterator_start (struct itree_iterator *iter,
   iter->end = end;
   iter->otick = tree->otick;
   iter->order = order;
-  /* Beware: the `node` field always holds "the next" node to consider.
-     so it's always "one node ahead" of what the iterator loop sees.
-     In most respects this makes no difference, but we depend on this
-     detail in `delete_all_overlays` where this allows us to modify
-     the current node knowing that the iterator will not need it to
-     find the next.  */
+  /* As the NODE field is always "one ahead" of the current iteration,
+     `delete_all_overlays' can modify the current node without fear of
+     needing it to find the next.  */
   iter->node = itree_iterator_first_node (tree, iter);
   return iter;
 }

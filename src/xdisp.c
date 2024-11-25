@@ -9399,8 +9399,8 @@ move_it_backward (struct it *it, int op_to, int op)
 	       && ((op_target - it->current_y) >= actual_line_height (it->w, tpos))
 	       && IT_CHARPOS (*it) < ZV)
 	{
-	  /* Common branch where SLINES exceeds estimate (too
-	     far back).  Scooch forward.  */
+	  /* Common branch where SLINES exceeds estimate (too far back).
+	     Scooch forward.  */
 	  move_it_dy (it, op_target - it->current_y);
 	}
       break;
