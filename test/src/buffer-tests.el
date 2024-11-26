@@ -423,7 +423,7 @@ should evaporate overlays in both."
                               ?\n))
          (dolist (tup tuple)
            (make-overlay (car tup) (cadr tup)))
-         (should (equal (previous-overlay-change ,pos)
+         (should (equal (previous-overlay-change ,pos #'identity)
                         ,result))))))
 
 (defmacro deftest-overlays-at-1 (id pos result &rest ov-triple)

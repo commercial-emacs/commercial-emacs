@@ -228,7 +228,7 @@ skip_invisible (ptrdiff_t pos, ptrdiff_t *next_boundary_p, ptrdiff_t to, Lisp_Ob
   /* We must not advance farther than the next overlay change.
      The overlay change might change the invisible property;
      or there might be overlay strings to be displayed there.  */
-  overlay_limit = Fnext_overlay_change (position);
+  overlay_limit = Fnext_overlay_change (position, Qnil);
   /* As for text properties, this gives a lower bound
      for where the invisible text property could change.  */
   proplimit = Fnext_property_change (position, buffer, Qt);

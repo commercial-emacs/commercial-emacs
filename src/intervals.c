@@ -2024,11 +2024,11 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
       if (current_buffer->proximity.following.beg <= PT
 	  && PT < current_buffer->proximity.following.end)
 	{
-	  Lisp_Object olays = Foverlays_at (PT, Qnil);
-	  FOR_EACH_TAIL (olays)
-	    {
+	  /* Lisp_Object olays = Foverlays_at (PT, Qnil); */
+	  /* FOR_EACH_TAIL (olays) */
+	  /*   { */
 
-	    }
+	  /*   } */
 	}
       else if (current_buffer->proximity.preceding.beg <= PT
 	       && PT < current_buffer->proximity.preceding.end)
@@ -2041,12 +2041,7 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
 	}
       else
 	{
-	  for (Lisp_Object following = Fnext_overlay_change (PT);
-	       OVERLAYP (following) && OVERLAY_ON_ENTER (following);
-	       following =
-	    preceding = Fprevious_overlay_change (PT);
-
-	  // call overlays_at.  establish new proximity.
+	  // call next_overlay_at with lambda
 	}
     }
 }

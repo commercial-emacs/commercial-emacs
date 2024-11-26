@@ -746,7 +746,7 @@ before LIMIT.  LIMIT is a no-op if it is greater than (point-max).  */)
 {
   Lisp_Object temp;
 
-  temp = Fnext_overlay_change (position);
+  temp = Fnext_overlay_change (position, Qnil);
   if (!NILP (limit))
     {
       CHECK_FIXNUM_COERCE_MARKER (limit);
@@ -772,7 +772,7 @@ before LIMIT.  LIMIT is a no-op if it is less than (point-min).  */)
 {
   Lisp_Object temp;
 
-  temp = Fprevious_overlay_change (position);
+  temp = Fprevious_overlay_change (position, Qnil);
   if (!NILP (limit))
     {
       CHECK_FIXNUM_COERCE_MARKER (limit);
