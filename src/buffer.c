@@ -2940,7 +2940,6 @@ next_overlay_change (ptrdiff_t pos, Lisp_Object predicate)
   ptrdiff_t ret = ZV; // ret gets smaller and smaller
   if (current_buffer->overlays)
     {
-      struct itree_node *last = NULL;
       struct itree_iterator iter, *iter_p   /* [pos, ret) */
 	= itree_iterator_start (&iter, current_buffer->overlays,
 				pos, ret, ITREE_ASCENDING);
@@ -2949,22 +2948,24 @@ next_overlay_change (ptrdiff_t pos, Lisp_Object predicate)
 	   node != NULL;
 	   node = itree_iterator_next (iter_p))
 	{
-	  last = node;
-	  if (node->begin > pos)
+	  Lisp_Object args[] = { predicate, node->data };
+	  if (NILP (predicate) || !NILP (Ffuncall (2, args)))
 	    {
-	      /* Ordinarily first iteration. */
-	      eassert (node->begin < ret);
-	      ret = node->begin;
-	      break;
-	    }
-	  else if (node->begin < node->end && node->end < ret)
-	    {
-	      /* Overlay starts at POS? */
-	      ret = node->end;
-	      itree_iterator_narrow (iter_p, pos, ret);
+	      if (node->begin > pos)
+		{
+		  /* Ordinarily first iteration. */
+		  eassert (node->begin < ret);
+		  ret = node->begin;
+		  break;
+		}
+	      else if (node->begin < node->end && node->end < ret)
+		{
+		  /* Overlay starts at POS? */
+		  ret = node->end;
+		  itree_iterator_narrow (iter_p, pos, ret);
+		}
 	    }
 	}
-      (void) last;
     }
   return ret;
 }
@@ -2979,68 +2980,21 @@ previous_overlay_change (ptrdiff_t pos, Lisp_Object predicate)
 	= itree_iterator_start (&iter, current_buffer->overlays,
 				ret, pos, ITREE_DESCENDING);
 
-      /* A PREDICATE will require backtracking.  */
-      USE_SAFE_ALLOCA;
-      struct itree_node **seen = NULL;
-      int n_seen = 0;
-      if (!NILP (predicate))
-	{
-	  const intmax_t sz = itree_size (current_buffer->overlays);
-	  SAFE_NALLOCA (seen, 1, sz);
-	  memset (seen, 0, sizeof *seen * sz);
-	}
-
       /* Since tree is sorted by interval-begin, and we are comparing by
 	 interval-end, an exhaustive search is required.  */
       for (struct itree_node *node = itree_iterator_next (iter_p);
 	   node != NULL;
 	   node = itree_iterator_next (iter_p))
 	{
-	  ret = (node->end < pos)
-	    ? node->end
-	    : max (ret, node->begin);
-	  itree_iterator_narrow (iter_p, ret, pos);
-
-	  if (seen != NULL)
+	  Lisp_Object args[] = { predicate, node->data };
+	  if (NILP (predicate) || !NILP (Ffuncall (2, args)))
 	    {
-	      for (int i = 0; i <= n_seen; ++i)
-		{
-		  /* Earlier interval-ends correlate to earlier interval-begins,
-		     so start finding insertion point at SEEN's end (SEEN sorted
-		     latest first).  */
-		  int j = n_seen - i;
-		  if (j == 0
-		      || node->end < pos && seen[j - 1]->begin
-		      || node->end <= seen[j - 1]->end)
-		    {
-		      fprintf (stderr, "wtf %ld %ld\n", node->begin, node->end);
-		      memcpy (seen + j + 1, seen + j, i * sizeof *seen);
-		      seen[j] = node;
-		    }
-		}
-	      ++n_seen;
+	      ret = (node->end < pos)
+		? node->end
+		: max (ret, node->begin);
+	      itree_iterator_narrow (iter_p, ret, pos);
 	    }
 	}
-
-      if (!NILP (predicate))
-	{
-	  ret = BEGV;
-	  for (int i = 0; i < n_seen; ++i)
-	    {
-	      struct itree_node *node = seen[i];
-	      Lisp_Object args[] = { predicate, node->data };
-	      if (!NILP (Ffuncall (2, args)))
-		{
-		  fprintf (stderr, "wtf %ld %ld %ld\n", node->end, pos, node->begin);
-		  ret = (node->end < pos)
-		    ? node->end
-		    : node->begin;
-		  break;
-		}
-	    }
-	}
-
-      SAFE_FREE ();
     }
   return ret;
 }
