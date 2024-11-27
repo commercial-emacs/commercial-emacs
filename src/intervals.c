@@ -2021,27 +2021,28 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
   /* Adjust overlay proximity cache. */
   if (have_overlays)
     {
-      if (current_buffer->proximity.following.beg <= PT
-	  && PT < current_buffer->proximity.following.end)
-	{
-	  /* Lisp_Object olays = Foverlays_at (PT, Qnil); */
-	  /* FOR_EACH_TAIL (olays) */
-	  /*   { */
-
-	  /*   } */
-	}
-      else if (current_buffer->proximity.preceding.beg <= PT
-	       && PT < current_buffer->proximity.preceding.end)
-	{
-	}
-      else if (current_buffer->proximity.preceding.end <= PT
-	       && PT < current_buffer->proximity.following.beg)
+      if (current_buffer->proximity.preceding <= PT
+	  && PT < current_buffer->proximity.following)
 	{
 	  // all good in the hood.
 	}
       else
 	{
-	  // call next_overlay_at with lambda
+	  Lisp_Object tail = Foverlays_at (make_fixnum (old_position), Qnil);
+	  FOR_EACH_TAIL (tail)
+	    {
+	      Lisp_Object on_exit = Foverlay_on_exit (XCAR (tail));
+	      if (!NILP (on_exit))
+		Ffuncall (1, &on_exit);
+	    }
+
+	  tail = Foverlays_at (make_fixnum (charpos), Qnil);
+	  FOR_EACH_TAIL (tail)
+	    {
+	      Lisp_Object on_enter = Foverlay_on_enter (XCAR (tail));
+	      if (!NILP (on_enter))
+		Ffuncall (1, &on_enter);
+	    }
 	}
     }
 }

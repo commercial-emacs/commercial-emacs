@@ -252,12 +252,7 @@ extern ptrdiff_t advance_to_char_boundary (ptrdiff_t byte_pos);
 
 struct proximity
 {
-  struct {
-    ptrdiff_t beg, end;
-  } preceding;
-  struct {
-    ptrdiff_t beg, end;
-  } following;
+  ptrdiff_t preceding, following;
 };
 
 /* This data structure describes the actual text contents of a buffer.

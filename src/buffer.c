@@ -1050,8 +1050,8 @@ reset_buffer (register struct buffer *b)
   bset_auto_save_file_name (b, Qnil);
   bset_read_only (b, Qnil);
   b->overlays = NULL;
-  b->proximity.preceding.beg = b->proximity.following.beg = PTRDIFF_MAX;
-  b->proximity.preceding.end = b->proximity.following.end = PTRDIFF_MIN;
+  b->proximity.preceding = PTRDIFF_MAX;
+  b->proximity.following = PTRDIFF_MIN;
   bset_mark_active (b, Qnil);
   bset_point_before_scroll (b, Qnil);
   bset_file_format (b, Qnil);
@@ -3452,6 +3452,11 @@ for the rear of the overlay advance when text is inserted there
 
   CHECK_FIXNUM_COERCE_MARKER (beg);
   CHECK_FIXNUM_COERCE_MARKER (end);
+
+  if (!NILP (on_enter))
+    CHECK_TYPE (FUNCTIONP (on_enter), Qfunctionp, on_enter);
+  if (!NILP (on_exit))
+    CHECK_TYPE (FUNCTIONP (on_exit), Qfunctionp, on_exit);
 
   if (XFIXNUM (beg) > XFIXNUM (end))
     {
