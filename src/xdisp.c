@@ -3341,7 +3341,7 @@ compute_stop_pos (struct it *it)
       /* just-in-time disaster aversion Bug#5984 */
       it->end_charpos = min (it->end_charpos, ZV);
 
-      it->stop_charpos = min (it->end_charpos, next_overlay_change (charpos, Qnil));
+      it->stop_charpos = min (it->end_charpos, next_overlay_change (charpos, false));
 
       if (toofar < it->stop_charpos)
 	{
@@ -6344,7 +6344,7 @@ following_line_start (struct it *it, bool *skipped_p, struct bidi_it *bidi_it_pr
 						      make_fixnum (limit));
       *skipped_p =
 	(NILP (pos) || XFIXNAT (pos) == limit) /* no display props */
-	&& next_overlay_change (start, Qnil) == ZV;  /* no overlays */
+	&& next_overlay_change (start, false) == ZV;  /* no overlays */
     }
 
   if (*skipped_p)

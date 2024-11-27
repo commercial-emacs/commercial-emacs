@@ -2021,13 +2021,14 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
   /* Adjust overlay proximity cache. */
   if (have_overlays)
     {
-      if (current_buffer->proximity.preceding <= PT
-	  && PT < current_buffer->proximity.following)
+      if (charpos < current_buffer->proximity.preceding
+	  || charpos >= current_buffer->proximity.following)
 	{
-	  // all good in the hood.
-	}
-      else
-	{
+	  current_buffer->proximity.preceding
+	    = previous_overlay_change (charpos, true);
+	  current_buffer->proximity.following
+	    = next_overlay_change (charpos, true);
+
 	  Lisp_Object tail = Foverlays_at (make_fixnum (old_position), Qnil);
 	  FOR_EACH_TAIL (tail)
 	    {
@@ -2044,6 +2045,8 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
 		Ffuncall (1, &on_enter);
 	    }
 	}
+
+
     }
 }
 

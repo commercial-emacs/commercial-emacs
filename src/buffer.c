@@ -2935,7 +2935,7 @@ overlays_at (ptrdiff_t pos, bool extend,
 }
 
 ptrdiff_t
-next_overlay_change (ptrdiff_t pos, Lisp_Object predicate)
+next_overlay_change (ptrdiff_t pos, bool callback_p)
 {
   ptrdiff_t ret = ZV; // ret gets smaller and smaller
   if (current_buffer->overlays)
@@ -2948,8 +2948,9 @@ next_overlay_change (ptrdiff_t pos, Lisp_Object predicate)
 	   node != NULL;
 	   node = itree_iterator_next (iter_p))
 	{
-	  Lisp_Object args[] = { predicate, node->data };
-	  if (NILP (predicate) || !NILP (Ffuncall (2, args)))
+	  if (!callback_p
+	      || OVERLAY_ON_ENTER (node->data)
+	      || OVERLAY_ON_EXIT (node->data))
 	    {
 	      if (node->begin > pos)
 		{
@@ -2971,7 +2972,7 @@ next_overlay_change (ptrdiff_t pos, Lisp_Object predicate)
 }
 
 ptrdiff_t
-previous_overlay_change (ptrdiff_t pos, Lisp_Object predicate)
+previous_overlay_change (ptrdiff_t pos, bool callback_p)
 {
   ptrdiff_t ret = BEGV; // ret gets bigger and bigger
   if (current_buffer->overlays)
@@ -2986,8 +2987,9 @@ previous_overlay_change (ptrdiff_t pos, Lisp_Object predicate)
 	   node != NULL;
 	   node = itree_iterator_next (iter_p))
 	{
-	  Lisp_Object args[] = { predicate, node->data };
-	  if (NILP (predicate) || !NILP (Ffuncall (2, args)))
+	  if (!callback_p
+	      || OVERLAY_ON_ENTER (node->data)
+	      || OVERLAY_ON_EXIT (node->data))
 	    {
 	      ret = (node->end < pos)
 		? node->end
@@ -3783,26 +3785,26 @@ The resulting list of overlays is in an arbitrary unpredictable order.  */)
 }
 
 DEFUN ("next-overlay-change", Fnext_overlay_change, Snext_overlay_change,
-       1, 2, 0,
+       1, 1, 0,
        doc: /* Return the next position after POS where an overlay starts or ends.
 If there are no overlay boundaries from POS to (point-max),
 the value is (point-max).  */)
-  (Lisp_Object pos, Lisp_Object predicate)
+  (Lisp_Object pos)
 {
   CHECK_FIXNUM_COERCE_MARKER (pos);
 
   if (!buffer_has_overlays ())
     return make_fixnum (ZV);
 
-  return make_fixnum (next_overlay_change (XFIXNUM (pos), predicate));
+  return make_fixnum (next_overlay_change (XFIXNUM (pos), false));
 }
 
 DEFUN ("previous-overlay-change", Fprevious_overlay_change,
-       Sprevious_overlay_change, 1, 2, 0,
+       Sprevious_overlay_change, 1, 1, 0,
        doc: /* Return the previous position before POS where an overlay starts or ends.
 If there are no overlay boundaries from (point-min) to POS,
 the value is (point-min).  */)
-  (Lisp_Object pos, Lisp_Object predicate)
+  (Lisp_Object pos)
 {
 
   CHECK_FIXNUM_COERCE_MARKER (pos);
@@ -3810,7 +3812,7 @@ the value is (point-min).  */)
   if (!buffer_has_overlays ())
     return make_fixnum (BEGV);
 
-  return make_fixnum (previous_overlay_change (XFIXNUM (pos), predicate));
+  return make_fixnum (previous_overlay_change (XFIXNUM (pos), false));
 }
 
 /* These functions are for debugging overlays.  */
