@@ -807,8 +807,7 @@ Interactively, CLONE and INHIBIT-BUFFER-HOOKS are nil.  */)
 
   b = allocate_buffer ();
 
-  /* No double indirection - if base buffer is indirect,
-     new buffer becomes an indirect to base's base.  */
+  /* Ensure base buffer is not itself indirect.  */
   b->base_buffer = (XBUFFER (base_buffer)->base_buffer
 		    ? XBUFFER (base_buffer)->base_buffer
 		    : XBUFFER (base_buffer));
@@ -912,6 +911,22 @@ Interactively, CLONE and INHIBIT-BUFFER-HOOKS are nil.  */)
 
   run_buffer_list_update_hook (b);
 
+  return buf;
+}
+
+DEFUN ("make-multilang-overlay", Fmake_multilang_overlay, Smake_multilang_overlay,
+       1, 1, "d",
+       doc: /* Return indirect buffer with shared overlays.  */)
+  (Lisp_Object beg)
+{
+  Lisp_Object buf = Fmake_indirect_buffer
+    (Fcurrent_buffer(),
+     Fmake_temp_name (concat2 (build_string (" "),
+			       Fbuffer_name (Fcurrent_buffer()))),
+     Qnil, Qt);
+
+  XBUFFER (buf)->overlays = XBUFFER (buf)->base_buffer->overlays;
+  debug_print (beg);
   return buf;
 }
 
@@ -1954,8 +1969,13 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 
       /* Perhaps we should explicitly free the interval tree here...  */
     }
-  delete_all_overlays (b);
-  free_buffer_overlays (b);
+
+  /* Delete overlays only for base, or a non-sharing indirect.  */
+  if (!b->base_buffer || b->overlays != b->base_buffer->overlays)
+    {
+      delete_all_overlays (b);
+      free_buffer_overlays (b);
+    }
 
   /* Reset the local variables, so that this buffer's local values
      won't be protected from GC.  They would be protected
@@ -5733,6 +5753,7 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
   defsubr (&Sfind_buffer);
   defsubr (&Sget_buffer_create);
   defsubr (&Smake_indirect_buffer);
+  defsubr (&Smake_multilang_overlay);
   defsubr (&Sgenerate_new_buffer_name);
   defsubr (&Sbuffer_name);
   defsubr (&Sbuffer_last_name);
