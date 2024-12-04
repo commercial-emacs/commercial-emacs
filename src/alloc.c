@@ -4347,6 +4347,12 @@ mark_buffer (struct buffer *buffer)
 
   mark_interval_tree (&buffer->text->intervals);
 
+  if (buffer->proximity != NULL)
+    {
+      mark_object (&buffer->proximity->preceding);
+      mark_object (&buffer->proximity->following);
+    }
+
   /* For now, we just don't mark the undo_list.  It's done later in
      a special way just before the sweep phase, and after stripping
      some of its elements that are not needed any more.

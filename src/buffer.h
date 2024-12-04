@@ -252,7 +252,7 @@ extern ptrdiff_t advance_to_char_boundary (ptrdiff_t byte_pos);
 
 struct proximity
 {
-  ptrdiff_t preceding, following;
+  Lisp_Object preceding, following; /* markers */
 };
 
 /* This data structure describes the actual text contents of a buffer.
@@ -728,7 +728,8 @@ struct buffer
   /* The interval tree containing this buffer's overlays. */
   struct itree_tree *overlays;
 
-  struct proximity proximity;
+  /* indirect buffers share with base.  */
+  struct proximity *proximity;
 
   /* Changes in the buffer are recorded here for undo, and t means
      don't record anything.  This information belongs to the base

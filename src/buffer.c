@@ -68,6 +68,10 @@ struct buffer buffer_slot_symbols;
   ((ptrdiff_t) min (MOST_POSITIVE_FIXNUM,				\
 		    min (PTRDIFF_MAX, SIZE_MAX) / word_size))
 
+#define MULTI_LANG_INDIRECT_P(BUFFER)				\
+  ((BUFFER)->base_buffer					\
+   && (BUFFER)->overlays == (BUFFER)->base_buffer->overlays)
+
 /* Flags indicating which built-in buffer-local variables are
    permanent locals.  */
 static char buffer_permanent_local_flags[MAX_PER_BUFFER_VARS];
@@ -914,19 +918,131 @@ Interactively, CLONE and INHIBIT-BUFFER-HOOKS are nil.  */)
   return buf;
 }
 
-DEFUN ("make-multilang-overlay", Fmake_multilang_overlay, Smake_multilang_overlay,
-       1, 1, "d",
-       doc: /* Return indirect buffer with shared overlays.  */)
-  (Lisp_Object beg)
+DEFUN ("multi-lang--switch-to-buffer", Fmake_multi_lang__switch_to_buffer,
+       Smake_multi_lang__switch_to_buffer, 1, 1, 0,
+       doc: /* Switch to indirect BUF of the just entered overlay.  */)
+  (Lisp_Object buf)
 {
-  Lisp_Object buf = Fmake_indirect_buffer
-    (Fcurrent_buffer(),
-     Fmake_temp_name (concat2 (build_string (" "),
-			       Fbuffer_name (Fcurrent_buffer()))),
-     Qnil, Qt);
+  ptrdiff_t newpt = clip_to_bounds (BUF_BEG (XBUFFER (buf)), PT,
+				    BUF_Z (XBUFFER (buf)));
 
-  XBUFFER (buf)->overlays = XBUFFER (buf)->base_buffer->overlays;
-  debug_print (beg);
+  fprintf (stderr, "foo0 %ld %s->%s\n",
+	   PT,
+	   SSDATA (BVAR (current_buffer, name)),
+	   SSDATA (BVAR (XBUFFER (buf), name)));
+
+  CALLN (Ffuncall, intern ("switch-to-buffer"), buf, Qt);
+  SET_PT (newpt);
+
+  /* previous_overlay_change scans [BEGV, arg), ergo +1.  */
+  const ptrdiff_t previous = previous_overlay_change (PT + 1, true),
+    next = next_overlay_change (PT, true);
+  current_buffer->proximity->preceding
+    = build_marker (XBUFFER (buf), previous, CHAR_TO_BYTE (previous));
+  current_buffer->proximity->following
+    = build_marker (XBUFFER (buf), next, CHAR_TO_BYTE (next));
+
+  /* next_overlay_change returns ZV when null is more apropos.  */
+  if (!NILP (Fequal (XBUFFER (buf)->proximity->following,
+		     Fpoint_max_marker ())))
+    {
+      current_buffer->proximity->following = Qnil;
+      struct itree_iterator iter, *iter_p   /* [PT, ZV) */
+	= itree_iterator_start (&iter, XBUFFER (buf)->overlays,
+				PT, ZV, ITREE_ASCENDING);
+      for (struct itree_node *node = itree_iterator_next (iter_p);
+	   node != NULL;
+	   node = itree_iterator_next (iter_p))
+	{
+	  if (OVERLAY_ON_ENTER (node->data)
+	      || OVERLAY_ON_EXIT (node->data))
+	    {
+	      XBUFFER (buf)->proximity->following = Fpoint_max_marker ();
+	      break;
+	    }
+	}
+    }
+
+  fprintf (stderr, "foo %ld %ld %ld %s\n",
+	   XFIXNUM (Fmarker_position (XBUFFER (buf)->proximity->preceding)),
+	   (NILP (XBUFFER (buf)->proximity->following)
+	    ? -1
+	    : XFIXNUM (Fmarker_position (XBUFFER (buf)->proximity->following))),
+	   PT,
+	   SSDATA (BVAR (current_buffer, name)));
+  return buf;
+}
+
+DEFUN ("make-multi-lang-overlay", Fmake_multi_lang_overlay, Smake_multi_lang_overlay,
+       2, 2, "(list (point) (intern-soft (completing-read \"Mode: \" (let (modes) (mapatoms (lambda (sym) (when (provided-mode-derived-p sym '(prog-mode)) (push sym modes)))) modes) nil t)))",
+       doc: /* Return indirect buffer with shared overlays.  */)
+  (Lisp_Object beg, Lisp_Object mode)
+{
+  if (0 == SCHARS (SYMBOL_NAME (mode)))
+    call0 (intern ("keyboard-quit"));
+
+  CHECK_FIXNUM_COERCE_MARKER (beg);
+  CHECK_TYPE (FUNCTIONP (mode), Qfunctionp, mode);
+
+  if (current_buffer->base_buffer)
+    xsignal1 (Quser_error, build_string ("Only permitted in base buffer"));
+
+  struct buffer *base = current_buffer;
+
+  if (EQ (BVAR (base, major_mode), mode))
+    xsignal1 (Quser_error, concat2 (build_string ("Base buffer already "),
+				    SYMBOL_NAME (mode)));
+
+  if (base->proximity == NULL)
+    {
+      base->proximity = (struct proximity *) xmalloc (sizeof *base->proximity);
+      base->proximity->preceding = Fpoint_max_marker ();
+      base->proximity->following = Fpoint_min_marker ();
+    }
+
+  if (base->overlays == NULL)
+    base->overlays = itree_create ();
+
+  Lisp_Object tail, xcar, buf = Qnil;
+  FOR_EACH_LIVE_BUFFER (tail, xcar)
+    if (XBUFFER (xcar)->base_buffer == base
+	&& EQ (BVAR (XBUFFER (xcar), major_mode), mode))
+      {
+	buf = xcar;
+	break;
+      }
+
+  if (NILP (buf))
+    {
+      buf = Fmake_indirect_buffer
+	(Fcurrent_buffer (),
+	 concat2 (concat2 (build_string (" "), BVAR (base, name)),
+		  concat3 (build_string ("["), SYMBOL_NAME (mode), build_string ("]"))),
+	 Qnil, Qt);
+      XBUFFER (buf)->overlays = base->overlays;
+      XBUFFER (buf)->proximity = base->proximity;
+      set_buffer_internal (XBUFFER (buf));
+      call0 (mode);
+      set_buffer_internal (base);
+    }
+
+  struct Lisp_Subr *sname = &Smake_multi_lang__switch_to_buffer.s;
+  Lisp_Object switch_to_buffer = intern_c_string (sname->symbol_name);
+  Lisp_Object on_enter = CALLN (Ffuncall, intern ("apply-partially"),
+				switch_to_buffer, buf);
+  Lisp_Object on_exit = CALLN (Ffuncall, intern ("apply-partially"),
+			       switch_to_buffer,
+			       Fcurrent_buffer ());
+  Lisp_Object ov = build_overlay (false, true, Qnil, on_enter, on_exit);
+  ptrdiff_t obeg = clip_to_bounds (BUF_BEG (base), XFIXNUM (beg), BUF_Z (base));
+  insert_char (10); /* newline */
+  SET_PT (obeg);
+  add_buffer_overlay (base, XOVERLAY (ov), obeg, obeg + 1);
+
+  /* invalidate proximity cache */
+  base->proximity->preceding = Fpoint_max_marker ();
+  base->proximity->following = Fpoint_min_marker ();
+  call0 (on_enter);
   return buf;
 }
 
@@ -996,7 +1112,9 @@ free_buffer_overlays (struct buffer *b)
 static void
 set_overlays_multibyte (bool multibyte)
 {
-  if (!current_buffer->overlays || Z == Z_BYTE)
+  if (!current_buffer->overlays
+      || Z == Z_BYTE
+      || MULTI_LANG_INDIRECT_P (current_buffer))
     return;
 
   struct itree_node **nodes = NULL;
@@ -1065,8 +1183,7 @@ reset_buffer (register struct buffer *b)
   bset_auto_save_file_name (b, Qnil);
   bset_read_only (b, Qnil);
   b->overlays = NULL;
-  b->proximity.preceding = PTRDIFF_MAX;
-  b->proximity.following = PTRDIFF_MIN;
+  b->proximity = NULL;
   bset_mark_active (b, Qnil);
   bset_point_before_scroll (b, Qnil);
   bset_file_format (b, Qnil);
@@ -1970,8 +2087,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
       /* Perhaps we should explicitly free the interval tree here...  */
     }
 
-  /* Delete overlays only for base, or a non-sharing indirect.  */
-  if (!b->base_buffer || b->overlays != b->base_buffer->overlays)
+  if (!MULTI_LANG_INDIRECT_P (b))
     {
       delete_all_overlays (b);
       free_buffer_overlays (b);
@@ -1998,6 +2114,11 @@ cleaning up all windows currently displaying the buffer to be killed. */)
     }
   else
     {
+      if (b->proximity != NULL)
+	{
+	  xfree (b->proximity);
+	  b->proximity = NULL;
+	}
       /* Make sure that no one shows us.  */
       eassert (b->window_count == 0);
       /* No one shares our buffer text, can free it.  */
@@ -2366,6 +2487,9 @@ static void
 swap_buffer_overlays (struct buffer *buffer, struct buffer *other)
 {
   struct itree_node *node;
+
+  if (MULTI_LANG_INDIRECT_P (buffer))
+    return;
 
   ITREE_FOREACH (node, buffer->overlays, PTRDIFF_MIN, PTRDIFF_MAX, ASCENDING)
     XOVERLAY (node->data)->buffer = other;
@@ -3370,9 +3494,9 @@ overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
 void
 adjust_overlays_for_insert (ptrdiff_t pos, ptrdiff_t length, bool before_markers)
 {
-  if (!current_buffer->indirections)
+  if (!current_buffer->indirections) /* indirect */
     itree_insert_gap (current_buffer->overlays, pos, length, before_markers);
-  else
+  else /* base */
     {
       struct buffer *base = current_buffer->base_buffer
                             ? current_buffer->base_buffer
@@ -3380,7 +3504,8 @@ adjust_overlays_for_insert (ptrdiff_t pos, ptrdiff_t length, bool before_markers
       Lisp_Object tail, other;
       itree_insert_gap (base->overlays, pos, length, before_markers);
       FOR_EACH_LIVE_BUFFER (tail, other)
-        if (XBUFFER (other)->base_buffer == base)
+	if (XBUFFER (other)->base_buffer == base
+	    && XBUFFER (other)->overlays != base->overlays)
 	  itree_insert_gap (XBUFFER (other)->overlays, pos, length,
 			    before_markers);
     }
@@ -3425,7 +3550,8 @@ adjust_overlays_for_delete (ptrdiff_t pos, ptrdiff_t length)
       Lisp_Object tail, other;
       adjust_overlays_for_delete_in_buffer (base, pos, length);
       FOR_EACH_LIVE_BUFFER (tail, other)
-        if (XBUFFER (other)->base_buffer == base)
+	if (XBUFFER (other)->base_buffer == base
+	    && XBUFFER (other)->overlays != base->overlays)
           adjust_overlays_for_delete_in_buffer (XBUFFER (other), pos, length);
     }
 }
@@ -5753,7 +5879,8 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
   defsubr (&Sfind_buffer);
   defsubr (&Sget_buffer_create);
   defsubr (&Smake_indirect_buffer);
-  defsubr (&Smake_multilang_overlay);
+  defsubr (&Smake_multi_lang__switch_to_buffer);
+  defsubr (&Smake_multi_lang_overlay);
   defsubr (&Sgenerate_new_buffer_name);
   defsubr (&Sbuffer_name);
   defsubr (&Sbuffer_last_name);
