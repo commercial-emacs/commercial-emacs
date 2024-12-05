@@ -2823,8 +2823,7 @@ safe_eval (Lisp_Object sexp)
   return safe_calln (Qeval, sexp, Qt);
 }
 
-/* Apply a C subroutine SUBR to the NUMARGS evaluated arguments in ARG_VECTOR
-   and return the result of evaluation.  */
+/* Return result of applying C subroutine SUBR to the NARGS evaluated ARGS.  */
 
 Lisp_Object
 funcall_subr (struct Lisp_Subr *subr, ptrdiff_t nargs, Lisp_Object *args)
