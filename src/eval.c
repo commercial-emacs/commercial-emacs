@@ -2346,17 +2346,14 @@ eval_form (Lisp_Object form)
 	}
       else if (NILP (fun))
 	{
-	  SAFE_FREE ();
 	  xsignal1 (Qvoid_function, original_fun);
 	}
       else if (!CONSP (fun))
 	{
-	  SAFE_FREE ();
 	  xsignal1 (Qinvalid_function, original_fun);
 	}
       else if (!SYMBOLP (XCAR (fun)))
 	{
-	  SAFE_FREE ();
 	  xsignal1 (Qinvalid_function, original_fun);
 	}
       else if (EQ (XCAR (fun), Qautoload))
@@ -2402,7 +2399,6 @@ eval_form (Lisp_Object form)
 	}
       else
 	{
-	  SAFE_FREE ();
 	  xsignal1 (Qinvalid_function, original_fun);
 	}
       pop_eval_frame (specpdl_ref_to_ptr (count), &result, sa_count); /* SAFE_FREEs */
