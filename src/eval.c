@@ -2827,64 +2827,68 @@ safe_eval (Lisp_Object sexp)
    and return the result of evaluation.  */
 
 Lisp_Object
-funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
+funcall_subr (struct Lisp_Subr *subr, ptrdiff_t nargs, Lisp_Object *args)
 {
-  eassume (numargs >= 0);
-  if (numargs >= subr->min_args)
-    {
-      /* Conforming call to finite-arity subr.  */
-      ptrdiff_t maxargs = subr->max_args;
-      if (numargs <= maxargs && maxargs <= 8)
-	{
-	  Lisp_Object argbuf[8];
-	  Lisp_Object *a;
-	  if (numargs < maxargs)
-	    {
-	      eassume (maxargs <= ARRAYELTS (argbuf));
-	      a = argbuf;
-	      memcpy (a, args, numargs * word_size);
-	      memclear (a + numargs, (maxargs - numargs) * word_size);
-	    }
-	  else
-	    a = args;
-	  switch (maxargs)
-	    {
-	    case 0:
-	      return subr->function.a0 ();
-	    case 1:
-	      return subr->function.a1 (a[0]);
-	    case 2:
-	      return subr->function.a2 (a[0], a[1]);
-	    case 3:
-	      return subr->function.a3 (a[0], a[1], a[2]);
-	    case 4:
-	      return subr->function.a4 (a[0], a[1], a[2], a[3]);
-	    case 5:
-	      return subr->function.a5 (a[0], a[1], a[2], a[3], a[4]);
-	    case 6:
-	      return subr->function.a6 (a[0], a[1], a[2], a[3], a[4], a[5]);
-	    case 7:
-	      return subr->function.a7 (a[0], a[1], a[2], a[3], a[4], a[5],
-					a[6]);
-	    case 8:
-	      return subr->function.a8 (a[0], a[1], a[2], a[3], a[4], a[5],
-					a[6], a[7]);
-	    }
-	  eassume (false);	/* In case the compiler is too stupid.  */
-	}
-
-      /* Call to n-adic subr.  */
-      if (maxargs == MANY || maxargs > 8)
-	return subr->function.aMANY (numargs, args);
-    }
-
-  /* Anything else is an error.  */
-  Lisp_Object fun;
+  eassume (nargs >= 0);
+  const int eight = 8;
+  Lisp_Object result, fun;
   XSETSUBR (fun, subr);
+
   if (subr->max_args == UNEVALLED)
     xsignal1 (Qinvalid_function, fun);
-  else
-    xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (numargs));
+  else if (nargs < subr->min_args)
+    xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
+  else if (subr->max_args == MANY || subr->max_args > eight)
+    result = subr->function.aMANY (nargs, args);
+  else if (nargs > subr->max_args) /* now that negative max_args dealt with */
+    xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (nargs));
+  else /* nargs <= subr->max_args && subr->max_args <= eight */
+    {
+      USE_SAFE_ALLOCA;
+      Lisp_Object *argbuf;
+      SAFE_ALLOCA_LISP (argbuf, subr->max_args);
+      memclear (argbuf, subr->max_args * word_size);
+      memcpy (argbuf, args, nargs * word_size);
+      switch (subr->max_args)
+	{
+	case 0:
+	  result = subr->function.a0 ();
+	  break;
+	case 1:
+	  result = subr->function.a1 (argbuf[0]);
+	  break;
+	case 2:
+	  result = subr->function.a2 (argbuf[0], argbuf[1]);
+	  break;
+	case 3:
+	  result = subr->function.a3 (argbuf[0], argbuf[1], argbuf[2]);
+	  break;
+	case 4:
+	  result = subr->function.a4 (argbuf[0], argbuf[1], argbuf[2], argbuf[3]);
+	  break;
+	case 5:
+	  result = subr->function.a5 (argbuf[0], argbuf[1], argbuf[2], argbuf[3],
+				      argbuf[4]);
+	  break;
+	case 6:
+	  result = subr->function.a6 (argbuf[0], argbuf[1], argbuf[2], argbuf[3],
+				      argbuf[4], argbuf[5]);
+	  break;
+	case 7:
+	  result = subr->function.a7 (argbuf[0], argbuf[1], argbuf[2], argbuf[3],
+				      argbuf[4], argbuf[5], argbuf[6]);
+	  break;
+	case 8:
+	  result = subr->function.a8 (argbuf[0], argbuf[1], argbuf[2], argbuf[3],
+				      argbuf[4], argbuf[5], argbuf[6], argbuf[7]);
+	  break;
+	default:
+	  emacs_abort ();
+	  break;
+	}
+      SAFE_FREE ();
+    }
+  return result;
 }
 
 /* Return the result of applying FUN to NARGS number of evaluated
