@@ -2282,13 +2282,11 @@ populate_evaluated_args (Lisp_Object args,
   CHECK_LIST_END (tail, args);
 }
 
-/* Evaluate non-byte-compiled FORM within prevailing lexical
-   scope.  */
+/* Evaluate non-byte-compiled FORM within prevailing lexical scope.  */
 
 Lisp_Object
 eval_form (Lisp_Object form)
 {
-  static const unsigned char subr_max_nargs = 8; /* !!! tweak switch cases.  */
   Lisp_Object result = form;
   if (SYMBOLP (form))
     {
@@ -2322,77 +2320,17 @@ eval_form (Lisp_Object form)
 
       if (SUBRP (fun) && !NATIVE_COMP_FUNCTION_DYNP (fun))
 	{
-	  const ptrdiff_t nargs = list_length (args);
-	  if (nargs < XSUBR (fun)->min_args
-	      || (XSUBR (fun)->max_args >= 0
-		  && XSUBR (fun)->max_args < nargs))
-	    {
-	      SAFE_FREE ();
-	      xsignal2 (Qwrong_number_of_arguments, original_fun,
-			make_fixnum (nargs));
-	    }
-	  else if (XSUBR (fun)->max_args == UNEVALLED)
+	  if (XSUBR (fun)->max_args == UNEVALLED)
 	    result = (XSUBR (fun)->function.aUNEVALLED) (args);
 	  else
 	    {
+	      const ptrdiff_t nargs = list_length (args);
 	      const ptrdiff_t capacity = max (nargs, XSUBR (fun)->max_args);
 	      Lisp_Object *evaluated_args;
 	      SAFE_ALLOCA_LISP (evaluated_args, capacity);
 	      populate_evaluated_args (args, evaluated_args, capacity);
 	      set_backtrace_args (specpdl_ref_to_ptr (count), evaluated_args, nargs);
-
-	      if (XSUBR (fun)->max_args == MANY
-		  || XSUBR (fun)->max_args > subr_max_nargs)
-		result = XSUBR (fun)->function.aMANY (nargs, evaluated_args);
-	      else
-		switch (XSUBR (fun)->max_args)
-		  {
-		  case 0:
-		    result = (XSUBR (fun)->function.a0 ());
-		    break;
-		  case 1:
-		    result = (XSUBR (fun)->function.a1
-			      (evaluated_args[0]));
-		    break;
-		  case 2:
-		    result = (XSUBR (fun)->function.a2
-			      (evaluated_args[0], evaluated_args[1]));
-		    break;
-		  case 3:
-		    result = (XSUBR (fun)->function.a3
-			      (evaluated_args[0], evaluated_args[1], evaluated_args[2]));
-		    break;
-		  case 4:
-		    result = (XSUBR (fun)->function.a4
-			      (evaluated_args[0], evaluated_args[1], evaluated_args[2],
-			       evaluated_args[3]));
-		    break;
-		  case 5:
-		    result = (XSUBR (fun)->function.a5
-			      (evaluated_args[0], evaluated_args[1], evaluated_args[2],
-			       evaluated_args[3], evaluated_args[4]));
-		    break;
-		  case 6:
-		    result = (XSUBR (fun)->function.a6
-			      (evaluated_args[0], evaluated_args[1], evaluated_args[2],
-			       evaluated_args[3], evaluated_args[4], evaluated_args[5]));
-		    break;
-		  case 7:
-		    result = (XSUBR (fun)->function.a7
-			      (evaluated_args[0], evaluated_args[1], evaluated_args[2],
-			       evaluated_args[3], evaluated_args[4], evaluated_args[5],
-			       evaluated_args[6]));
-		    break;
-		  case 8:
-		    result = (XSUBR (fun)->function.a8
-			      (evaluated_args[0], evaluated_args[1], evaluated_args[2],
-			       evaluated_args[3], evaluated_args[4], evaluated_args[5],
-			       evaluated_args[6], evaluated_args[7]));
-		    break;
-		  default:
-		    SAFE_FREE ();
-		    emacs_abort ();
-		  }
+	      result = funcall_subr (XSUBR (fun), nargs, evaluated_args);
 	    }
 	}
       else if (CLOSUREP (fun)

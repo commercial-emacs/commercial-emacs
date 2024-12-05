@@ -159,7 +159,6 @@ static Lisp_Object oblookup_considering_shorthand (Lisp_Object, const char *,
 						   char **, ptrdiff_t *,
 						   ptrdiff_t *);
 
-
 /* Functions that read one byte from the current source READCHARFUN
    or unreads one byte.  If the integer argument C is -1, it returns
    one read byte, or -1 when there's no more byte in the source.  If C
@@ -1838,12 +1837,11 @@ readevalloop_eager_expand_eval (Lisp_Object val, Lisp_Object macroexpand)
   return val;
 }
 
-/* UNIBYTE specifies how to set load_convert_to_unibyte
-   for this invocation.
-   READFUN, if non-nil, is used instead of `read'.
+/* UNIBYTE configures load_convert_to_unibyte.  READFUN supplants `read'
+   if non-nil.
 
-   START, END specify region to read in current buffer (from eval-region).
-   If the input is not from a buffer, they must be nil.  */
+   START, END delimits the region read, and are nil for non-buffer
+   input.  */
 
 static void
 readevalloop (Lisp_Object readcharfun,
@@ -1858,10 +1856,8 @@ readevalloop (Lisp_Object readcharfun,
   specpdl_ref count = SPECPDL_INDEX ();
   struct buffer *b = 0;
   bool continue_reading_p;
-  /* True if reading an entire buffer.  */
-  bool whole_buffer = 0;
-  /* True on the first time around.  */
   bool first_sexp = 1;
+  bool whole_buffer = 0; /* true if reading entire buffer */
   Lisp_Object macroexpand = intern ("internal-macroexpand-for-load");
 
   if (!NILP (sourcename))
@@ -1875,11 +1871,8 @@ readevalloop (Lisp_Object readcharfun,
        been done already.  */
     macroexpand = Qnil;
 
-  if (MARKERP (readcharfun))
-    {
-      if (NILP (start))
-	start = readcharfun;
-    }
+  if (MARKERP (readcharfun) && NILP (start))
+    start = readcharfun;
 
   if (BUFFERP (readcharfun))
     b = XBUFFER (readcharfun);
@@ -1904,7 +1897,8 @@ readevalloop (Lisp_Object readcharfun,
 
   /* Ensure sourcename is absolute, except whilst preloading.  */
   if (!will_dump_p ()
-      && !NILP (sourcename) && !NILP (Ffile_name_absolute_p (sourcename)))
+      && !NILP (sourcename)
+      && !NILP (Ffile_name_absolute_p (sourcename)))
     sourcename = Fexpand_file_name (sourcename, Qnil);
 
   loadhist_initialize (sourcename);
