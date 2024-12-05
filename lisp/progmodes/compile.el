@@ -2047,7 +2047,11 @@ Returns the compilation buffer created."
             (when compilation-process-setup-function
 	      (funcall compilation-process-setup-function))))
 	;; Move point after `save-excursion'
-	(let* ((outwin (display-buffer outbuf '(nil (allow-no-window . t))))
+	(let* ((outwin (display-buffer
+                        outbuf
+                        (if (> (length (window-list)) 1)
+                            '((display-buffer-use-some-window) . ((some-window . mru)))
+                          '(nil (allow-no-window . t)))))
                (desired-visible-point
 	        (cond (continue (point))
                       (compilation-scroll-output (point-max))
