@@ -299,8 +299,8 @@ invoke it (via an `interactive' spec that contains, for instance, an
 			? Fget (function, Qenable_recursive_minibuffers)
 			: Qnil);
 
-  /* If k or K discard an up-event, save it here so it can be retrieved with
-     U.  */
+  /* If k or K discard an up-event, save it here so it can be retrieved
+     with U.  */
   Lisp_Object up_event = Qnil;
 
   /* Set SPECS to the interactive form, or barf if not interactive.  */
