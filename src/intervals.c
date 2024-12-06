@@ -2029,17 +2029,17 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
 	  Lisp_Object tail = Foverlays_at (make_fixnum (old_position), Qnil);
 	  FOR_EACH_TAIL (tail)
 	    {
-	      Lisp_Object on_exit = Foverlay_on_exit (XCAR (tail));
+	      Lisp_Object on_exit = OVERLAY_ON_EXIT (XCAR (tail));
 	      if (!NILP (on_exit))
-		Ffuncall (1, &on_exit);
+		call1 (on_exit, XCAR (tail));
 	    }
 
 	  tail = Foverlays_at (make_fixnum (charpos), Qnil);
 	  FOR_EACH_TAIL (tail)
 	    {
-	      Lisp_Object on_enter = Foverlay_on_enter (XCAR (tail));
+	      Lisp_Object on_enter = OVERLAY_ON_ENTER (XCAR (tail));
 	      if (!NILP (on_enter))
-		Ffuncall (1, &on_enter);
+		call1 (on_enter, XCAR (tail));
 	    }
 	}
     }

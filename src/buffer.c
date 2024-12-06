@@ -68,10 +68,6 @@ struct buffer buffer_slot_symbols;
   ((ptrdiff_t) min (MOST_POSITIVE_FIXNUM,				\
 		    min (PTRDIFF_MAX, SIZE_MAX) / word_size))
 
-#define MULTI_LANG_INDIRECT_P(BUFFER)				\
-  ((BUFFER)->base_buffer					\
-   && (BUFFER)->overlays == (BUFFER)->base_buffer->overlays)
-
 /* Flags indicating which built-in buffer-local variables are
    permanent locals.  */
 static char buffer_permanent_local_flags[MAX_PER_BUFFER_VARS];
@@ -918,10 +914,8 @@ Interactively, CLONE and INHIBIT-BUFFER-HOOKS are nil.  */)
   return buf;
 }
 
-DEFUN ("multi-lang--switch-to-buffer", Fmake_multi_lang__switch_to_buffer,
-       Smake_multi_lang__switch_to_buffer, 1, 1, 0,
-       doc: /* Switch to indirect BUF of the just entered overlay.  */)
-  (Lisp_Object buf)
+static void
+multi_lang_switch_to_buffer (Lisp_Object buf)
 {
   ptrdiff_t newpt = clip_to_bounds (BUF_BEG (XBUFFER (buf)), PT,
 				    BUF_Z (XBUFFER (buf)));
@@ -970,6 +964,29 @@ DEFUN ("multi-lang--switch-to-buffer", Fmake_multi_lang__switch_to_buffer,
 	    : XFIXNUM (Fmarker_position (XBUFFER (buf)->proximity->following))),
 	   PT,
 	   SSDATA (BVAR (current_buffer, name)));
+}
+
+
+DEFUN ("multi-lang--enter-buffer", Fmake_multi_lang__enter_buffer,
+       Smake_multi_lang__enter_buffer, 2, 2, 0,
+       doc: /* Switch to indirect BUF of the just entered overlay.
+Overlay OV is the overlay just entered.  */)
+  (Lisp_Object buf, Lisp_Object ov)
+{
+  if (NILP (Fmemq (ov, current_buffer->proximity->current)))
+    current_buffer->proximity->current = Fcons (ov, current_buffer->proximity->current);
+  multi_lang_switch_to_buffer (buf);
+  return buf;
+}
+
+DEFUN ("multi-lang--exit-buffer", Fmake_multi_lang__exit_buffer,
+       Smake_multi_lang__exit_buffer, 2, 2, 0,
+       doc: /* Switch to indirect BUF of the just exited overlay.
+Overlay OV is the overlay just exited.  */)
+  (Lisp_Object buf, Lisp_Object ov)
+{
+  current_buffer->proximity->current = Fdelq (ov, current_buffer->proximity->current);
+  multi_lang_switch_to_buffer (buf);
   return buf;
 }
 
@@ -996,6 +1013,7 @@ DEFUN ("make-multi-lang-overlay", Fmake_multi_lang_overlay, Smake_multi_lang_ove
   if (base->proximity == NULL)
     {
       base->proximity = (struct proximity *) xmalloc (sizeof *base->proximity);
+      base->proximity->current = Qnil;
       base->proximity->preceding = Fpoint_max_marker ();
       base->proximity->following = Fpoint_min_marker ();
     }
@@ -1026,23 +1044,25 @@ DEFUN ("make-multi-lang-overlay", Fmake_multi_lang_overlay, Smake_multi_lang_ove
       set_buffer_internal (base);
     }
 
-  struct Lisp_Subr *sname = &Smake_multi_lang__switch_to_buffer.s;
-  Lisp_Object switch_to_buffer = intern_c_string (sname->symbol_name);
+  struct Lisp_Subr *sname = &Smake_multi_lang__enter_buffer.s;
+  Lisp_Object callback = intern_c_string (sname->symbol_name);
   Lisp_Object on_enter = CALLN (Ffuncall, intern ("apply-partially"),
-				switch_to_buffer, buf);
+				callback,
+				buf);
+  sname = &Smake_multi_lang__exit_buffer.s;
+  callback = intern_c_string (sname->symbol_name);
   Lisp_Object on_exit = CALLN (Ffuncall, intern ("apply-partially"),
-			       switch_to_buffer,
+			       callback,
 			       Fcurrent_buffer ());
   Lisp_Object ov = build_overlay (false, true, Qnil, on_enter, on_exit);
   ptrdiff_t obeg = clip_to_bounds (BUF_BEG (base), XFIXNUM (beg), BUF_Z (base));
   insert_char (10); /* newline */
-  SET_PT (obeg);
   add_buffer_overlay (base, XOVERLAY (ov), obeg, obeg + 1);
+  if (PT != obeg)
+    SET_PT (obeg);
+  else
+    call1 (on_enter, ov); /* safety hack */
 
-  /* invalidate proximity cache */
-  base->proximity->preceding = Fpoint_max_marker ();
-  base->proximity->following = Fpoint_min_marker ();
-  call0 (on_enter);
   return buf;
 }
 
@@ -5879,7 +5899,8 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
   defsubr (&Sfind_buffer);
   defsubr (&Sget_buffer_create);
   defsubr (&Smake_indirect_buffer);
-  defsubr (&Smake_multi_lang__switch_to_buffer);
+  defsubr (&Smake_multi_lang__enter_buffer);
+  defsubr (&Smake_multi_lang__exit_buffer);
   defsubr (&Smake_multi_lang_overlay);
   defsubr (&Sgenerate_new_buffer_name);
   defsubr (&Sbuffer_name);

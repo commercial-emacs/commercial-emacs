@@ -252,6 +252,7 @@ extern ptrdiff_t advance_to_char_boundary (ptrdiff_t byte_pos);
 
 struct proximity
 {
+  Lisp_Object current; /* list of overlays */
   Lisp_Object preceding, following; /* markers */
 };
 
@@ -1460,6 +1461,10 @@ extern bool valid_per_buffer_idx (int);
   for (offset = PER_BUFFER_VAR_OFFSET (name);				 \
        offset <= PER_BUFFER_VAR_OFFSET (cursor_in_non_selected_windows); \
        offset += word_size)
+
+#define MULTI_LANG_INDIRECT_P(BUFFER)				\
+  ((BUFFER)->base_buffer					\
+   && (BUFFER)->overlays == (BUFFER)->base_buffer->overlays)
 
 INLINE bool
 LOCALIZED_SLOT_P (struct buffer *b, int idx)

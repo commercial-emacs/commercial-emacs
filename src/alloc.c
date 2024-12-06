@@ -4349,6 +4349,7 @@ mark_buffer (struct buffer *buffer)
 
   if (buffer->proximity != NULL)
     {
+      mark_object (&buffer->proximity->current);
       mark_object (&buffer->proximity->preceding);
       mark_object (&buffer->proximity->following);
     }
