@@ -523,13 +523,7 @@ copy_text (const unsigned char *from_addr, unsigned char *to_addr,
     }
 }
 
-/* Insert a string of specified length before point.
-   This function judges multibyteness based on
-   enable_multibyte_characters in the current buffer;
-   it never converts between single-byte and multibyte.
-
-   DO NOT use this for the contents of a Lisp string or a Lisp buffer!
-   prepare_modify_buffer could relocate the text.  */
+/* Insert a string of specified length before point.  */
 
 void
 insert (const char *string, ptrdiff_t nbytes)

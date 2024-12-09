@@ -1049,9 +1049,6 @@ bool undo_amalgamating;
 static Lisp_Object
 command_loop (void)
 {
-  modiff_count prev_modiff = 0;
-  struct buffer *prev_buffer = NULL;
-
   kset_prefix_arg (current_kboard, Qnil);
   kset_last_prefix_arg (current_kboard, Qnil);
   Fset (Qdeactivate_mark, Qnil);
@@ -1081,9 +1078,6 @@ command_loop (void)
 
   for (;;)
     {
-      Lisp_Object cmd;
-      ptrdiff_t orig_pt = PT;
-
       if (!FRAME_LIVE_P (XFRAME (selected_frame)))
 	Fkill_emacs (Qnil, Qnil);
 
@@ -1140,13 +1134,10 @@ command_loop (void)
       ++num_input_keys;
 
       if (keylen == 0)
-        /* EOF found; presumably at end of kbd macro. */
-	return Qnil;
-
-      if (keylen == -1)
+	return Qnil; /* EOF found, presumably at end of kbd macro */
+      else if (keylen == -1)
 	{
-          /* read_key_sequence got a menu that was rejected.
-	     Skip to next command.  */
+          /* read_key_sequence received a menu that was rejected */
 	  cancel_echoing ();
 	  this_command_key_count = 0;
 	  this_single_command_key_start = 0;
@@ -1164,19 +1155,17 @@ command_loop (void)
         BUF_BEG_UNCHANGED (b) = BUF_END_UNCHANGED (b) = 0;
       }
 
-      cmd = read_key_sequence_cmd;
-      if (!NILP (Vexecuting_kbd_macro))
+      Lisp_Object cmd = read_key_sequence_cmd;
+      if (!NILP (Vexecuting_kbd_macro)
+	  && !NILP (Vquit_flag))
 	{
-	  if (!NILP (Vquit_flag))
-	    {
-	      Vexecuting_kbd_macro = Qt;
-	      maybe_quit ();
-	    }
+	  Vexecuting_kbd_macro = Qt;
+	  maybe_quit ();
 	}
 
-      prev_buffer = current_buffer;
-      prev_modiff = MODIFF;
-      orig_pt = PT;
+      struct buffer *prev_buffer = current_buffer;
+      modiff_count prev_modiff = MODIFF;
+      ptrdiff_t prev_pt = PT;
 
       /* Re-enable adjusting point to a tangibility boundary (e.g.,
          composition, display).  */
@@ -1199,38 +1188,36 @@ command_loop (void)
       Vreal_this_command = cmd;
       safe_run_hooks (Qpre_command_hook);
 
+      /* Conclude undo amalgamation, if any.  */
+      if (!EQ (Vthis_command, KVAR (current_kboard, Vlast_command)))
+	Fundo_boundary ();
+
+#ifdef HAVE_WINDOW_SYSTEM
+      specpdl_ref scount = SPECPDL_INDEX ();
+      if (display_hourglass_p
+	  && NILP (Vexecuting_kbd_macro))
+	{
+	  record_unwind_protect_void (cancel_hourglass);
+	  start_hourglass ();
+	}
+#endif
       if (NILP (Vthis_command))
 	call0 (Qundefined);
       else
-	{
+	call1 (Qcommand_execute, Vthis_command); /* blink and miss it */
 #ifdef HAVE_WINDOW_SYSTEM
-          specpdl_ref scount = SPECPDL_INDEX ();
-          if (display_hourglass_p
-              && NILP (Vexecuting_kbd_macro))
-            {
-              record_unwind_protect_void (cancel_hourglass);
-              start_hourglass ();
-            }
+      unbind_to (scount, Qnil);
 #endif
-	  /* Conclude undo amalgamation, if any.  */
-	  if (!EQ (Vthis_command, KVAR (current_kboard, Vlast_command)))
-	    Fundo_boundary ();
 
-          call1 (Qcommand_execute, Vthis_command);
+      if (!undo_amalgamating)
+	Fundo_boundary ();
 
-	  if (!undo_amalgamating)
-	    Fundo_boundary ();
+      if (CONSP (BVAR (current_buffer, undo_list))
+	  && (EQ (Vthis_command, Qundo)
+	      || EQ (Vthis_command, Qundo_only)))
+	/* An undo lookup table dating back to RMS.  */
+	call0 (Qundo__seen_list);
 
-	  if (CONSP (BVAR (current_buffer, undo_list))
-	      && (EQ (Vthis_command, Qundo)
-		  || EQ (Vthis_command, Qundo_only)))
-	    /* An undo lookup table dating back to RMS.  */
-	    call0 (Qundo__seen_list);
-
-#ifdef HAVE_WINDOW_SYSTEM
-          unbind_to (scount, Qnil);
-#endif
-        }
       kset_last_prefix_arg (current_kboard, Vcurrent_prefix_arg);
 
       safe_run_hooks (Qpost_command_hook);
@@ -1266,24 +1253,28 @@ command_loop (void)
 	  if (EQ (Vtransient_mark_mode, Qidentity))
 	    Vtransient_mark_mode = Qnil;
 	  else if (EQ (Vtransient_mark_mode, Qonly))
-	    /* Deprecated since v22.  Setting transient-mark-mode to
-	       `only' turns it on for a single command.  */
+	    /* Deprecated since v22.  Turns on transient-mark-mode for a
+	       single command.  */
 	    Vtransient_mark_mode = Qidentity;
 
-	  /* Set PRIMARY if `select-active-regions' is non-nil.  */
-	  if (!NILP (find_symbol_value (XSYMBOL (Qdeactivate_mark), current_buffer)))
-	    call0 (Qdeactivate_mark); /* Sets PRIMARY appropriately.  */
+	  /* If `select-active-regions', set PRIMARY.  */
+	  if (!NILP (find_symbol_value (XSYMBOL (Qdeactivate_mark),
+					current_buffer)))
+	    call0 (Qdeactivate_mark);
 	  else
 	    {
-	      Lisp_Object symval;
-	      if ((!NILP (Fwindow_system (Qnil))
-		   || ((symval =
-			find_symbol_value (XSYMBOL (Qxterm_select_active_regions), NULL),
-			(!EQ (symval, Qunbound) && !NILP (symval)))
-		         && !NILP (Fterminal_parameter (Qnil,
-						        Qxterm__set_selection))))
-		  /* Even if mark_active is non-nil, the actual buffer
-		     marker may not have been set yet (Bug#7044).  */
+	      bool xterm_select_p = false;
+	      if (NILP (Fwindow_system (Qnil)))
+		{
+		  Lisp_Object val
+		    = find_symbol_value (XSYMBOL (Qxterm_select_active_regions),
+					 NULL);
+		  xterm_select_p
+		    = (!EQ (val, Qunbound)
+		       && !NILP (val)
+		       && !NILP (Fterminal_parameter (Qnil, Qxterm__set_selection)));
+		}
+	      if ((xterm_select_p || !NILP (Fwindow_system (Qnil)))
 		  && XMARKER (BVAR (current_buffer, mark))->buffer
 		  && (EQ (Vselect_active_regions, Qonly)
 		      ? EQ (CAR_SAFE (Vtransient_mark_mode), Qonly)
@@ -1311,19 +1302,44 @@ command_loop (void)
 
       if (current_buffer == prev_buffer
 	  && XBUFFER (XWINDOW (selected_window)->contents) == current_buffer
-	  && orig_pt != PT)
+	  && prev_pt != PT)
 	{
 	  if (NILP (Vdisable_point_adjustment)
 	      && NILP (Vglobal_disable_point_adjustment)
 	      && !composition_break_at_point)
-	    adjust_point_for_property (orig_pt,
+	    adjust_point_for_property (prev_pt,
 				       MODIFF != prev_modiff);
 	  else if (PT > BEGV
                    && PT < ZV
-		   && PT != composition_adjust_point (orig_pt, PT))
+		   && PT != composition_adjust_point (prev_pt, PT))
 	    /* Point is within a multibyte glyph.  Updating display
                decomposes glyph so that cursor finds point.  */
             windows_or_buffers_changed = 39;
+
+	  if (current_buffer->proximity != NULL
+	      /* And point outside [preceding, following) */
+	      && (PT < XFIXNUM (Fmarker_position
+				(current_buffer->proximity->preceding))
+		  || (!NILP (current_buffer->proximity->following)
+		      && PT >= XFIXNUM (Fmarker_position
+					(current_buffer->proximity->following)))))
+	    {
+	      Lisp_Object tail = Foverlays_at (make_fixnum (prev_pt), Qnil);
+	      FOR_EACH_TAIL (tail)
+		{
+		  Lisp_Object on_exit = OVERLAY_ON_EXIT (XCAR (tail));
+		  if (!NILP (on_exit))
+		    call1 (on_exit, XCAR (tail));
+		}
+
+	      tail = Foverlays_at (make_fixnum (PT), Qnil);
+	      FOR_EACH_TAIL (tail)
+		{
+		  Lisp_Object on_enter = OVERLAY_ON_ENTER (XCAR (tail));
+		  if (!NILP (on_enter))
+		    call1 (on_enter, XCAR (tail));
+		}
+	    }
         }
 
       /* Install chars in kbd macro.  */

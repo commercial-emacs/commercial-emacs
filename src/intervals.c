@@ -2017,32 +2017,6 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
       	call2 (enter_after, make_fixnum (old_position),
       	       make_fixnum (charpos));
     }
-
-  /* Adjust overlay proximity cache. */
-  if (current_buffer->proximity != NULL)
-    {
-      if (charpos < XFIXNUM (Fmarker_position (current_buffer->proximity->preceding))
-	  || (!NILP (current_buffer->proximity->following)
-	      && charpos >= XFIXNUM (Fmarker_position
-				     (current_buffer->proximity->following))))
-	{
-	  Lisp_Object tail = Foverlays_at (make_fixnum (old_position), Qnil);
-	  FOR_EACH_TAIL (tail)
-	    {
-	      Lisp_Object on_exit = OVERLAY_ON_EXIT (XCAR (tail));
-	      if (!NILP (on_exit))
-		call1 (on_exit, XCAR (tail));
-	    }
-
-	  tail = Foverlays_at (make_fixnum (charpos), Qnil);
-	  FOR_EACH_TAIL (tail)
-	    {
-	      Lisp_Object on_enter = OVERLAY_ON_ENTER (XCAR (tail));
-	      if (!NILP (on_enter))
-		call1 (on_enter, XCAR (tail));
-	    }
-	}
-    }
 }
 
 /* Move point to POSITION, unless POSITION is inside an intangible
