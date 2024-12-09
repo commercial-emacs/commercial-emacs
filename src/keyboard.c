@@ -1298,8 +1298,6 @@ command_loop (void)
 	  Vsaved_region_selection = Qnil;
 	}
 
-    finalize:
-
       if (current_buffer == prev_buffer
 	  && XBUFFER (XWINDOW (selected_window)->contents) == current_buffer
 	  && prev_pt != PT)
@@ -1342,6 +1340,7 @@ command_loop (void)
 	    }
         }
 
+    finalize:
       /* Install chars in kbd macro.  */
       if (!NILP (KVAR (current_kboard, defining_kbd_macro))
 	  && NILP (KVAR (current_kboard, Vprefix_arg)))
