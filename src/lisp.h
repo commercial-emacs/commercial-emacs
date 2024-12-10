@@ -1177,6 +1177,7 @@ dead_object (void)
 #define XSETTREE_SITTER(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_TREE_SITTER))
 #define XSETTREE_SITTER_NODE(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_TREE_SITTER_NODE))
 #define XSETTREE_SITTER_CURSOR(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_TREE_SITTER_CURSOR))
+#define XSETOVERLAY(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_OVERLAY))
 
 /* Efficiently convert a pointer to a Lisp object and back.  The
    pointer is represented as a fixnum, so the garbage collector

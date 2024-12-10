@@ -1057,34 +1057,11 @@ DEFUN ("make-multi-lang-overlay", Fmake_multi_lang_overlay, Smake_multi_lang_ove
   Lisp_Object ov = build_overlay (false, true, Qnil, on_enter, on_exit);
   ptrdiff_t obeg = clip_to_bounds (BUF_BEG (base), XFIXNUM (beg), BUF_Z (base));
   insert_char (10); /* newline */
-  add_buffer_overlay (base, XOVERLAY (ov), obeg, obeg + 1);
-  if (PT != obeg)
-    SET_PT (obeg);
-  else
-    call1 (on_enter, ov); /* safety hack */
-
+  add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, obeg + 1);
+  Foverlay_put (ov, Qface, find_symbol_value (XSYMBOL (Qmulti_lang_face), NULL));
+  SET_PT (obeg);
+  call1 (on_enter, ov);
   return buf;
-}
-
-static void
-remove_buffer_overlay (struct buffer *b, struct Lisp_Overlay *ov)
-{
-  eassert (b->overlays);
-  eassert (ov->buffer == b);
-  itree_remove (ov->buffer->overlays, ov->interval);
-  ov->buffer = NULL;
-}
-
-/* Mark OV as no longer associated with its buffer.  */
-
-static void
-drop_overlay (struct Lisp_Overlay *ov)
-{
-  if (!ov->buffer)
-    return;
-
-  modify_overlay (ov->buffer, overlay_start (ov), overlay_end (ov));
-  remove_buffer_overlay (ov->buffer, ov);
 }
 
 /* Delete all overlays of B and reset its overlay lists.  */
@@ -3653,31 +3630,28 @@ modify_overlay (struct buffer *buf, ptrdiff_t start, ptrdiff_t end)
       start = end;
       end = temp;
     }
-
   BUF_COMPUTE_UNCHANGED (buf, start, end);
-
   bset_redisplay (buf);
-
   modiff_incr (&BUF_OVERLAY_MODIFF (buf));
 }
 
 DEFUN ("move-overlay", Fmove_overlay, Smove_overlay, 3, 4, 0,
-       doc: /* Set the endpoints of OVERLAY to BEG and END in BUFFER.
-If BUFFER is omitted, leave OVERLAY in the same buffer it inhabits now.
-If BUFFER is omitted, and OVERLAY is in no buffer, put it in the current
-buffer.  */)
+       doc: /* Move OVERLAY to BUFFER range spanning BEG to END.
+A null target BUFFER results in OVERLAY being moved within its
+associated buffer, or if it lacks one, to the current buffer.  */)
   (Lisp_Object overlay, Lisp_Object beg, Lisp_Object end, Lisp_Object buffer)
 {
-  struct buffer *b, *ob = 0;
-  Lisp_Object obuffer;
   specpdl_ref count = SPECPDL_INDEX ();
-  ptrdiff_t o_beg UNINIT, o_end UNINIT;
 
   CHECK_OVERLAY (overlay);
+  Lisp_Object obuffer = Foverlay_buffer (overlay);
   if (NILP (buffer))
-    buffer = Foverlay_buffer (overlay);
-  if (NILP (buffer))
-    XSETBUFFER (buffer, current_buffer);
+    {
+      if (!NILP (obuffer))
+	buffer = obuffer;
+      else
+	XSETBUFFER (buffer, current_buffer);
+    }
   CHECK_BUFFER (buffer);
 
   if (NILP (Fbuffer_live_p (buffer)))
@@ -3699,63 +3673,39 @@ buffer.  */)
 
   specbind (Qinhibit_quit, Qt); /* FIXME: Why?  */
 
-  obuffer = Foverlay_buffer (overlay);
-  b = XBUFFER (buffer);
+  ptrdiff_t n_beg = clip_to_bounds (BUF_BEG (XBUFFER (buffer)),
+				    XFIXNUM (beg), BUF_Z (XBUFFER (buffer)));
+  ptrdiff_t n_end = clip_to_bounds (n_beg, XFIXNUM (end), BUF_Z (XBUFFER (buffer)));
 
-  ptrdiff_t n_beg = clip_to_bounds (BUF_BEG (b), XFIXNUM (beg), BUF_Z (b));
-  ptrdiff_t n_end = clip_to_bounds (n_beg, XFIXNUM (end), BUF_Z (b));
-
-  if (!NILP (obuffer))
+  if (EQ (buffer, obuffer))
     {
-      ob = XBUFFER (obuffer);
+      /* Move within OVERLAY's buffer.  */
+      itree_node_set_region (XBUFFER (buffer)->overlays,
+			     XOVERLAY (overlay)->interval, n_beg, n_end);
 
-      o_beg = OVERLAY_START (overlay);
-      o_end = OVERLAY_END (overlay);
-    }
+      ptrdiff_t o_beg = OVERLAY_START (overlay);
+      ptrdiff_t o_end = OVERLAY_END (overlay);
 
-  if (!EQ (buffer, obuffer))
-    {
-      if (!NILP (obuffer))
-        remove_buffer_overlay (XBUFFER (obuffer), XOVERLAY (overlay));
-      add_buffer_overlay (XBUFFER (buffer), XOVERLAY (overlay), n_beg, n_end);
-    }
-  else
-    itree_node_set_region (b->overlays, XOVERLAY (overlay)->interval,
-			   n_beg, n_end);
-
-  /* If the overlay has changed buffers, do a thorough redisplay.  */
-  if (!EQ (buffer, obuffer))
-    {
-      /* Redisplay where the overlay was.  */
-      if (ob)
-        modify_overlay (ob, o_beg, o_end);
-
-      /* Redisplay where the overlay is going to be.  */
-      modify_overlay (b, n_beg, n_end);
-    }
-  else
-    /* Redisplay the area the overlay has just left, or just enclosed.  */
-    {
+      /* Redisplay the area OVERLAY just left, or just enclosed.  */
       if (o_beg == n_beg)
-	modify_overlay (b, o_end, n_end);
+	modify_overlay (XBUFFER (buffer), o_end, n_end);
       else if (o_end == n_end)
-	modify_overlay (b, o_beg, n_beg);
+	modify_overlay (XBUFFER (buffer), o_beg, n_beg);
       else
-	modify_overlay (b, min (o_beg, n_beg), max (o_end, n_end));
+	modify_overlay (XBUFFER (buffer), min (o_beg, n_beg), max (o_end, n_end));
+    }
+  else
+    {
+      /* Do a thorough redisplay if overlay changed buffers.  */
+      if (!NILP (obuffer))
+	Fdelete_overlay (obuffer);
+      add_buffer_overlay (XBUFFER (buffer), XOVERLAY (overlay), n_beg, n_end);
+      modify_overlay (XBUFFER (buffer), n_beg, n_end);
     }
 
-  /* Delete the overlay if it is empty after clipping and has the
-     evaporate property.  */
+  /* Delete an evaporated overlay.  */
   if (n_beg == n_end && !NILP (Foverlay_get (overlay, Qevaporate)))
-    { /* We used to call `Fdelete_overlay' here, but it causes problems:
-         - At this stage, `overlay' is not included in its buffer's lists
-           of overlays (the data-structure is in an inconsistent state),
-           contrary to `Fdelete_overlay's assumptions.
-         - Most of the work done by Fdelete_overlay has already been done
-           here for other reasons.  */
-      drop_overlay (XOVERLAY (overlay));
-      return unbind_to (count, overlay);
-    }
+    Fdelete_overlay (overlay);
 
   return unbind_to (count, overlay);
 }
@@ -3764,28 +3714,37 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
        doc: /* Delete the overlay OVERLAY from its buffer.  */)
   (Lisp_Object overlay)
 {
-  struct buffer *b;
   specpdl_ref count = SPECPDL_INDEX ();
-
   CHECK_OVERLAY (overlay);
+  if (OVERLAY_BUFFER (overlay) != NULL)
+    {
+      specbind (Qinhibit_quit, Qt);
+      /* Turn off optimizations if overlay contained before- or
+	 after-strings since they could contain newlines.  */
+      if (!windows_or_buffers_changed
+	  && (!NILP (Foverlay_get (overlay, Qbefore_string))
+	      || !NILP (Foverlay_get (overlay, Qafter_string))))
+	OVERLAY_BUFFER (overlay)->prevent_redisplay_optimizations_p = 1;
 
-  b = OVERLAY_BUFFER (overlay);
-  if (!b)
-    return Qnil;
+      modify_overlay (OVERLAY_BUFFER (overlay), OVERLAY_START (overlay),
+		      OVERLAY_END (overlay));
+      itree_remove (OVERLAY_BUFFER (overlay)->overlays,
+		    XOVERLAY (overlay)->interval);
 
-  specbind (Qinhibit_quit, Qt);
-
-  drop_overlay (XOVERLAY (overlay));
-
-  /* When deleting an overlay with before or after strings, turn off
-     display optimizations for the affected buffer, on the basis that
-     these strings may contain newlines.  This is easier to do than to
-     check for that situation during redisplay.  */
-  if (!windows_or_buffers_changed
-      && (!NILP (Foverlay_get (overlay, Qbefore_string))
-	  || !NILP (Foverlay_get (overlay, Qafter_string))))
-    b->prevent_redisplay_optimizations_p = 1;
-
+      Lisp_Object b; XSETBUFFER (b, OVERLAY_BUFFER (overlay));
+      Lisp_Object face = plist_get (OVERLAY_PLIST (overlay), Qface);
+      if (!NILP (face))
+	Fremove_text_properties (make_fixnum (OVERLAY_START (overlay)),
+				 make_fixnum (OVERLAY_END (overlay)),
+				 list1 (face), b);
+      if (MULTI_LANG_INDIRECT_P (OVERLAY_BUFFER (overlay)))
+	{
+	  Fkill_buffer (b);
+	  if (!NILP (OVERLAY_ON_EXIT (overlay)))
+	    call1 (OVERLAY_ON_EXIT (overlay), overlay);
+	}
+      XOVERLAY (overlay)->buffer = NULL;
+    }
   return unbind_to (count, Qnil);
 }
 
@@ -3809,7 +3768,6 @@ DEFUN ("overlay-start", Foverlay_start, Soverlay_start, 1, 1, 0,
   CHECK_OVERLAY (overlay);
   if (!OVERLAY_BUFFER (overlay))
     return Qnil;
-
   return make_fixnum (OVERLAY_START (overlay));
 }
 
@@ -3820,7 +3778,6 @@ DEFUN ("overlay-end", Foverlay_end, Soverlay_end, 1, 1, 0,
   CHECK_OVERLAY (overlay);
   if (!OVERLAY_BUFFER (overlay))
     return Qnil;
-
   return make_fixnum (OVERLAY_END (overlay));
 }
 
@@ -3830,14 +3787,10 @@ Return nil if OVERLAY has been deleted.  */)
   (Lisp_Object overlay)
 {
   Lisp_Object buffer;
-
   CHECK_OVERLAY (overlay);
-
   if (!OVERLAY_BUFFER (overlay))
     return Qnil;
-
   XSETBUFFER (buffer, OVERLAY_BUFFER (overlay));
-
   return buffer;
 }
 
@@ -3848,7 +3801,6 @@ OVERLAY.  */)
   (Lisp_Object overlay)
 {
   CHECK_OVERLAY (overlay);
-
   return Fcopy_sequence (OVERLAY_PLIST (overlay));
 }
 
@@ -3857,7 +3809,6 @@ DEFUN ("overlay-on-enter", Foverlay_on_enter, Soverlay_on_enter, 1, 1, 0,
   (Lisp_Object overlay)
 {
   CHECK_OVERLAY (overlay);
-
   return OVERLAY_ON_ENTER (overlay);
 }
 
@@ -3866,7 +3817,6 @@ DEFUN ("overlay-on-exit", Foverlay_on_exit, Soverlay_on_exit, 1, 1, 0,
   (Lisp_Object overlay)
 {
   CHECK_OVERLAY (overlay);
-
   return OVERLAY_ON_EXIT (overlay);
 }
 
@@ -4018,7 +3968,7 @@ the value returned by `overlay-lists'.  */)
 }
 
 DEFUN ("overlay-get", Foverlay_get, Soverlay_get, 2, 2, 0,
-       doc: /* Get the property of overlay OVERLAY with property name PROP.  */)
+       doc: /* Return PROP's associated value in OVERLAY's property list.  */)
   (Lisp_Object overlay, Lisp_Object prop)
 {
   CHECK_OVERLAY (overlay);
@@ -4026,43 +3976,42 @@ DEFUN ("overlay-get", Foverlay_get, Soverlay_get, 2, 2, 0,
 }
 
 DEFUN ("overlay-put", Foverlay_put, Soverlay_put, 3, 3, 0,
-       doc: /* Set one property of overlay OVERLAY: give property PROP value VALUE.
-VALUE will be returned.*/)
+       doc: /* Associate PROP with VALUE in OVERLAY's property list.
+Return VALUE.*/)
   (Lisp_Object overlay, Lisp_Object prop, Lisp_Object value)
 {
-  Lisp_Object tail;
-  struct buffer *b;
-  bool changed;
-
+  bool found = false, changed = false;
   CHECK_OVERLAY (overlay);
-
-  b = OVERLAY_BUFFER (overlay);
-
-  for (tail = XOVERLAY (overlay)->plist;
-       CONSP (tail) && CONSP (XCDR (tail));
+  for (Lisp_Object tail = XOVERLAY (overlay)->plist;
+       CONSP (CDR_SAFE (tail));
        tail = XCDR (XCDR (tail)))
-    if (EQ (XCAR (tail), prop))
-      {
-	changed = !EQ (XCAR (XCDR (tail)), value);
-	XSETCAR (XCDR (tail), value);
-	goto found;
-      }
-  /* It wasn't in the list, so add it to the front.  */
-  changed = !NILP (value);
-  set_overlay_plist
-    (overlay, Fcons (prop, Fcons (value, XOVERLAY (overlay)->plist)));
- found:
-  if (b)
     {
-      if (changed)
-	modify_overlay (b, OVERLAY_START (overlay),
-                        OVERLAY_END (overlay));
-      if (EQ (prop, Qevaporate) && !NILP (value)
-	  && (OVERLAY_START (overlay)
-              == OVERLAY_END (overlay)))
-	Fdelete_overlay (overlay);
+      if (EQ (XCAR (tail), prop))
+	{
+	  found = true;
+	  changed = !EQ (XCAR (XCDR (tail)), value);
+	  XSETCAR (XCDR (tail), value);
+	  break;
+	}
     }
 
+  if (!found)
+    {
+      changed = !NILP (value);
+      set_overlay_plist (overlay,
+			 Fcons (prop, Fcons (value, XOVERLAY (overlay)->plist)));
+    }
+
+  if (OVERLAY_BUFFER (overlay) != NULL)
+    {
+      if (changed)
+	modify_overlay (OVERLAY_BUFFER (overlay), OVERLAY_START (overlay),
+                        OVERLAY_END (overlay));
+      if (EQ (prop, Qevaporate)
+	  && !NILP (value)
+	  && (OVERLAY_START (overlay) == OVERLAY_END (overlay)))
+	Fdelete_overlay (overlay);
+    }
   return value;
 }
 
@@ -5031,6 +4980,7 @@ syms_of_buffer (void)
   DEFSYM (Qafter_change_functions, "after-change-functions");
   DEFSYM (Qkill_buffer_query_functions, "kill-buffer-query-functions");
   DEFSYM (Qget_scratch_buffer_create, "get-scratch-buffer-create");
+  DEFSYM (Qmulti_lang_face, "multi-lang-face");
 
   DEFSYM (Qvertical_scroll_bar, "vertical-scroll-bar");
   Fput (Qvertical_scroll_bar, Qchoice, list4 (Qnil, Qt, Qleft, Qright));

@@ -1362,39 +1362,6 @@ buffer_window_count (struct buffer *b)
 
 /* Overlays */
 
-INLINE ptrdiff_t
-overlay_start (struct Lisp_Overlay *ov)
-{
-  if (! ov->buffer)
-    return -1;
-  return itree_node_begin (ov->buffer->overlays, ov->interval);
-}
-
-INLINE ptrdiff_t
-overlay_end (struct Lisp_Overlay *ov)
-{
-  if (! ov->buffer)
-    return -1;
-  return itree_node_end (ov->buffer->overlays, ov->interval);
-}
-
-/* Return the start of OV in its buffer, or -1 if OV is not associated
-   with any buffer.  */
-
-INLINE ptrdiff_t
-OVERLAY_START (Lisp_Object ov)
-{
-  return overlay_start (XOVERLAY (ov));
-}
-
-/* Return the end of OV in its buffer, or -1. */
-
-INLINE ptrdiff_t
-OVERLAY_END (Lisp_Object ov)
-{
-  return overlay_end (XOVERLAY (ov));
-}
-
 /* Return the plist of overlay OV.  */
 
 INLINE Lisp_Object
@@ -1409,6 +1376,27 @@ INLINE struct buffer *
 OVERLAY_BUFFER (Lisp_Object ov)
 {
   return XOVERLAY (ov)->buffer;
+}
+
+/* Return the start of OV in its buffer, or -1 if OV is not associated
+   with any buffer.  */
+
+INLINE ptrdiff_t
+OVERLAY_START (Lisp_Object ov)
+{
+  return OVERLAY_BUFFER (ov)
+    ? itree_node_begin (OVERLAY_BUFFER (ov)->overlays, XOVERLAY (ov)->interval)
+    : -1;
+}
+
+/* Return the end of OV in its buffer, or -1. */
+
+INLINE ptrdiff_t
+OVERLAY_END (Lisp_Object ov)
+{
+  return OVERLAY_BUFFER (ov)
+    ? itree_node_end (OVERLAY_BUFFER (ov)->overlays, XOVERLAY (ov)->interval)
+    : -1;
 }
 
 /* Return true, if OV's rear-advance is set. */
