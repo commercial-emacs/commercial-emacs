@@ -915,6 +915,15 @@ Interactively, CLONE and INHIBIT-BUFFER-HOOKS are nil.  */)
 }
 
 static void
+restore_undo_list (Lisp_Object arg)
+{
+  Lisp_Object undo_list = XCAR (arg);
+  struct buffer *buf = XBUFFER (XCDR (arg));
+
+  bset_undo_list (buf, undo_list);
+}
+
+static void
 multi_lang_switch_to_buffer (Lisp_Object buf)
 {
   ptrdiff_t newpt = clip_to_bounds (BUF_BEG (XBUFFER (buf)), PT,
@@ -990,10 +999,10 @@ Overlay OV is the overlay just exited.  */)
 }
 
 DEFUN ("make-multi-lang-overlay", Fmake_multi_lang_overlay, Smake_multi_lang_overlay,
-       2, 2, "(list (point) (intern-soft (completing-read \"Mode: \" (let (modes) (mapatoms (lambda (sym) (when (provided-mode-derived-p sym '(prog-mode)) (push sym modes)))) modes) nil t)))",
+       3, 3, "(list (if (region-active-p) (region-beginning) (point)) (if (region-active-p) (region-end) (point)) (intern-soft (completing-read \"Mode: \" (let (modes) (mapatoms (lambda (sym) (when (provided-mode-derived-p sym '(prog-mode)) (push sym modes)))) modes) nil t)))",
        doc: /* Return indirect buffer with major mode MODE.
 Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
-  (Lisp_Object beg, Lisp_Object mode)
+  (Lisp_Object beg, Lisp_Object end, Lisp_Object mode)
 {
   if (0 == SCHARS (SYMBOL_NAME (mode)))
     call0 (intern ("keyboard-quit"));
@@ -1009,6 +1018,11 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
   if (EQ (BVAR (base, major_mode), mode))
     xsignal1 (Quser_error, concat2 (build_string ("Base buffer already "),
 				    SYMBOL_NAME (mode)));
+
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_excursion ();
+  set_buffer_internal (base);
+  call0 (Qdeactivate_mark);
 
   if (base->proximity == NULL)
     {
@@ -1039,9 +1053,12 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
 	 Qnil, Qt);
       XBUFFER (buf)->overlays = base->overlays;
       XBUFFER (buf)->proximity = base->proximity;
+
+      specpdl_ref back = SPECPDL_INDEX ();
+      record_unwind_protect_excursion ();
       set_buffer_internal (XBUFFER (buf));
       call0 (mode);
-      set_buffer_internal (base);
+      unbind_to (back, Qnil);
     }
 
   struct Lisp_Subr *sname = &Smake_multi_lang__enter_buffer.s;
@@ -1056,11 +1073,38 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
 			       Fcurrent_buffer ());
   Lisp_Object ov = build_overlay (false, true, Qnil, on_enter, on_exit);
   ptrdiff_t obeg = clip_to_bounds (BUF_BEG (base), XFIXNUM (beg), BUF_Z (base));
-  insert_char (10); /* newline */
-  add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, obeg + 1);
+  ptrdiff_t oend = clip_to_bounds (BUF_BEG (base), XFIXNUM (end), BUF_Z (base));
+
+  specpdl_ref suspend_undo = SPECPDL_INDEX ();
+  record_unwind_protect (restore_undo_list,
+			 Fcons (BVAR (current_buffer, undo_list),
+				Fcurrent_buffer ()));
+  bset_undo_list (current_buffer, Qt);
+  if (oend <= obeg
+      || oend == BUF_BEG (base)
+      || !EQ (Fchar_before (make_fixnum (oend)), make_fixnum (10)))
+    {
+      /* Patch in newline if one not already at OEND.  */
+      SET_PT (oend++);
+      insert_char (10);
+    }
+
+  /* Make the demarcating newline read-only */
+  Fput_text_property (make_fixnum (oend - 1), make_fixnum (oend),
+		      Qrear_nonsticky, list2 (Qface, Qread_only), Qnil);
+  Fput_text_property (make_fixnum (oend - 1), make_fixnum (oend),
+		      Qface, find_symbol_value (XSYMBOL (Qmulti_lang_face), NULL), Qnil);
+  Fput_text_property (make_fixnum (oend - 1), make_fixnum (oend),
+		      Qread_only, Qt, Qnil);
+  unbind_to (suspend_undo, Qnil);
+
+  /* Read-only newline not part of overlay, ergo -1 */
+  add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, oend - 1);
   Foverlay_put (ov, Qface, find_symbol_value (XSYMBOL (Qmulti_lang_face), NULL));
   Foverlay_put (ov, Qmulti_lang_p, Qt);
   SET_PT (obeg);
+  unbind_to (count, Qnil);
+
   call1 (on_enter, ov);
   return buf;
 }
