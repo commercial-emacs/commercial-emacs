@@ -107,7 +107,9 @@ Highlighting can be further customized with
 Expert users can specify their own `font-lock-function' to
 supplant all of the above."
   :lighter nil
-  (when (or noninteractive (eq (aref (buffer-name) 0) ?\s))
+  (when (or noninteractive
+            (and (eq (aref (buffer-name) 0) ?\s)
+                 (not (multi-lang-p (current-buffer)))))
     ;; batch mode or buffer is hidden (name starts space).
     (setq font-lock-mode nil))
 
