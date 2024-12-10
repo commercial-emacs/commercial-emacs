@@ -992,7 +992,8 @@ Overlay OV is the overlay just exited.  */)
 
 DEFUN ("make-multi-lang-overlay", Fmake_multi_lang_overlay, Smake_multi_lang_overlay,
        2, 2, "(list (point) (intern-soft (completing-read \"Mode: \" (let (modes) (mapatoms (lambda (sym) (when (provided-mode-derived-p sym '(prog-mode)) (push sym modes)))) modes) nil t)))",
-       doc: /* Return indirect buffer with shared overlays.  */)
+       doc: /* Return indirect buffer with major mode MODE.
+Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
   (Lisp_Object beg, Lisp_Object mode)
 {
   if (0 == SCHARS (SYMBOL_NAME (mode)))
@@ -1059,6 +1060,7 @@ DEFUN ("make-multi-lang-overlay", Fmake_multi_lang_overlay, Smake_multi_lang_ove
   insert_char (10); /* newline */
   add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, obeg + 1);
   Foverlay_put (ov, Qface, find_symbol_value (XSYMBOL (Qmulti_lang_face), NULL));
+  Foverlay_put (ov, Qmulti_lang_p, Qt);
   SET_PT (obeg);
   call1 (on_enter, ov);
   return buf;
@@ -3698,7 +3700,7 @@ associated buffer, or if it lacks one, to the current buffer.  */)
     {
       /* Do a thorough redisplay if overlay changed buffers.  */
       if (!NILP (obuffer))
-	Fdelete_overlay (obuffer);
+	Fdelete_overlay (overlay);
       add_buffer_overlay (XBUFFER (buffer), XOVERLAY (overlay), n_beg, n_end);
       modify_overlay (XBUFFER (buffer), n_beg, n_end);
     }
@@ -3732,12 +3734,8 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
 		    XOVERLAY (overlay)->interval);
 
       Lisp_Object b; XSETBUFFER (b, OVERLAY_BUFFER (overlay));
-      Lisp_Object face = plist_get (OVERLAY_PLIST (overlay), Qface);
-      if (!NILP (face))
-	Fremove_text_properties (make_fixnum (OVERLAY_START (overlay)),
-				 make_fixnum (OVERLAY_END (overlay)),
-				 list1 (face), b);
-      if (MULTI_LANG_INDIRECT_P (OVERLAY_BUFFER (overlay)))
+      if (MULTI_LANG_INDIRECT_P (OVERLAY_BUFFER (overlay))
+	  && !NILP (plist_get (OVERLAY_PLIST (overlay), Qmulti_lang_p)))
 	{
 	  Fkill_buffer (b);
 	  if (!NILP (OVERLAY_ON_EXIT (overlay)))
@@ -4981,6 +4979,7 @@ syms_of_buffer (void)
   DEFSYM (Qkill_buffer_query_functions, "kill-buffer-query-functions");
   DEFSYM (Qget_scratch_buffer_create, "get-scratch-buffer-create");
   DEFSYM (Qmulti_lang_face, "multi-lang-face");
+  DEFSYM (Qmulti_lang_p, "multi-lang-p");
 
   DEFSYM (Qvertical_scroll_bar, "vertical-scroll-bar");
   Fput (Qvertical_scroll_bar, Qchoice, list4 (Qnil, Qt, Qleft, Qright));

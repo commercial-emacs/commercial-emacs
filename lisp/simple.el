@@ -6973,19 +6973,18 @@ The overlay is returned by the function.")
 
 (defun redisplay--update-region-highlight (window)
   (let ((rol (window-parameter window 'internal-region-overlay)))
-    (if (not (and (region-active-p)
-                  (or highlight-nonselected-windows
-                      (eq window (selected-window))
-                      (and (window-minibuffer-p)
-                           (eq window (minibuffer-selected-window))))))
+    (if (or (not (region-active-p))
+            (and (not highlight-nonselected-windows)
+                 (not (eq window (selected-window)))
+                 (or (not (window-minibuffer-p))
+                     (not (eq window (minibuffer-selected-window))))))
         (funcall redisplay-unhighlight-region-function rol)
       (let* ((pt (window-point window))
              (mark (mark))
              (start (min pt mark))
-             (end   (max pt mark))
-             (new
-              (funcall redisplay-highlight-region-function
-                       start end window rol)))
+             (end (max pt mark))
+             (new (funcall redisplay-highlight-region-function
+                           start end window rol)))
         (unless (equal new rol)
           (set-window-parameter window 'internal-region-overlay new))))))
 
