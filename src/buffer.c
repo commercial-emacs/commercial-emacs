@@ -1102,9 +1102,9 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
   add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, oend - 1);
   Foverlay_put (ov, Qface, find_symbol_value (XSYMBOL (Qmulti_lang_face), NULL));
   Foverlay_put (ov, Qmulti_lang_p, Qt);
-  SET_PT (obeg);
-  unbind_to (count, Qnil);
+  unbind_to (count, Qnil); /* restores current_buffer */
 
+  SET_PT (obeg);
   call1 (on_enter, ov);
   return buf;
 }

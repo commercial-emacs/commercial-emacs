@@ -3555,7 +3555,8 @@ handle_fontified_prop (struct it *it)
       && !(input_was_pending && redisplay_skip_fontification_on_input)
       && (pos = make_fixnum (IT_CHARPOS (*it)),
 	  prop = Fget_char_property (pos, Qfontified, Qnil),
-	  NILP (prop) && IT_CHARPOS (*it) < Z))
+	  NILP (prop) && IT_CHARPOS (*it) < Z)
+      && current_buffer->proximity == NULL)
     {
       /* We're not in string context, and Qfontified property was nil;
 	 run hooks from Qfontification_functions.  */
@@ -3571,6 +3572,25 @@ handle_fontified_prop (struct it *it)
       /* Prevent arbitrary lisp in Qfontification_functions from
 	 modifying faces or image caches.  */
       it->f->inhibit_clear_image_cache = true;
+
+      if (current_buffer->proximity != NULL)
+	{
+	  record_unwind_protect (save_restriction_restore,
+				 save_restriction_save ());
+	  Fnarrow_to_region
+	    (Fmarker_position (current_buffer->proximity->preceding),
+	     NILP (current_buffer->proximity->following)
+	     ? Fpoint_max ()
+	     : Fmarker_position (current_buffer->proximity->following));
+
+	  /* fprintf (stderr, "foo2 %ld %ld %ld %s\n", */
+	  /* 	   XFIXNUM (Fmarker_position (current_buffer->proximity->preceding)), */
+	  /* 	   (NILP (current_buffer->proximity->following) */
+	  /* 	    ? -1 */
+	  /* 	    : XFIXNUM (Fmarker_position (current_buffer->proximity->following))), */
+	  /* 	   PT, */
+	  /* 	   SSDATA (BVAR (current_buffer, name))); */
+	}
 
       if (!CONSP (funs) || EQ (XCAR (funs), Qlambda))
 	/* FUNS is a scalar function binding or lambda expression.  */
