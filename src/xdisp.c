@@ -1134,12 +1134,12 @@ DEFUN ("line-pixel-height", Fline_pixel_height,
 {
   struct text_pos pt;
   struct window *w = XWINDOW (selected_window);
-  struct buffer *old_buffer = NULL;
+  struct buffer *restore_buffer = NULL;
   Lisp_Object result;
 
   if (XBUFFER (w->contents) != current_buffer)
     {
-      old_buffer = current_buffer;
+      restore_buffer = current_buffer;
       set_buffer_internal (XBUFFER (w->contents));
     }
 
@@ -1147,8 +1147,8 @@ DEFUN ("line-pixel-height", Fline_pixel_height,
 
   result = make_fixnum (actual_line_height (w, pt));
 
-  if (old_buffer)
-    set_buffer_internal (old_buffer);
+  if (restore_buffer != NULL)
+    set_buffer_internal (restore_buffer);
 
   return result;
 }
@@ -3546,51 +3546,53 @@ compute_display_string_end (ptrdiff_t charpos, struct bidi_string_data *string)
 static enum prop_handled
 handle_fontified_prop (struct it *it)
 {
-  Lisp_Object prop, pos;
+  Lisp_Object funs = Vfontification_functions;
   enum prop_handled handled = HANDLED_NORMALLY;
+  specpdl_ref count = SPECPDL_INDEX ();
 
   if (!STRINGP (it->string)
       && it->s == NULL
-      && !NILP (Vfontification_functions)
-      && !(input_was_pending && redisplay_skip_fontification_on_input)
-      && (pos = make_fixnum (IT_CHARPOS (*it)),
-	  prop = Fget_char_property (pos, Qfontified, Qnil),
-	  NILP (prop) && IT_CHARPOS (*it) < Z)
-      && current_buffer->proximity == NULL)
+      && !NILP (funs)
+      && IT_CHARPOS (*it) < Z
+      && !(input_was_pending && redisplay_skip_fontification_on_input))
     {
-      /* We're not in string context, and Qfontified property was nil;
-	 run hooks from Qfontification_functions.  */
-      specpdl_ref count = SPECPDL_INDEX ();
-      struct buffer *obuf = current_buffer;
-      bool saved_clip_changed = current_buffer->clip_changed;
-      bool saved_inhibit_flag = it->f->inhibit_clear_image_cache;
-      Lisp_Object funs = Vfontification_functions;
+      /* We're not in string context.  */
+      struct buffer *restore_buf = current_buffer;
+      const bool restore_clip_changed = current_buffer->clip_changed;
+      const bool restore_inhibit_flag = it->f->inhibit_clear_image_cache;
+
+      Lisp_Object pos = make_fixnum (IT_CHARPOS (*it));
+      if (!NILP (Fget_char_property (pos, Qfontified, Qnil)))
+	goto fontified;
+
+      eassert (it->end_charpos == ZV);
+
+      if (current_buffer->proximity != NULL)
+	{
+	  Lisp_Object preceding
+	    = Fmarker_position (current_buffer->proximity->preceding);
+	  Lisp_Object following
+	    = Fmarker_position (current_buffer->proximity->following);
+	  if (NILP (following))
+	    following = make_fixnum (ZV);
+	  if (IT_CHARPOS (*it) < XFIXNUM (preceding)
+	      || IT_CHARPOS (*it) >= XFIXNUM (following))
+	    goto fontified;
+
+	  fprintf (stderr, "foo2 %ld %ld %ld %s\n",
+		   XFIXNUM (Fmarker_position (current_buffer->proximity->preceding)),
+		   (NILP (current_buffer->proximity->following)
+		    ? -1
+		    : XFIXNUM (Fmarker_position (current_buffer->proximity->following))),
+		   PT,
+		   SSDATA (BVAR (current_buffer, name)));
+	}
 
       specbind (Qfontification_functions, Qnil);
-      eassert (it->end_charpos == ZV);
 
       /* Prevent arbitrary lisp in Qfontification_functions from
 	 modifying faces or image caches.  */
       it->f->inhibit_clear_image_cache = true;
-
-      if (current_buffer->proximity != NULL)
-	{
-	  record_unwind_protect (save_restriction_restore,
-				 save_restriction_save ());
-	  Fnarrow_to_region
-	    (Fmarker_position (current_buffer->proximity->preceding),
-	     NILP (current_buffer->proximity->following)
-	     ? Fpoint_max ()
-	     : Fmarker_position (current_buffer->proximity->following));
-
-	  /* fprintf (stderr, "foo2 %ld %ld %ld %s\n", */
-	  /* 	   XFIXNUM (Fmarker_position (current_buffer->proximity->preceding)), */
-	  /* 	   (NILP (current_buffer->proximity->following) */
-	  /* 	    ? -1 */
-	  /* 	    : XFIXNUM (Fmarker_position (current_buffer->proximity->following))), */
-	  /* 	   PT, */
-	  /* 	   SSDATA (BVAR (current_buffer, name))); */
-	}
 
       if (!CONSP (funs) || EQ (XCAR (funs), Qlambda))
 	/* FUNS is a scalar function binding or lambda expression.  */
@@ -3612,14 +3614,11 @@ handle_fontified_prop (struct it *it)
 	      dsafe_call1 (XCAR (funs), pos);
 	  }
 
-      it->f->inhibit_clear_image_cache = saved_inhibit_flag;
-      if (obuf != current_buffer && BUFFER_LIVE_P (obuf))
-	/* Fontification stultifyingly switched buffers!  */
-	set_buffer_internal (obuf);
-      if (obuf == current_buffer)
-	/* Bug#6671.  */
-	current_buffer->clip_changed = saved_clip_changed;
-      unbind_to (count, Qnil);
+      it->f->inhibit_clear_image_cache = restore_inhibit_flag;
+      if (restore_buf != current_buffer && BUFFER_LIVE_P (restore_buf))
+	set_buffer_internal (restore_buf); /* fontification switched bufs */
+      if (restore_buf == current_buffer)
+	current_buffer->clip_changed = restore_clip_changed; /* bug#6671 */
 
       /* Protect against text modifications beyond POS, as in grep.el
 	 which turned escape sequences face properties (bug#7876).  */
@@ -3635,6 +3634,8 @@ handle_fontified_prop (struct it *it)
 	}
     }
 
+fontified:
+  unbind_to (count, Qnil);
   return handled;
 }
 

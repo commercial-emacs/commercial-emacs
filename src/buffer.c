@@ -1091,7 +1091,7 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
 
   /* Make the demarcating newline read-only */
   Fput_text_property (make_fixnum (oend - 1), make_fixnum (oend),
-		      Qrear_nonsticky, list2 (Qface, Qread_only), Qnil);
+		      Qrear_nonsticky, list1 (Qread_only), Qnil);
   Fput_text_property (make_fixnum (oend - 1), make_fixnum (oend),
 		      Qread_only, Qt, Qnil);
   unbind_to (suspend_undo, Qnil);
