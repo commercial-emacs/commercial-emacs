@@ -934,6 +934,8 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
 	   SSDATA (BVAR (current_buffer, name)),
 	   SSDATA (BVAR (XBUFFER (buf), name)));
 
+  Lisp_Object tgc = intern ("temporary-goal-column");
+  set_internal (tgc, find_symbol_value (XSYMBOL (tgc), NULL), buf, SET_INTERNAL_SET);
   CALLN (Ffuncall, intern ("switch-to-buffer"), buf, Qt);
   SET_PT (newpt);
 
