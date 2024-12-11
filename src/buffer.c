@@ -1071,7 +1071,7 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
   Lisp_Object on_exit = CALLN (Ffuncall, intern ("apply-partially"),
 			       callback,
 			       Fcurrent_buffer ());
-  Lisp_Object ov = build_overlay (false, true, Qnil, on_enter, on_exit);
+  Lisp_Object ov = build_overlay (false, false, Qnil, on_enter, on_exit);
   ptrdiff_t obeg = clip_to_bounds (BUF_BEG (base), XFIXNUM (beg), BUF_Z (base));
   ptrdiff_t oend = clip_to_bounds (BUF_BEG (base), XFIXNUM (end), BUF_Z (base));
 
@@ -1093,13 +1093,11 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
   Fput_text_property (make_fixnum (oend - 1), make_fixnum (oend),
 		      Qrear_nonsticky, list2 (Qface, Qread_only), Qnil);
   Fput_text_property (make_fixnum (oend - 1), make_fixnum (oend),
-		      Qface, find_symbol_value (XSYMBOL (Qmulti_lang_face), NULL), Qnil);
-  Fput_text_property (make_fixnum (oend - 1), make_fixnum (oend),
 		      Qread_only, Qt, Qnil);
   unbind_to (suspend_undo, Qnil);
 
-  /* Read-only newline not part of overlay, ergo -1 */
-  add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, oend - 1);
+  /* Read-only newline is part of overlay */
+  add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, oend);
   Foverlay_put (ov, Qface, find_symbol_value (XSYMBOL (Qmulti_lang_face), NULL));
   Foverlay_put (ov, Qmulti_lang_p, Qt);
   unbind_to (count, Qnil); /* restores current_buffer */
