@@ -923,32 +923,33 @@ restore_undo_list (Lisp_Object arg)
   bset_undo_list (buf, undo_list);
 }
 
-/* Make read-only newline at (*END - 1).  If (*END - 1) isn't already a
-   newline, insert one and update *END.  */
+/* Make read-only newline at (END - 1).  If (END - 1) isn't already a
+   newline, insert one and return new END.  */
 
-static void
-multi_lang_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_t *end)
+static ptrdiff_t
+multi_lang_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_t end)
 {
   specpdl_ref count = SPECPDL_INDEX ();
   record_unwind_protect (restore_undo_list,
 			 Fcons (BVAR (current_buffer, undo_list),
 				Fcurrent_buffer ()));
   bset_undo_list (current_buffer, Qt);
-  if (*end <= beg
-      || *end == BUF_BEG (buf)
-      || !EQ (Fchar_before (make_fixnum (*end)), make_fixnum (10)))
+  if (end <= beg
+      || end == BUF_BEG (buf)
+      || !EQ (Fchar_before (make_fixnum (end)), make_fixnum (10)))
     {
-      /* Patch in newline if one not already at *END.  */
-      SET_PT ((*end)++);
+      /* Patch in newline if one not already at END.  */
+      SET_PT (end++);
       insert_char (10);
     }
 
   /* Make the demarcating newline read-only */
-  Fput_text_property (make_fixnum (*end - 1), make_fixnum (*end),
+  Fput_text_property (make_fixnum (end - 1), make_fixnum (end),
 		      Qrear_nonsticky, list1 (Qread_only), Qnil);
-  Fput_text_property (make_fixnum (*end - 1), make_fixnum (*end),
+  Fput_text_property (make_fixnum (end - 1), make_fixnum (end),
 		      Qread_only, Qt, Qnil);
   unbind_to (count, Qnil);
+  return end;
 }
 
 /* Remove read-only bumpguard to multi-lang overlay.  */
@@ -1136,10 +1137,13 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
   ptrdiff_t obeg = clip_to_bounds (BUF_BEG (base), XFIXNUM (beg), BUF_Z (base));
   ptrdiff_t oend = clip_to_bounds (BUF_BEG (base), XFIXNUM (end), BUF_Z (base));
 
-  multi_lang_insert_bumpguard (base,
-			       obeg == BUF_BEG (base) ? obeg : obeg - 1,
-			       &obeg);
-  multi_lang_insert_bumpguard (base, obeg, &oend);
+  const ptrdiff_t obeg1
+    = multi_lang_insert_bumpguard (base,
+				   obeg == BUF_BEG (base) ? obeg : obeg - 1,
+				   obeg);
+  oend += (obeg1 - obeg);
+  obeg = obeg1;
+  oend = multi_lang_insert_bumpguard (base, obeg, oend);
 
   /* Read-only newline is part of overlay */
   add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, oend);
