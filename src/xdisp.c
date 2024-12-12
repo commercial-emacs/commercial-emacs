@@ -3577,14 +3577,6 @@ handle_fontified_prop (struct it *it)
 	     ? Fpoint_max ()
 	     : Fmarker_position (current_buffer->proximity->following));
 
-	  fprintf (stderr, "foo2 %ld %ld %ld %s\n",
-		   XFIXNUM (Fmarker_position (current_buffer->proximity->preceding)),
-		   (NILP (current_buffer->proximity->following)
-		    ? -1
-		    : XFIXNUM (Fmarker_position (current_buffer->proximity->following))),
-		   PT,
-		   SSDATA (BVAR (current_buffer, name)));
-
 	  if (IT_CHARPOS (*it) < BEGV || IT_CHARPOS (*it) >= ZV)
 	    goto fontified;
 	}

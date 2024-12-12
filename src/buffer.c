@@ -923,6 +923,53 @@ restore_undo_list (Lisp_Object arg)
   bset_undo_list (buf, undo_list);
 }
 
+/* Make read-only newline at (*END - 1).  If (*END - 1) isn't already a
+   newline, insert one and update *END.  */
+
+static void
+multi_lang_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_t *end)
+{
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect (restore_undo_list,
+			 Fcons (BVAR (current_buffer, undo_list),
+				Fcurrent_buffer ()));
+  bset_undo_list (current_buffer, Qt);
+  if (*end <= beg
+      || *end == BUF_BEG (buf)
+      || !EQ (Fchar_before (make_fixnum (*end)), make_fixnum (10)))
+    {
+      /* Patch in newline if one not already at *END.  */
+      SET_PT ((*end)++);
+      insert_char (10);
+    }
+
+  /* Make the demarcating newline read-only */
+  Fput_text_property (make_fixnum (*end - 1), make_fixnum (*end),
+		      Qrear_nonsticky, list1 (Qread_only), Qnil);
+  Fput_text_property (make_fixnum (*end - 1), make_fixnum (*end),
+		      Qread_only, Qt, Qnil);
+  unbind_to (count, Qnil);
+}
+
+/* Remove read-only bumpguard to multi-lang overlay.  */
+
+static void
+multi_lang_delete_bumpguard (struct buffer *buf, const ptrdiff_t pos)
+{
+  Lisp_Object b; XSETBUFFER (b, buf);
+  specpdl_ref count = SPECPDL_INDEX ();
+  specbind (Qinhibit_read_only, Qt);
+  record_unwind_protect (restore_undo_list, Fcons (BVAR (buf, undo_list), b));
+  bset_undo_list (buf, Qt);
+  Fremove_list_of_text_properties (make_fixnum (pos),
+				   make_fixnum (pos + 1),
+				   list2 (Qrear_nonsticky, Qread_only), b);
+  del_range (pos, pos + 1);
+  unbind_to (count, Qnil);
+}
+
+/* Entering BUF that is MULTI_LANG_INDIRECT_P.  */
+
 static void
 multi_lang_switch_to_buffer (Lisp_Object buf)
 {
@@ -936,8 +983,20 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
 
   Lisp_Object tgc = intern ("temporary-goal-column");
   set_internal (tgc, find_symbol_value (XSYMBOL (tgc), NULL), buf, SET_INTERNAL_SET);
+
+  Lisp_Object mark = Qnil;
+  if (!NILP (BVAR (current_buffer, mark_active)))
+    {
+      /* Mark state is a mess between mark, mark-active,
+	 transient-mark-mode, mark-even-if-active, etc.  */
+      mark = Fcopy_marker (BVAR (current_buffer, mark), Qnil);
+      call1 (intern ("set-mark"), Qnil);
+    }
+
   CALLN (Ffuncall, intern ("switch-to-buffer"), buf, Qt);
   SET_PT (newpt);
+  if (MARKERP (mark))
+    call1 (intern ("set-mark"), Fmarker_position (mark));
 
   /* previous_overlay_change scans [BEGV, arg), ergo +1.  */
   const ptrdiff_t previous = previous_overlay_change (PT + 1, true),
@@ -1077,26 +1136,10 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
   ptrdiff_t obeg = clip_to_bounds (BUF_BEG (base), XFIXNUM (beg), BUF_Z (base));
   ptrdiff_t oend = clip_to_bounds (BUF_BEG (base), XFIXNUM (end), BUF_Z (base));
 
-  specpdl_ref suspend_undo = SPECPDL_INDEX ();
-  record_unwind_protect (restore_undo_list,
-			 Fcons (BVAR (current_buffer, undo_list),
-				Fcurrent_buffer ()));
-  bset_undo_list (current_buffer, Qt);
-  if (oend <= obeg
-      || oend == BUF_BEG (base)
-      || !EQ (Fchar_before (make_fixnum (oend)), make_fixnum (10)))
-    {
-      /* Patch in newline if one not already at OEND.  */
-      SET_PT (oend++);
-      insert_char (10);
-    }
-
-  /* Make the demarcating newline read-only */
-  Fput_text_property (make_fixnum (oend - 1), make_fixnum (oend),
-		      Qrear_nonsticky, list1 (Qread_only), Qnil);
-  Fput_text_property (make_fixnum (oend - 1), make_fixnum (oend),
-		      Qread_only, Qt, Qnil);
-  unbind_to (suspend_undo, Qnil);
+  multi_lang_insert_bumpguard (base,
+			       obeg == BUF_BEG (base) ? obeg : obeg - 1,
+			       &obeg);
+  multi_lang_insert_bumpguard (base, obeg, &oend);
 
   /* Read-only newline is part of overlay */
   add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, oend);
@@ -3781,16 +3824,11 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
       if (MULTI_LANG_INDIRECT_P (obuffer)
 	  && !NILP (plist_get (OVERLAY_PLIST (overlay), Qmulti_lang_p)))
 	{
-	  /* Unencumber demarcating newline.  */
-	  specpdl_ref count = SPECPDL_INDEX ();
-	  specbind (Qinhibit_read_only, Qt);
-	  record_unwind_protect (restore_undo_list,
-				 Fcons (BVAR (obuffer, undo_list), b));
-	  bset_undo_list (obuffer, Qt);
-	  Fremove_list_of_text_properties (make_fixnum (OVERLAY_END (overlay) - 1),
-					   make_fixnum (OVERLAY_END (overlay)),
-					   list2 (Qrear_nonsticky, Qread_only), b);
-	  unbind_to (count, Qnil);
+	  multi_lang_delete_bumpguard (obuffer, OVERLAY_END (overlay) - 1);
+	  multi_lang_delete_bumpguard (obuffer,
+				       OVERLAY_START (overlay) == BUF_BEG (obuffer)
+				       ? OVERLAY_START (overlay)
+				       : OVERLAY_START (overlay) - 1);
 
 	  /* Kill OBUFFER if no other overlays attached.  */
 	  bool kill = true;
@@ -3808,6 +3846,7 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
 	  if (kill)
 	    Fkill_buffer (b);
 	  if (!NILP (OVERLAY_ON_EXIT (overlay)))
+	    /* yes, after Fkill_buffer */
 	    call1 (OVERLAY_ON_EXIT (overlay), overlay);
 	}
 
