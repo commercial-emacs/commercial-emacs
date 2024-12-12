@@ -3766,6 +3766,8 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
   struct buffer *obuffer = OVERLAY_BUFFER (overlay);
   if (obuffer != NULL)
     {
+      Lisp_Object b; XSETBUFFER (b, obuffer);
+
       /* Turn off optimizations if overlay contained before- or
 	 after-strings since they could contain newlines.  */
       if (!windows_or_buffers_changed
@@ -3779,8 +3781,32 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
       if (MULTI_LANG_INDIRECT_P (obuffer)
 	  && !NILP (plist_get (OVERLAY_PLIST (overlay), Qmulti_lang_p)))
 	{
-	  Lisp_Object b; XSETBUFFER (b, obuffer);
-	  Fkill_buffer (b);
+	  /* Unencumber demarcating newline.  */
+	  specpdl_ref count = SPECPDL_INDEX ();
+	  specbind (Qinhibit_read_only, Qt);
+	  record_unwind_protect (restore_undo_list,
+				 Fcons (BVAR (obuffer, undo_list), b));
+	  bset_undo_list (obuffer, Qt);
+	  Fremove_list_of_text_properties (make_fixnum (OVERLAY_END (overlay) - 1),
+					   make_fixnum (OVERLAY_END (overlay)),
+					   list2 (Qrear_nonsticky, Qread_only), b);
+	  unbind_to (count, Qnil);
+
+	  /* Kill OBUFFER if no other overlays attached.  */
+	  bool kill = true;
+	  struct itree_node *node;
+	  ITREE_FOREACH (node, obuffer->overlays, PTRDIFF_MIN,
+			 PTRDIFF_MAX, POST_ORDER)
+	    {
+	      if (!EQ (node->data, overlay)
+		  && XOVERLAY (node->data)->buffer == obuffer)
+		{
+		  kill = false;
+		  break;
+		}
+	    }
+	  if (kill)
+	    Fkill_buffer (b);
 	  if (!NILP (OVERLAY_ON_EXIT (overlay)))
 	    call1 (OVERLAY_ON_EXIT (overlay), overlay);
 	}

@@ -618,7 +618,7 @@ static enum prop_handled handle_fontified_prop (struct it *);
 
 static struct props it_props[] =
   {
-    /* Order matters! */
+    /* Order matters!  */
     {SYMBOL_INDEX (Qfontified),   FONTIFIED_PROP_IDX,     handle_fontified_prop},
     {SYMBOL_INDEX (Qface),        FACE_PROP_IDX,          handle_face_prop},
     {SYMBOL_INDEX (Qdisplay),     DISPLAY_PROP_IDX,       handle_display_prop},
@@ -3316,7 +3316,6 @@ handle_stop (struct it *it)
     compute_stop_pos (it);
 }
 
-
 /* Compute IT->stop_charpos from text property and overlay changes. */
 
 static void
@@ -3338,9 +3337,7 @@ compute_stop_pos (struct it *it)
       charpos = IT_CHARPOS (*it);
       bytepos = IT_BYTEPOS (*it);
 
-      /* just-in-time disaster aversion Bug#5984 */
       it->end_charpos = min (it->end_charpos, ZV);
-
       it->stop_charpos = min (it->end_charpos, next_overlay_change (charpos, false));
 
       if (toofar < it->stop_charpos)
@@ -3569,15 +3566,16 @@ handle_fontified_prop (struct it *it)
 
       if (current_buffer->proximity != NULL)
 	{
-	  Lisp_Object preceding
-	    = Fmarker_position (current_buffer->proximity->preceding);
-	  Lisp_Object following
-	    = Fmarker_position (current_buffer->proximity->following);
-	  if (NILP (following))
-	    following = make_fixnum (ZV);
-	  if (IT_CHARPOS (*it) < XFIXNUM (preceding)
-	      || IT_CHARPOS (*it) >= XFIXNUM (following))
-	    goto fontified;
+	  specbind (Qfont_lock_dont_widen, Qt);
+	  record_unwind_protect (restore_point_unwind,
+				 build_marker (current_buffer, PT, PT_BYTE));
+	  record_unwind_protect (save_restriction_restore,
+				 save_restriction_save ());
+	  Fnarrow_to_region
+	    (Fmarker_position (current_buffer->proximity->preceding),
+	     NILP (current_buffer->proximity->following)
+	     ? Fpoint_max ()
+	     : Fmarker_position (current_buffer->proximity->following));
 
 	  fprintf (stderr, "foo2 %ld %ld %ld %s\n",
 		   XFIXNUM (Fmarker_position (current_buffer->proximity->preceding)),
@@ -3586,6 +3584,9 @@ handle_fontified_prop (struct it *it)
 		    : XFIXNUM (Fmarker_position (current_buffer->proximity->following))),
 		   PT,
 		   SSDATA (BVAR (current_buffer, name)));
+
+	  if (IT_CHARPOS (*it) < BEGV || IT_CHARPOS (*it) >= ZV)
+	    goto fontified;
 	}
 
       specbind (Qfontification_functions, Qnil);
@@ -33148,6 +33149,7 @@ be let-bound around code that needs to disable messages temporarily. */);
   DEFSYM (QCfile, ":file");
   DEFSYM (Qfontified, "fontified");
   DEFSYM (Qfontification_functions, "fontification-functions");
+  DEFSYM (Qfont_lock_dont_widen, "font-lock-dont-widen");
 
   Vtext_property_default_nonsticky
     = Fcons (Fcons (Qfontified, Qt), Vtext_property_default_nonsticky);
