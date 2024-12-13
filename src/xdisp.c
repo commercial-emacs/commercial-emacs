@@ -3321,7 +3321,7 @@ handle_stop (struct it *it)
 static void
 compute_stop_pos (struct it *it)
 {
-  register INTERVAL interval;
+  INTERVAL interval = NULL;
   Lisp_Object position;
   ptrdiff_t charpos, bytepos;
 
@@ -3368,9 +3368,12 @@ compute_stop_pos (struct it *it)
     }
 
   position = make_fixnum (charpos);
-  interval = validate_interval_range
-    (STRINGP (it->string) ? it->string : Fcurrent_buffer (),
-     &position, &position, false);
+  Lisp_Object substrate = STRINGP (it->string) ? it->string : Fcurrent_buffer ();
+  if (validate_interval_range (substrate, &position, &position, false))
+    interval = find_interval (BUFFERP (substrate)
+			      ? buffer_intervals (XBUFFER (substrate))
+			      : string_intervals (substrate),
+			      XFIXNUM (position));
   if (interval)
     {
       Lisp_Object props_here[LAST_PROP_IDX];
@@ -3573,9 +3576,7 @@ handle_fontified_prop (struct it *it)
 				 save_restriction_save ());
 	  Fnarrow_to_region
 	    (Fmarker_position (current_buffer->proximity->preceding),
-	     NILP (current_buffer->proximity->following)
-	     ? Fpoint_max ()
-	     : Fmarker_position (current_buffer->proximity->following));
+	     Fmarker_position (current_buffer->proximity->following));
 
 	  if (IT_CHARPOS (*it) < BEGV || IT_CHARPOS (*it) >= ZV)
 	    goto fontified;

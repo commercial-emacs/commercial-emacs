@@ -1001,27 +1001,6 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
     = build_marker (XBUFFER (buf), previous, CHAR_TO_BYTE (previous));
   current_buffer->proximity->following
     = build_marker (XBUFFER (buf), next, CHAR_TO_BYTE (next));
-
-  /* next_overlay_change returns ZV when null is more apropos.  */
-  if (!NILP (Fequal (XBUFFER (buf)->proximity->following,
-		     Fpoint_max_marker ())))
-    {
-      current_buffer->proximity->following = Qnil;
-      struct itree_iterator iter, *iter_p   /* [PT, ZV) */
-	= itree_iterator_start (&iter, XBUFFER (buf)->overlays,
-				PT, ZV, ITREE_ASCENDING);
-      for (struct itree_node *node = itree_iterator_next (iter_p);
-	   node != NULL;
-	   node = itree_iterator_next (iter_p))
-	{
-	  if (OVERLAY_ON_ENTER (node->data)
-	      || OVERLAY_ON_EXIT (node->data))
-	    {
-	      XBUFFER (buf)->proximity->following = Fpoint_max_marker ();
-	      break;
-	    }
-	}
-    }
 }
 
 DEFUN ("multi-lang--enter-buffer", Fmake_multi_lang__enter_buffer,
@@ -1077,10 +1056,9 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
     {
       base->proximity = (struct proximity *) xmalloc (sizeof *base->proximity);
       base->proximity->current = Qnil;
-      base->proximity->preceding = Fpoint_max_marker ();
-      base->proximity->following = Fpoint_min_marker ();
+      base->proximity->preceding = Fpoint_min_marker ();
+      base->proximity->following = Fpoint_max_marker ();
     }
-
   if (base->overlays == NULL)
     base->overlays = itree_create ();
 

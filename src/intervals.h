@@ -229,8 +229,8 @@ extern bool get_property_and_range (ptrdiff_t, Lisp_Object, Lisp_Object *,
 extern Lisp_Object get_local_map (ptrdiff_t, struct buffer *, Lisp_Object);
 extern INTERVAL update_interval (INTERVAL, ptrdiff_t);
 extern void set_intervals_multibyte (bool);
-extern INTERVAL validate_interval_range (Lisp_Object, Lisp_Object *,
-                                         Lisp_Object *, bool);
+extern bool validate_interval_range (Lisp_Object, Lisp_Object *,
+				     Lisp_Object *, bool);
 extern INTERVAL interval_of (ptrdiff_t, Lisp_Object);
 
 /* Defined in xdisp.c.  */

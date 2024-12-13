@@ -592,9 +592,8 @@ interval_start_pos (INTERVAL source)
    If POSITION is at the end of the buffer or string,
    return the interval containing the last character.
 
-   The `position' field, which is a cache of an interval's position,
-   is updated in the interval found.  Other functions (e.g., next_interval)
-   will update this cache based on the result of find_interval.  */
+   Update the returned interval's `position' field.  Other functions
+   e.g., next_interval consult this field.  */
 
 INTERVAL
 find_interval (register INTERVAL tree, register ptrdiff_t position)
