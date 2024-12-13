@@ -977,11 +977,6 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
   ptrdiff_t newpt = clip_to_bounds (BUF_BEG (XBUFFER (buf)), PT,
 				    BUF_Z (XBUFFER (buf)));
 
-  fprintf (stderr, "foo0 %ld %s->%s\n",
-	   PT,
-	   SSDATA (BVAR (current_buffer, name)),
-	   SSDATA (BVAR (XBUFFER (buf), name)));
-
   Lisp_Object tgc = intern ("temporary-goal-column");
   set_internal (tgc, find_symbol_value (XSYMBOL (tgc), NULL), buf, SET_INTERNAL_SET);
 
@@ -1027,14 +1022,6 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
 	    }
 	}
     }
-
-  fprintf (stderr, "foo %ld %ld %ld %s\n",
-	   XFIXNUM (Fmarker_position (XBUFFER (buf)->proximity->preceding)),
-	   (NILP (XBUFFER (buf)->proximity->following)
-	    ? -1
-	    : XFIXNUM (Fmarker_position (XBUFFER (buf)->proximity->following))),
-	   PT,
-	   SSDATA (BVAR (current_buffer, name)));
 }
 
 DEFUN ("multi-lang--enter-buffer", Fmake_multi_lang__enter_buffer,
