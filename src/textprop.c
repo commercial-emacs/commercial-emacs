@@ -1179,6 +1179,21 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
     return make_fixnum (previous->position + LENGTH (previous));
 }
 
+static bool
+outside_multi_lang (struct buffer *buf, Lisp_Object start, Lisp_Object end)
+{
+  bool result = false;
+  if (buf->proximity != NULL)
+    {
+      ptrdiff_t following = !NILP (buf->proximity->following)
+	? XFIXNUM (Fmarker_position (buf->proximity->following))
+	: buf->zv;
+      ptrdiff_t preceding = XFIXNUM (Fmarker_position (buf->proximity->preceding));
+      result = !(XFIXNUM (start) < following && preceding <= XFIXNUM (end));
+    }
+  return result;
+}
+
 /* Used by add-text-properties and add-face-text-property. */
 
 static Lisp_Object
@@ -1212,6 +1227,10 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
  retry:
   unchanged = validate_interval_range (object, &start, &end, hard);
   if (!unchanged)
+    return Qnil;
+
+  if (BUFFERP (object)
+      && outside_multi_lang (XBUFFER (object), start, end))
     return Qnil;
 
   interval = unchanged;
@@ -1374,9 +1393,8 @@ into it.  */)
    the text.  OBJECT nil means use the current buffer.
    COHERENT_CHANGE_P nil means this is being called as an internal
    subroutine, rather than as a change primitive with checking of
-   read-only, invoking change hooks, etc..  Value is nil if the
-   function _detected_ that it did not replace any properties, non-nil
-   otherwise.  */
+   read-only, invoking change hooks, etc.  Return true if
+   function did replace properties.  */
 
 Lisp_Object
 set_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object properties,
@@ -1430,6 +1448,10 @@ set_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object properties,
       if (!i)
 	return Qnil;
     }
+
+  if (BUFFERP (object)
+      && outside_multi_lang (XBUFFER (object), start, end))
+    return Qnil;
 
   if (BUFFERP (object) && !NILP (coherent_change_p) && first_time)
     {
@@ -1585,6 +1607,10 @@ Use `set-text-properties' if you want to remove all text properties.  */)
  retry:
   i = validate_interval_range (object, &start, &end, soft);
   if (!i)
+    return Qnil;
+
+  if (BUFFERP (object)
+      && outside_multi_lang (XBUFFER (object), start, end))
     return Qnil;
 
   s = XFIXNUM (start);

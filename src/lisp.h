@@ -624,9 +624,8 @@ struct interval
 
   bool_bf gcmarkbit : 1;
 
-  /* The remaining components are `properties' of the interval.
-     The first four are duplicates for things which can be on the list,
-     for purposes of speed.  */
+  /* Dupe four properties already present on the plist for
+     accessibility.  */
 
   bool_bf write_protect : 1;	    /* True means can't modify.  */
   bool_bf visible : 1;		    /* False means don't display.  */
