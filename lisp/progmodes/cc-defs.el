@@ -1241,8 +1241,6 @@ MODE is either a mode symbol or a list of mode symbols."
        ,@(when (and (fboundp 'syntax-ppss)
 		    (eq `,property 'syntax-table))
 	   `((setq c-syntax-table-hwm (min c-syntax-table-hwm -pos-))))
-       (princ (format "wtf %d %s %s\n" -pos- ',property ,value)
-	      (function external-debugging-output))
        (put-text-property -pos- (1+ -pos-) ',property ,value))))
 
 (defmacro c-put-string-fence (pos)

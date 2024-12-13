@@ -21,6 +21,18 @@
              ;; (mapc (lambda (ov) (overlay-put ov 'face multi-lang-face)) overlays)
              ))))
 
+(defalias 'multi-lang-disable-widen
+  (lambda (buffer)
+    (add-function :before-until (symbol-function 'widen)
+                  (lambda () (and (eq (current-buffer) buffer)
+                                  (message "NERP!"))))))
+
+(defalias 'multi-lang-enable-widen
+  (lambda (buffer)
+    (remove-function (symbol-function 'widen)
+                     (lambda () (and (eq (current-buffer) buffer)
+                                     (message "NERP!"))))))
+
 (provide 'multi-lang)
 
 ;;; multi-lang.el ends here
