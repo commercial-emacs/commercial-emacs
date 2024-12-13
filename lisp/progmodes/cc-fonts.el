@@ -1782,7 +1782,6 @@ casts and declarations are fontified.  Used on level 2 and higher."
 	     (c-at-enum-brace encl-pos))
 	(c-syntactic-skip-backward "^{," nil t)
 	(c-put-char-property (1- (point)) 'c-type 'c-decl-id-start)
-
 	(c-forward-syntactic-ws)
 	(c-font-lock-declarators limit t nil t))))
   nil)

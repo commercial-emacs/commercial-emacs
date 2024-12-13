@@ -3540,6 +3540,33 @@ compute_display_string_end (ptrdiff_t charpos, struct bidi_string_data *string)
   return XFIXNAT (Fnext_single_char_property_change (pos, Qdisplay, object, Qnil));
 }
 
+static void
+restore_beg_z (Lisp_Object data)
+{
+  struct buffer *orig_current = current_buffer;
+  struct buffer *restore_buffer = XBUFFER (XCAR (data));
+  data = XCDR (data);
+
+  set_buffer_internal (restore_buffer);
+  BEG = XFIXNUM (XCAR (data));
+  data = XCDR (data);
+  BEG_BYTE = XFIXNUM (XCAR (data));
+  data = XCDR (data);
+  Z = XFIXNUM (XCAR (data));
+  data = XCDR (data);
+  Z_BYTE = XFIXNUM (XCAR (data));
+  data = XCDR (data);
+  set_buffer_internal (orig_current);
+}
+
+static Lisp_Object
+save_beg_z (void)
+{
+  return list5 (Fcurrent_buffer (),
+		make_fixnum (BEG), make_fixnum (BEG_BYTE),
+		make_fixnum (Z), make_fixnum (Z_BYTE));
+}
+
 static enum prop_handled
 handle_fontified_prop (struct it *it)
 {
@@ -3571,11 +3598,24 @@ handle_fontified_prop (struct it *it)
 				 build_marker (current_buffer, PT, PT_BYTE));
 	  record_unwind_protect (save_restriction_restore,
 				 save_restriction_save ());
+	  /* Disallow widen in fontification functions:
+
+	     Cannot just set_symbol_function `widen' since other buffers
+	     need widen to work, and Fwiden calls are impervious.
+	     Strongarming BEG and Z rely on Fwiden not changing.
+	  */
 	  Fnarrow_to_region
 	    (Fmarker_position (current_buffer->proximity->preceding),
 	     NILP (current_buffer->proximity->following)
 	     ? Fpoint_max ()
 	     : Fmarker_position (current_buffer->proximity->following));
+
+	  record_unwind_protect (restore_beg_z, save_beg_z ());
+
+	  BEG = BEGV;
+	  BEG_BYTE = BEGV_BYTE;
+	  Z = ZV;
+	  Z_BYTE = ZV_BYTE;
 
 	  if (IT_CHARPOS (*it) < BEGV || IT_CHARPOS (*it) >= ZV)
 	    goto fontified;
