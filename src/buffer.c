@@ -973,8 +973,6 @@ multi_lang_delete_bumpguard (struct buffer *buf, const ptrdiff_t pos)
   unbind_to (count, Qnil);
 }
 
-/* Entering BUF that is MULTI_LANG_INDIRECT_P.  */
-
 static void
 multi_lang_switch_to_buffer (Lisp_Object buf)
 {
@@ -1014,8 +1012,7 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
 
 DEFUN ("multi-lang--enter-buffer", Fmake_multi_lang__enter_buffer,
        Smake_multi_lang__enter_buffer, 2, 2, 0,
-       doc: /* Switch to indirect BUF of the just entered overlay.
-Overlay OV is the overlay just entered.  */)
+       doc: /* Switch to indirect BUF of the just entered overlay OV.  */)
   (Lisp_Object buf, Lisp_Object ov)
 {
   if (NILP (Fmemq (ov, current_buffer->proximity->current)))
@@ -1026,8 +1023,7 @@ Overlay OV is the overlay just entered.  */)
 
 DEFUN ("multi-lang--exit-buffer", Fmake_multi_lang__exit_buffer,
        Smake_multi_lang__exit_buffer, 2, 2, 0,
-       doc: /* Switch to indirect BUF of the just exited overlay.
-Overlay OV is the overlay just exited.  */)
+       doc: /* Switch to base BUF of the just exited overlay OV.  */)
   (Lisp_Object buf, Lisp_Object ov)
 {
   current_buffer->proximity->current = Fdelq (ov, current_buffer->proximity->current);
@@ -1035,15 +1031,12 @@ Overlay OV is the overlay just exited.  */)
   return buf;
 }
 
-DEFUN ("make-multi-lang-overlay", Fmake_multi_lang_overlay, Smake_multi_lang_overlay,
-       3, 3, "(list (if (region-active-p) (region-beginning) (point)) (if (region-active-p) (region-end) (point)) (intern-soft (completing-read \"Mode: \" (let (modes) (mapatoms (lambda (sym) (when (provided-mode-derived-p sym '(prog-mode)) (push sym modes)))) modes) nil t)))",
-       doc: /* Return indirect buffer with major mode MODE.
-Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
+DEFUN ("make-multi-lang--overlay", Fmake_multi_lang__overlay, Smake_multi_lang__overlay,
+       3, 3, 0,
+       doc: /* Unexposed workhorse of `make-multi-lang-overlay'.
+The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   (Lisp_Object beg, Lisp_Object end, Lisp_Object mode)
 {
-  if (0 == SCHARS (SYMBOL_NAME (mode)))
-    call0 (intern ("keyboard-quit"));
-
   CHECK_FIXNUM_COERCE_MARKER (beg);
   CHECK_TYPE (FUNCTIONP (mode), Qfunctionp, mode);
 
@@ -1060,6 +1053,9 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
   record_unwind_protect_excursion ();
   set_buffer_internal (base);
   call0 (Qdeactivate_mark);
+  call4 (Qadd_hook, Qwindow_buffer_change_functions,
+	 Qmulti_lang_on_switch_to_buffer,
+	 Qnil, Qt);
 
   if (base->overlays == NULL)
     base->overlays = itree_create ();
@@ -1131,7 +1127,7 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
   return buf;
 }
 
-DEFUN ("multi-lang-p", Fmulti_lang_p, Smulti_lang_p, 1, 1, 0,
+DEFUN ("multi-lang-indirect-p", Fmulti_lang_indirect_p, Smulti_lang_indirect_p, 1, 1, 0,
        doc: /* Return t if BUF corresponds to a multi-lang overlay.  */)
   (Lisp_Object buf)
 {
@@ -3800,7 +3796,7 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
       modify_overlay (obuffer, OVERLAY_START (overlay), OVERLAY_END (overlay));
       itree_remove (obuffer->overlays, XOVERLAY (overlay)->interval);
 
-      if (MULTI_LANG_INDIRECT_P (obuffer)
+      if (MULTI_LANG_INDIRECT_P (obuffer) /* don't touch base buffer! */
 	  && !NILP (plist_get (OVERLAY_PLIST (overlay), Qmulti_lang_p)))
 	{
 	  multi_lang_delete_bumpguard (obuffer, OVERLAY_END (overlay) - 1);
@@ -5068,6 +5064,8 @@ syms_of_buffer (void)
   DEFSYM (Qget_scratch_buffer_create, "get-scratch-buffer-create");
   DEFSYM (Qmulti_lang_face, "multi-lang-face");
   DEFSYM (Qmulti_lang_p, "multi-lang-p");
+  DEFSYM (Qmulti_lang_on_switch_to_buffer, "multi-lang-on-switch-to-buffer");
+  DEFSYM (Qadd_hook, "add-hook");
 
   DEFSYM (Qvertical_scroll_bar, "vertical-scroll-bar");
   Fput (Qvertical_scroll_bar, Qchoice, list4 (Qnil, Qt, Qleft, Qright));
@@ -5938,8 +5936,8 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
   defsubr (&Smake_indirect_buffer);
   defsubr (&Smake_multi_lang__enter_buffer);
   defsubr (&Smake_multi_lang__exit_buffer);
-  defsubr (&Smake_multi_lang_overlay);
-  defsubr (&Smulti_lang_p);
+  defsubr (&Smake_multi_lang__overlay);
+  defsubr (&Smulti_lang_indirect_p);
   defsubr (&Sgenerate_new_buffer_name);
   defsubr (&Sbuffer_name);
   defsubr (&Sbuffer_last_name);
