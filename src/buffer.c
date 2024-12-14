@@ -962,10 +962,14 @@ multi_lang_delete_bumpguard (struct buffer *buf, const ptrdiff_t pos)
   specbind (Qinhibit_read_only, Qt);
   record_unwind_protect (restore_undo_list, Fcons (BVAR (buf, undo_list), b));
   bset_undo_list (buf, Qt);
+  if (buf->proximity != NULL)
+    {
+      buf->proximity->preceding = Fpoint_min_marker ();
+      buf->proximity->following = Fpoint_max_marker ();
+    }
   Fremove_list_of_text_properties (make_fixnum (pos),
 				   make_fixnum (pos + 1),
 				   list2 (Qrear_nonsticky, Qread_only), b);
-  del_range (pos, pos + 1);
   unbind_to (count, Qnil);
 }
 
@@ -978,8 +982,11 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
 				    BUF_Z (XBUFFER (buf)));
 
   Lisp_Object tgc = intern ("temporary-goal-column");
-  set_internal (tgc, find_symbol_value (XSYMBOL (tgc), NULL), buf, SET_INTERNAL_SET);
-
+  set_internal (tgc, find_symbol_value (XSYMBOL (tgc), NULL), buf,
+		SET_INTERNAL_SET);
+  Lisp_Object wstart = !NILP (Fpos_visible_in_window_p (Qnil, Qnil, Qnil))
+    ? Fwindow_start (Qnil)
+    : Qnil;
   Lisp_Object mark = Qnil;
   if (!NILP (BVAR (current_buffer, mark_active)))
     {
@@ -993,6 +1000,8 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
   SET_PT (newpt);
   if (MARKERP (mark))
     call1 (intern ("set-mark"), Fmarker_position (mark));
+  if (!NILP (wstart))
+    Fset_window_start (Qnil, wstart, Qnil);
 
   /* previous_overlay_change scans [BEGV, arg), ergo +1.  */
   const ptrdiff_t previous = previous_overlay_change (PT + 1, true),
@@ -1052,15 +1061,16 @@ Such buffers are distinguished by MULTI_LANG_INDIRECT_P.  */)
   set_buffer_internal (base);
   call0 (Qdeactivate_mark);
 
+  if (base->overlays == NULL)
+    base->overlays = itree_create ();
+
   if (base->proximity == NULL)
     {
       base->proximity = (struct proximity *) xmalloc (sizeof *base->proximity);
       base->proximity->current = Qnil;
-      base->proximity->preceding = Fpoint_min_marker ();
-      base->proximity->following = Fpoint_max_marker ();
     }
-  if (base->overlays == NULL)
-    base->overlays = itree_create ();
+  base->proximity->preceding = Fpoint_min_marker ();
+  base->proximity->following = Fpoint_max_marker ();
 
   Lisp_Object tail, xcar, buf = Qnil;
   FOR_EACH_LIVE_BUFFER (tail, xcar)
