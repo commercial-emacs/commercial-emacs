@@ -10,16 +10,11 @@
   :version "31.1"
   :group 'multi-lang)
 
-(defcustom multi-lang-face 'multi-lang
+(defcustom multi-lang-face-alist nil
   "Demarcate multi-lang overlay."
-  :type 'face
-  :group 'multi-lang
-  :set (lambda (symbol value)
-	 (set symbol value)
-	 (dolist (b (buffer-list))
-	   (with-current-buffer b
-             ;; (mapc (lambda (ov) (overlay-put ov 'face multi-lang-face)) overlays)
-             ))))
+  :type '(alist :key-type (symbol :tag "Major mode")
+                :value-type (symbol :tag "Face"))
+  :group 'multi-lang)
 
 (defsubst multi-lang-p (overlay)
   (overlay-get overlay 'multi-lang-p))

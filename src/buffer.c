@@ -1118,7 +1118,14 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
 
   /* Read-only newline is part of overlay */
   add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, oend);
-  Foverlay_put (ov, Qface, find_symbol_value (XSYMBOL (Qmulti_lang_face), NULL));
+
+  Lisp_Object face_alist = find_symbol_value (XSYMBOL (Qmulti_lang_face_alist), NULL);
+  Lisp_Object face = CDR_SAFE (Fassq (mode, face_alist));
+  if (CONSP (face))
+    face = XCAR (face);
+  if (NILP (Finternal_lisp_face_p (face, Qnil)))
+    face = Qmulti_lang;
+  Foverlay_put (ov, Qface, face);
   Foverlay_put (ov, Qmulti_lang_p, Qt);
   unbind_to (count, Qnil); /* restores current_buffer */
 
@@ -5062,8 +5069,9 @@ syms_of_buffer (void)
   DEFSYM (Qafter_change_functions, "after-change-functions");
   DEFSYM (Qkill_buffer_query_functions, "kill-buffer-query-functions");
   DEFSYM (Qget_scratch_buffer_create, "get-scratch-buffer-create");
-  DEFSYM (Qmulti_lang_face, "multi-lang-face");
+  DEFSYM (Qmulti_lang_face_alist, "multi-lang-face-alist");
   DEFSYM (Qmulti_lang_p, "multi-lang-p");
+  DEFSYM (Qmulti_lang, "multi-lang");
   DEFSYM (Qmulti_lang_on_switch_to_buffer, "multi-lang-on-switch-to-buffer");
   DEFSYM (Qadd_hook, "add-hook");
 
