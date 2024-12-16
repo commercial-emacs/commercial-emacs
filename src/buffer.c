@@ -3877,6 +3877,9 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
 				       ? OVERLAY_START (overlay)
 				       : OVERLAY_START (overlay) - 1);
 
+	  if (!NILP (OVERLAY_ON_EXIT (overlay)))
+	    call1 (OVERLAY_ON_EXIT (overlay), overlay);
+
 	  /* Kill OBUFFER if no other overlays attached.  */
 	  bool kill = true;
 	  struct itree_node *node;
@@ -3892,9 +3895,6 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
 	    }
 	  if (kill)
 	    Fkill_buffer (b);
-	  if (!NILP (OVERLAY_ON_EXIT (overlay)))
-	    /* yes, after Fkill_buffer */
-	    call1 (OVERLAY_ON_EXIT (overlay), overlay);
 	}
 
       XOVERLAY (overlay)->buffer = NULL;
