@@ -1033,6 +1033,16 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
     = build_marker (XBUFFER (buf), next, CHAR_TO_BYTE (next));
 }
 
+/* True if B can be used as 'other-than-BUFFER' buffer.  */
+
+static bool
+candidate_buffer (Lisp_Object b, Lisp_Object buffer)
+{
+  return (BUFFERP (b) && !EQ (b, buffer)
+	  && BUFFER_LIVE_P (XBUFFER (b))
+	  && !BUFFER_HIDDEN_P (XBUFFER (b)));
+}
+
 DEFUN ("multi-lang--enter-buffer", Fmake_multi_lang__enter_buffer,
        Smake_multi_lang__enter_buffer, 2, 2, 0,
        doc: /* Switch to indirect BUF of the just entered overlay OV.  */)
@@ -1040,6 +1050,32 @@ DEFUN ("multi-lang--enter-buffer", Fmake_multi_lang__enter_buffer,
 {
   if (NILP (Fmemq (ov, current_buffer->proximity->current)))
     current_buffer->proximity->current = Fcons (ov, current_buffer->proximity->current);
+  Lisp_Object base = Fbuffer_base_buffer (buf);
+  if (!NILP (base))
+    {
+      struct frame *f = XFRAME (selected_frame);
+      Lisp_Object tail = f->buffer_list;
+      FOR_EACH_TAIL (tail)
+	{
+	  if (EQ (XCAR (tail), base))
+	    {
+	      Lisp_Object here = tail;
+	      FOR_EACH_TAIL (tail)
+		{
+		  Lisp_Object cand = XCAR (tail);
+		  if (candidate_buffer (cand, base))
+		    {
+		      XSETCAR (tail, XCAR (here));
+		      XSETCAR (here, cand);
+		      break;
+		    }
+		}
+	      break;
+	    }
+	}
+      Fset_window_prev_buffers (Qnil, call2 (Qassq_delete_all, base,
+					     Fwindow_prev_buffers (Qnil)));
+    }
   multi_lang_switch_to_buffer (buf);
   return buf;
 }
@@ -1813,16 +1849,6 @@ This does not change the name of the visited file (if any).  */)
 
   /* Refetch since that last call may have done GC.  */
   return BVAR (current_buffer, name);
-}
-
-/* True if B can be used as 'other-than-BUFFER' buffer.  */
-
-static bool
-candidate_buffer (Lisp_Object b, Lisp_Object buffer)
-{
-  return (BUFFERP (b) && !EQ (b, buffer)
-	  && BUFFER_LIVE_P (XBUFFER (b))
-	  && !BUFFER_HIDDEN_P (XBUFFER (b)));
 }
 
 DEFUN ("other-buffer", Fother_buffer, Sother_buffer, 0, 3, 0,
