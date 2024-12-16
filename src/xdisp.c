@@ -3569,7 +3569,6 @@ handle_fontified_prop (struct it *it)
 
       if (current_buffer->proximity != NULL)
 	{
-	  specbind (Qfont_lock_dont_widen, Qt);
 	  record_unwind_protect (restore_point_unwind,
 				 build_marker (current_buffer, PT, PT_BYTE));
 	  record_unwind_protect (save_restriction_restore,
@@ -3577,7 +3576,6 @@ handle_fontified_prop (struct it *it)
 	  Fnarrow_to_region
 	    (Fmarker_position (current_buffer->proximity->preceding),
 	     Fmarker_position (current_buffer->proximity->following));
-
 	  if (IT_CHARPOS (*it) < BEGV || IT_CHARPOS (*it) >= ZV)
 	    goto fontified;
 	}

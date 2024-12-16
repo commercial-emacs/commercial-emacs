@@ -24,12 +24,23 @@
   (interactive "d")
   (dolist (ov (overlays-at beg))
     (when (multi-lang-p ov)
-      (font-lock-unfontify-region (overlay-start ov) (overlay-end ov))
-      (with-silent-modifications
-        (delete-overlay ov)))))
+      (let ((font-lock-extra-managed-props
+             (cons 'fontified font-lock-extra-managed-props))
+            (beg (overlay-start ov))
+            (end (overlay-end ov))
+            (modified (buffer-modified-p)))
+        ;; Eschew `with-silent-modifications' since precision required.
+        (unwind-protect
+            (progn
+              (delete-overlay ov)
+              (font-lock-unfontify-region beg end))
+          (when (memq modified '(nil autosaved))
+            (restore-buffer-modified-p modified)))))))
 
 (defun make-multi-lang-overlay (beg end mode)
-  "Return indirect buffer with major mode MODE."
+  "Return indirect buffer with major mode MODE.
+The macro `with-silent-modifications' is unused
+as we require surgical precision on `buffer-undo-list'."
   (interactive
    (list (if (region-active-p) (region-beginning) (point))
          (if (region-active-p) (region-end) (point))
@@ -44,8 +55,15 @@
            nil t))))
   (if (or (null mode) (string-empty-p (symbol-name mode)))
       (keyboard-quit)
-    (with-silent-modifications
-      (make-multi-lang--overlay beg end mode))))
+    ;; Eschew `with-silent-modifications' since precision required.
+    (let ((modified (buffer-modified-p)))
+      (unwind-protect
+          (let ((font-lock-extra-managed-props
+                 (cons 'fontified font-lock-extra-managed-props)))
+            (font-lock-unfontify-region beg end)
+            (make-multi-lang--overlay beg end mode))
+        (when (memq modified '(nil autosaved))
+          (restore-buffer-modified-p modified))))))
 
 (defalias 'multi-lang-on-switch-to-buffer
   (lambda (_window)

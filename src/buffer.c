@@ -916,10 +916,7 @@ Interactively, CLONE and INHIBIT-BUFFER-HOOKS are nil.  */)
 static void
 restore_undo_list (Lisp_Object arg)
 {
-  Lisp_Object undo_list = XCAR (arg);
-  struct buffer *buf = XBUFFER (XCDR (arg));
-
-  bset_undo_list (buf, undo_list);
+  bset_undo_list (XBUFFER (XCAR (arg)), XCDR (arg));
 }
 
 static void
@@ -943,9 +940,7 @@ multi_lang_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_t 
   Lisp_Object b; XSETBUFFER (b, buf);
   specpdl_ref count = SPECPDL_INDEX ();
 
-  specbind (Qinhibit_read_only, Qt);
-  specbind (Qfont_lock_fontify_region_function, Qignore);
-  record_unwind_protect (restore_undo_list, Fcons (BVAR (buf, undo_list), b));
+  record_unwind_protect (restore_undo_list, Fcons (b, BVAR (buf, undo_list)));
   bset_undo_list (buf, Qt);
 
   record_unwind_protect (restore_proximity,
@@ -984,9 +979,7 @@ multi_lang_delete_bumpguard (struct buffer *buf, const ptrdiff_t pos)
   specpdl_ref count = SPECPDL_INDEX ();
 
   specbind (Qinhibit_read_only, Qt);
-  specbind (Qfont_lock_fontify_region_function, Qignore);
-
-  record_unwind_protect (restore_undo_list, Fcons (BVAR (buf, undo_list), b));
+  record_unwind_protect (restore_undo_list, Fcons (b, BVAR (buf, undo_list)));
   bset_undo_list (buf, Qt);
 
   record_unwind_protect (restore_proximity,
@@ -1100,13 +1093,12 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
     base->overlays = itree_create ();
 
   if (base->proximity == NULL)
-    {
-      /* Initialize null proximity with crossed boundaries.  */
-      base->proximity = (struct proximity *) xmalloc (sizeof *base->proximity);
-      base->proximity->current = Qnil;
-      base->proximity->preceding = Fpoint_max_marker ();
-      base->proximity->following = Fpoint_min_marker ();
-    }
+    base->proximity = (struct proximity *) xmalloc (sizeof *base->proximity);
+
+  /* Reset proximity with crossed boundaries.  */
+  base->proximity->current = Qnil;
+  base->proximity->preceding = Fpoint_max_marker ();
+  base->proximity->following = Fpoint_min_marker ();
 
   Lisp_Object tail, xcar, buf = Qnil;
   FOR_EACH_LIVE_BUFFER (tail, xcar)
@@ -1131,7 +1123,6 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
       specpdl_ref back = SPECPDL_INDEX ();
       record_unwind_protect_excursion ();
       set_buffer_internal (XBUFFER (buf));
-      call0 (mode);
       if (!EQ (Qunbound, find_symbol_value
 	       (XSYMBOL (Qhl_line_sticky_flag), XBUFFER (buf))))
 	{
@@ -1177,7 +1168,8 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   unbind_to (count, Qnil); /* restores current_buffer */
 
   SET_PT (obeg);
-  call1 (on_enter, ov);
+  call1 (on_enter, ov); /* sets proximity */
+  call0 (mode); /* font locks */
   return buf;
 }
 
@@ -6049,7 +6041,6 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
 
   DEFSYM (Qkill_buffer__possibly_save, "kill-buffer--possibly-save");
   DEFSYM (Qbuffer_stale_function, "buffer-stale-function");
-  DEFSYM (Qfont_lock_fontify_region_function, "font-lock-fontify-region-function");
   DEFSYM (Qignore, "ignore");
   DEFSYM (Qtemporary_goal_column, "temporary-goal-column");
   DEFSYM (Qhl_line_sticky_flag, "hl-line-sticky-flag");

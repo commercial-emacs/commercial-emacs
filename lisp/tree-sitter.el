@@ -188,11 +188,11 @@ On Linux systems this is $XDG_CACHE_HOME/tree-sitter."
   "As was the case for `jit-lock-after-change', I repeat,
 Make sure we change at least one char (in case of deletions).
 
-Undo, because it restores a non-nil Qfontified prop, requires
-similar goosing so that handle_fontified_prop() sees the
-NILP(prop) it needs to proceed."
+Undo, because it restores the Qfontified prop, requires similar goosing
+so that handle_fontified_prop() sees the NILP(prop) it needs to proceed."
   (when (or (> old-len 0) undo-in-progress)
-    (put-text-property beg (min (point-max) (1+ beg)) 'fontified nil)))
+    (let ((inhibit-read-only t))
+      (put-text-property beg (min (point-max) (1+ beg)) 'fontified nil))))
 
 (defun tree-sitter-fontify-region (beg end loudly)
   "Presumably widened in `font-lock-fontify-region'."
