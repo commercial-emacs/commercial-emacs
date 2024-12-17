@@ -3316,6 +3316,18 @@ handle_stop (struct it *it)
     compute_stop_pos (it);
 }
 
+/* For benefit of multi-lang overlays that need to hem display
+   propertizing. */
+
+bool has_display_prop (Lisp_Object properties)
+{
+  FOR_EACH_TAIL (properties)
+    for (struct props *p = it_props; p->handler; ++p)
+      if (EQ (XCAR (properties), builtin_lisp_symbol (p->name)))
+	return true;
+  return false;
+}
+
 /* Compute IT->stop_charpos from text property and overlay changes. */
 
 static void

@@ -3347,6 +3347,7 @@ void move_it_x (struct it *it, int to_x);
 int partial_line_height (struct it *it_origin);
 bool in_display_vector_p (struct it *);
 int frame_mode_line_height (struct frame *);
+bool has_display_prop (Lisp_Object properties);
 
 extern bool redisplaying_p;
 extern bool help_echo_showing_p;

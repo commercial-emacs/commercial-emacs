@@ -25,7 +25,7 @@
   (dolist (ov (overlays-at beg))
     (when (multi-lang-p ov)
       (let ((font-lock-extra-managed-props
-             (cons 'fontified font-lock-extra-managed-props))
+             `(display fontified . ,font-lock-extra-managed-props))
             (beg (overlay-start ov))
             (end (overlay-end ov))
             (modified (buffer-modified-p)))
@@ -38,9 +38,7 @@
             (restore-buffer-modified-p modified)))))))
 
 (defun make-multi-lang-overlay (beg end mode)
-  "Return indirect buffer with major mode MODE.
-The macro `with-silent-modifications' is unused
-as we require surgical precision on `buffer-undo-list'."
+  "Return indirect buffer with major mode MODE."
   (interactive
    (list (if (region-active-p) (region-beginning) (point))
          (if (region-active-p) (region-end) (point))
@@ -59,7 +57,7 @@ as we require surgical precision on `buffer-undo-list'."
     (let ((modified (buffer-modified-p)))
       (unwind-protect
           (let ((font-lock-extra-managed-props
-                 (cons 'fontified font-lock-extra-managed-props)))
+                 `(display fontified . ,font-lock-extra-managed-props)))
             (font-lock-unfontify-region beg end)
             (make-multi-lang--overlay beg end mode))
         (when (memq modified '(nil autosaved))
@@ -71,6 +69,16 @@ as we require surgical precision on `buffer-undo-list'."
           (overlays-at (point))))
   "A hook in `window-buffer-change-functions' to immediately switch
 to the appropriate indirect buffer.")
+
+(defalias 'multi-lang-filter-buffer-substring-function
+  (lambda ()
+    (add-function :filter-return
+                  (local 'filter-buffer-substring-function)
+                  (lambda (s)
+                    (prog2 (remove-list-of-text-properties
+                            0 (length s) '(read-only rear-nonsticky) s)
+                        s))))
+  "Don't paste a read-only bumpguard user then can't delete.")
 
 (provide 'multi-lang)
 

@@ -20,15 +20,20 @@
 ;;; Code:
 
 (require 'ert)
+(require 'python)
 
 (defmacro multi-lang-tests-doit (text &rest body)
   (declare (indent defun))
   `(let ((dir (make-temp-file "multi-lang-tests" t)))
      (unwind-protect
-         (let ((file-name (expand-file-name "multi-lang-tests.Rnw" dir))
+         (let ((file-name (expand-file-name "multi-lang-tests.tex" dir))
+               font-lock-global-modes ;only works when not interactive
                enable-dir-local-variables)
            (with-temp-file file-name (insert ,text))
            (find-file file-name)
+           (should-not (text-property-any (point-min) (point-max) 'fontified t))
+           (let (noninteractive)
+             (font-lock-mode))
            (should font-lock-mode)
            (should jit-lock-mode)
            ,@body)
@@ -40,28 +45,20 @@
 (ert-deftest multi-lang-test-interactive ()
   "Test interactive use."
   (let ((text "
-\documentclass{article}
-\author{Kate Cowles}
-\usepackage{Sweave}
-
-<<>>=
-summary( lmout <- lm( y ~ x, data=mydat) )
-@
-
-A \LaTeX\ figure.
-
-\begin{center}
-<<fig=TRUE,echo=FALSE>>=
-plot(lmout)
-@
-\end{center}
-\end{document}
+\usepackage{listings}
+\begin{lstlisting}[language=Python]
+def my_function(x, y):
+    return x + y
+\end{lstlisting}
 "))
     (multi-lang-tests-doit (replace-regexp-in-string "^\n" "" text)
-      (should (equal (multi-lang-highlights (point-min) (point-max))
-                     ))
-      (goto-char (point-min))
-      (forward-line 1))))
+      (search-forward "def")
+      (backward-word)
+      (should-not (get-text-property (point) 'face))
+      (make-multi-lang-overlay (line-beginning-position) (line-end-position)
+                               'python-mode)
+      (should (eq (get-text-property (point) 'face) 'font-lock-constant-face))
+      )))
 
 (provide 'multi-lang-tests)
 ;;; multi-lang-tests.el ends here

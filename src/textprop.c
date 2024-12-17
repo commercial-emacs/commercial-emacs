@@ -1212,7 +1212,7 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
 
  retry:
   if (validate_interval_range (object, &start, &end,
-			       !NILP (Fmemq (Qface, properties))))
+			       has_display_prop (properties)))
     {
       unchanged = find_interval (BUFFERP (object)
 				 ? buffer_intervals (XBUFFER (object))
@@ -1427,7 +1427,7 @@ set_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object properties,
 
  retry:
   if (validate_interval_range (object, &start, &end,
-			       !NILP (Fmemq (Qface, properties))))
+			       has_display_prop (properties)))
     {
       i = find_interval (BUFFERP (object)
 			 ? buffer_intervals (XBUFFER (object))
@@ -1598,7 +1598,7 @@ Use `set-text-properties' if you want to remove all text properties.  */)
 
  retry:
   if (validate_interval_range (object, &start, &end,
-			       !NILP (Fmemq (Qface, properties))))
+			       has_display_prop (properties)))
     i = find_interval (BUFFERP (object)
 		       ? buffer_intervals (XBUFFER (object))
 		       : string_intervals (object),
@@ -1729,7 +1729,7 @@ Return t if any property was actually removed, nil otherwise.  */)
     XSETBUFFER (object, current_buffer);
 
   if (validate_interval_range (object, &start, &end,
-			       !NILP (Fmemq (Qface, properties))))
+			       has_display_prop (properties)))
     i = find_interval (BUFFERP (object)
 		       ? buffer_intervals (XBUFFER (object))
 		       : string_intervals (object),

@@ -1112,6 +1112,7 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   record_unwind_protect_excursion ();
   set_buffer_internal (base);
   call0 (Qdeactivate_mark);
+  call0 (Qmulti_lang_filter_buffer_substring_function);
   call4 (Qadd_hook, Qwindow_buffer_change_functions,
 	 Qmulti_lang_on_switch_to_buffer,
 	 Qnil, Qt);
@@ -1159,6 +1160,7 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
       specpdl_ref back = SPECPDL_INDEX ();
       record_unwind_protect_excursion ();
       set_buffer_internal (XBUFFER (buf));
+      call0 (Qmulti_lang_filter_buffer_substring_function);
       if (!EQ (Qunbound, find_symbol_value
 	       (XSYMBOL (Qhl_line_sticky_flag), XBUFFER (buf))))
 	{
@@ -5138,6 +5140,8 @@ syms_of_buffer (void)
   DEFSYM (Qmulti_lang_p, "multi-lang-p");
   DEFSYM (Qmulti_lang, "multi-lang");
   DEFSYM (Qmulti_lang_on_switch_to_buffer, "multi-lang-on-switch-to-buffer");
+  DEFSYM (Qmulti_lang_filter_buffer_substring_function,
+	  "multi-lang-filter-buffer-substring-function");
   DEFSYM (Qadd_hook, "add-hook");
 
   DEFSYM (Qvertical_scroll_bar, "vertical-scroll-bar");
