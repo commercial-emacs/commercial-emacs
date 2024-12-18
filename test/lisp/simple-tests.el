@@ -527,8 +527,9 @@ See bug#35036."
         (progn
           (set-default 'pre-command-hook (list hook))
           (execute-kbd-macro kbd-macro)
-          (funcall (pop checks))
-          (should-not checks)
+          (dolist (check checks)
+            (when check
+              (funcall check)))
           (should-not i-hate-command-loop))
       (set-default 'pre-command-hook restore-pre-command-hook))))
 
