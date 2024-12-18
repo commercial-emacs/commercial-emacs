@@ -495,33 +495,42 @@ See bug#35036."
          (switch-to-buffer ,before-buffer)))))
 
 (defun simple-tests--exec (&rest args)
-  (let* ((checks (let ((command-p t)
+  "Simulate command loop."
+  (let* ((restore-pre-command-hook (default-value 'pre-command-hook))
+         (checks (let ((command-p t)
                        ret)
                    (dolist (arg args)
                      (if command-p
                          (setq command-p nil)
-                       (if (and (consp arg)
-                                (functionp arg))
+                       (if (eq (type-of arg) 'interpreted-function)
                            (progn
                              (setq command-p t)
                              (push arg ret))
                          (push nil ret))))
-                   (nreverse ret)))
+                   (cons 'burner (nreverse ret))))
          (commands (seq-filter #'symbolp args))
-         (buffer (current-buffer))
-         (post-command-hook
-          (list (lambda ()
-                  (when (memq this-command commands)
-                    (when-let ((check (car checks)))
-                      (with-current-buffer buffer
-                        (funcall check)))
-                    (setq checks (cdr checks)))))))
-    (execute-kbd-macro
-     (read-kbd-macro
-      (mapconcat (lambda (s) (concat "M-x " (symbol-name s) " RET"))
-                 commands "\n")))
-    (unless post-command-hook ;safe_run_hooks nulls on error
-      (should nil))))
+         i-hate-command-loop
+         (hook (lambda ()
+                 (unless (minibufferp)
+                   (condition-case err
+                       (when (eq this-command 'execute-extended-command)
+                         (when-let ((check (car checks)))
+                           (unless (eq check 'burner)
+                             (funcall check)))
+                         (setq checks (cdr checks)))
+                     (error (setq i-hate-command-loop err))))))
+         (kbd-macro (read-kbd-macro
+                     (mapconcat
+                      (lambda (s) (concat "M-x " (symbol-name s) " RET"))
+                      commands "\n"))))
+    (unwind-protect
+        (progn
+          (set-default 'pre-command-hook (list hook))
+          (execute-kbd-macro kbd-macro)
+          (funcall (pop checks))
+          (should-not checks)
+          (should-not i-hate-command-loop))
+      (set-default 'pre-command-hook restore-pre-command-hook))))
 
 (ert-deftest simple-tests--undo ()
   (simple-test-undo-with-switched-buffer
