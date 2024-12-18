@@ -1041,9 +1041,15 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
 static bool
 candidate_buffer (Lisp_Object b, Lisp_Object buffer)
 {
+  bool multi_lang_related = XBUFFER (b)->overlays != NULL
+    && XBUFFER (b)->overlays == XBUFFER (buffer)->overlays;
   return (BUFFERP (b) && !EQ (b, buffer)
 	  && BUFFER_LIVE_P (XBUFFER (b))
-	  && !BUFFER_HIDDEN_P (XBUFFER (b)));
+	  /* And not within BUFFER's multi lang family */
+	  && !multi_lang_related
+	  /* And not hidden, or if it is, that it's a multi lang buffer */
+	  && (!BUFFER_HIDDEN_P (XBUFFER (b))
+	      || MULTI_LANG_INDIRECT_P (XBUFFER (b))));
 }
 
 DEFUN ("multi-lang--enter-buffer", Fmake_multi_lang__enter_buffer,
@@ -1055,30 +1061,8 @@ DEFUN ("multi-lang--enter-buffer", Fmake_multi_lang__enter_buffer,
     current_buffer->proximity->current = Fcons (ov, current_buffer->proximity->current);
   Lisp_Object base = Fbuffer_base_buffer (buf);
   if (!NILP (base))
-    {
-      struct frame *f = XFRAME (selected_frame);
-      Lisp_Object tail = f->buffer_list;
-      FOR_EACH_TAIL (tail)
-	{
-	  if (EQ (XCAR (tail), base))
-	    {
-	      Lisp_Object here = tail;
-	      FOR_EACH_TAIL (tail)
-		{
-		  Lisp_Object cand = XCAR (tail);
-		  if (candidate_buffer (cand, base))
-		    {
-		      XSETCAR (tail, XCAR (here));
-		      XSETCAR (here, cand);
-		      break;
-		    }
-		}
-	      break;
-	    }
-	}
-      Fset_window_prev_buffers (Qnil, call2 (Qassq_delete_all, base,
-					     Fwindow_prev_buffers (Qnil)));
-    }
+    Fset_window_prev_buffers (Qnil, call2 (Qassq_delete_all, base,
+					   Fwindow_prev_buffers (Qnil)));
   multi_lang_switch_to_buffer (buf);
   return buf;
 }
