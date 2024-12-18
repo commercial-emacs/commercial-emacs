@@ -1031,8 +1031,9 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
     next = next_overlay_change (PT, true);
   current_buffer->proximity->preceding
     = build_marker (XBUFFER (buf), previous, CHAR_TO_BYTE (previous));
-  current_buffer->proximity->following = (next == ZV)
-    ? Qnil
+  current_buffer->proximity->following =
+    (next == ZV && !XBUFFER (buf)->base_buffer)
+    ? Qnil /* MULTI_LANG_BASE_P grows without limit.  */
     : build_marker (XBUFFER (buf), next, CHAR_TO_BYTE (next));
 }
 
