@@ -141,7 +141,9 @@ validate_interval_range (Lisp_Object object, Lisp_Object *begin,
       if (hem && XBUFFER (object)->proximity != NULL)
 	{
 	  Lisp_Object preceding = Fmarker_position (b->proximity->preceding);
-	  Lisp_Object following = Fmarker_position (b->proximity->following);
+	  Lisp_Object following = !NILP (b->proximity->following)
+	    ? Fmarker_position (b->proximity->following)
+	    : *end;
 	  *begin = Fmax (2, (Lisp_Object []) { *begin, preceding });
 	  *end = Fmin (2, (Lisp_Object []) { *end, following });
 	  if (XFIXNUM (*begin) > XFIXNUM (*end))

@@ -948,6 +948,7 @@ multi_lang_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_t 
 				buf->proximity->current,
 				buf->proximity->preceding,
 				buf->proximity->following));
+  /* perform equivalent of `widen' */
   buf->proximity->current = Qnil;
   buf->proximity->preceding = Fpoint_min_marker ();
   buf->proximity->following = Fpoint_max_marker ();
@@ -987,6 +988,7 @@ multi_lang_delete_bumpguard (struct buffer *buf, const ptrdiff_t pos)
 				buf->proximity->current,
 				buf->proximity->preceding,
 				buf->proximity->following));
+  /* perform equivalent of `widen' */
   buf->proximity->current = Qnil;
   buf->proximity->preceding = Fpoint_min_marker ();
   buf->proximity->following = Fpoint_max_marker ();
@@ -1029,8 +1031,9 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
     next = next_overlay_change (PT, true);
   current_buffer->proximity->preceding
     = build_marker (XBUFFER (buf), previous, CHAR_TO_BYTE (previous));
-  current_buffer->proximity->following
-    = build_marker (XBUFFER (buf), next, CHAR_TO_BYTE (next));
+  current_buffer->proximity->following = (next == ZV)
+    ? Qnil
+    : build_marker (XBUFFER (buf), next, CHAR_TO_BYTE (next));
 }
 
 /* True if B can be used as 'other-than-BUFFER' buffer.  */
@@ -1219,36 +1222,30 @@ DEFUN ("multi-lang-indirect-p", Fmulti_lang_indirect_p, Smulti_lang_indirect_p, 
   return MULTI_LANG_INDIRECT_P (XBUFFER (buf)) ? Qt : Qnil;
 }
 
-/* Delete all overlays of B and reset its overlay lists.  */
-
 void
 delete_all_overlays (struct buffer *b)
 {
-  struct itree_node *node;
-
-  if (!b->overlays)
-    return;
-
-  /* The general rule is that the tree cannot be modified from within
-     ITREE_FOREACH, but here we bend this rule a little because we know
-     that the POST_ORDER iterator will not need to look at `node` again.  */
-  ITREE_FOREACH (node, b->overlays, PTRDIFF_MIN, PTRDIFF_MAX, POST_ORDER)
-    {
-      modify_overlay (b, node->begin, node->end);
-      XOVERLAY (node->data)->buffer = NULL;
-      node->parent = NULL;
-      node->left = NULL;
-      node->right = NULL;
-    }
-  itree_clear (b->overlays);
-}
-
-static void
-free_buffer_overlays (struct buffer *b)
-{
-  /* Actually this does not free any overlay, but the tree only.  --ap */
   if (b->overlays)
     {
+      /* The general rule is that the tree cannot be modified from within
+	 ITREE_FOREACH, but here we bend this rule a little because we know
+	 that the POST_ORDER iterator will not need to look at `node` again.  */
+      struct itree_node *node;
+      ITREE_FOREACH (node, b->overlays, PTRDIFF_MIN, PTRDIFF_MAX, POST_ORDER)
+	{
+	  modify_overlay (b, node->begin, node->end);
+	  if (MULTI_LANG_INDIRECT_P (XOVERLAY (node->data)->buffer))
+	    {
+	      /* these are shared with B, so douse them */
+	      XOVERLAY (node->data)->buffer->overlays = NULL;
+	      XOVERLAY (node->data)->buffer->proximity = NULL;
+	    }
+	  XOVERLAY (node->data)->buffer = NULL;
+	  node->parent = NULL;
+	  node->left = NULL;
+	  node->right = NULL;
+	}
+      itree_clear (b->overlays);
       itree_destroy (b->overlays);
       b->overlays = NULL;
     }
@@ -2022,6 +2019,10 @@ cleaning up all windows currently displaying the buffer to be killed. */)
   if (NILP (buffer))
     nsberror (buffer_or_name);
 
+  if (MULTI_LANG_INDIRECT_P (XBUFFER (buffer)))
+    XSETBUFFER (buffer, XBUFFER (buffer)->base_buffer);
+
+  CHECK_BUFFER (buffer);
   b = XBUFFER (buffer);
 
   if (!BUFFER_LIVE_P (b))
@@ -2110,6 +2111,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 	  struct buffer *obuf = XBUFFER (other);
 	  if (obuf->base_buffer == b)
 	    {
+	      obuf->proximity = NULL; /* otherwise Fkill_buffer infloops */
 	      Fkill_buffer (other);
 	      if (BUFFER_LIVE_P (obuf))
 		error ("Unable to kill buffer whose indirect buffer `%s' cannot be killed",
@@ -2229,11 +2231,9 @@ cleaning up all windows currently displaying the buffer to be killed. */)
       /* Perhaps we should explicitly free the interval tree here...  */
     }
 
-  if (!MULTI_LANG_INDIRECT_P (b))
-    {
-      delete_all_overlays (b);
-      free_buffer_overlays (b);
-    }
+  if (b->base_buffer == NULL
+      || b->overlays != b->base_buffer->overlays)
+    delete_all_overlays (b);
 
   /* Reset the local variables, so that this buffer's local values
      won't be protected from GC.  They would be protected
@@ -2253,6 +2253,8 @@ cleaning up all windows currently displaying the buffer to be killed. */)
       eassert (b->base_buffer->indirections >= 0);
       /* Make sure that we wasn't confused.  */
       eassert (b->window_count == -1);
+      b->proximity = NULL; /* base buffer xfree's */
+      b->overlays = NULL;  /* base buffer xfree's */
     }
   else
     {
@@ -3858,8 +3860,6 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
   struct buffer *obuffer = OVERLAY_BUFFER (overlay);
   if (obuffer != NULL)
     {
-      Lisp_Object b; XSETBUFFER (b, obuffer);
-
       /* Turn off optimizations if overlay contained before- or
 	 after-strings since they could contain newlines.  */
       if (!windows_or_buffers_changed
@@ -3869,7 +3869,7 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
 
       modify_overlay (obuffer, OVERLAY_START (overlay), OVERLAY_END (overlay));
       itree_remove (obuffer->overlays, XOVERLAY (overlay)->interval);
-
+      /* Now kill multi-lang buffer associated with OBUFFER.  */
       if (MULTI_LANG_INDIRECT_P (obuffer) /* don't touch base buffer! */
 	  && !NILP (plist_get (OVERLAY_PLIST (overlay), Qmulti_lang_p)))
 	{
@@ -3882,23 +3882,40 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
 	  if (!NILP (OVERLAY_ON_EXIT (overlay)))
 	    call1 (OVERLAY_ON_EXIT (overlay), overlay);
 
-	  /* Kill OBUFFER if no other overlays attached.  */
-	  bool kill = true;
+	  /* Kill OBUFFER if no other overlays attached.
+	     Erase all proximity tracking if no other multi-lang overlays. */
+	  bool kill_one = true; /* kill OBUFFER if no other overlays attached. */
+	  bool erase_all = true; /* erase tracking if no more multi-lang overlays. */
 	  struct itree_node *node;
 	  ITREE_FOREACH (node, obuffer->overlays, PTRDIFF_MIN,
 			 PTRDIFF_MAX, POST_ORDER)
 	    {
-	      if (!EQ (node->data, overlay)
-		  && XOVERLAY (node->data)->buffer == obuffer)
+	      if (!EQ (node->data, overlay))
 		{
-		  kill = false;
-		  break;
+		  /* recall obuffer->overlays is same as base->overlays */
+		  if (!NILP (plist_get (OVERLAY_PLIST (node->data), Qmulti_lang_p)))
+		    erase_all = false;
+		  if (XOVERLAY (node->data)->buffer == obuffer)
+		    {
+		      kill_one = false;
+		      erase_all = false; /* should already be */
+		      break;
+		    }
 		}
 	    }
-	  if (kill)
-	    Fkill_buffer (b);
+	  if (kill_one)
+	    {
+	      struct buffer *base = obuffer->base_buffer;
+	      obuffer->proximity = NULL; /* otherwise Fkill_buffer kills base */
+	      Lisp_Object b; XSETBUFFER (b, obuffer);
+	      Fkill_buffer (b);
+	      if (erase_all)
+		{
+		  xfree (base->proximity);
+		  base->proximity = NULL;
+		}
+	    }
 	}
-
       XOVERLAY (overlay)->buffer = NULL;
     }
   return Qnil;

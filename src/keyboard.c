@@ -1315,11 +1315,12 @@ command_loop (void)
             windows_or_buffers_changed = 39;
 
 	  if (current_buffer->proximity != NULL
-	      /* And point is outside [preceding, following).  */
+	      /* And point outside [preceding, following).  */
 	      && (PT < XFIXNUM (Fmarker_position
 				(current_buffer->proximity->preceding))
-		  || PT >= XFIXNUM (Fmarker_position
-				    (current_buffer->proximity->following))))
+		  || (!NILP (current_buffer->proximity->following)
+		      && PT >= XFIXNUM (Fmarker_position
+					(current_buffer->proximity->following)))))
 	    {
 	      /* Update proximity cache.  */
 	      Lisp_Object tail = Foverlays_at (make_fixnum (prev_pt), Qnil);

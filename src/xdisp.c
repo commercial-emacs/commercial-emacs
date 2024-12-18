@@ -3587,7 +3587,9 @@ handle_fontified_prop (struct it *it)
 				 save_restriction_save ());
 	  Fnarrow_to_region
 	    (Fmarker_position (current_buffer->proximity->preceding),
-	     Fmarker_position (current_buffer->proximity->following));
+	     !NILP (current_buffer->proximity->following)
+	     ? Fmarker_position (current_buffer->proximity->following)
+	     : Fpoint_max_marker ());
 	  if (IT_CHARPOS (*it) < BEGV || IT_CHARPOS (*it) >= ZV)
 	    goto fontified;
 	}
