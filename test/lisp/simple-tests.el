@@ -494,45 +494,6 @@ See bug#35036."
              ,@body)
          (switch-to-buffer ,before-buffer)))))
 
-(defun simple-tests--exec (&rest args)
-  "Simulate command loop."
-  (let* ((restore-pre-command-hook (default-value 'pre-command-hook))
-         (checks (let ((command-p t)
-                       ret)
-                   (dolist (arg args)
-                     (if command-p
-                         (setq command-p nil)
-                       (if (eq (type-of arg) 'interpreted-function)
-                           (progn
-                             (setq command-p t)
-                             (push arg ret))
-                         (push nil ret))))
-                   (cons 'burner (nreverse ret))))
-         (commands (seq-filter #'symbolp args))
-         i-hate-command-loop
-         (hook (lambda ()
-                 (unless (minibufferp)
-                   (condition-case err
-                       (when (eq this-command 'execute-extended-command)
-                         (when-let ((check (car checks)))
-                           (unless (eq check 'burner)
-                             (funcall check)))
-                         (setq checks (cdr checks)))
-                     (error (setq i-hate-command-loop err))))))
-         (kbd-macro (read-kbd-macro
-                     (mapconcat
-                      (lambda (s) (concat "M-x " (symbol-name s) " RET"))
-                      commands "\n"))))
-    (unwind-protect
-        (progn
-          (set-default 'pre-command-hook (list hook))
-          (execute-kbd-macro kbd-macro)
-          (dolist (check checks)
-            (when check
-              (funcall check)))
-          (should-not i-hate-command-loop))
-      (set-default 'pre-command-hook restore-pre-command-hook))))
-
 (ert-deftest simple-tests--undo ()
   (simple-test-undo-with-switched-buffer
       "foo"
@@ -540,7 +501,7 @@ See bug#35036."
       (insert x)
       (undo-boundary))
     (should (equal (buffer-string) "abcde"))
-    (simple-tests--exec
+    (ert-command-loop
      'undo 'undo
      (lambda () (should (equal "abc" (buffer-string))))
      'backward-char 'undo
@@ -581,7 +542,7 @@ See bug#35036."
     ;; `undo-only'.  There used to be a bug in
     ;; `undo-make-selective-list' that makes `undo-only' error out in
     ;; that case, which is fixed by in the same commit as this change.
-    (simple-tests--exec
+    (ert-command-loop
      'move-beginning-of-line
      'push-mark-command
      'forward-char
@@ -612,7 +573,7 @@ See bug#35036."
         (undo-boundary))
       (should (equal (buffer-string) "abc"))
       ;; Tests mappings in `stupid-table'.
-      (simple-tests--exec
+      (ert-command-loop
        'undo
        (lambda () (should (and (equal (buffer-string) "ab")
                                (eq (gethash buffer-undo-list

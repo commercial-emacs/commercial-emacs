@@ -47,44 +47,6 @@
        (set-buffer-modified-p nil)
        (kill-buffer))))
 
-(defun multi-lang-tests--exec (&rest args)
-  "Borrow from simple-tests.el until it gets factored up."
-  (let* ((restore-pre-command-hook (default-value 'pre-command-hook))
-         (checks (let ((command-p t)
-                       ret)
-                   (dolist (arg args)
-                     (if command-p
-                         (setq command-p nil)
-                       (if (eq (type-of arg) 'interpreted-function)
-                           (progn
-                             (setq command-p t)
-                             (push arg ret))
-                         (push nil ret))))
-                   (cons 'burner (nreverse ret))))
-         (commands (seq-filter #'symbolp args))
-         (hook (lambda ()
-                 (unless (minibufferp)
-                   (condition-case err
-                       (when (eq this-command 'execute-extended-command)
-                         (when-let ((check (pop checks)))
-                           (unless (eq check 'burner)
-                             (funcall check))))
-                     (error (throw 'error err))))))
-         (kbd-macro (read-kbd-macro
-                     (mapconcat
-                      (lambda (s) (concat "M-x " (symbol-name s) " RET"))
-                      commands "\n"))))
-    (unwind-protect
-        (should-not
-         (catch 'error
-           (prog1 nil
-             (set-default 'pre-command-hook (list hook))
-             (execute-kbd-macro kbd-macro)
-             (dolist (check checks)
-               (when check
-                 (funcall check))))))
-      (set-default 'pre-command-hook restore-pre-command-hook))))
-
 (ert-deftest multi-lang-test-interactive ()
   "Test interactive use."
   (let ((text "
@@ -117,7 +79,7 @@ def my_function(x, y):
                           (search-forward "\\end")
                           (line-beginning-position))
                         'python-mode)))
-        (multi-lang-tests--exec
+        (ert-command-loop
          'end-of-buffer
          (lambda ()
            (should (eq (current-buffer) base)))
@@ -142,3 +104,38 @@ def my_function(x, y):
 
 (provide 'multi-lang-tests)
 ;;; multi-lang-tests.el ends here
+
+
+;; (package-initialize)
+;; (require 'paredit)
+
+
+;; (defun collect-pos ()
+;;   (with-current-buffer "s.tex"
+;;     (cl-loop with queue = (list (tree-sitter-root-node))
+;; 	     while queue
+;; 	     for node = (pop queue)
+;; 	     append
+;; 	     (prog1 (when-let ((word-p (equal (tree-sitter-node-type node) "word"))
+;; 			       (word-text (buffer-substring-no-properties
+;; 					   (tree-sitter-node-start node)
+;; 					   (tree-sitter-node-end node)))
+;; 			       (parent (tree-sitter-node-parent node))
+;; 			       (lstlisting-p (and (equal word-text "lstlisting")
+;; 						  (equal "begin" (tree-sitter-node-type parent)))))
+;; 		      (list (cl-some (lambda (child)
+;; 				       (when-let ((bracket-group-p (equal "bracket_group" (tree-sitter-node-type child)))
+;; 						  (bracket-text (buffer-substring-no-properties (tree-sitter-node-start child) (tree-sitter-node-end child)))
+;; 						  (language-p (string-prefix-p "[language=" bracket-text)))
+;; 					 bracket-text))
+;; 				     (mapcar (lambda (k)
+;; 					       (tree-sitter-node-child parent k))
+;; 					     (number-sequence 0 (1- (tree-sitter-node-child-count parent)))))))
+;; 	       (dotimes (i (tree-sitter-node-child-count node))
+;; 		 (push (tree-sitter-node-child node i) queue))))))
+
+
+
+
+
+;; (collect-pos)
