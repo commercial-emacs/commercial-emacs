@@ -25,44 +25,6 @@
 (require 'tex-mode)
 (eval-when-compile (require 'cl-lib))
 
-(defun multi-lang-tests--exec (&rest args)
-  "Borrow nifty command simulator from simple-tests.el."
-  (let* ((restore-pre-command-hook (default-value 'pre-command-hook))
-         (checks (let ((command-p t)
-                       ret)
-                   (dolist (arg args)
-                     (if command-p
-                         (setq command-p nil)
-                       (if (eq (type-of arg) 'interpreted-function)
-                           (progn
-                             (setq command-p t)
-                             (push arg ret))
-                         (push nil ret))))
-                   (cons 'burner (nreverse ret))))
-         (commands (seq-filter #'symbolp args))
-         i-hate-command-loop
-         (hook (lambda ()
-                 (unless (minibufferp)
-                   (condition-case err
-                       (when (eq this-command 'execute-extended-command)
-                         (when-let ((check (car checks)))
-                           (unless (eq check 'burner)
-                             (funcall check)))
-                         (setq checks (cdr checks)))
-                     (error (setq i-hate-command-loop err))))))
-         (kbd-macro (read-kbd-macro
-                     (mapconcat
-                      (lambda (s) (concat "M-x " (symbol-name s) " RET"))
-                      commands "\n"))))
-    (unwind-protect
-        (progn
-          (set-default 'pre-command-hook (list hook))
-          (execute-kbd-macro kbd-macro)
-          (funcall (pop checks))
-          (should-not checks)
-          (should-not i-hate-command-loop))
-      (set-default 'pre-command-hook restore-pre-command-hook))))
-
 (defmacro multi-lang-tests-doit (ext text &rest body)
   (declare (indent defun))
   `(let ((dir (make-temp-file "multi-lang-tests" t)))
@@ -80,10 +42,48 @@
            (should-not (text-property-any (point-min) (point-max) 'fontified nil))
            (should (text-property-not-all (point-min) (point-max) 'face nil))
            ,@body)
-       (let (kill-buffer-query-functions)
-         (set-buffer-modified-p nil)
-         (kill-buffer))
-       (delete-directory dir t))))
+       (delete-directory dir t))
+     (let (kill-buffer-query-functions)
+       (set-buffer-modified-p nil)
+       (kill-buffer))))
+
+(defun multi-lang-tests--exec (&rest args)
+  "Borrow from simple-tests.el until it gets factored up."
+  (let* ((restore-pre-command-hook (default-value 'pre-command-hook))
+         (checks (let ((command-p t)
+                       ret)
+                   (dolist (arg args)
+                     (if command-p
+                         (setq command-p nil)
+                       (if (eq (type-of arg) 'interpreted-function)
+                           (progn
+                             (setq command-p t)
+                             (push arg ret))
+                         (push nil ret))))
+                   (cons 'burner (nreverse ret))))
+         (commands (seq-filter #'symbolp args))
+         (hook (lambda ()
+                 (unless (minibufferp)
+                   (condition-case err
+                       (when (eq this-command 'execute-extended-command)
+                         (when-let ((check (pop checks)))
+                           (unless (eq check 'burner)
+                             (funcall check))))
+                     (error (throw 'error err))))))
+         (kbd-macro (read-kbd-macro
+                     (mapconcat
+                      (lambda (s) (concat "M-x " (symbol-name s) " RET"))
+                      commands "\n"))))
+    (unwind-protect
+        (should-not
+         (catch 'error
+           (prog1 nil
+             (set-default 'pre-command-hook (list hook))
+             (execute-kbd-macro kbd-macro)
+             (dolist (check checks)
+               (when check
+                 (funcall check))))))
+      (set-default 'pre-command-hook restore-pre-command-hook))))
 
 (ert-deftest multi-lang-test-interactive ()
   "Test interactive use."
@@ -105,6 +105,7 @@ def my_function(x, y):
       (search-forward "my_f")
       (backward-word)
       (should (equal (get-text-property (point) 'face) '(subscript)))
+      (should (get-text-property (point) 'display))
       (let* ((base (current-buffer))
              (indirect (make-multi-lang-overlay
                         (save-excursion
@@ -136,7 +137,8 @@ def my_function(x, y):
            (search-forward "my_f"))
          'backward-word
          (lambda ()
-           (should-not (equal (get-text-property (point) 'face) '(subscript)))))))))
+           (should-not (equal (get-text-property (point) 'face) '(subscript)))
+           (should-not (get-text-property (point) 'display))))))))
 
 (provide 'multi-lang-tests)
 ;;; multi-lang-tests.el ends here
