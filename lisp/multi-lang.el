@@ -19,10 +19,10 @@
 (defsubst multi-lang-p (overlay)
   (overlay-get overlay 'multi-lang-p))
 
-(defun delete-multi-lang-overlay (beg)
-  "Remove all multi-lang overlays at BEG."
+(defun delete-multi-lang-overlay (pos)
+  "Remove all multi-lang overlays at POS."
   (interactive "d")
-  (dolist (ov (overlays-at beg))
+  (dolist (ov (overlays-at pos))
     (when (multi-lang-p ov)
       (let ((font-lock-extra-managed-props
              `(display fontified . ,font-lock-extra-managed-props))

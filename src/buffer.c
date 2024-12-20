@@ -1090,6 +1090,13 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   if (current_buffer->base_buffer)
     xsignal1 (Quser_error, build_string ("Only permitted in base buffer"));
 
+  Lisp_Object extant = Foverlays_in (beg, end);
+  FOR_EACH_TAIL (extant)
+    {
+      if (!NILP (plist_get (OVERLAY_PLIST (XCAR (extant)), Qmulti_lang_p)))
+	xsignal1 (Quser_error, build_string ("Overlapping multi-lang overlays"));
+    }
+
   struct buffer *base = current_buffer;
 
   if (EQ (BVAR (base, major_mode), mode))

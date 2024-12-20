@@ -1768,6 +1768,16 @@ DEFUN ("tree-sitter",
   if (NILP (buffer))
     buffer = Fcurrent_buffer ();
 
+  /* Indirect buffers except multi-lang cannibalize their base buffer's
+     tree sitter.  */
+  if (XBUFFER (buffer)->base_buffer != NULL
+      && !MULTI_LANG_INDIRECT_P (XBUFFER (buffer)))
+    {
+      Lisp_Object base;
+      XSETBUFFER (base, XBUFFER (buffer)->base_buffer);
+      buffer = base;
+    }
+
   CHECK_BUFFER (buffer);
 
   sitter = Fbuffer_local_value (Qtree_sitter_sitter, buffer);
@@ -1796,7 +1806,7 @@ DEFUN ("tree-sitter",
 	}
     }
   else
-    xsignal1 (Qtree_sitter_error, BVAR (XBUFFER (Fcurrent_buffer ()), name));
+    xsignal1 (Qtree_sitter_error, BVAR (XBUFFER (buffer), name));
   return sitter;
 }
 
@@ -1807,28 +1817,73 @@ tree_sitter_record_change (ptrdiff_t start_char,
 			   uint32_t old_end_byte,
 			   ptrdiff_t new_end_char)
 {
-  Lisp_Object sitter = Fbuffer_local_value (Qtree_sitter_sitter, Fcurrent_buffer ());
-  if (!NILP (sitter))
+#define tree_sitter_record_change_initial_CAPACITY 16
+  USE_SAFE_ALLOCA;
+  struct buffer *init[tree_sitter_record_change_initial_CAPACITY];
+  struct buffer **buffers = &init[0];
+  int j = 0, capacity = tree_sitter_record_change_initial_CAPACITY;
+
+  /* The function `tree-sitter' returns that of the base.  */
+  buffers[j++] = current_buffer->base_buffer
+    ? current_buffer->base_buffer
+    : current_buffer;
+
+  /* Multi-lang indirect buffers host their own tree-sitter.  */
+  if (current_buffer->proximity != NULL)
     {
-      TSTree *tree = XTREE_SITTER (sitter)->tree;
-      if (tree != NULL)
+      struct itree_node *node;
+      ITREE_FOREACH (node, current_buffer->overlays, PTRDIFF_MIN,
+		     PTRDIFF_MAX, POST_ORDER)
 	{
-	  TSInputEdit edit = {
-	    BUFFER_TO_SITTER (start_char),
-	    old_end_byte,
-	    BUFFER_TO_SITTER (new_end_char),
-	    (TSPoint) { 0, 0 },
-	    (TSPoint) { 0, 0 },
-	    (TSPoint) { 0, max (1, new_end_char - start_char) } /* black magic */
-	  };
-          XTREE_SITTER (sitter)->dirty = true;
-	  ts_tree_edit (tree, &edit);
-	}
-      else
-	{
-	  xsignal1 (Qtree_sitter_error, BVAR (XBUFFER (Fcurrent_buffer ()), name));
+	  struct buffer *obuffer = XOVERLAY (node->data)->buffer;
+	  if (obuffer != NULL)
+	    {
+	      int i = 0;
+	      for (; i < j; ++i)
+		if (buffers[i] == obuffer)
+		  break;
+	      if (i >= j)
+		{
+		  if (j >= capacity)
+		    {
+		      struct buffer **more;
+		      capacity *= 2;
+		      SAFE_NALLOCA (more, 1, capacity);
+		      memcpy (more, buffers, j * sizeof (*buffers));
+		      buffers = more;
+		    }
+		  buffers[j++] = obuffer;
+		}
+	    }
 	}
     }
+
+  for (int i = 0; i < j; ++i)
+    {
+      Lisp_Object buf; XSETBUFFER (buf, buffers[i]);
+      Lisp_Object sitter = Fbuffer_local_value (Qtree_sitter_sitter, buf);
+      if (!NILP (sitter))
+	{
+	  TSTree *tree = XTREE_SITTER (sitter)->tree;
+	  if (tree != NULL)
+	    {
+	      TSInputEdit edit = {
+		BUFFER_TO_SITTER (start_char),
+		old_end_byte,
+		BUFFER_TO_SITTER (new_end_char),
+		(TSPoint) { 0, 0 },
+		(TSPoint) { 0, 0 },
+		(TSPoint) { 0, max (1, new_end_char - start_char) } /* black magic */
+	      };
+	      XTREE_SITTER (sitter)->dirty = true;
+	      ts_tree_edit (tree, &edit);
+	    }
+	  else
+	    xsignal1 (Qtree_sitter_error, BVAR (buffers[i], name));
+	}
+    }
+  SAFE_FREE ();
+#undef tree_sitter_record_change_initial_CAPACITY
 }
 
 void

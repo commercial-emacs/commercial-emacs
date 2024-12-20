@@ -104,38 +104,3 @@ def my_function(x, y):
 
 (provide 'multi-lang-tests)
 ;;; multi-lang-tests.el ends here
-
-
-;; (package-initialize)
-;; (require 'paredit)
-
-
-;; (defun collect-pos ()
-;;   (with-current-buffer "s.tex"
-;;     (cl-loop with queue = (list (tree-sitter-root-node))
-;; 	     while queue
-;; 	     for node = (pop queue)
-;; 	     append
-;; 	     (prog1 (when-let ((word-p (equal (tree-sitter-node-type node) "word"))
-;; 			       (word-text (buffer-substring-no-properties
-;; 					   (tree-sitter-node-start node)
-;; 					   (tree-sitter-node-end node)))
-;; 			       (parent (tree-sitter-node-parent node))
-;; 			       (lstlisting-p (and (equal word-text "lstlisting")
-;; 						  (equal "begin" (tree-sitter-node-type parent)))))
-;; 		      (list (cl-some (lambda (child)
-;; 				       (when-let ((bracket-group-p (equal "bracket_group" (tree-sitter-node-type child)))
-;; 						  (bracket-text (buffer-substring-no-properties (tree-sitter-node-start child) (tree-sitter-node-end child)))
-;; 						  (language-p (string-prefix-p "[language=" bracket-text)))
-;; 					 bracket-text))
-;; 				     (mapcar (lambda (k)
-;; 					       (tree-sitter-node-child parent k))
-;; 					     (number-sequence 0 (1- (tree-sitter-node-child-count parent)))))))
-;; 	       (dotimes (i (tree-sitter-node-child-count node))
-;; 		 (push (tree-sitter-node-child node i) queue))))))
-
-
-
-
-
-;; (collect-pos)
