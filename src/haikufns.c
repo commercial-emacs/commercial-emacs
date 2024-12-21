@@ -3220,7 +3220,6 @@ syms_of_haikufns (void)
 {
   DEFSYM (Qfont_parameter, "font-parameter");
   DEFSYM (Qcancel_timer, "cancel-timer");
-  DEFSYM (Qassq_delete_all, "assq-delete-all");
 
   DEFSYM (Qrun_at_time, "run-at-time");
   DEFSYM (Qx_hide_tip, "x-hide-tip");

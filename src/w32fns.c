@@ -10741,7 +10741,6 @@ syms_of_w32fns (void)
   DEFSYM (Qmm_size, "mm-size");
   DEFSYM (Qframes, "frames");
   DEFSYM (Qtip_frame, "tip-frame");
-  DEFSYM (Qassq_delete_all, "assq-delete-all");
   DEFSYM (Qunicode_sip, "unicode-sip");
 #if defined WINDOWSNT && !defined HAVE_DBUS
   DEFSYM (QCicon, ":icon");

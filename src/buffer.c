@@ -6097,6 +6097,7 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
   defsubr (&Soverlay_tree);
 #endif
 
+  DEFSYM (Qassq_delete_all, "assq-delete-all");
   DEFSYM (Qkill_buffer__possibly_save, "kill-buffer--possibly-save");
   DEFSYM (Qbefore_revert_hook, "before-revert-hook");
   DEFSYM (Qdelete_all_multi_lang_overlays, "delete-all-multi-lang-overlays");
