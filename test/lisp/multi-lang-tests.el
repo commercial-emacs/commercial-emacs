@@ -97,10 +97,10 @@
           (make-multi-lang-overlay beg end mode)))
       (search-forward "import")
       (backward-word)
-      (should (eq (get-text-property (point) 'face) 'font-lock-keyword-face))
+      (should (memq 'font-lock-keyword-face (get-text-property (point) 'face)))
       (search-forward "asked")
       (backward-word)
-      (should (eq (get-text-property (point) 'face) 'font-lock-variable-name-face)))))
+      (should (memq 'font-lock-variable-name-face (get-text-property (point) 'face))))))
 
 (ert-deftest multi-lang-test-interactive ()
   "Test interactive use."
