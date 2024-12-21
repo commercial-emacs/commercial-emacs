@@ -980,6 +980,7 @@ multi_lang_delete_bumpguard (struct buffer *buf, const ptrdiff_t pos)
   specpdl_ref count = SPECPDL_INDEX ();
 
   specbind (Qinhibit_read_only, Qt);
+  specbind (Qinhibit_modification_hooks, Qt);
   record_unwind_protect (restore_undo_list, Fcons (b, BVAR (buf, undo_list)));
   bset_undo_list (buf, Qt);
 
@@ -1085,6 +1086,7 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   (Lisp_Object beg, Lisp_Object end, Lisp_Object mode)
 {
   CHECK_FIXNUM_COERCE_MARKER (beg);
+  CHECK_FIXNUM_COERCE_MARKER (end);
   CHECK_TYPE (FUNCTIONP (mode), Qfunctionp, mode);
 
   if (current_buffer->base_buffer)
@@ -1110,6 +1112,9 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   call0 (Qmulti_lang_filter_buffer_substring_function);
   call4 (Qadd_hook, Qwindow_buffer_change_functions,
 	 Qmulti_lang_on_switch_to_buffer,
+	 Qnil, Qt);
+  call4 (Qadd_hook, Qbefore_revert_hook,
+	 Qdelete_all_multi_lang_overlays,
 	 Qnil, Qt);
 
   if (!EQ (Qunbound, find_symbol_value
@@ -1203,6 +1208,14 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   SET_PT (obeg);
   call1 (on_enter, ov); /* sets proximity */
   call0 (mode); /* font locks */
+
+  specpdl_ref back = SPECPDL_INDEX ();
+  record_unwind_protect_excursion ();
+  set_buffer_internal (XBUFFER (buf));
+  call4 (Qadd_hook, Qbefore_revert_hook,
+	 Qdelete_all_multi_lang_overlays,
+	 Qnil, Qt);
+  unbind_to (back, Qnil);
   return buf;
 }
 
@@ -6079,6 +6092,8 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
 #endif
 
   DEFSYM (Qkill_buffer__possibly_save, "kill-buffer--possibly-save");
+  DEFSYM (Qbefore_revert_hook, "before-revert-hook");
+  DEFSYM (Qdelete_all_multi_lang_overlays, "delete-all-multi-lang-overlays");
   DEFSYM (Qbuffer_stale_function, "buffer-stale-function");
   DEFSYM (Qignore, "ignore");
   DEFSYM (Qtemporary_goal_column, "temporary-goal-column");

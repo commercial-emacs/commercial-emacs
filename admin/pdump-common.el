@@ -261,7 +261,6 @@
 (load "uniquify")
 (load "electric")
 (load "paren")
-(load "multi-lang")
 
 (load "emacs-lisp/shorthands")
 

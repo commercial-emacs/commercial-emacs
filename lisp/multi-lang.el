@@ -19,6 +19,14 @@
 (defsubst multi-lang-p (overlay)
   (overlay-get overlay 'multi-lang-p))
 
+;;;###autoload
+(defun delete-all-multi-lang-overlays ()
+  (interactive)
+  (dolist (ov (overlays-in (point-min) (point-max)))
+    (when (multi-lang-p ov)
+      (delete-multi-lang-overlay (overlay-start ov)))))
+
+;;;###autoload
 (defun delete-multi-lang-overlay (pos)
   "Remove all multi-lang overlays at POS."
   (interactive "d")
@@ -37,6 +45,7 @@
           (when (memq modified '(nil autosaved))
             (restore-buffer-modified-p modified)))))))
 
+;;;###autoload
 (defun make-multi-lang-overlay (beg end mode)
   "Return indirect buffer with major mode MODE."
   (interactive
@@ -58,8 +67,9 @@
       (unwind-protect
           (let ((font-lock-extra-managed-props
                  `(display fontified . ,font-lock-extra-managed-props)))
-            (font-lock-unfontify-region beg end)
-            (make-multi-lang--overlay beg end mode))
+            (save-excursion
+              (font-lock-unfontify-region beg end)
+              (make-multi-lang--overlay beg end mode)))
         (when (memq modified '(nil autosaved))
           (restore-buffer-modified-p modified))))))
 
