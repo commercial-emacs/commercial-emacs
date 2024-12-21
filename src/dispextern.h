@@ -2254,7 +2254,7 @@ struct it
   enum it_method method;
 
   /* The next position at which to check for face changes, invisible
-     text, overlay strings, end of text etc., which see.  */
+     text, overlay strings, end of text (it_props in xdisp.c).  */
   ptrdiff_t stop_charpos;
 
   /* Previous stop position, i.e. the last one before the current
@@ -3347,6 +3347,7 @@ void move_it_x (struct it *it, int to_x);
 int partial_line_height (struct it *it_origin);
 bool in_display_vector_p (struct it *);
 int frame_mode_line_height (struct frame *);
+bool has_display_prop (Lisp_Object properties);
 
 extern bool redisplaying_p;
 extern bool help_echo_showing_p;

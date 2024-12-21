@@ -1156,8 +1156,7 @@ command_loop (void)
       }
 
       Lisp_Object cmd = read_key_sequence_cmd;
-      if (!NILP (Vexecuting_kbd_macro)
-	  && !NILP (Vquit_flag))
+      if (!NILP (Vexecuting_kbd_macro) && !NILP (Vquit_flag))
 	{
 	  Vexecuting_kbd_macro = Qt;
 	  maybe_quit ();
@@ -1257,24 +1256,27 @@ command_loop (void)
 	       single command.  */
 	    Vtransient_mark_mode = Qidentity;
 
-	  /* If `select-active-regions', set PRIMARY.  */
 	  if (!NILP (find_symbol_value (XSYMBOL (Qdeactivate_mark),
 					current_buffer)))
 	    call0 (Qdeactivate_mark);
 	  else
 	    {
-	      bool xterm_select_p = false;
-	      if (NILP (Fwindow_system (Qnil)))
+	      bool set_primary_p = !NILP (Fwindow_system (Qnil));
+	      if (!set_primary_p)
 		{
+		  /* Duncan Findlay imposed a weak-sauce defcustom
+		     `xterm-select-active-regions' as a fallback when
+		     `window-system' can't find a type.  */
 		  Lisp_Object val
 		    = find_symbol_value (XSYMBOL (Qxterm_select_active_regions),
 					 NULL);
-		  xterm_select_p
+		  set_primary_p
 		    = (!EQ (val, Qunbound)
 		       && !NILP (val)
 		       && !NILP (Fterminal_parameter (Qnil, Qxterm__set_selection)));
 		}
-	      if ((xterm_select_p || !NILP (Fwindow_system (Qnil)))
+
+	      if (set_primary_p
 		  && XMARKER (BVAR (current_buffer, mark))->buffer
 		  && (EQ (Vselect_active_regions, Qonly)
 		      ? EQ (CAR_SAFE (Vtransient_mark_mode), Qonly)
@@ -1285,10 +1287,8 @@ command_loop (void)
 		{
 		  Lisp_Object txt
 		    = call1 (Vregion_extract_function, Qnil);
-
 		  if (XFIXNUM (Flength (txt)) > 0)
 		    call2 (Qgui_set_selection, QPRIMARY, txt);
-
 		  CALLN (Frun_hook_with_args, Qpost_select_region_hook, txt);
 		}
 
@@ -1307,12 +1307,38 @@ command_loop (void)
 	      && !composition_break_at_point)
 	    adjust_point_for_property (prev_pt,
 				       MODIFF != prev_modiff);
-	  else if (PT > BEGV
+	  else if (BEGV < PT
                    && PT < ZV
 		   && PT != composition_adjust_point (prev_pt, PT))
 	    /* Point is within a multibyte glyph.  Updating display
                decomposes glyph so that cursor finds point.  */
             windows_or_buffers_changed = 39;
+
+	  if (current_buffer->proximity != NULL
+	      /* And point outside [preceding, following).  */
+	      && (PT < XFIXNUM (Fmarker_position
+				(current_buffer->proximity->preceding))
+		  || (!NILP (current_buffer->proximity->following)
+		      && PT >= XFIXNUM (Fmarker_position
+					(current_buffer->proximity->following)))))
+	    {
+	      /* Update proximity cache.  */
+	      Lisp_Object tail = Foverlays_at (make_fixnum (prev_pt), Qnil);
+	      FOR_EACH_TAIL (tail)
+		{
+		  Lisp_Object on_exit = OVERLAY_ON_EXIT (XCAR (tail));
+		  if (!NILP (on_exit))
+		    call1 (on_exit, XCAR (tail));
+		}
+
+	      tail = Foverlays_at (make_fixnum (PT), Qnil);
+	      FOR_EACH_TAIL (tail)
+		{
+		  Lisp_Object on_enter = OVERLAY_ON_ENTER (XCAR (tail));
+		  if (!NILP (on_enter))
+		    call1 (on_enter, XCAR (tail));
+		}
+	    }
         }
 
     finalize:

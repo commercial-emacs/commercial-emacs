@@ -220,7 +220,8 @@ If you need to debug code run from jit-lock, see `jit-lock-debug-mode'."
   (setq jit-lock-mode arg)
   (cond
    ((and (buffer-base-buffer)
-         jit-lock-mode)
+         jit-lock-mode
+         (not (multi-lang-indirect-p (current-buffer))))
     ;; We're in an indirect buffer, and we're turning the mode on.
     ;; This doesn't work because jit-lock relies on the `fontified'
     ;; text-property which is shared with the base buffer.

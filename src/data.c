@@ -1449,8 +1449,8 @@ DEFUN ("set", Fset, Sset, 2, 2, 0,
   return newval;
 }
 
-/* Ensure setting of VARIABLE in the buffer that localized VARIABLE
-   never attempts to change its default binding.  (Bug#65209)
+/* Ensure changing VARIABLE with its own bespoke buffer-local binding
+   does not alter the default binding.  (Bug#65209)
 */
 
 static Lisp_Object

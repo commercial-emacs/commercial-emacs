@@ -592,9 +592,8 @@ interval_start_pos (INTERVAL source)
    If POSITION is at the end of the buffer or string,
    return the interval containing the last character.
 
-   The `position' field, which is a cache of an interval's position,
-   is updated in the interval found.  Other functions (e.g., next_interval)
-   will update this cache based on the result of find_interval.  */
+   Update the returned interval's `position' field.  Other functions
+   e.g., next_interval consult this field.  */
 
 INTERVAL
 find_interval (register INTERVAL tree, register ptrdiff_t position)
@@ -1991,27 +1990,18 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
       && (!intervals_equal (from, to)
 	  || !intervals_equal (fromprev, toprev)))
     {
-      Lisp_Object leave_after, leave_before, enter_after, enter_before;
-
-      if (fromprev)
-	leave_before = textget (fromprev->plist, Qpoint_left);
-      else
-	leave_before = Qnil;
-
-      if (from)
-	leave_after = textget (from->plist, Qpoint_left);
-      else
-	leave_after = Qnil;
-
-      if (toprev)
-	enter_before = textget (toprev->plist, Qpoint_entered);
-      else
-	enter_before = Qnil;
-
-      if (to)
-	enter_after = textget (to->plist, Qpoint_entered);
-      else
-	enter_after = Qnil;
+      Lisp_Object leave_before = fromprev
+	? textget (fromprev->plist, Qpoint_left)
+	: Qnil;
+      Lisp_Object leave_after = from
+	? textget (from->plist, Qpoint_left)
+	: Qnil;
+      Lisp_Object enter_before = toprev
+	? textget (toprev->plist, Qpoint_entered)
+	: Qnil;
+      Lisp_Object enter_after = to
+	? textget (to->plist, Qpoint_entered)
+	: Qnil;
 
       if (!EQ (leave_before, enter_before) && !NILP (leave_before))
       	call2 (leave_before, make_fixnum (old_position),
@@ -2019,7 +2009,6 @@ set_point_both (ptrdiff_t charpos, ptrdiff_t bytepos)
       if (!EQ (leave_after, enter_after) && !NILP (leave_after))
       	call2 (leave_after, make_fixnum (old_position),
       	       make_fixnum (charpos));
-
       if (!EQ (enter_before, leave_before) && !NILP (enter_before))
       	call2 (enter_before, make_fixnum (old_position),
       	       make_fixnum (charpos));

@@ -2823,8 +2823,7 @@ safe_eval (Lisp_Object sexp)
   return safe_calln (Qeval, sexp, Qt);
 }
 
-/* Apply a C subroutine SUBR to the NUMARGS evaluated arguments in ARG_VECTOR
-   and return the result of evaluation.  */
+/* Return result of applying C subroutine SUBR to the NARGS evaluated ARGS.  */
 
 Lisp_Object
 funcall_subr (struct Lisp_Subr *subr, ptrdiff_t nargs, Lisp_Object *args)
@@ -2832,6 +2831,7 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t nargs, Lisp_Object *args)
   eassume (nargs >= 0);
   const int eight = 8;
   Lisp_Object result, fun;
+  specpdl_ref count = SPECPDL_INDEX ();
   XSETSUBR (fun, subr);
 
   if (subr->max_args == UNEVALLED)
@@ -2888,7 +2888,8 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t nargs, Lisp_Object *args)
 	}
       SAFE_FREE ();
     }
-  return result;
+
+  return unbind_to (count, result);
 }
 
 /* Return the result of applying FUN to NARGS number of evaluated

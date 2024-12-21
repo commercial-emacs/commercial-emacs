@@ -296,10 +296,7 @@ predicates which report frame's specific UI-related capabilities.  */)
   if (NILP (type))
     wrong_type_argument (Qframep, frame);
 
-  if (EQ (type, Qt))
-    return Qnil;
-  else
-    return type;
+  return (EQ (type, Qt)) ? Qnil : type;
 }
 
 /* Placeholder used by temacs -nw before window.el is loaded.  */

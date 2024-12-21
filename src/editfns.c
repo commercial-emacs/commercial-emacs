@@ -4307,7 +4307,10 @@ ring.  */)
       tmp_interval2 = copy_intervals (cur_intv, start2, len2);
       /* Don't use Fset_text_properties: that can cause GC, which can
 	 clobber objects stored in the tmp_intervals.  */
-      tmp_interval3 = validate_interval_range (buf, &startr1, &endr2, 0);
+      tmp_interval3 = NULL;
+      if (validate_interval_range (buf, &startr1, &endr2, false))
+	tmp_interval3 = find_interval (buffer_intervals (XBUFFER (buf)),
+				       XFIXNUM (startr1));
       if (tmp_interval3)
 	set_text_properties_1 (startr1, endr2, Qnil, buf, tmp_interval3);
 
@@ -4363,11 +4366,17 @@ ring.  */)
           tmp_interval1 = copy_intervals (cur_intv, start1, len1);
           tmp_interval2 = copy_intervals (cur_intv, start2, len2);
 
-	  tmp_interval3 = validate_interval_range (buf, &startr1, &endr1, 0);
+	  tmp_interval3 = NULL;
+	  if (validate_interval_range (buf, &startr1, &endr1, false))
+	    tmp_interval3 = find_interval (buffer_intervals (XBUFFER (buf)),
+					   XFIXNUM (startr1));
 	  if (tmp_interval3)
 	    set_text_properties_1 (startr1, endr1, Qnil, buf, tmp_interval3);
 
-	  tmp_interval3 = validate_interval_range (buf, &startr2, &endr2, 0);
+	  tmp_interval3 = NULL;
+	  if (validate_interval_range (buf, &startr2, &endr2, false))
+	    tmp_interval3 = find_interval (buffer_intervals (XBUFFER (buf)),
+					   XFIXNUM (startr2));
 	  if (tmp_interval3)
 	    set_text_properties_1 (startr2, endr2, Qnil, buf, tmp_interval3);
 
@@ -4396,7 +4405,10 @@ ring.  */)
           tmp_interval_mid = copy_intervals (cur_intv, end1, len_mid);
           tmp_interval2 = copy_intervals (cur_intv, start2, len2);
 
-	  tmp_interval3 = validate_interval_range (buf, &startr1, &endr2, 0);
+	  tmp_interval3 = NULL;
+	  if (validate_interval_range (buf, &startr1, &endr2, false))
+	    tmp_interval3 = find_interval (buffer_intervals (XBUFFER (buf)),
+					   XFIXNUM (startr1));
 	  if (tmp_interval3)
 	    set_text_properties_1 (startr1, endr2, Qnil, buf, tmp_interval3);
 
@@ -4429,7 +4441,10 @@ ring.  */)
           tmp_interval_mid = copy_intervals (cur_intv, end1, len_mid);
           tmp_interval2 = copy_intervals (cur_intv, start2, len2);
 
-	  tmp_interval3 = validate_interval_range (buf, &startr1, &endr2, 0);
+	  tmp_interval3 = NULL;
+	  if (validate_interval_range (buf, &startr1, &endr2, false))
+	    tmp_interval3 = find_interval (buffer_intervals (XBUFFER (buf)),
+					   XFIXNUM (startr1));
 	  if (tmp_interval3)
 	    set_text_properties_1 (startr1, endr2, Qnil, buf, tmp_interval3);
 

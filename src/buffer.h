@@ -250,6 +250,12 @@ extern ptrdiff_t advance_to_char_boundary (ptrdiff_t byte_pos);
 
 /* Define the actual buffer data structures.  */
 
+struct proximity
+{
+  Lisp_Object current; /* list of overlays */
+  Lisp_Object preceding, following; /* markers */
+};
+
 /* This data structure describes the actual text contents of a buffer.
    It is shared between indirect buffers and their base buffer.  */
 
@@ -723,6 +729,9 @@ struct buffer
   /* The interval tree containing this buffer's overlays. */
   struct itree_tree *overlays;
 
+  /* indirect buffers share with base.  */
+  struct proximity *proximity;
+
   /* Changes in the buffer are recorded here for undo, and t means
      don't record anything.  This information belongs to the base
      buffer of an indirect buffer.  But we can't store it in the
@@ -1164,8 +1173,8 @@ extern void delete_all_overlays (struct buffer *);
 extern void reset_buffer (struct buffer *);
 extern void compact_buffer (struct buffer *);
 extern ptrdiff_t overlays_at (ptrdiff_t, bool, Lisp_Object **, ptrdiff_t *, ptrdiff_t *);
-extern ptrdiff_t previous_overlay_change (ptrdiff_t);
-extern ptrdiff_t next_overlay_change (ptrdiff_t);
+extern ptrdiff_t previous_overlay_change (ptrdiff_t, bool);
+extern ptrdiff_t next_overlay_change (ptrdiff_t, bool);
 extern ptrdiff_t sort_overlays (Lisp_Object *, ptrdiff_t, struct window *);
 extern void recenter_overlay_lists (struct buffer *, ptrdiff_t);
 extern ptrdiff_t overlay_strings (ptrdiff_t, struct window *, unsigned char **);
@@ -1353,39 +1362,6 @@ buffer_window_count (struct buffer *b)
 
 /* Overlays */
 
-INLINE ptrdiff_t
-overlay_start (struct Lisp_Overlay *ov)
-{
-  if (! ov->buffer)
-    return -1;
-  return itree_node_begin (ov->buffer->overlays, ov->interval);
-}
-
-INLINE ptrdiff_t
-overlay_end (struct Lisp_Overlay *ov)
-{
-  if (! ov->buffer)
-    return -1;
-  return itree_node_end (ov->buffer->overlays, ov->interval);
-}
-
-/* Return the start of OV in its buffer, or -1 if OV is not associated
-   with any buffer.  */
-
-INLINE ptrdiff_t
-OVERLAY_START (Lisp_Object ov)
-{
-  return overlay_start (XOVERLAY (ov));
-}
-
-/* Return the end of OV in its buffer, or -1. */
-
-INLINE ptrdiff_t
-OVERLAY_END (Lisp_Object ov)
-{
-  return overlay_end (XOVERLAY (ov));
-}
-
 /* Return the plist of overlay OV.  */
 
 INLINE Lisp_Object
@@ -1400,6 +1376,27 @@ INLINE struct buffer *
 OVERLAY_BUFFER (Lisp_Object ov)
 {
   return XOVERLAY (ov)->buffer;
+}
+
+/* Return the start of OV in its buffer, or -1 if OV is not associated
+   with any buffer.  */
+
+INLINE ptrdiff_t
+OVERLAY_START (Lisp_Object ov)
+{
+  return OVERLAY_BUFFER (ov)
+    ? itree_node_begin (OVERLAY_BUFFER (ov)->overlays, XOVERLAY (ov)->interval)
+    : -1;
+}
+
+/* Return the end of OV in its buffer, or -1. */
+
+INLINE ptrdiff_t
+OVERLAY_END (Lisp_Object ov)
+{
+  return OVERLAY_BUFFER (ov)
+    ? itree_node_end (OVERLAY_BUFFER (ov)->overlays, XOVERLAY (ov)->interval)
+    : -1;
 }
 
 /* Return true, if OV's rear-advance is set. */
@@ -1452,6 +1449,14 @@ extern bool valid_per_buffer_idx (int);
   for (offset = PER_BUFFER_VAR_OFFSET (name);				 \
        offset <= PER_BUFFER_VAR_OFFSET (cursor_in_non_selected_windows); \
        offset += word_size)
+
+#define MULTI_LANG_BASE_P(BUFFER)				\
+  ((BUFFER)->proximity != NULL					\
+   && (BUFFER)->base_buffer == NULL)
+
+#define MULTI_LANG_INDIRECT_P(BUFFER)				\
+  ((BUFFER)->proximity != NULL					\
+   && (BUFFER)->base_buffer != NULL)
 
 INLINE bool
 LOCALIZED_SLOT_P (struct buffer *b, int idx)

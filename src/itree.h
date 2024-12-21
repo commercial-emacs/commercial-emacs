@@ -58,7 +58,7 @@ struct itree_node
 
      LIMIT is a buffer position, the maximum of END of this node and
      its children.  See itree.c for its use.
-
+.
      OFFSET is in buffer position units, and will be non-zero only
      when the node is dirty.
 

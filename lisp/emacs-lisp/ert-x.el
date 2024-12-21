@@ -567,6 +567,44 @@ The same keyword arguments are supported as in
         (format "/mock::%s" temporary-file-directory))))
   "Temporary directory for remote file tests.")
 
+(defun ert-command-loop (&rest args)
+  "Naive elisp evaluation does not a command loop simulate."
+  (let* ((restore-pre-command-hook (default-value 'pre-command-hook))
+         (checks (let ((command-p t)
+                       ret)
+                   (dolist (arg args)
+                     (if command-p
+                         (setq command-p nil)
+                       (if (eq (type-of arg) 'interpreted-function)
+                           (progn
+                             (setq command-p t)
+                             (push arg ret))
+                         (push nil ret))))
+                   (cons 'burner (nreverse ret))))
+         (commands (seq-filter #'symbolp args))
+         (hook (lambda ()
+                 (unless (minibufferp)
+                   (condition-case err
+                       (when (eq this-command 'execute-extended-command)
+                         (when-let ((check (pop checks)))
+                           (unless (eq check 'burner)
+                             (funcall check))))
+                     (error (throw 'error err))))))
+         (kbd-macro (read-kbd-macro
+                     (mapconcat
+                      (lambda (s) (concat "M-x " (symbol-name s) " RET"))
+                      commands "\n"))))
+    (unwind-protect
+        (should-not
+         (catch 'error
+           (prog1 nil
+             (set-default 'pre-command-hook (list hook))
+             (execute-kbd-macro kbd-macro)
+             (dolist (check checks)
+               (when check
+                 (funcall check))))))
+      (set-default 'pre-command-hook restore-pre-command-hook))))
+
 (provide 'ert-x)
 
 ;;; ert-x.el ends here

@@ -624,9 +624,8 @@ struct interval
 
   bool_bf gcmarkbit : 1;
 
-  /* The remaining components are `properties' of the interval.
-     The first four are duplicates for things which can be on the list,
-     for purposes of speed.  */
+  /* Dupe four properties already present on the plist for
+     accessibility.  */
 
   bool_bf write_protect : 1;	    /* True means can't modify.  */
   bool_bf visible : 1;		    /* False means don't display.  */
@@ -1177,6 +1176,7 @@ dead_object (void)
 #define XSETTREE_SITTER(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_TREE_SITTER))
 #define XSETTREE_SITTER_NODE(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_TREE_SITTER_NODE))
 #define XSETTREE_SITTER_CURSOR(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_TREE_SITTER_CURSOR))
+#define XSETOVERLAY(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_OVERLAY))
 
 /* Efficiently convert a pointer to a Lisp object and back.  The
    pointer is represented as a fixnum, so the garbage collector

@@ -1730,6 +1730,166 @@ as the constructs of Haddock, Javadoc and similar systems."
   "Font Lock mode face used to highlight grouping constructs in Lisp regexps."
   :group 'font-lock-faces)
 
+(defface font-lock-escape-face
+  '((t :inherit font-lock-regexp-grouping-backslash))
+  "Font Lock mode face used to highlight escape sequences in strings."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-number-face
+  '((t nil))
+  "Font Lock mode face used to highlight numbers."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-operator-face
+  '((t nil))
+  "Font Lock mode face used to highlight operators."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-property-face
+  '((t :inherit font-lock-variable-name-face))
+  "Font Lock mode face used to highlight properties of an object.
+For example, the declaration and use of fields in a struct."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-punctuation-face
+  '((t nil))
+  "Font Lock mode face used to highlight punctuation."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-bracket-face
+  '((t :inherit font-lock-punctuation-face))
+  "Font Lock mode face used to highlight brackets."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-delimiter-face
+  '((t :inherit font-lock-punctuation-face))
+  "Font Lock mode face used to highlight delimiters."
+  :group 'font-lock-faces
+  :version "29.1")
+
+(defface font-lock-misc-punctuation-face
+  '((t :inherit font-lock-punctuation-face))
+  "Font Lock mode face used to highlight miscellaneous punctuation."
+  :group 'font-lock-faces
+  :version "29.1")
+
+;; End of Color etc. support.
+
+;;; Menu support.
+
+;; This section of code is commented out because Emacs does not have real menu
+;; buttons.  (We can mimic them by putting "( ) " or "(X) " at the beginning of
+;; the menu entry text, but with Xt it looks both ugly and embarrassingly
+;; amateur.)  If/When Emacs gets real menus buttons, put in menu-bar.el after
+;; the entry for "Text Properties" something like:
+;;
+;; (define-key menu-bar-edit-menu [font-lock]
+;;   (cons "Syntax Highlighting" font-lock-menu))
+;;
+;; and remove a single ";" from the beginning of each line in the rest of this
+;; section.  Probably the mechanism for telling the menu code what are menu
+;; buttons and when they are on or off needs tweaking.  I have assumed that the
+;; mechanism is via `menu-toggle' and `menu-selected' symbol properties.  sm.
+
+;;;;;###autoload
+;;(progn
+;;  ;; Make the Font Lock menu.
+;;  (defvar-keymap font-lock-menu :name "Syntax Highlighting")
+;;  ;; Add the menu items in reverse order.
+;;  (define-key font-lock-menu [fontify-less]
+;;    '("Less In Current Buffer" . font-lock-fontify-less))
+;;  (define-key font-lock-menu [fontify-more]
+;;    '("More In Current Buffer" . font-lock-fontify-more))
+;;  (define-key font-lock-menu [font-lock-sep]
+;;    '("--"))
+;;  (define-key font-lock-menu [font-lock-mode]
+;;    '("In Current Buffer" . font-lock-mode))
+;;  (define-key font-lock-menu [global-font-lock-mode]
+;;    '("In All Buffers" . global-font-lock-mode)))
+;;
+;;;;;###autoload
+;;(progn
+;;  ;; We put the appropriate `menu-enable' etc. symbol property values on when
+;;  ;; font-lock.el is loaded, so we don't need to autoload the three variables.
+;;  (put 'global-font-lock-mode 'menu-toggle t)
+;;  (put 'font-lock-mode 'menu-toggle t)
+;;  (put 'font-lock-fontify-more 'menu-enable '(identity))
+;;  (put 'font-lock-fontify-less 'menu-enable '(identity)))
+;;
+;; ;; Put the appropriate symbol property values on now.  See above.
+;;(put 'global-font-lock-mode 'menu-selected 'global-font-lock-mode)
+;;(put 'font-lock-mode 'menu-selected 'font-lock-mode)
+;;(put 'font-lock-fontify-more 'menu-enable '(nth 2 font-lock-fontify-level))
+;;(put 'font-lock-fontify-less 'menu-enable '(nth 1 font-lock-fontify-level))
+;;
+;;(defvar font-lock-fontify-level nil)	; For less/more fontification.
+;;
+;;(defun font-lock-fontify-level (level)
+;;  (let ((font-lock-maximum-decoration level))
+;;    (when font-lock-mode
+;;      (font-lock-mode))
+;;    (font-lock-mode)
+;;    (when font-lock-verbose
+;;      (message "Fontifying %s... level %d" (buffer-name) level))))
+;;
+;;(defun font-lock-fontify-less ()
+;;  "Fontify the current buffer with less decoration.
+;;See `font-lock-maximum-decoration'."
+;;  (interactive)
+;;  ;; Check in case we get called interactively.
+;;  (if (nth 1 font-lock-fontify-level)
+;;      (font-lock-fontify-level (1- (car font-lock-fontify-level)))
+;;    (error "No less decoration")))
+;;
+;;(defun font-lock-fontify-more ()
+;;  "Fontify the current buffer with more decoration.
+;;See `font-lock-maximum-decoration'."
+;;  (interactive)
+;;  ;; Check in case we get called interactively.
+;;  (if (nth 2 font-lock-fontify-level)
+;;      (font-lock-fontify-level (1+ (car font-lock-fontify-level)))
+;;    (error "No more decoration")))
+;;
+;; ;; This should be called by `font-lock-set-defaults'.
+;;(defun font-lock-set-menu ()
+;;  ;; Activate less/more fontification entries if there are multiple levels for
+;;  ;; the current buffer.  Sets `font-lock-fontify-level' to be of the form
+;;  ;; (CURRENT-LEVEL IS-LOWER-LEVEL-P IS-HIGHER-LEVEL-P) for menu activation.
+;;  (let ((keywords (nth 0 font-lock-defaults))
+;;	(level (font-lock-value-in-major-mode font-lock-maximum-decoration)))
+;;    (make-local-variable 'font-lock-fontify-level)
+;;    (if (or (symbolp keywords) (= (length keywords) 1))
+;;	(font-lock-unset-menu)
+;;      (cond ((eq level t)
+;;	     (setq level (1- (length keywords))))
+;;	    ((or (null level) (zerop level))
+;;	     ;; The default level is usually, but not necessarily, level 1.
+;;	     (setq level (- (length keywords)
+;;			    (length (member (eval (car keywords))
+;;					    (mapcar #'eval (cdr keywords))))))))
+;;      (setq font-lock-fontify-level (list level (> level 1)
+;;					  (< level (1- (length keywords))))))))
+;;
+;; ;; This should be called by `font-lock-unset-defaults'.
+;;(defun font-lock-unset-menu ()
+;;  ;; Deactivate less/more fontification entries.
+;;  (setq font-lock-fontify-level nil))
+
+;; End of Menu support.
+
+;;; Various regexp information shared by several modes.
+;; ;; Information specific to a single mode should go in its load library.
+
+;; Font Lock support for C, C++, Objective-C and Java modes is now in
+;; cc-fonts.el (and required by cc-mode.el).  However, the below function
+;; should stay in font-lock.el, since it is used by other libraries.  sm.
+
 (defun font-lock-match-c-style-declaration-item-and-skip-to-next (limit)
   "Match, and move over, any declaration/definition item after point.
 Matches after point, but ignores leading whitespace and `*' characters.

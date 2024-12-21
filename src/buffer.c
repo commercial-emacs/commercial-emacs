@@ -60,16 +60,6 @@ struct buffer buffer_slot_defaults;
 struct buffer buffer_slot_map;
 struct buffer buffer_slot_symbols;
 
-static struct proximity
-{
-  struct {
-    ptrdiff_t beg, end;
-  } preceding;
-  struct {
-    ptrdiff_t beg, end;
-  } following;
-} proximity;
-
 #define PER_BUFFER_SYMBOL(OFFSET) \
   (*(Lisp_Object *)((OFFSET) + (char *) &buffer_slot_symbols))
 
@@ -772,7 +762,6 @@ fetch_buffer_markers (struct buffer *b)
     }
 }
 
-
 DEFUN ("make-indirect-buffer", Fmake_indirect_buffer, Smake_indirect_buffer,
        2, 4,
        "bMake indirect buffer (to buffer): \nBName of indirect buffer: ",
@@ -817,8 +806,7 @@ Interactively, CLONE and INHIBIT-BUFFER-HOOKS are nil.  */)
 
   b = allocate_buffer ();
 
-  /* No double indirection - if base buffer is indirect,
-     new buffer becomes an indirect to base's base.  */
+  /* Ensure base buffer is not itself indirect.  */
   b->base_buffer = (XBUFFER (base_buffer)->base_buffer
 		    ? XBUFFER (base_buffer)->base_buffer
 		    : XBUFFER (base_buffer));
@@ -926,56 +914,349 @@ Interactively, CLONE and INHIBIT-BUFFER-HOOKS are nil.  */)
 }
 
 static void
-remove_buffer_overlay (struct buffer *b, struct Lisp_Overlay *ov)
+restore_undo_list (Lisp_Object arg)
 {
-  eassert (b->overlays);
-  eassert (ov->buffer == b);
-  itree_remove (ov->buffer->overlays, ov->interval);
-  ov->buffer = NULL;
+  bset_undo_list (XBUFFER (XCAR (arg)), XCDR (arg));
 }
-
-/* Mark OV as no longer associated with its buffer.  */
 
 static void
-drop_overlay (struct Lisp_Overlay *ov)
+restore_proximity (Lisp_Object restore)
 {
-  if (!ov->buffer)
-    return;
-
-  modify_overlay (ov->buffer, overlay_start (ov), overlay_end (ov));
-  remove_buffer_overlay (ov->buffer, ov);
+  struct buffer *buf = XBUFFER (XCAR (restore));
+  restore = XCDR (restore);
+  buf->proximity->current = XCAR (restore);
+  restore = XCDR (restore);
+  buf->proximity->preceding = XCAR (restore);
+  restore = XCDR (restore);
+  buf->proximity->following = XCAR (restore);
 }
 
-/* Delete all overlays of B and reset its overlay lists.  */
+/* Make read-only newline at (END - 1).  If (END - 1) isn't already a
+   newline, insert one and return new END.  */
+
+static ptrdiff_t
+multi_lang_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_t end)
+{
+  Lisp_Object b; XSETBUFFER (b, buf);
+  specpdl_ref count = SPECPDL_INDEX ();
+
+  record_unwind_protect (restore_undo_list, Fcons (b, BVAR (buf, undo_list)));
+  bset_undo_list (buf, Qt);
+
+  record_unwind_protect (restore_proximity,
+			 list4 (b,
+				buf->proximity->current,
+				buf->proximity->preceding,
+				buf->proximity->following));
+  /* perform equivalent of `widen' */
+  buf->proximity->current = Qnil;
+  buf->proximity->preceding = Fpoint_min_marker ();
+  buf->proximity->following = Fpoint_max_marker ();
+
+  if (end <= beg
+      || end == BUF_BEG (buf)
+      || !EQ (Fchar_before (make_fixnum (end)), make_fixnum (10)))
+    {
+      /* Patch in newline if one not already at END.  */
+      SET_PT (end++);
+      insert_char (10);
+    }
+
+  /* Make the demarcating newline read-only */
+  Fput_text_property (make_fixnum (end - 1), make_fixnum (end),
+		      Qrear_nonsticky, list1 (Qread_only), Qnil);
+  Fput_text_property (make_fixnum (end - 1), make_fixnum (end),
+		      Qread_only, Qt, Qnil);
+  unbind_to (count, Qnil);
+  return end;
+}
+
+/* Remove read-only bumpguard to multi-lang overlay.  */
+
+static void
+multi_lang_delete_bumpguard (struct buffer *buf, const ptrdiff_t pos)
+{
+  Lisp_Object b; XSETBUFFER (b, buf);
+  specpdl_ref count = SPECPDL_INDEX ();
+
+  specbind (Qinhibit_read_only, Qt);
+  specbind (Qinhibit_modification_hooks, Qt);
+  record_unwind_protect (restore_undo_list, Fcons (b, BVAR (buf, undo_list)));
+  bset_undo_list (buf, Qt);
+
+  record_unwind_protect (restore_proximity,
+			 list4 (b,
+				buf->proximity->current,
+				buf->proximity->preceding,
+				buf->proximity->following));
+  /* perform equivalent of `widen' */
+  buf->proximity->current = Qnil;
+  buf->proximity->preceding = Fpoint_min_marker ();
+  buf->proximity->following = Fpoint_max_marker ();
+
+  Fremove_list_of_text_properties (make_fixnum (pos),
+				   make_fixnum (pos + 1),
+				   list2 (Qrear_nonsticky, Qread_only), b);
+  unbind_to (count, Qnil);
+}
+
+static void
+multi_lang_switch_to_buffer (Lisp_Object buf)
+{
+  ptrdiff_t newpt = clip_to_bounds (BUF_BEG (XBUFFER (buf)), PT,
+				    BUF_Z (XBUFFER (buf)));
+  set_internal (Qtemporary_goal_column,
+		find_symbol_value (XSYMBOL (Qtemporary_goal_column), NULL),
+		buf, SET_INTERNAL_SET);
+  Lisp_Object wstart = !NILP (Fpos_visible_in_window_p (Qnil, Qnil, Qnil))
+    ? Fwindow_start (Qnil)
+    : Qnil;
+  Lisp_Object mark = Qnil;
+  if (!NILP (BVAR (current_buffer, mark_active)))
+    {
+      /* Mark state is a mess between mark, mark-active,
+	 transient-mark-mode, mark-even-if-active, etc.  */
+      mark = Fcopy_marker (BVAR (current_buffer, mark), Qnil);
+      call1 (intern ("set-mark"), Qnil);
+    }
+
+  CALLN (Ffuncall, intern ("switch-to-buffer"), buf, Qt);
+  SET_PT (newpt);
+  if (MARKERP (mark))
+    call1 (intern ("set-mark"), Fmarker_position (mark));
+  if (!NILP (wstart))
+    Fset_window_start (Qnil, wstart, Qnil);
+
+  /* previous_overlay_change scans [BEGV, arg), ergo +1.  */
+  const ptrdiff_t previous = previous_overlay_change (PT + 1, true),
+    next = next_overlay_change (PT, true);
+  current_buffer->proximity->preceding
+    = build_marker (XBUFFER (buf), previous, CHAR_TO_BYTE (previous));
+  current_buffer->proximity->following =
+    (next == ZV && !XBUFFER (buf)->base_buffer)
+    ? Qnil /* MULTI_LANG_BASE_P grows without limit.  */
+    : build_marker (XBUFFER (buf), next, CHAR_TO_BYTE (next));
+}
+
+/* True if B can be used as 'other-than-BUFFER' buffer.  */
+
+static bool
+candidate_buffer (Lisp_Object b, Lisp_Object buffer)
+{
+  return (BUFFERP (b) && !EQ (b, buffer)
+	  && BUFFER_LIVE_P (XBUFFER (b))
+	  /* And not within BUFFER's multi lang family */
+	  && !(BUFFERP (buffer)
+	       && XBUFFER (buffer)->overlays != NULL
+	       && XBUFFER (buffer)->overlays == XBUFFER (b)->overlays)
+	  /* And not hidden, or if it is, that it's a multi lang buffer */
+	  && (!BUFFER_HIDDEN_P (XBUFFER (b))
+	      || MULTI_LANG_INDIRECT_P (XBUFFER (b))));
+}
+
+DEFUN ("multi-lang--enter-buffer", Fmake_multi_lang__enter_buffer,
+       Smake_multi_lang__enter_buffer, 2, 2, 0,
+       doc: /* Switch to indirect BUF of the just entered overlay OV.  */)
+  (Lisp_Object buf, Lisp_Object ov)
+{
+  if (NILP (Fmemq (ov, current_buffer->proximity->current)))
+    current_buffer->proximity->current = Fcons (ov, current_buffer->proximity->current);
+  Lisp_Object base = Fbuffer_base_buffer (buf);
+  if (!NILP (base))
+    Fset_window_prev_buffers (Qnil, call2 (Qassq_delete_all, base,
+					   Fwindow_prev_buffers (Qnil)));
+  multi_lang_switch_to_buffer (buf);
+  return buf;
+}
+
+DEFUN ("multi-lang--exit-buffer", Fmake_multi_lang__exit_buffer,
+       Smake_multi_lang__exit_buffer, 2, 2, 0,
+       doc: /* Switch to base BUF of the just exited overlay OV.  */)
+  (Lisp_Object buf, Lisp_Object ov)
+{
+  current_buffer->proximity->current = Fdelq (ov, current_buffer->proximity->current);
+  multi_lang_switch_to_buffer (buf);
+  return buf;
+}
+
+DEFUN ("make-multi-lang--overlay", Fmake_multi_lang__overlay, Smake_multi_lang__overlay,
+       3, 3, 0,
+       doc: /* Unexposed workhorse of `make-multi-lang-overlay'.
+The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
+  (Lisp_Object beg, Lisp_Object end, Lisp_Object mode)
+{
+  CHECK_FIXNUM_COERCE_MARKER (beg);
+  CHECK_FIXNUM_COERCE_MARKER (end);
+  CHECK_TYPE (FUNCTIONP (mode), Qfunctionp, mode);
+
+  if (current_buffer->base_buffer)
+    xsignal1 (Quser_error, build_string ("Only permitted in base buffer"));
+
+  Lisp_Object extant = Foverlays_in (beg, end);
+  FOR_EACH_TAIL (extant)
+    {
+      if (!NILP (plist_get (OVERLAY_PLIST (XCAR (extant)), Qmulti_lang_p)))
+	xsignal1 (Quser_error, build_string ("Overlapping multi-lang overlays"));
+    }
+
+  struct buffer *base = current_buffer;
+
+  if (EQ (BVAR (base, major_mode), mode))
+    xsignal1 (Quser_error, concat2 (build_string ("Base buffer already "),
+				    SYMBOL_NAME (mode)));
+
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_excursion ();
+  set_buffer_internal (base);
+  call0 (Qdeactivate_mark);
+  call0 (Qmulti_lang_filter_buffer_substring_function);
+  call4 (Qadd_hook, Qwindow_buffer_change_functions,
+	 Qmulti_lang_on_switch_to_buffer,
+	 Qnil, Qt);
+  call4 (Qadd_hook, Qbefore_revert_hook,
+	 Qdelete_all_multi_lang_overlays,
+	 Qnil, Qt);
+
+  if (!EQ (Qunbound, find_symbol_value
+	   (XSYMBOL (Qhl_line_sticky_flag), base)))
+    {
+      if (FUNCTIONP (Qhl_line_unhighlight))
+	call0 (Qhl_line_unhighlight);
+      Fmake_local_variable (Qhl_line_sticky_flag);
+      set_internal (Qhl_line_sticky_flag, Qnil, Fcurrent_buffer (), SET_INTERNAL_SET);
+    }
+
+  if (base->overlays == NULL)
+    base->overlays = itree_create ();
+
+  if (base->proximity == NULL)
+    base->proximity = (struct proximity *) xmalloc (sizeof *base->proximity);
+
+  /* Reset proximity with crossed boundaries.  */
+  base->proximity->current = Qnil;
+  base->proximity->preceding = Fpoint_max_marker ();
+  base->proximity->following = Fpoint_min_marker ();
+
+  Lisp_Object tail, xcar, buf = Qnil;
+  FOR_EACH_LIVE_BUFFER (tail, xcar)
+    if (XBUFFER (xcar)->base_buffer == base
+	&& EQ (BVAR (XBUFFER (xcar), major_mode), mode))
+      {
+	/* reuse already extant for MODE.  */
+	buf = xcar;
+	break;
+      }
+
+  if (NILP (buf))
+    {
+      buf = Fmake_indirect_buffer
+	(Fcurrent_buffer (),
+	 concat2 (concat2 (build_string (" "), BVAR (base, name)),
+		  concat3 (build_string ("["), SYMBOL_NAME (mode), build_string ("]"))),
+	 Qnil, Qt);
+      XBUFFER (buf)->overlays = base->overlays;
+      XBUFFER (buf)->proximity = base->proximity;
+
+      specpdl_ref back = SPECPDL_INDEX ();
+      record_unwind_protect_excursion ();
+      set_buffer_internal (XBUFFER (buf));
+      call0 (Qmulti_lang_filter_buffer_substring_function);
+      if (!EQ (Qunbound, find_symbol_value
+	       (XSYMBOL (Qhl_line_sticky_flag), XBUFFER (buf))))
+	{
+	  Fmake_local_variable (Qhl_line_sticky_flag);
+	  set_internal (Qhl_line_sticky_flag, Qnil, buf, SET_INTERNAL_SET);
+	}
+      unbind_to (back, Qnil);
+    }
+
+  struct Lisp_Subr *sname = &Smake_multi_lang__enter_buffer.s;
+  Lisp_Object callback = intern_c_string (sname->symbol_name);
+  Lisp_Object on_enter = CALLN (Ffuncall, intern ("apply-partially"),
+				callback,
+				buf);
+  sname = &Smake_multi_lang__exit_buffer.s;
+  callback = intern_c_string (sname->symbol_name);
+  Lisp_Object on_exit = CALLN (Ffuncall, intern ("apply-partially"),
+			       callback,
+			       Fcurrent_buffer ());
+  Lisp_Object ov = build_overlay (false, false, Qnil, on_enter, on_exit);
+  ptrdiff_t obeg = clip_to_bounds (BUF_BEG (base), XFIXNUM (beg), BUF_Z (base));
+  ptrdiff_t oend = clip_to_bounds (BUF_BEG (base), XFIXNUM (end), BUF_Z (base));
+
+  const ptrdiff_t obeg1
+    = multi_lang_insert_bumpguard (base,
+				   obeg == BUF_BEG (base) ? obeg : obeg - 1,
+				   obeg);
+  oend += (obeg1 - obeg);
+  obeg = obeg1;
+  oend = multi_lang_insert_bumpguard (base, obeg, oend);
+
+  /* Read-only newline is part of overlay */
+  add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, oend);
+
+  Lisp_Object face_alist = find_symbol_value (XSYMBOL (Qmulti_lang_face_alist), NULL);
+  Lisp_Object face = CDR_SAFE (Fassq (mode, face_alist));
+  if (CONSP (face))
+    face = XCAR (face);
+  if (NILP (Finternal_lisp_face_p (face, Qnil)))
+    face = Qmulti_lang;
+  Foverlay_put (ov, Qface, face);
+  Foverlay_put (ov, Qmulti_lang_p, Qt);
+
+  SET_PT (obeg);
+  call1 (on_enter, ov); /* sets proximity */
+  call0 (mode);
+  specbind (Qfont_lock_extra_managed_props, list2 (Qdisplay, Qfontified));
+  call2 (Qfont_lock_fontify_region, beg, end); /* calls unfontify too */
+
+  /* Because MODE kills all local variables, we do this here.  */
+  call4 (Qadd_hook, Qbefore_revert_hook,
+	 Qdelete_all_multi_lang_overlays,
+	 Qnil, Qt);
+
+  /* restores caller buffer */
+  unbind_to (count, Qnil);
+  if (PT < XFIXNUM (Fmarker_position (current_buffer->proximity->preceding))
+      || (!NILP (current_buffer->proximity->following)
+	  && PT >= XFIXNUM (Fmarker_position
+			    (current_buffer->proximity->following))))
+    call1 (on_exit, ov);
+  return buf;
+}
+
+DEFUN ("multi-lang-indirect-p", Fmulti_lang_indirect_p, Smulti_lang_indirect_p, 1, 1, 0,
+       doc: /* Return t if BUF corresponds to a multi-lang overlay.  */)
+  (Lisp_Object buf)
+{
+  CHECK_BUFFER (buf);
+  return MULTI_LANG_INDIRECT_P (XBUFFER (buf)) ? Qt : Qnil;
+}
 
 void
 delete_all_overlays (struct buffer *b)
 {
-  struct itree_node *node;
-
-  if (!b->overlays)
-    return;
-
-  /* The general rule is that the tree cannot be modified from within
-     ITREE_FOREACH, but here we bend this rule a little because we know
-     that the POST_ORDER iterator will not need to look at `node` again.  */
-  ITREE_FOREACH (node, b->overlays, PTRDIFF_MIN, PTRDIFF_MAX, POST_ORDER)
-    {
-      modify_overlay (b, node->begin, node->end);
-      XOVERLAY (node->data)->buffer = NULL;
-      node->parent = NULL;
-      node->left = NULL;
-      node->right = NULL;
-    }
-  itree_clear (b->overlays);
-}
-
-static void
-free_buffer_overlays (struct buffer *b)
-{
-  /* Actually this does not free any overlay, but the tree only.  --ap */
   if (b->overlays)
     {
+      /* The general rule is that the tree cannot be modified from within
+	 ITREE_FOREACH, but here we bend this rule a little because we know
+	 that the POST_ORDER iterator will not need to look at `node` again.  */
+      struct itree_node *node;
+      ITREE_FOREACH (node, b->overlays, PTRDIFF_MIN, PTRDIFF_MAX, POST_ORDER)
+	{
+	  modify_overlay (b, node->begin, node->end);
+	  if (MULTI_LANG_INDIRECT_P (XOVERLAY (node->data)->buffer))
+	    {
+	      /* these are shared with B, so douse them */
+	      XOVERLAY (node->data)->buffer->overlays = NULL;
+	      XOVERLAY (node->data)->buffer->proximity = NULL;
+	    }
+	  XOVERLAY (node->data)->buffer = NULL;
+	  node->parent = NULL;
+	  node->left = NULL;
+	  node->right = NULL;
+	}
+      itree_clear (b->overlays);
       itree_destroy (b->overlays);
       b->overlays = NULL;
     }
@@ -991,7 +1272,9 @@ free_buffer_overlays (struct buffer *b)
 static void
 set_overlays_multibyte (bool multibyte)
 {
-  if (!current_buffer->overlays || Z == Z_BYTE)
+  if (!current_buffer->overlays
+      || Z == Z_BYTE
+      || MULTI_LANG_INDIRECT_P (current_buffer))
     return;
 
   struct itree_node **nodes = NULL;
@@ -1027,12 +1310,12 @@ set_overlays_multibyte (bool multibyte)
                  && !CHAR_HEAD_P (FETCH_BYTE (end)))
             end++;
           itree_node_set_region (tree, node, BYTE_TO_CHAR (begin),
-                                    BYTE_TO_CHAR (end));
+				 BYTE_TO_CHAR (end));
         }
       else
         {
           itree_node_set_region (tree, node, CHAR_TO_BYTE (node->begin),
-                                    CHAR_TO_BYTE (node->end));
+				 CHAR_TO_BYTE (node->end));
         }
     }
   SAFE_FREE ();
@@ -1060,6 +1343,7 @@ reset_buffer (register struct buffer *b)
   bset_auto_save_file_name (b, Qnil);
   bset_read_only (b, Qnil);
   b->overlays = NULL;
+  b->proximity = NULL;
   bset_mark_active (b, Qnil);
   bset_point_before_scroll (b, Qnil);
   bset_file_format (b, Qnil);
@@ -1577,16 +1861,6 @@ This does not change the name of the visited file (if any).  */)
   return BVAR (current_buffer, name);
 }
 
-/* True if B can be used as 'other-than-BUFFER' buffer.  */
-
-static bool
-candidate_buffer (Lisp_Object b, Lisp_Object buffer)
-{
-  return (BUFFERP (b) && !EQ (b, buffer)
-	  && BUFFER_LIVE_P (XBUFFER (b))
-	  && !BUFFER_HIDDEN_P (XBUFFER (b)));
-}
-
 DEFUN ("other-buffer", Fother_buffer, Sother_buffer, 0, 3, 0,
        doc: /* Return most recently selected buffer other than BUFFER.
 Buffers not visible in windows are preferred to visible buffers, unless
@@ -1756,6 +2030,10 @@ cleaning up all windows currently displaying the buffer to be killed. */)
   if (NILP (buffer))
     nsberror (buffer_or_name);
 
+  if (MULTI_LANG_INDIRECT_P (XBUFFER (buffer)))
+    XSETBUFFER (buffer, XBUFFER (buffer)->base_buffer);
+
+  CHECK_BUFFER (buffer);
   b = XBUFFER (buffer);
 
   if (!BUFFER_LIVE_P (b))
@@ -1844,6 +2122,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 	  struct buffer *obuf = XBUFFER (other);
 	  if (obuf->base_buffer == b)
 	    {
+	      obuf->proximity = NULL; /* otherwise Fkill_buffer infloops */
 	      Fkill_buffer (other);
 	      if (BUFFER_LIVE_P (obuf))
 		error ("Unable to kill buffer whose indirect buffer `%s' cannot be killed",
@@ -1962,8 +2241,10 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 
       /* Perhaps we should explicitly free the interval tree here...  */
     }
-  delete_all_overlays (b);
-  free_buffer_overlays (b);
+
+  if (b->base_buffer == NULL
+      || b->overlays != b->base_buffer->overlays)
+    delete_all_overlays (b);
 
   /* Reset the local variables, so that this buffer's local values
      won't be protected from GC.  They would be protected
@@ -1983,9 +2264,16 @@ cleaning up all windows currently displaying the buffer to be killed. */)
       eassert (b->base_buffer->indirections >= 0);
       /* Make sure that we wasn't confused.  */
       eassert (b->window_count == -1);
+      b->proximity = NULL; /* base buffer xfree's */
+      b->overlays = NULL;  /* base buffer xfree's */
     }
   else
     {
+      if (b->proximity != NULL)
+	{
+	  xfree (b->proximity);
+	  b->proximity = NULL;
+	}
       /* Make sure that no one shows us.  */
       eassert (b->window_count == 0);
       /* No one shares our buffer text, can free it.  */
@@ -2354,6 +2642,9 @@ static void
 swap_buffer_overlays (struct buffer *buffer, struct buffer *other)
 {
   struct itree_node *node;
+
+  if (MULTI_LANG_INDIRECT_P (buffer))
+    return;
 
   ITREE_FOREACH (node, buffer->overlays, PTRDIFF_MIN, PTRDIFF_MAX, ASCENDING)
     XOVERLAY (node->data)->buffer = other;
@@ -2943,47 +3234,70 @@ overlays_at (ptrdiff_t pos, bool extend,
 }
 
 ptrdiff_t
-next_overlay_change (ptrdiff_t pos)
+next_overlay_change (ptrdiff_t pos, bool callback_p)
 {
-  ptrdiff_t next = ZV;
-  struct itree_node *node;
-
-  ITREE_FOREACH (node, current_buffer->overlays, pos, next, ASCENDING)
+  ptrdiff_t ret = ZV; // ret gets smaller and smaller
+  if (current_buffer->overlays)
     {
-      if (node->begin > pos)
-        {
-          /* If we reach this branch, node->begin must be the least upper bound
-             of pos, because the search is limited to [pos,next) . */
-          eassert (node->begin < next);
-          next = node->begin;
-          break;
-        }
-      else if (node->begin < node->end && node->end < next)
-        {
-          next = node->end;
-          ITREE_FOREACH_NARROW (pos, next);
-        }
-    }
+      struct itree_iterator iter, *iter_p   /* [pos, ret) */
+	= itree_iterator_start (&iter, current_buffer->overlays,
+				pos, ret, ITREE_ASCENDING);
 
-  return next;
+      for (struct itree_node *node = itree_iterator_next (iter_p);
+	   node != NULL;
+	   node = itree_iterator_next (iter_p))
+	{
+	  if (!callback_p
+	      || OVERLAY_ON_ENTER (node->data)
+	      || OVERLAY_ON_EXIT (node->data))
+	    {
+	      if (node->begin > pos)
+		{
+		  /* Ordinarily first iteration. */
+		  eassert (node->begin < ret);
+		  ret = node->begin;
+		  break;
+		}
+	      else if (node->begin < node->end && node->end < ret)
+		{
+		  /* Overlay starts at POS? */
+		  ret = node->end;
+		  itree_iterator_narrow (iter_p, pos, ret);
+		}
+	    }
+	}
+    }
+  return ret;
 }
 
 ptrdiff_t
-previous_overlay_change (ptrdiff_t pos)
+previous_overlay_change (ptrdiff_t pos, bool callback_p)
 {
-  struct itree_node *node;
-  ptrdiff_t prev = BEGV;
-
-  ITREE_FOREACH (node, current_buffer->overlays, prev, pos, DESCENDING)
+  ptrdiff_t ret = BEGV; // ret gets bigger and bigger
+  if (current_buffer->overlays)
     {
-      if (node->end < pos)
-        prev = node->end;
-      else
-        prev = max (prev, node->begin);
-      ITREE_FOREACH_NARROW (prev, pos);
-    }
+      struct itree_iterator iter, *iter_p   /* [ret, pos) */
+	= itree_iterator_start (&iter, current_buffer->overlays,
+				ret, pos, ITREE_DESCENDING);
 
-  return prev;
+      /* Since tree is sorted by interval-begin, and we are comparing by
+	 interval-end, an exhaustive search is required.  */
+      for (struct itree_node *node = itree_iterator_next (iter_p);
+	   node != NULL;
+	   node = itree_iterator_next (iter_p))
+	{
+	  if (!callback_p
+	      || OVERLAY_ON_ENTER (node->data)
+	      || OVERLAY_ON_EXIT (node->data))
+	    {
+	      ret = (node->end < pos)
+		? node->end
+		: max (ret, node->begin);
+	      itree_iterator_narrow (iter_p, ret, pos);
+	    }
+	}
+    }
+  return ret;
 }
 
 /* Return true if there exists an overlay with a non-nil
@@ -3335,9 +3649,9 @@ overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
 void
 adjust_overlays_for_insert (ptrdiff_t pos, ptrdiff_t length, bool before_markers)
 {
-  if (!current_buffer->indirections)
+  if (!current_buffer->indirections) /* indirect */
     itree_insert_gap (current_buffer->overlays, pos, length, before_markers);
-  else
+  else /* base */
     {
       struct buffer *base = current_buffer->base_buffer
                             ? current_buffer->base_buffer
@@ -3345,7 +3659,8 @@ adjust_overlays_for_insert (ptrdiff_t pos, ptrdiff_t length, bool before_markers
       Lisp_Object tail, other;
       itree_insert_gap (base->overlays, pos, length, before_markers);
       FOR_EACH_LIVE_BUFFER (tail, other)
-        if (XBUFFER (other)->base_buffer == base)
+	if (XBUFFER (other)->base_buffer == base
+	    && XBUFFER (other)->overlays != base->overlays)
 	  itree_insert_gap (XBUFFER (other)->overlays, pos, length,
 			    before_markers);
     }
@@ -3390,7 +3705,8 @@ adjust_overlays_for_delete (ptrdiff_t pos, ptrdiff_t length)
       Lisp_Object tail, other;
       adjust_overlays_for_delete_in_buffer (base, pos, length);
       FOR_EACH_LIVE_BUFFER (tail, other)
-        if (XBUFFER (other)->base_buffer == base)
+	if (XBUFFER (other)->base_buffer == base
+	    && XBUFFER (other)->overlays != base->overlays)
           adjust_overlays_for_delete_in_buffer (XBUFFER (other), pos, length);
     }
 }
@@ -3440,6 +3756,11 @@ for the rear of the overlay advance when text is inserted there
   CHECK_FIXNUM_COERCE_MARKER (beg);
   CHECK_FIXNUM_COERCE_MARKER (end);
 
+  if (!NILP (on_enter))
+    CHECK_TYPE (FUNCTIONP (on_enter), Qfunctionp, on_enter);
+  if (!NILP (on_exit))
+    CHECK_TYPE (FUNCTIONP (on_exit), Qfunctionp, on_exit);
+
   if (XFIXNUM (beg) > XFIXNUM (end))
     {
       Lisp_Object temp;
@@ -3467,31 +3788,26 @@ modify_overlay (struct buffer *buf, ptrdiff_t start, ptrdiff_t end)
       start = end;
       end = temp;
     }
-
   BUF_COMPUTE_UNCHANGED (buf, start, end);
-
   bset_redisplay (buf);
-
   modiff_incr (&BUF_OVERLAY_MODIFF (buf));
 }
 
 DEFUN ("move-overlay", Fmove_overlay, Smove_overlay, 3, 4, 0,
-       doc: /* Set the endpoints of OVERLAY to BEG and END in BUFFER.
-If BUFFER is omitted, leave OVERLAY in the same buffer it inhabits now.
-If BUFFER is omitted, and OVERLAY is in no buffer, put it in the current
-buffer.  */)
+       doc: /* Move OVERLAY to BUFFER range spanning BEG to END.
+A null target BUFFER results in OVERLAY being moved within its
+associated buffer, or if it lacks one, to the current buffer.  */)
   (Lisp_Object overlay, Lisp_Object beg, Lisp_Object end, Lisp_Object buffer)
 {
-  struct buffer *b, *ob = 0;
-  Lisp_Object obuffer;
-  specpdl_ref count = SPECPDL_INDEX ();
-  ptrdiff_t o_beg UNINIT, o_end UNINIT;
-
   CHECK_OVERLAY (overlay);
+  Lisp_Object obuffer = Foverlay_buffer (overlay);
   if (NILP (buffer))
-    buffer = Foverlay_buffer (overlay);
-  if (NILP (buffer))
-    XSETBUFFER (buffer, current_buffer);
+    {
+      if (!NILP (obuffer))
+	buffer = obuffer;
+      else
+	XSETBUFFER (buffer, current_buffer);
+    }
   CHECK_BUFFER (buffer);
 
   if (NILP (Fbuffer_live_p (buffer)))
@@ -3511,96 +3827,109 @@ buffer.  */)
       temp = beg; beg = end; end = temp;
     }
 
-  specbind (Qinhibit_quit, Qt); /* FIXME: Why?  */
+  ptrdiff_t n_beg = clip_to_bounds (BUF_BEG (XBUFFER (buffer)),
+				    XFIXNUM (beg), BUF_Z (XBUFFER (buffer)));
+  ptrdiff_t n_end = clip_to_bounds (n_beg, XFIXNUM (end), BUF_Z (XBUFFER (buffer)));
 
-  obuffer = Foverlay_buffer (overlay);
-  b = XBUFFER (buffer);
-
-  ptrdiff_t n_beg = clip_to_bounds (BUF_BEG (b), XFIXNUM (beg), BUF_Z (b));
-  ptrdiff_t n_end = clip_to_bounds (n_beg, XFIXNUM (end), BUF_Z (b));
-
-  if (!NILP (obuffer))
+  if (EQ (buffer, obuffer))
     {
-      ob = XBUFFER (obuffer);
+      /* Move within OVERLAY's buffer.  */
+      itree_node_set_region (XBUFFER (buffer)->overlays,
+			     XOVERLAY (overlay)->interval, n_beg, n_end);
 
-      o_beg = OVERLAY_START (overlay);
-      o_end = OVERLAY_END (overlay);
-    }
+      ptrdiff_t o_beg = OVERLAY_START (overlay);
+      ptrdiff_t o_end = OVERLAY_END (overlay);
 
-  if (!EQ (buffer, obuffer))
-    {
-      if (!NILP (obuffer))
-        remove_buffer_overlay (XBUFFER (obuffer), XOVERLAY (overlay));
-      add_buffer_overlay (XBUFFER (buffer), XOVERLAY (overlay), n_beg, n_end);
-    }
-  else
-    itree_node_set_region (b->overlays, XOVERLAY (overlay)->interval,
-                              n_beg, n_end);
-
-  /* If the overlay has changed buffers, do a thorough redisplay.  */
-  if (!EQ (buffer, obuffer))
-    {
-      /* Redisplay where the overlay was.  */
-      if (ob)
-        modify_overlay (ob, o_beg, o_end);
-
-      /* Redisplay where the overlay is going to be.  */
-      modify_overlay (b, n_beg, n_end);
-    }
-  else
-    /* Redisplay the area the overlay has just left, or just enclosed.  */
-    {
+      /* Redisplay the area OVERLAY just left, or just enclosed.  */
       if (o_beg == n_beg)
-	modify_overlay (b, o_end, n_end);
+	modify_overlay (XBUFFER (buffer), o_end, n_end);
       else if (o_end == n_end)
-	modify_overlay (b, o_beg, n_beg);
+	modify_overlay (XBUFFER (buffer), o_beg, n_beg);
       else
-	modify_overlay (b, min (o_beg, n_beg), max (o_end, n_end));
+	modify_overlay (XBUFFER (buffer), min (o_beg, n_beg), max (o_end, n_end));
+    }
+  else
+    {
+      /* Do a thorough redisplay if overlay changed buffers.  */
+      Fdelete_overlay (overlay);
+      add_buffer_overlay (XBUFFER (buffer), XOVERLAY (overlay), n_beg, n_end);
+      modify_overlay (XBUFFER (buffer), n_beg, n_end);
     }
 
-  /* Delete the overlay if it is empty after clipping and has the
-     evaporate property.  */
+  /* Delete an evaporated overlay.  */
   if (n_beg == n_end && !NILP (Foverlay_get (overlay, Qevaporate)))
-    { /* We used to call `Fdelete_overlay' here, but it causes problems:
-         - At this stage, `overlay' is not included in its buffer's lists
-           of overlays (the data-structure is in an inconsistent state),
-           contrary to `Fdelete_overlay's assumptions.
-         - Most of the work done by Fdelete_overlay has already been done
-           here for other reasons.  */
-      drop_overlay (XOVERLAY (overlay));
-      return unbind_to (count, overlay);
-    }
+    Fdelete_overlay (overlay);
 
-  return unbind_to (count, overlay);
+  return overlay;
 }
 
 DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
        doc: /* Delete the overlay OVERLAY from its buffer.  */)
   (Lisp_Object overlay)
 {
-  struct buffer *b;
-  specpdl_ref count = SPECPDL_INDEX ();
-
   CHECK_OVERLAY (overlay);
+  struct buffer *obuffer = OVERLAY_BUFFER (overlay);
+  if (obuffer != NULL)
+    {
+      /* Turn off optimizations if overlay contained before- or
+	 after-strings since they could contain newlines.  */
+      if (!windows_or_buffers_changed
+	  && (!NILP (Foverlay_get (overlay, Qbefore_string))
+	      || !NILP (Foverlay_get (overlay, Qafter_string))))
+	obuffer->prevent_redisplay_optimizations_p = 1;
 
-  b = OVERLAY_BUFFER (overlay);
-  if (!b)
-    return Qnil;
+      modify_overlay (obuffer, OVERLAY_START (overlay), OVERLAY_END (overlay));
+      itree_remove (obuffer->overlays, XOVERLAY (overlay)->interval);
+      /* Now kill multi-lang buffer associated with OBUFFER.  */
+      if (MULTI_LANG_INDIRECT_P (obuffer) /* don't touch base buffer! */
+	  && !NILP (plist_get (OVERLAY_PLIST (overlay), Qmulti_lang_p)))
+	{
+	  multi_lang_delete_bumpguard (obuffer, OVERLAY_END (overlay) - 1);
+	  multi_lang_delete_bumpguard (obuffer,
+				       OVERLAY_START (overlay) == BUF_BEG (obuffer)
+				       ? OVERLAY_START (overlay)
+				       : OVERLAY_START (overlay) - 1);
 
-  specbind (Qinhibit_quit, Qt);
+	  if (!NILP (OVERLAY_ON_EXIT (overlay)))
+	    call1 (OVERLAY_ON_EXIT (overlay), overlay);
 
-  drop_overlay (XOVERLAY (overlay));
-
-  /* When deleting an overlay with before or after strings, turn off
-     display optimizations for the affected buffer, on the basis that
-     these strings may contain newlines.  This is easier to do than to
-     check for that situation during redisplay.  */
-  if (!windows_or_buffers_changed
-      && (!NILP (Foverlay_get (overlay, Qbefore_string))
-	  || !NILP (Foverlay_get (overlay, Qafter_string))))
-    b->prevent_redisplay_optimizations_p = 1;
-
-  return unbind_to (count, Qnil);
+	  /* Kill OBUFFER if no other overlays attached.
+	     Erase all proximity tracking if no other multi-lang overlays. */
+	  bool kill_one = true; /* kill OBUFFER if no other overlays attached. */
+	  bool erase_all = true; /* erase tracking if no more multi-lang overlays. */
+	  struct itree_node *node;
+	  ITREE_FOREACH (node, obuffer->overlays, PTRDIFF_MIN,
+			 PTRDIFF_MAX, POST_ORDER)
+	    {
+	      if (!EQ (node->data, overlay))
+		{
+		  /* recall obuffer->overlays is same as base->overlays */
+		  if (!NILP (plist_get (OVERLAY_PLIST (node->data), Qmulti_lang_p)))
+		    erase_all = false;
+		  if (XOVERLAY (node->data)->buffer == obuffer)
+		    {
+		      kill_one = false;
+		      erase_all = false; /* should already be */
+		      break;
+		    }
+		}
+	    }
+	  if (kill_one)
+	    {
+	      struct buffer *base = obuffer->base_buffer;
+	      obuffer->proximity = NULL; /* otherwise Fkill_buffer kills base */
+	      Lisp_Object b; XSETBUFFER (b, obuffer);
+	      Fkill_buffer (b);
+	      if (erase_all)
+		{
+		  xfree (base->proximity);
+		  base->proximity = NULL;
+		}
+	    }
+	}
+      XOVERLAY (overlay)->buffer = NULL;
+    }
+  return Qnil;
 }
 
 DEFUN ("delete-all-overlays", Fdelete_all_overlays, Sdelete_all_overlays, 0, 1, 0,
@@ -3623,7 +3952,6 @@ DEFUN ("overlay-start", Foverlay_start, Soverlay_start, 1, 1, 0,
   CHECK_OVERLAY (overlay);
   if (!OVERLAY_BUFFER (overlay))
     return Qnil;
-
   return make_fixnum (OVERLAY_START (overlay));
 }
 
@@ -3634,7 +3962,6 @@ DEFUN ("overlay-end", Foverlay_end, Soverlay_end, 1, 1, 0,
   CHECK_OVERLAY (overlay);
   if (!OVERLAY_BUFFER (overlay))
     return Qnil;
-
   return make_fixnum (OVERLAY_END (overlay));
 }
 
@@ -3644,14 +3971,10 @@ Return nil if OVERLAY has been deleted.  */)
   (Lisp_Object overlay)
 {
   Lisp_Object buffer;
-
   CHECK_OVERLAY (overlay);
-
   if (!OVERLAY_BUFFER (overlay))
     return Qnil;
-
   XSETBUFFER (buffer, OVERLAY_BUFFER (overlay));
-
   return buffer;
 }
 
@@ -3662,10 +3985,24 @@ OVERLAY.  */)
   (Lisp_Object overlay)
 {
   CHECK_OVERLAY (overlay);
-
   return Fcopy_sequence (OVERLAY_PLIST (overlay));
 }
 
+DEFUN ("overlay-on-enter", Foverlay_on_enter, Soverlay_on_enter, 1, 1, 0,
+       doc: /* Return the on-enter function of OVERLAY.  */)
+  (Lisp_Object overlay)
+{
+  CHECK_OVERLAY (overlay);
+  return OVERLAY_ON_ENTER (overlay);
+}
+
+DEFUN ("overlay-on-exit", Foverlay_on_exit, Soverlay_on_exit, 1, 1, 0,
+       doc: /* Return the on-enter function of OVERLAY.  */)
+  (Lisp_Object overlay)
+{
+  CHECK_OVERLAY (overlay);
+  return OVERLAY_ON_EXIT (overlay);
+}
 
 DEFUN ("overlays-at", Foverlays_at, Soverlays_at, 1, 2, 0,
        doc: /* Return a list of the overlays that contain the character at POS.
@@ -3759,7 +4096,7 @@ the value is (point-max).  */)
   if (!buffer_has_overlays ())
     return make_fixnum (ZV);
 
-  return make_fixnum (next_overlay_change (XFIXNUM (pos)));
+  return make_fixnum (next_overlay_change (XFIXNUM (pos), false));
 }
 
 DEFUN ("previous-overlay-change", Fprevious_overlay_change,
@@ -3775,7 +4112,7 @@ the value is (point-min).  */)
   if (!buffer_has_overlays ())
     return make_fixnum (BEGV);
 
-  return make_fixnum (previous_overlay_change (XFIXNUM (pos)));
+  return make_fixnum (previous_overlay_change (XFIXNUM (pos), false));
 }
 
 /* These functions are for debugging overlays.  */
@@ -3815,7 +4152,7 @@ the value returned by `overlay-lists'.  */)
 }
 
 DEFUN ("overlay-get", Foverlay_get, Soverlay_get, 2, 2, 0,
-       doc: /* Get the property of overlay OVERLAY with property name PROP.  */)
+       doc: /* Return PROP's associated value in OVERLAY's property list.  */)
   (Lisp_Object overlay, Lisp_Object prop)
 {
   CHECK_OVERLAY (overlay);
@@ -3823,43 +4160,42 @@ DEFUN ("overlay-get", Foverlay_get, Soverlay_get, 2, 2, 0,
 }
 
 DEFUN ("overlay-put", Foverlay_put, Soverlay_put, 3, 3, 0,
-       doc: /* Set one property of overlay OVERLAY: give property PROP value VALUE.
-VALUE will be returned.*/)
+       doc: /* Associate PROP with VALUE in OVERLAY's property list.
+Return VALUE.*/)
   (Lisp_Object overlay, Lisp_Object prop, Lisp_Object value)
 {
-  Lisp_Object tail;
-  struct buffer *b;
-  bool changed;
-
+  bool found = false, changed = false;
   CHECK_OVERLAY (overlay);
-
-  b = OVERLAY_BUFFER (overlay);
-
-  for (tail = XOVERLAY (overlay)->plist;
-       CONSP (tail) && CONSP (XCDR (tail));
+  for (Lisp_Object tail = XOVERLAY (overlay)->plist;
+       CONSP (CDR_SAFE (tail));
        tail = XCDR (XCDR (tail)))
-    if (EQ (XCAR (tail), prop))
-      {
-	changed = !EQ (XCAR (XCDR (tail)), value);
-	XSETCAR (XCDR (tail), value);
-	goto found;
-      }
-  /* It wasn't in the list, so add it to the front.  */
-  changed = !NILP (value);
-  set_overlay_plist
-    (overlay, Fcons (prop, Fcons (value, XOVERLAY (overlay)->plist)));
- found:
-  if (b)
     {
-      if (changed)
-	modify_overlay (b, OVERLAY_START (overlay),
-                        OVERLAY_END (overlay));
-      if (EQ (prop, Qevaporate) && !NILP (value)
-	  && (OVERLAY_START (overlay)
-              == OVERLAY_END (overlay)))
-	Fdelete_overlay (overlay);
+      if (EQ (XCAR (tail), prop))
+	{
+	  found = true;
+	  changed = !EQ (XCAR (XCDR (tail)), value);
+	  XSETCAR (XCDR (tail), value);
+	  break;
+	}
     }
 
+  if (!found)
+    {
+      changed = !NILP (value);
+      set_overlay_plist (overlay,
+			 Fcons (prop, Fcons (value, XOVERLAY (overlay)->plist)));
+    }
+
+  if (OVERLAY_BUFFER (overlay) != NULL)
+    {
+      if (changed)
+	modify_overlay (OVERLAY_BUFFER (overlay), OVERLAY_START (overlay),
+                        OVERLAY_END (overlay));
+      if (EQ (prop, Qevaporate)
+	  && !NILP (value)
+	  && (OVERLAY_START (overlay) == OVERLAY_END (overlay)))
+	Fdelete_overlay (overlay);
+    }
   return value;
 }
 
@@ -4662,8 +4998,6 @@ init_buffer_once (void)
   Fset_buffer (Fget_buffer_create (build_pure_c_string ("*scratch*"), Qnil));
 
   inhibit_modification_hooks = false;
-
-  (void) proximity;
 }
 
 void
@@ -4830,6 +5164,13 @@ syms_of_buffer (void)
   DEFSYM (Qafter_change_functions, "after-change-functions");
   DEFSYM (Qkill_buffer_query_functions, "kill-buffer-query-functions");
   DEFSYM (Qget_scratch_buffer_create, "get-scratch-buffer-create");
+  DEFSYM (Qmulti_lang_face_alist, "multi-lang-face-alist");
+  DEFSYM (Qmulti_lang_p, "multi-lang-p");
+  DEFSYM (Qmulti_lang, "multi-lang");
+  DEFSYM (Qmulti_lang_on_switch_to_buffer, "multi-lang-on-switch-to-buffer");
+  DEFSYM (Qmulti_lang_filter_buffer_substring_function,
+	  "multi-lang-filter-buffer-substring-function");
+  DEFSYM (Qadd_hook, "add-hook");
 
   DEFSYM (Qvertical_scroll_bar, "vertical-scroll-bar");
   Fput (Qvertical_scroll_bar, Qchoice, list4 (Qnil, Qt, Qleft, Qright));
@@ -5698,6 +6039,10 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
   defsubr (&Sfind_buffer);
   defsubr (&Sget_buffer_create);
   defsubr (&Smake_indirect_buffer);
+  defsubr (&Smake_multi_lang__enter_buffer);
+  defsubr (&Smake_multi_lang__exit_buffer);
+  defsubr (&Smake_multi_lang__overlay);
+  defsubr (&Smulti_lang_indirect_p);
   defsubr (&Sgenerate_new_buffer_name);
   defsubr (&Sbuffer_name);
   defsubr (&Sbuffer_last_name);
@@ -5734,6 +6079,8 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
   defsubr (&Soverlay_end);
   defsubr (&Soverlay_buffer);
   defsubr (&Soverlay_properties);
+  defsubr (&Soverlay_on_enter);
+  defsubr (&Soverlay_on_exit);
   defsubr (&Soverlays_at);
   defsubr (&Soverlays_in);
   defsubr (&Snext_overlay_change);
@@ -5751,8 +6098,15 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
 #endif
 
   DEFSYM (Qkill_buffer__possibly_save, "kill-buffer--possibly-save");
-
+  DEFSYM (Qbefore_revert_hook, "before-revert-hook");
+  DEFSYM (Qdelete_all_multi_lang_overlays, "delete-all-multi-lang-overlays");
+  DEFSYM (Qfont_lock_extra_managed_props, "font-lock-extra-managed-props");
+  DEFSYM (Qfont_lock_fontify_region, "font-lock-fontify-region");
   DEFSYM (Qbuffer_stale_function, "buffer-stale-function");
+  DEFSYM (Qignore, "ignore");
+  DEFSYM (Qtemporary_goal_column, "temporary-goal-column");
+  DEFSYM (Qhl_line_sticky_flag, "hl-line-sticky-flag");
+  DEFSYM (Qhl_line_unhighlight, "hl-line-unhighlight");
 
   Fput (intern_c_string ("erase-buffer"), Qdisabled, Qt);
 }

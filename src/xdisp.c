@@ -618,7 +618,7 @@ static enum prop_handled handle_fontified_prop (struct it *);
 
 static struct props it_props[] =
   {
-    /* Order matters! */
+    /* Order matters!  */
     {SYMBOL_INDEX (Qfontified),   FONTIFIED_PROP_IDX,     handle_fontified_prop},
     {SYMBOL_INDEX (Qface),        FACE_PROP_IDX,          handle_face_prop},
     {SYMBOL_INDEX (Qdisplay),     DISPLAY_PROP_IDX,       handle_display_prop},
@@ -1134,12 +1134,12 @@ DEFUN ("line-pixel-height", Fline_pixel_height,
 {
   struct text_pos pt;
   struct window *w = XWINDOW (selected_window);
-  struct buffer *old_buffer = NULL;
+  struct buffer *restore_buffer = NULL;
   Lisp_Object result;
 
   if (XBUFFER (w->contents) != current_buffer)
     {
-      old_buffer = current_buffer;
+      restore_buffer = current_buffer;
       set_buffer_internal (XBUFFER (w->contents));
     }
 
@@ -1147,8 +1147,8 @@ DEFUN ("line-pixel-height", Fline_pixel_height,
 
   result = make_fixnum (actual_line_height (w, pt));
 
-  if (old_buffer)
-    set_buffer_internal (old_buffer);
+  if (restore_buffer != NULL)
+    set_buffer_internal (restore_buffer);
 
   return result;
 }
@@ -3316,13 +3316,24 @@ handle_stop (struct it *it)
     compute_stop_pos (it);
 }
 
+/* For benefit of multi-lang overlays that need to hem display
+   propertizing. */
+
+bool has_display_prop (Lisp_Object properties)
+{
+  FOR_EACH_TAIL (properties)
+    for (struct props *p = it_props; p->handler; ++p)
+      if (EQ (XCAR (properties), builtin_lisp_symbol (p->name)))
+	return true;
+  return false;
+}
 
 /* Compute IT->stop_charpos from text property and overlay changes. */
 
 static void
 compute_stop_pos (struct it *it)
 {
-  register INTERVAL interval;
+  INTERVAL interval = NULL;
   Lisp_Object position;
   ptrdiff_t charpos, bytepos;
 
@@ -3338,10 +3349,8 @@ compute_stop_pos (struct it *it)
       charpos = IT_CHARPOS (*it);
       bytepos = IT_BYTEPOS (*it);
 
-      /* just-in-time disaster aversion Bug#5984 */
       it->end_charpos = min (it->end_charpos, ZV);
-
-      it->stop_charpos = min (it->end_charpos, next_overlay_change (charpos));
+      it->stop_charpos = min (it->end_charpos, next_overlay_change (charpos, false));
 
       if (toofar < it->stop_charpos)
 	{
@@ -3371,9 +3380,12 @@ compute_stop_pos (struct it *it)
     }
 
   position = make_fixnum (charpos);
-  interval = validate_interval_range
-    (STRINGP (it->string) ? it->string : Fcurrent_buffer (),
-     &position, &position, false);
+  Lisp_Object substrate = STRINGP (it->string) ? it->string : Fcurrent_buffer ();
+  if (validate_interval_range (substrate, &position, &position, false))
+    interval = find_interval (BUFFERP (substrate)
+			      ? buffer_intervals (XBUFFER (substrate))
+			      : string_intervals (substrate),
+			      XFIXNUM (position));
   if (interval)
     {
       Lisp_Object props_here[LAST_PROP_IDX];
@@ -3546,27 +3558,43 @@ compute_display_string_end (ptrdiff_t charpos, struct bidi_string_data *string)
 static enum prop_handled
 handle_fontified_prop (struct it *it)
 {
-  Lisp_Object prop, pos;
+  Lisp_Object funs = Vfontification_functions;
   enum prop_handled handled = HANDLED_NORMALLY;
+  specpdl_ref count = SPECPDL_INDEX ();
 
   if (!STRINGP (it->string)
       && it->s == NULL
-      && !NILP (Vfontification_functions)
-      && !(input_was_pending && redisplay_skip_fontification_on_input)
-      && (pos = make_fixnum (IT_CHARPOS (*it)),
-	  prop = Fget_char_property (pos, Qfontified, Qnil),
-	  NILP (prop) && IT_CHARPOS (*it) < Z))
+      && !NILP (funs)
+      && IT_CHARPOS (*it) < Z
+      && !(input_was_pending && redisplay_skip_fontification_on_input))
     {
-      /* We're not in string context, and Qfontified property was nil;
-	 run hooks from Qfontification_functions.  */
-      specpdl_ref count = SPECPDL_INDEX ();
-      struct buffer *obuf = current_buffer;
-      bool saved_clip_changed = current_buffer->clip_changed;
-      bool saved_inhibit_flag = it->f->inhibit_clear_image_cache;
-      Lisp_Object funs = Vfontification_functions;
+      /* We're not in string context.  */
+      struct buffer *restore_buf = current_buffer;
+      const bool restore_clip_changed = current_buffer->clip_changed;
+      const bool restore_inhibit_flag = it->f->inhibit_clear_image_cache;
+
+      Lisp_Object pos = make_fixnum (IT_CHARPOS (*it));
+      if (!NILP (Fget_char_property (pos, Qfontified, Qnil)))
+	goto fontified;
+
+      eassert (it->end_charpos == ZV);
+
+      if (current_buffer->proximity != NULL)
+	{
+	  record_unwind_protect (restore_point_unwind,
+				 build_marker (current_buffer, PT, PT_BYTE));
+	  record_unwind_protect (save_restriction_restore,
+				 save_restriction_save ());
+	  Fnarrow_to_region
+	    (Fmarker_position (current_buffer->proximity->preceding),
+	     !NILP (current_buffer->proximity->following)
+	     ? Fmarker_position (current_buffer->proximity->following)
+	     : Fpoint_max_marker ());
+	  if (IT_CHARPOS (*it) < BEGV || IT_CHARPOS (*it) >= ZV)
+	    goto fontified;
+	}
 
       specbind (Qfontification_functions, Qnil);
-      eassert (it->end_charpos == ZV);
 
       /* Prevent arbitrary lisp in Qfontification_functions from
 	 modifying faces or image caches.  */
@@ -3592,14 +3620,11 @@ handle_fontified_prop (struct it *it)
 	      dsafe_call1 (XCAR (funs), pos);
 	  }
 
-      it->f->inhibit_clear_image_cache = saved_inhibit_flag;
-      if (obuf != current_buffer && BUFFER_LIVE_P (obuf))
-	/* Fontification stultifyingly switched buffers!  */
-	set_buffer_internal (obuf);
-      if (obuf == current_buffer)
-	/* Bug#6671.  */
-	current_buffer->clip_changed = saved_clip_changed;
-      unbind_to (count, Qnil);
+      it->f->inhibit_clear_image_cache = restore_inhibit_flag;
+      if (restore_buf != current_buffer && BUFFER_LIVE_P (restore_buf))
+	set_buffer_internal (restore_buf); /* fontification switched bufs */
+      if (restore_buf == current_buffer)
+	current_buffer->clip_changed = restore_clip_changed; /* bug#6671 */
 
       /* Protect against text modifications beyond POS, as in grep.el
 	 which turned escape sequences face properties (bug#7876).  */
@@ -3615,6 +3640,8 @@ handle_fontified_prop (struct it *it)
 	}
     }
 
+fontified:
+  unbind_to (count, Qnil);
   return handled;
 }
 
@@ -6344,7 +6371,7 @@ following_line_start (struct it *it, bool *skipped_p, struct bidi_it *bidi_it_pr
 						      make_fixnum (limit));
       *skipped_p =
 	(NILP (pos) || XFIXNAT (pos) == limit) /* no display props */
-	&& next_overlay_change (start) == ZV;  /* no overlays */
+	&& next_overlay_change (start, false) == ZV;  /* no overlays */
     }
 
   if (*skipped_p)
@@ -9399,8 +9426,8 @@ move_it_backward (struct it *it, int op_to, int op)
 	       && ((op_target - it->current_y) >= actual_line_height (it->w, tpos))
 	       && IT_CHARPOS (*it) < ZV)
 	{
-	  /* Common branch where SLINES exceeds estimate (too
-	     far back).  Scooch forward.  */
+	  /* Common branch where SLINES exceeds estimate (too far back).
+	     Scooch forward.  */
 	  move_it_dy (it, op_target - it->current_y);
 	}
       break;
@@ -33127,6 +33154,7 @@ be let-bound around code that needs to disable messages temporarily. */);
   DEFSYM (QCfile, ":file");
   DEFSYM (Qfontified, "fontified");
   DEFSYM (Qfontification_functions, "fontification-functions");
+  DEFSYM (Qfont_lock_dont_widen, "font-lock-dont-widen");
 
   Vtext_property_default_nonsticky
     = Fcons (Fcons (Qfontified, Qt), Vtext_property_default_nonsticky);
