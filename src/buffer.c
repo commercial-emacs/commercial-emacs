@@ -1205,10 +1205,12 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   Foverlay_put (ov, Qmulti_lang_p, Qt);
 
   SET_PT (obeg);
-  call1 (on_enter, ov); /* sets proximity */
+  /* sets proximity */
+  call1 (on_enter, ov);
+  /* will fontify unless noninteractive */
   call0 (mode);
-  specbind (Qfont_lock_extra_managed_props, list2 (Qdisplay, Qfontified));
-  call2 (Qfont_lock_fontify_region, beg, end); /* calls unfontify too */
+  /* insurance fontify for noninteractive */
+  call2 (Qfont_lock_fontify_region, beg, end);
 
   /* Because MODE kills all local variables, we do this here.  */
   call4 (Qadd_hook, Qbefore_revert_hook,

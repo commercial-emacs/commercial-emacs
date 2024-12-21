@@ -125,6 +125,7 @@ def my_function(x, y):
       (should-not (get-text-property (point) 'face))
       (search-forward "my_f")
       (backward-word)
+      (should (eq (char-after) ?f))
       (should (equal (get-text-property (point) 'face) '(subscript)))
       (should (get-text-property (point) 'display))
       (let* ((base (current-buffer))
@@ -158,6 +159,7 @@ def my_function(x, y):
            (search-forward "my_f"))
          'backward-word
          (lambda ()
+           (should (eq (char-after) ?f))
            (should-not (equal (get-text-property (point) 'face) '(subscript)))
            (should-not (get-text-property (point) 'display))))))))
 

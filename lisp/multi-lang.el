@@ -63,9 +63,13 @@
   (if (or (null mode) (string-empty-p (symbol-name mode)))
       (keyboard-quit)
     ;; Eschew `with-silent-modifications' since precision required.
-    (let ((modified (buffer-modified-p)))
+    (let ((modified (buffer-modified-p))
+          (font-lock-extra-managed-props
+           `(display fontified . ,font-lock-extra-managed-props)))
       (unwind-protect
-          (make-multi-lang--overlay beg end mode)
+          (progn
+            (font-lock-unfontify-region beg end)
+            (make-multi-lang--overlay beg end mode))
         (when (memq modified '(nil autosaved))
           (restore-buffer-modified-p modified))))))
 
