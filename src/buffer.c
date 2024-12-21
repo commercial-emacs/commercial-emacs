@@ -3907,21 +3907,35 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
 		{
 		  /* recall obuffer->overlays is same as base->overlays */
 		  if (!NILP (plist_get (OVERLAY_PLIST (node->data), Qmulti_lang_p)))
-		    erase_all = false;
-		  if (XOVERLAY (node->data)->buffer == obuffer)
 		    {
-		      kill_one = false;
-		      erase_all = false; /* should already be */
-		      break;
+		      /* another multi-lang buffer */
+		      erase_all = false;
+		      if (XOVERLAY (node->data)->buffer == obuffer)
+			{
+			  /* another multi-lang overlay to this buffer */
+			  kill_one = false;
+			  break;
+			}
 		    }
 		}
 	    }
 	  if (kill_one)
 	    {
+	      /* null out shared overlays to OBUFFER */
+	      struct itree_node *node;
+	      ITREE_FOREACH (node, obuffer->overlays, PTRDIFF_MIN,
+			     PTRDIFF_MAX, POST_ORDER)
+		if (XOVERLAY (node->data)->buffer == obuffer)
+		  XOVERLAY (node->data)->buffer = NULL;
+
+	      /* before Fkill_buffer */
 	      struct buffer *base = obuffer->base_buffer;
+
+	      /* kill the buffer */
 	      obuffer->proximity = NULL; /* otherwise Fkill_buffer kills base */
 	      Lisp_Object b; XSETBUFFER (b, obuffer);
 	      Fkill_buffer (b);
+
 	      if (erase_all)
 		{
 		  xfree (base->proximity);
