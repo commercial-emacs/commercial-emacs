@@ -1043,12 +1043,12 @@ multi_lang_switch_to_buffer (Lisp_Object buf)
 static bool
 candidate_buffer (Lisp_Object b, Lisp_Object buffer)
 {
-  bool multi_lang_related = XBUFFER (b)->overlays != NULL
-    && XBUFFER (b)->overlays == XBUFFER (buffer)->overlays;
   return (BUFFERP (b) && !EQ (b, buffer)
 	  && BUFFER_LIVE_P (XBUFFER (b))
 	  /* And not within BUFFER's multi lang family */
-	  && !multi_lang_related
+	  && !(BUFFERP (buffer)
+	       && XBUFFER (buffer)->overlays != NULL
+	       && XBUFFER (buffer)->overlays == XBUFFER (b)->overlays)
 	  /* And not hidden, or if it is, that it's a multi lang buffer */
 	  && (!BUFFER_HIDDEN_P (XBUFFER (b))
 	      || MULTI_LANG_INDIRECT_P (XBUFFER (b))));
@@ -1203,19 +1203,25 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
     face = Qmulti_lang;
   Foverlay_put (ov, Qface, face);
   Foverlay_put (ov, Qmulti_lang_p, Qt);
-  unbind_to (count, Qnil); /* restores current_buffer */
 
   SET_PT (obeg);
   call1 (on_enter, ov); /* sets proximity */
-  call0 (mode); /* font locks */
+  call0 (mode);
+  specbind (Qfont_lock_extra_managed_props, list2 (Qdisplay, Qfontified));
+  call2 (Qfont_lock_fontify_region, beg, end); /* calls unfontify too */
 
-  specpdl_ref back = SPECPDL_INDEX ();
-  record_unwind_protect_excursion ();
-  set_buffer_internal (XBUFFER (buf));
+  /* Because MODE kills all local variables, we do this here.  */
   call4 (Qadd_hook, Qbefore_revert_hook,
 	 Qdelete_all_multi_lang_overlays,
 	 Qnil, Qt);
-  unbind_to (back, Qnil);
+
+  /* restores caller buffer */
+  unbind_to (count, Qnil);
+  if (PT < XFIXNUM (Fmarker_position (current_buffer->proximity->preceding))
+      || (!NILP (current_buffer->proximity->following)
+	  && PT >= XFIXNUM (Fmarker_position
+			    (current_buffer->proximity->following))))
+    call1 (on_exit, ov);
   return buf;
 }
 
@@ -6094,6 +6100,8 @@ This is the default.  If nil, auto-save file deletion is inhibited.  */);
   DEFSYM (Qkill_buffer__possibly_save, "kill-buffer--possibly-save");
   DEFSYM (Qbefore_revert_hook, "before-revert-hook");
   DEFSYM (Qdelete_all_multi_lang_overlays, "delete-all-multi-lang-overlays");
+  DEFSYM (Qfont_lock_extra_managed_props, "font-lock-extra-managed-props");
+  DEFSYM (Qfont_lock_fontify_region, "font-lock-fontify-region");
   DEFSYM (Qbuffer_stale_function, "buffer-stale-function");
   DEFSYM (Qignore, "ignore");
   DEFSYM (Qtemporary_goal_column, "temporary-goal-column");

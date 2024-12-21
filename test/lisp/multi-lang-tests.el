@@ -64,6 +64,7 @@
        (kill-buffer))))
 
 (ert-deftest multi-lang-test-org ()
+  "Dominik's commit afe98df locks down a bespoke font lock scheme."
   (let ((text "
 #+BEGIN_SRC emacs-lisp :results output :exports both
   (list 1 2 3)
@@ -83,7 +84,6 @@
 "))
     (multi-lang-tests-doit ".org" (replace-regexp-in-string "^\n" "" text)
       (should (eq major-mode 'org-mode))
-      (setq-local org-src-fontify-natively nil)
       (goto-char (point-max))
       (while (ignore-errors (org-babel-previous-src-block))
         (when-let ((lang (car (org-babel-get-src-block-info t)))
@@ -94,10 +94,13 @@
                    (end (save-excursion
                           (and (re-search-forward org-babel-src-block-regexp nil t)
                                (line-beginning-position)))))
-          (save-current-buffer
-            (switch-to-buffer (make-multi-lang-overlay beg end mode))
-            (goto-char beg)
-            (font-lock-ensure)))))))
+          (make-multi-lang-overlay beg end mode)))
+      (search-forward "import")
+      (backward-word)
+      (should (eq (get-text-property (point) 'face) 'font-lock-keyword-face))
+      (search-forward "asked")
+      (backward-word)
+      (should (eq (get-text-property (point) 'face) 'font-lock-variable-name-face)))))
 
 (ert-deftest multi-lang-test-interactive ()
   "Test interactive use."
@@ -197,10 +200,7 @@ def flatten(lst):
 	     (when-let ((mode (assoc-default
                                lang '(("Python" . python-mode)
 		                      ("C" . c-mode)))))
-               (save-current-buffer
-                 (switch-to-buffer (make-multi-lang-overlay beg end mode))
-                 (goto-char beg)
-                 (font-lock-ensure))))))
+               (make-multi-lang-overlay beg end mode)))))
        (search-forward "section")
        (backward-word)
        (should (eq (get-text-property (point) 'face)
