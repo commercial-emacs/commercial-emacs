@@ -1116,6 +1116,9 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   call4 (Qadd_hook, Qbefore_revert_hook,
 	 Qdelete_all_multi_lang_overlays,
 	 Qnil, Qt);
+  call4 (Qadd_hook, Qchange_major_mode_hook,
+	 Qdelete_all_multi_lang_overlays,
+	 Qnil, Qt);
 
   if (!EQ (Qunbound, find_symbol_value
 	   (XSYMBOL (Qhl_line_sticky_flag), base)))
@@ -1216,14 +1219,18 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   call4 (Qadd_hook, Qbefore_revert_hook,
 	 Qdelete_all_multi_lang_overlays,
 	 Qnil, Qt);
+  call4 (Qadd_hook, Qchange_major_mode_hook,
+	 Qdelete_all_multi_lang_overlays,
+	 Qnil, Qt);
 
   /* restores caller buffer */
   unbind_to (count, Qnil);
-  if (PT < XFIXNUM (Fmarker_position (current_buffer->proximity->preceding))
-      || (!NILP (current_buffer->proximity->following)
-	  && PT >= XFIXNUM (Fmarker_position
-			    (current_buffer->proximity->following))))
-    call1 (on_exit, ov);
+  if (current_buffer->proximity) /* MODE might have deleted this */
+    if (PT < XFIXNUM (Fmarker_position (current_buffer->proximity->preceding))
+	|| (!NILP (current_buffer->proximity->following)
+	    && PT >= XFIXNUM (Fmarker_position
+			      (current_buffer->proximity->following))))
+      call1 (on_exit, ov);
   return buf;
 }
 
