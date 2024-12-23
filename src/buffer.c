@@ -1141,11 +1141,13 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   base->proximity->following = Fpoint_min_marker ();
 
   Lisp_Object tail, xcar, buf = Qnil;
+  bool mode_called = false;
   FOR_EACH_LIVE_BUFFER (tail, xcar)
     if (XBUFFER (xcar)->base_buffer == base
 	&& EQ (BVAR (XBUFFER (xcar), major_mode), mode))
       {
 	/* reuse already extant for MODE.  */
+	mode_called = true;
 	buf = xcar;
 	break;
       }
@@ -1211,7 +1213,8 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
   /* sets proximity */
   call1 (on_enter, ov);
   /* will fontify unless noninteractive */
-  call0 (mode);
+  if (!mode_called)
+    call0 (mode);
   /* insurance fontify for noninteractive */
   call2 (Qfont_lock_fontify_region, beg, end);
 

@@ -25,6 +25,8 @@
 (require 'python)
 (require 'tex-mode)
 (require 'tree-sitter)
+(require 'js)
+(require 'multi-lang)
 (declare-function tree-sitter--testable "tree-sitter.c")
 
 (defsubst tree-sitter-testable ()
@@ -224,6 +226,57 @@ def flatten(lst):
        (should (eq (get-text-property (point) 'face)
                    'font-lock-function-name-face))))))
 
+(ert-deftest multi-lang-test-vue ()
+  (tree-sitter-tests-with-resources-dir
+   (let ((tree-sitter-mode-alist `((html-mode . "html") . ,tree-sitter-mode-alist))
+         (auto-mode-alist '(("\\.vue\\'" . html-mode)))
+         (text "
+<script>export default { // same line to check newline insertion
+    // a comment
+    data() { return { count: 0 } }
+}
+</script>
+<template>
+  <button>Count is: {{ count }}</button>
+</template>
+<script>
+export default {
+    mounted() {
+	console.log(`The initial count is ${this.count}.`)
+    }
+</script>
+"))
+     (multi-lang-tests-doit ".vue" (replace-regexp-in-string "^\n" "" text)
+       (should (eq major-mode 'html-mode))
+       (save-excursion
+         (search-forward "a comment")
+         (backward-word)
+         (should-not (get-text-property (point) 'face))
+         (search-forward "initial count")
+         (backward-word)
+         (should-not (get-text-property (point) 'face)))
+       (save-excursion
+         (goto-char (point-min))
+         (cl-loop with c = (tree-sitter-cursor-at)
+	          do (dfs (prog2 (while (tree-sitter-goto-parent c)) c))
+	          and do (while (tree-sitter-goto-parent c))
+	          while (when-let ((next (tree-sitter-node-next-sibling
+				          (tree-sitter-node-of c))))
+		          (goto-char (tree-sitter-node-start next))
+		          (setq c (tree-sitter-cursor-at)))))
+       (search-forward "a comment")
+       (backward-word)
+       (should (eq (get-text-property (point) 'face)
+                   'font-lock-comment-face))
+       (search-forward "<script>")
+       (should-not (overlays-at (point)))
+       (forward-line 1)
+       (should (multi-lang-p (car (overlays-at (point)))))
+       (search-forward "initial count")
+       (backward-word)
+       (should (eq (get-text-property (point) 'face)
+                   'font-lock-string-face))))))
+
 (defun string-of (node)
   (buffer-substring-no-properties
    (tree-sitter-node-start node)
@@ -282,6 +335,27 @@ def flatten(lst):
      (list `(,(cons (set-marker (make-marker) newline)
                     (set-marker (make-marker) newline2))
              ,language)))))
+
+(defun dfs (c)
+  (when-let ((node (tree-sitter-node-of c)))
+    (when (and (equal "end_tag" (tree-sitter-node-type node))
+	       (equal "script_element" (tree-sitter-node-type
+					(tree-sitter-node-parent node))))
+      (let ((raw-text node))
+	(while (and raw-text
+		    (not (equal "raw_text"
+				(tree-sitter-node-type
+				 (setq raw-text
+				       (tree-sitter-node-prev-sibling raw-text)))))))
+	(make-multi-lang-overlay
+	 (tree-sitter-node-start raw-text)
+	 (tree-sitter-node-start node)
+	 'js-mode)))
+    (when (tree-sitter-goto-first-child c)
+      (dfs c)
+      (tree-sitter-goto-parent c))
+    (when (tree-sitter-goto-next-sibling c)
+      (dfs c))))
 
 (provide 'multi-lang-tests)
 ;;; multi-lang-tests.el ends here
