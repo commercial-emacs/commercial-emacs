@@ -672,8 +672,9 @@ This is a no-op if CURSOR is at a leaf node.  */)
 
   CHECK_TREE_SITTER_CURSOR (cursor);
 
-  ts_tree_cursor_goto_first_child (&XTREE_SITTER_CURSOR (cursor)->cursor);
-  return cursor;
+  return ts_tree_cursor_goto_first_child (&XTREE_SITTER_CURSOR (cursor)->cursor)
+    ? cursor
+    : Qnil;
 }
 
 DEFUN ("tree-sitter-goto-next-sibling",
@@ -688,8 +689,9 @@ This is a no-op if no sibling follows.  */)
 
   CHECK_TREE_SITTER_CURSOR (cursor);
 
-  ts_tree_cursor_goto_next_sibling (&XTREE_SITTER_CURSOR (cursor)->cursor);
-  return cursor;
+  return ts_tree_cursor_goto_next_sibling (&XTREE_SITTER_CURSOR (cursor)->cursor)
+    ? cursor
+    : Qnil;
 }
 
 DEFUN ("tree-sitter-goto-parent",
@@ -704,8 +706,9 @@ This is a no-op if CURSOR was already at the root node.  */)
 
   CHECK_TREE_SITTER_CURSOR (cursor);
 
-  ts_tree_cursor_goto_parent (&XTREE_SITTER_CURSOR (cursor)->cursor);
-  return cursor;
+  return ts_tree_cursor_goto_parent (&XTREE_SITTER_CURSOR (cursor)->cursor)
+    ? cursor
+    : Qnil;
 }
 
 DEFUN ("tree-sitter-node-at",
