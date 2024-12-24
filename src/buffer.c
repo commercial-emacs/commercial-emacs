@@ -1234,7 +1234,7 @@ The indirect buffer created is distinguished by MULTI_LANG_INDIRECT_P.  */)
 	    && PT >= XFIXNUM (Fmarker_position
 			      (current_buffer->proximity->following))))
       call1 (on_exit, ov);
-  return buf;
+  return ov;
 }
 
 DEFUN ("multi-lang-indirect-p", Fmulti_lang_indirect_p, Smulti_lang_indirect_p, 1, 1, 0,

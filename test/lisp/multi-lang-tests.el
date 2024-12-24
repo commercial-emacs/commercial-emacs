@@ -131,16 +131,17 @@ def my_function(x, y):
       (should (equal (get-text-property (point) 'face) '(subscript)))
       (should (get-text-property (point) 'display))
       (let* ((base (current-buffer))
-             (indirect (make-multi-lang-overlay
-                        (save-excursion
-                          (goto-char (point-min))
-                          (search-forward "def")
-                          (line-beginning-position))
-                        (save-excursion
-                          (goto-char (point-min))
-                          (search-forward "\\end")
-                          (line-beginning-position))
-                        'python-mode)))
+             (ov (make-multi-lang-overlay
+                  (save-excursion
+                    (goto-char (point-min))
+                    (search-forward "def")
+                    (line-beginning-position))
+                  (save-excursion
+                    (goto-char (point-min))
+                    (search-forward "\\end")
+                    (line-beginning-position))
+                  'python-mode))
+             (indirect (overlay-buffer ov)))
         (ert-command-loop
          'end-of-buffer
          (lambda ()

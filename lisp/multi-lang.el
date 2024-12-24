@@ -47,7 +47,7 @@
 
 ;;;###autoload
 (defun make-multi-lang-overlay (beg end mode)
-  "Return indirect buffer with major mode MODE."
+  "Return new overlay corresponding to indirect buffer of major MODE."
   (interactive
    (list (if (region-active-p) (region-beginning) (point))
          (if (region-active-p) (region-end) (point))
