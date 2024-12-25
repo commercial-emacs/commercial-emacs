@@ -948,10 +948,9 @@ multi_lang_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_t 
 				buf->proximity->current,
 				buf->proximity->preceding,
 				buf->proximity->following));
-  /* perform equivalent of `widen' */
   buf->proximity->current = Qnil;
-  buf->proximity->preceding = Fpoint_min_marker ();
-  buf->proximity->following = Fpoint_max_marker ();
+  buf->proximity->preceding = build_marker (current_buffer, end - 1, CHAR_TO_BYTE (end - 1));
+  buf->proximity->following = build_marker (current_buffer, end, CHAR_TO_BYTE (end));
 
   if (end <= beg
       || end == BUF_BEG (buf)
@@ -959,10 +958,11 @@ multi_lang_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_t 
     {
       /* Patch in newline if one not already at END.  */
       SET_PT (end++);
+      buf->proximity->following = build_marker (current_buffer, end, CHAR_TO_BYTE (end));
       insert_char (10);
     }
 
-  /* Make the demarcating newline read-only */
+  /* Make the demarcating newline read-only.  */
   Fput_text_property (make_fixnum (end - 1), make_fixnum (end),
 		      Qrear_nonsticky, list1 (Qread_only), Qnil);
   Fput_text_property (make_fixnum (end - 1), make_fixnum (end),
@@ -989,10 +989,9 @@ multi_lang_delete_bumpguard (struct buffer *buf, const ptrdiff_t pos)
 				buf->proximity->current,
 				buf->proximity->preceding,
 				buf->proximity->following));
-  /* perform equivalent of `widen' */
   buf->proximity->current = Qnil;
-  buf->proximity->preceding = Fpoint_min_marker ();
-  buf->proximity->following = Fpoint_max_marker ();
+  buf->proximity->preceding = build_marker (current_buffer, pos, CHAR_TO_BYTE (pos));
+  buf->proximity->following = build_marker (current_buffer, pos, CHAR_TO_BYTE (pos + 1));
 
   Fremove_list_of_text_properties (make_fixnum (pos),
 				   make_fixnum (pos + 1),
