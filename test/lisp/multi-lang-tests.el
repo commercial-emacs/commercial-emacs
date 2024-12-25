@@ -29,18 +29,20 @@
 (require 'multi-lang)
 (declare-function tree-sitter--testable "tree-sitter.c")
 
-(defsubst tree-sitter-testable ()
-  (when-let ((dylib (expand-file-name "lib/latex.so" tree-sitter-resources-dir)))
+(defsubst tree-sitter-testable (lang)
+  (when-let ((dylib (expand-file-name
+                     (concat lang ".so")
+                     (expand-file-name "lib" tree-sitter-resources-dir))))
     (tree-sitter--testable dylib)))
 
-(defmacro tree-sitter-tests-with-resources-dir (&rest body)
+(defmacro tree-sitter-tests-with-resources-dir (lang &rest body)
   (declare (indent defun))
   `(let ((tree-sitter-resources-dir
           (expand-file-name (concat (file-name-as-directory "src/tree-sitter-resources")
                                     (if (eq system-type 'darwin)
                                         "darwin"
                                       "")))))
-     (skip-unless (tree-sitter-testable))
+     (skip-unless (tree-sitter-testable ,lang))
      ,@body))
 
 (defmacro multi-lang-tests-doit (ext text &rest body)
@@ -167,7 +169,7 @@ def my_function(x, y):
            (should-not (get-text-property (point) 'display))))))))
 
 (ert-deftest multi-lang-test-tree-walk ()
-  (tree-sitter-tests-with-resources-dir
+  (tree-sitter-tests-with-resources-dir "latex"
    (let ((tree-sitter-mode-alist `((latex-mode . "latex") . ,tree-sitter-mode-alist))
          (text "
 \\begin{document}
@@ -201,15 +203,48 @@ def flatten(lst):
 "))
      (multi-lang-tests-doit ".tex" (replace-regexp-in-string "^\n" "" text)
        (should (eq major-mode 'latex-mode))
-       (dolist (item (collect-regions))
-         (save-excursion
-           (cl-destructuring-bind ((beg . end) lang)
-	       item
-	     (delete-multi-lang-overlay beg)
-	     (when-let ((mode (assoc-default
-                               lang '(("Python" . python-mode)
-		                      ("C" . c-mode)))))
-               (make-multi-lang-overlay beg end mode)))))
+       (save-excursion
+         (goto-char (point-min))
+         (my/walk-tree
+          (lambda (node)
+            (when-let ((word-p (equal (tree-sitter-node-type node) "word"))
+	               (word-text (my/string-of node))
+	               (parent (tree-sitter-node-parent node))
+	               (lstlisting-p (and (equal word-text "lstlisting")
+			                  (equal "begin" (tree-sitter-node-type parent))))
+	               (bracket-text (cl-some (lambda (child)
+				                (when-let ((bracket-group-p (equal "bracket_group" (tree-sitter-node-type child)))
+					                   (bracket-text (my/string-of child))
+					                   (language-p (string-prefix-p "[language=" bracket-text)))
+				                  bracket-text))
+				              (my/children-of parent)))
+	               (lang (save-match-data
+		               (when (string-match "=\\(.+\\)]$" bracket-text)
+		                 (match-string 1 bracket-text))))
+                       (mode (assoc-default
+                              lang '(("Python" . python-mode)
+		                     ("C" . c-mode)
+                                     ("Emacs Lisp" . emacs-lisp-mode))))
+	               (body (tree-sitter-node-next-sibling parent))
+	               (newline (save-excursion
+		                  (goto-char (tree-sitter-node-end parent))
+		                  (when (zerop (forward-line 1))
+			            (when (<= (line-beginning-position)
+				              (tree-sitter-node-start body))
+			              (line-beginning-position)))))
+	               (newline2 (tree-sitter-node-start
+                                  (next-sib-until
+                                   body
+                                   (lambda (next)
+                                     (and (equal "end" (tree-sitter-node-type next))
+                                          (cl-some (lambda (child)
+                                                     (and (equal "word" (tree-sitter-node-type child))
+                                                          (equal "lstlisting" (my/string-of child))))
+                                                   (my/children-of next))))))))
+              (make-multi-lang-overlay
+               (set-marker (make-marker) newline)
+               (set-marker (make-marker) newline2)
+               mode)))))
        (search-forward "section")
        (backward-word)
        (should (eq (get-text-property (point) 'face)
@@ -228,7 +263,7 @@ def flatten(lst):
                    'font-lock-function-name-face))))))
 
 (ert-deftest multi-lang-test-vue ()
-  (tree-sitter-tests-with-resources-dir
+  (tree-sitter-tests-with-resources-dir "html"
    (let ((tree-sitter-mode-alist `((html-mode . "html") . ,tree-sitter-mode-alist))
          (auto-mode-alist '(("\\.vue\\'" . html-mode)))
          (text "
@@ -256,15 +291,22 @@ export default {
          (search-forward "initial count")
          (backward-word)
          (should-not (get-text-property (point) 'face)))
-       (save-excursion
-         (goto-char (point-min))
-         (cl-loop with c = (tree-sitter-cursor-at)
-	          do (dfs (prog2 (while (tree-sitter-goto-parent c)) c))
-	          and do (while (tree-sitter-goto-parent c))
-	          while (when-let ((next (tree-sitter-node-next-sibling
-				          (tree-sitter-node-of c))))
-		          (goto-char (tree-sitter-node-start next))
-		          (setq c (tree-sitter-cursor-at)))))
+       (my/walk-tree
+        (lambda (node)
+          (when (and (equal "end_tag" (tree-sitter-node-type node))
+	             (equal "script_element" (tree-sitter-node-type
+					      (tree-sitter-node-parent node))))
+            (let ((raw-text node))
+	      (while (and raw-text
+		          (not (equal "raw_text"
+				      (tree-sitter-node-type
+				       (setq raw-text
+				             (tree-sitter-node-prev-sibling
+                                              raw-text)))))))
+	      (make-multi-lang-overlay
+	       (tree-sitter-node-start raw-text)
+	       (tree-sitter-node-start node)
+	       'js-mode)))))
        (search-forward "a comment")
        (backward-word)
        (should (eq (get-text-property (point) 'face)
@@ -278,12 +320,12 @@ export default {
        (should (eq (get-text-property (point) 'face)
                    'font-lock-string-face))))))
 
-(defun string-of (node)
+(defun my/string-of (node)
   (buffer-substring-no-properties
    (tree-sitter-node-start node)
    (tree-sitter-node-end node)))
 
-(defun children-of (node)
+(defun my/children-of (node)
   (mapcar (lambda (k) (tree-sitter-node-child node k))
 	  (number-sequence 0 (1- (tree-sitter-node-child-count node)))))
 
@@ -292,71 +334,26 @@ export default {
     (setq node (tree-sitter-node-next-sibling node)))
   node)
 
-(defmacro walk-tree (form)
-  `(nreverse
-    (cl-loop with queue = (list (tree-sitter-root-node))
-	     while queue
-	     for node = (pop queue)
-	     append (prog1 ,form
-                      (dotimes (i (tree-sitter-node-child-count node))
-			(push (tree-sitter-node-child node i) queue))))))
+(defun my/walk-tree (doit)
+  (save-excursion
+    (goto-char (point-min))
+    (cl-loop with c = (tree-sitter-cursor-at)
+	     do (my/dfs (prog2 (while (tree-sitter-goto-parent c)) c)
+                        doit)
+	     and do (while (tree-sitter-goto-parent c))
+	     while (when-let ((next (tree-sitter-node-next-sibling
+				     (tree-sitter-node-of c))))
+		     (goto-char (tree-sitter-node-start next))
+		     (setq c (tree-sitter-cursor-at))))))
 
-(defun collect-regions ()
-  (walk-tree
-   (when-let ((word-p (equal (tree-sitter-node-type node) "word"))
-	      (word-text (string-of node))
-	      (parent (tree-sitter-node-parent node))
-	      (lstlisting-p (and (equal word-text "lstlisting")
-				 (equal "begin" (tree-sitter-node-type parent))))
-	      (bracket-text (cl-some (lambda (child)
-				       (when-let ((bracket-group-p (equal "bracket_group" (tree-sitter-node-type child)))
-						  (bracket-text (string-of child))
-						  (language-p (string-prefix-p "[language=" bracket-text)))
-					 bracket-text))
-				     (children-of parent)))
-	      (language (save-match-data
-			  (when (string-match "=\\(.+\\)]$" bracket-text)
-			    (match-string 1 bracket-text))))
-	      (body (tree-sitter-node-next-sibling parent))
-	      (newline (save-excursion
-			 (goto-char (tree-sitter-node-end parent))
-			 (when (zerop (forward-line 1))
-			   (when (<= (line-beginning-position)
-				     (tree-sitter-node-start body))
-			     (line-beginning-position)))))
-	      (newline2 (tree-sitter-node-start
-                         (next-sib-until
-                          body
-                          (lambda (next)
-                            (and (equal "end" (tree-sitter-node-type next))
-                                 (cl-some (lambda (child)
-                                            (and (equal "word" (tree-sitter-node-type child))
-                                                 (equal "lstlisting" (string-of child))))
-                                          (children-of next))))))))
-     (list `(,(cons (set-marker (make-marker) newline)
-                    (set-marker (make-marker) newline2))
-             ,language)))))
-
-(defun dfs (c)
+(defun my/dfs (c doit)
   (when-let ((node (tree-sitter-node-of c)))
-    (when (and (equal "end_tag" (tree-sitter-node-type node))
-	       (equal "script_element" (tree-sitter-node-type
-					(tree-sitter-node-parent node))))
-      (let ((raw-text node))
-	(while (and raw-text
-		    (not (equal "raw_text"
-				(tree-sitter-node-type
-				 (setq raw-text
-				       (tree-sitter-node-prev-sibling raw-text)))))))
-	(make-multi-lang-overlay
-	 (tree-sitter-node-start raw-text)
-	 (tree-sitter-node-start node)
-	 'js-mode)))
+    (funcall doit node)
     (when (tree-sitter-goto-first-child c)
-      (dfs c)
+      (my/dfs c doit)
       (tree-sitter-goto-parent c))
     (when (tree-sitter-goto-next-sibling c)
-      (dfs c))))
+      (my/dfs c doit))))
 
 (provide 'multi-lang-tests)
 ;;; multi-lang-tests.el ends here
