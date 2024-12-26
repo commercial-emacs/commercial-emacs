@@ -1,4 +1,4 @@
-;;; language-overlay-tests.el --- tests for lisp/language-overlay.el         -*- lexical-binding: t; -*-
+;;; mode-overlay-tests.el --- tests for lisp/mode-overlay.el         -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Command Line Systems
 
@@ -26,7 +26,7 @@
 (require 'tex-mode)
 (require 'tree-sitter)
 (require 'js)
-(require 'language-overlay)
+(require 'mode-overlay)
 (declare-function tree-sitter--testable "tree-sitter.c")
 
 (defsubst tree-sitter-testable (lang)
@@ -45,11 +45,11 @@
      (skip-unless (tree-sitter-testable ,lang))
      ,@body))
 
-(defmacro language-overlay-tests-doit (ext text &rest body)
+(defmacro mode-overlay-tests-doit (ext text &rest body)
   (declare (indent defun))
-  `(let ((dir (make-temp-file "language-overlay-tests" t)))
+  `(let ((dir (make-temp-file "mode-overlay-tests" t)))
      (unwind-protect
-         (let ((file-name (expand-file-name (concat "language-overlay-tests" ,ext) dir))
+         (let ((file-name (expand-file-name (concat "mode-overlay-tests" ,ext) dir))
                font-lock-global-modes ;only works when not interactive
                enable-dir-local-variables)
            (with-temp-file file-name (insert ,text))
@@ -67,7 +67,7 @@
        (set-buffer-modified-p nil)
        (kill-buffer))))
 
-(ert-deftest language-overlay-test-org ()
+(ert-deftest mode-overlay-test-org ()
   "Dominik's commit afe98df locks down a bespoke font lock scheme."
   (let ((text "
 #+BEGIN_SRC emacs-lisp :results output :exports both
@@ -86,7 +86,7 @@
   fi
 #+end_src
 "))
-    (language-overlay-tests-doit ".org" (replace-regexp-in-string "^\n" "" text)
+    (mode-overlay-tests-doit ".org" (replace-regexp-in-string "^\n" "" text)
       (should (eq major-mode 'org-mode))
       (goto-char (point-max))
       (while (ignore-errors (org-babel-previous-src-block))
@@ -98,7 +98,7 @@
                    (end (save-excursion
                           (and (re-search-forward org-babel-src-block-regexp nil t)
                                (line-beginning-position)))))
-          (make-language-overlay beg end mode)))
+          (make-mode-overlay beg end mode)))
       (search-forward "import")
       (backward-word)
       (let ((face (get-text-property (point) 'face)))
@@ -110,7 +110,7 @@
         (should (funcall (if (listp face) #'memq #'eq)
                          'font-lock-variable-name-face face))))))
 
-(ert-deftest language-overlay-test-interactive ()
+(ert-deftest mode-overlay-test-interactive ()
   "Test interactive use."
   (let ((text "
 \\usepackage{listings}
@@ -119,7 +119,7 @@ def my_function(x, y):
     return x + y
 \\end{lstlisting}
 "))
-    (language-overlay-tests-doit ".tex" (replace-regexp-in-string "^\n" "" text)
+    (mode-overlay-tests-doit ".tex" (replace-regexp-in-string "^\n" "" text)
       (should (eq major-mode 'plain-tex-mode))
       (search-forward "lstlisting")
       (backward-word)
@@ -133,7 +133,7 @@ def my_function(x, y):
       (should (equal (get-text-property (point) 'face) '(subscript)))
       (should (get-text-property (point) 'display))
       (let* ((base (current-buffer))
-             (ov (make-language-overlay
+             (ov (make-mode-overlay
                   (save-excursion
                     (goto-char (point-min))
                     (search-forward "def")
@@ -168,7 +168,7 @@ def my_function(x, y):
            (should-not (equal (get-text-property (point) 'face) '(subscript)))
            (should-not (get-text-property (point) 'display))))))))
 
-(ert-deftest language-overlay-test-tree-walk ()
+(ert-deftest mode-overlay-test-tree-walk ()
   (tree-sitter-tests-with-resources-dir "latex"
    (let ((tree-sitter-mode-alist `((latex-mode . "latex") . ,tree-sitter-mode-alist))
          (text "
@@ -201,7 +201,7 @@ def flatten(lst):
 
 \\end{document}
 "))
-     (language-overlay-tests-doit ".tex" (replace-regexp-in-string "^\n" "" text)
+     (mode-overlay-tests-doit ".tex" (replace-regexp-in-string "^\n" "" text)
        (should (eq major-mode 'latex-mode))
        (save-excursion
          (goto-char (point-min))
@@ -241,7 +241,7 @@ def flatten(lst):
                                                      (and (equal "word" (tree-sitter-node-type child))
                                                           (equal "lstlisting" (my/string-of child))))
                                                    (my/children-of next))))))))
-              (make-language-overlay
+              (make-mode-overlay
                (set-marker (make-marker) newline)
                (set-marker (make-marker) newline2)
                mode)))))
@@ -262,7 +262,7 @@ def flatten(lst):
        (should (eq (get-text-property (point) 'face)
                    'font-lock-function-name-face))))))
 
-(ert-deftest language-overlay-test-vue ()
+(ert-deftest mode-overlay-test-vue ()
   (tree-sitter-tests-with-resources-dir "html"
    (let ((tree-sitter-mode-alist `((html-mode . "html") . ,tree-sitter-mode-alist))
          (auto-mode-alist '(("\\.vue\\'" . html-mode)))
@@ -282,7 +282,7 @@ export default {
     }
 </script>
 "))
-     (language-overlay-tests-doit ".vue" (replace-regexp-in-string "^\n" "" text)
+     (mode-overlay-tests-doit ".vue" (replace-regexp-in-string "^\n" "" text)
        (should (eq major-mode 'html-mode))
        (save-excursion
          (search-forward "a comment")
@@ -303,7 +303,7 @@ export default {
 				       (setq raw-text
 				             (tree-sitter-node-prev-sibling
                                               raw-text)))))))
-	      (make-language-overlay
+	      (make-mode-overlay
 	       (tree-sitter-node-start raw-text)
 	       (tree-sitter-node-start node)
 	       'js-mode)))))
@@ -314,7 +314,7 @@ export default {
        (search-forward "<script>")
        (should-not (overlays-at (point)))
        (forward-line 1)
-       (should (language-overlay-p (car (overlays-at (point)))))
+       (should (mode-overlay-p (car (overlays-at (point)))))
        (search-forward "initial count")
        (backward-word)
        (should (eq (get-text-property (point) 'face)
@@ -355,5 +355,5 @@ export default {
     (when (tree-sitter-goto-next-sibling c)
       (my/dfs c doit))))
 
-(provide 'language-overlay-tests)
-;;; language-overlay-tests.el ends here
+(provide 'mode-overlay-tests)
+;;; mode-overlay-tests.el ends here

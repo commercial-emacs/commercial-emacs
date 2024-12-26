@@ -221,7 +221,7 @@ If you need to debug code run from jit-lock, see `jit-lock-debug-mode'."
   (cond
    ((and (buffer-base-buffer)
          jit-lock-mode
-         (not (language-overlay-indirect-p (current-buffer))))
+         (not (mode-overlay-indirect-p (current-buffer))))
     ;; We're in an indirect buffer, and we're turning the mode on.
     ;; This doesn't work because jit-lock relies on the `fontified'
     ;; text-property which is shared with the base buffer.

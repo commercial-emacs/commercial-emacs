@@ -3316,7 +3316,7 @@ handle_stop (struct it *it)
     compute_stop_pos (it);
 }
 
-/* For benefit of language overlays that need to hem display
+/* For benefit of mode overlays that need to hem display
    propertizing. */
 
 bool has_display_prop (Lisp_Object properties)

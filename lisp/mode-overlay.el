@@ -1,37 +1,37 @@
-;;; language-overlay.el --- One buffer, multiple major modes  -*- lexical-binding:t -*-
+;;; mode-overlay.el --- One buffer, multiple major modes  -*- lexical-binding:t -*-
 
-(defgroup language-overlay nil
+(defgroup mode-overlay nil
   "Multiple language modes in buffer."
   :version "31.1"
   :group 'convenience)
 
-(defface language-overlay '((t :inherit highlight :extend t))
-  "Default face for `language-overlay-face'."
+(defface mode-overlay '((t :inherit highlight :extend t))
+  "Default face for `mode-overlay-face'."
   :version "31.1"
-  :group 'language-overlay)
+  :group 'mode-overlay)
 
-(defcustom language-overlay-face-alist nil
-  "Demarcate language overlay."
+(defcustom mode-overlay-face-alist nil
+  "Demarcate mode overlay."
   :type '(alist :key-type (symbol :tag "Major mode")
                 :value-type (symbol :tag "Face"))
-  :group 'language-overlay)
+  :group 'mode-overlay)
 
-(defsubst language-overlay-p (overlay)
-  (overlay-get overlay 'language-overlay-p))
+(defsubst mode-overlay-p (overlay)
+  (overlay-get overlay 'mode-overlay-p))
 
 ;;;###autoload
-(defun delete-all-language-overlays ()
+(defun delete-all-mode-overlays ()
   (interactive)
   (dolist (ov (overlays-in (point-min) (point-max)))
-    (when (language-overlay-p ov)
-      (delete-language-overlay (overlay-start ov)))))
+    (when (mode-overlay-p ov)
+      (delete-mode-overlay (overlay-start ov)))))
 
 ;;;###autoload
-(defun delete-language-overlay (pos)
-  "Remove all language overlays at POS."
+(defun delete-mode-overlay (pos)
+  "Remove all mode overlays at POS."
   (interactive "d")
   (dolist (ov (overlays-at pos))
-    (when (language-overlay-p ov)
+    (when (mode-overlay-p ov)
       (let ((font-lock-extra-managed-props
              `(display fontified . ,font-lock-extra-managed-props))
             (beg (overlay-start ov))
@@ -46,7 +46,7 @@
             (restore-buffer-modified-p modified)))))))
 
 ;;;###autoload
-(defun make-language-overlay (beg end mode)
+(defun make-mode-overlay (beg end mode)
   "Return new overlay corresponding to indirect buffer of major MODE."
   (interactive
    (list (if (region-active-p) (region-beginning) (point))
@@ -69,18 +69,18 @@
       (unwind-protect
           (progn
             (font-lock-unfontify-region beg end)
-            (make-language--overlay beg end mode))
+            (make-mode--overlay beg end mode))
         (when (memq modified '(nil autosaved))
           (restore-buffer-modified-p modified))))))
 
-(defalias 'language-overlay-on-switch-to-buffer
+(defalias 'mode-overlay-on-switch-to-buffer
   (lambda (_window)
     (mapc (lambda (ov) (funcall (or (overlay-on-enter ov) #'ignore) ov))
           (overlays-at (point))))
   "A hook in `window-buffer-change-functions' to immediately switch
 to the appropriate indirect buffer.")
 
-(defalias 'language-overlay-filter-buffer-substring-function
+(defalias 'mode-overlay-filter-buffer-substring-function
   (lambda ()
     (add-function :filter-return
                   (local 'filter-buffer-substring-function)
@@ -90,6 +90,6 @@ to the appropriate indirect buffer.")
                         s))))
   "Don't paste a read-only bumpguard user then can't delete.")
 
-(provide 'language-overlay)
+(provide 'mode-overlay)
 
-;;; language-overlay.el ends here
+;;; mode-overlay.el ends here

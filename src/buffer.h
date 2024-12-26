@@ -1450,12 +1450,12 @@ extern bool valid_per_buffer_idx (int);
        offset <= PER_BUFFER_VAR_OFFSET (cursor_in_non_selected_windows); \
        offset += word_size)
 
-#define MULTI_LANG_BASE_P(BUFFER)				\
-  ((BUFFER)->proximity != NULL					\
+#define MODE_OVERLAY_BASE_P(BUFFER)		\
+  ((BUFFER)->proximity != NULL			\
    && (BUFFER)->base_buffer == NULL)
 
-#define MULTI_LANG_INDIRECT_P(BUFFER)				\
-  ((BUFFER)->proximity != NULL					\
+#define MODE_OVERLAY_INDIRECT_P(BUFFER)	\
+  ((BUFFER)->proximity != NULL			\
    && (BUFFER)->base_buffer != NULL)
 
 INLINE bool

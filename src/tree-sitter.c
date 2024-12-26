@@ -1771,10 +1771,10 @@ DEFUN ("tree-sitter",
   if (NILP (buffer))
     buffer = Fcurrent_buffer ();
 
-  /* Indirect buffers except language-overlay cannibalize their base
+  /* Indirect buffers except mode-overlay cannibalize their base
      buffer's tree sitter.  */
   if (XBUFFER (buffer)->base_buffer != NULL
-      && !MULTI_LANG_INDIRECT_P (XBUFFER (buffer)))
+      && !MODE_OVERLAY_INDIRECT_P (XBUFFER (buffer)))
     {
       Lisp_Object base;
       XSETBUFFER (base, XBUFFER (buffer)->base_buffer);
@@ -1831,7 +1831,7 @@ tree_sitter_record_change (ptrdiff_t start_char,
     ? current_buffer->base_buffer
     : current_buffer;
 
-  /* Language-overlay indirect buffers host their own tree-sitter.  */
+  /* mode-overlay indirect buffers host their own tree-sitter.  */
   if (current_buffer->proximity != NULL)
     {
       struct itree_node *node;

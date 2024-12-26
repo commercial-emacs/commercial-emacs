@@ -281,7 +281,7 @@ Used to bracket operations which move point in the sieve-buffer."
   (get-char-property (or pos (point)) 'script-name))
 
 (defun sieve-highlight (on)
-  "Turn ON or off highlighting on the current language overlay."
+  "Turn ON or off highlighting on the current mode overlay."
   (overlay-put (car (overlays-at (point))) 'face (if on 'highlight 'default)))
 
 (defun sieve-insert-scripts (scripts)

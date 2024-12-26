@@ -109,7 +109,7 @@ supplant all of the above."
   :lighter nil
   (when (or noninteractive
             (and (eq (aref (buffer-name) 0) ?\s)
-                 (not (language-overlay-indirect-p (current-buffer)))))
+                 (not (mode-overlay-indirect-p (current-buffer)))))
     ;; batch mode or buffer is hidden (name starts space).
     (setq font-lock-mode nil))
 
