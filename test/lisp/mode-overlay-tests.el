@@ -67,6 +67,16 @@
        (set-buffer-modified-p nil)
        (kill-buffer))))
 
+(ert-deftest mode-overlay-read-only ()
+  (with-temp-buffer
+    (save-excursion
+      (insert "foo\n"))
+    (setq buffer-read-only t)
+    (should-error (make-mode-overlay 1 3 'js-mode))
+    (should-not (cl-some (lambda (b)
+                           (cl-search "[js-mode]" (buffer-name b)))
+                         (buffer-list)))))
+
 (ert-deftest mode-overlay-test-org ()
   "Dominik's commit afe98df locks down a bespoke font lock scheme."
   (let ((text "

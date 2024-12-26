@@ -1078,12 +1078,36 @@ DEFUN ("mode-overlay--exit-buffer", Fmake_mode_overlay__exit_buffer,
   return buf;
 }
 
-DEFUN ("make-mode--overlay", Fmake_mode__overlay, Smake_mode__overlay,
-       3, 3, 0,
-       doc: /* Unexposed workhorse of `make-mode-overlay'.
-The indirect buffer created is distinguished by MODE_OVERLAY_INDIRECT_P.  */)
-  (Lisp_Object beg, Lisp_Object end, Lisp_Object mode)
+static Lisp_Object
+make_mode__overlay_error (Lisp_Object error_val)
 {
+  /* Unless I staticpro a "prospective overlay", I can't know which
+     overlay to delete, nor if I can dispense with proximity.  Can't
+     just call `delete-all-mode-overlays' because faulty overlay was
+     never added.
+  */
+  struct buffer *base = current_buffer->base_buffer
+    ? current_buffer->base_buffer
+    : current_buffer;
+  Lisp_Object tail, other;
+  FOR_EACH_LIVE_BUFFER (tail, other)
+    if (XBUFFER (other)->base_buffer == base
+	&& MODE_OVERLAY_INDIRECT_P (XBUFFER (other)))
+      {
+	XBUFFER (other)->proximity = NULL; /* otherwise Fkill_buffer infloops */
+	Fkill_buffer (other);
+      }
+  base->proximity = NULL;
+  xsignal1 (XCAR (error_val), XCDR (error_val));
+}
+
+static Lisp_Object
+make_mode__overlay (Lisp_Object args)
+{
+  Lisp_Object beg = XCAR (args);
+  Lisp_Object end = XCAR (XCDR (args));
+  Lisp_Object mode = XCAR (XCDR (XCDR (args)));
+
   CHECK_FIXNUM_COERCE_MARKER (beg);
   CHECK_FIXNUM_COERCE_MARKER (end);
   CHECK_TYPE (FUNCTIONP (mode), Qfunctionp, mode);
@@ -1234,6 +1258,17 @@ The indirect buffer created is distinguished by MODE_OVERLAY_INDIRECT_P.  */)
 			      (current_buffer->proximity->following))))
       call1 (on_exit, ov);
   return ov;
+}
+
+DEFUN ("make-mode--overlay", Fmake_mode__overlay, Smake_mode__overlay,
+       3, 3, 0,
+       doc: /* Unexposed workhorse of `make-mode-overlay'.
+The indirect buffer created is distinguished by MODE_OVERLAY_INDIRECT_P.  */)
+  (Lisp_Object beg, Lisp_Object end, Lisp_Object mode)
+{
+  return internal_condition_case_1 (&make_mode__overlay,
+				    list3 (beg, end, mode),
+				    Qt, &make_mode__overlay_error);
 }
 
 DEFUN ("mode-overlay-indirect-p", Fmode_overlay_indirect_p, Smode_overlay_indirect_p, 1, 1, 0,
