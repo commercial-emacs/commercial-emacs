@@ -1771,8 +1771,8 @@ DEFUN ("tree-sitter",
   if (NILP (buffer))
     buffer = Fcurrent_buffer ();
 
-  /* Indirect buffers except multi-lang cannibalize their base buffer's
-     tree sitter.  */
+  /* Indirect buffers except language-overlay cannibalize their base
+     buffer's tree sitter.  */
   if (XBUFFER (buffer)->base_buffer != NULL
       && !MULTI_LANG_INDIRECT_P (XBUFFER (buffer)))
     {
@@ -1831,7 +1831,7 @@ tree_sitter_record_change (ptrdiff_t start_char,
     ? current_buffer->base_buffer
     : current_buffer;
 
-  /* Multi-lang indirect buffers host their own tree-sitter.  */
+  /* Language-overlay indirect buffers host their own tree-sitter.  */
   if (current_buffer->proximity != NULL)
     {
       struct itree_node *node;

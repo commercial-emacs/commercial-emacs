@@ -107,7 +107,7 @@ CHECK_STRING_OR_BUFFER (Lisp_Object x)
    character.
 
    A true HEM modifies *BEGIN and *END to fit entirely within a
-   multi-lang buffer's `proximity' cache.
+   language-overlay buffer's `proximity' cache.
 */
 
 bool
