@@ -3668,18 +3668,13 @@ Indicate state by setting `pending-undo-list' to the undo list."
 	      (undo-make-selective-list (min beg end) (max beg end))
 	    buffer-undo-list))))
 
-;; The positions given in elements of the undo list are the positions
-;; as of the time that element was recorded to undo history.  In
-;; general, subsequent buffer edits render those positions invalid in
-;; the current buffer, unless adjusted according to the intervening
-;; undo elements.
+;; Recall positions of undo elements remain valid only if the undo list
+;; is unwound strictly and in-order.  Since undo-in-region skips
+;; elements outside the region, undo-make-selective-list records in
+;; undo-deltas the positional effect of undoing non-region elements
+;; without actually undoing them.
 ;;
-;; Undo in region is a use case that requires adjustments to undo
-;; elements.  It must adjust positions of elements in the region based
-;; on newer elements not in the region so as they may be correctly
-;; applied in the current buffer.  undo-make-selective-list
-;; accomplishes this with its undo-deltas list of adjustments.  An
-;; example undo history from oldest to newest:
+;; An example undo history from oldest to newest:
 ;;
 ;; buf pos:
 ;; 123456789 buffer-undo-list undo-deltas
@@ -3692,40 +3687,26 @@ Indicate state by setting `pending-undo-list' to the undo list."
 ;; ccaabaddd (6 . 8)          (6 . -2)
 ;;  |   |<-- region: "caab", from 2 to 6
 ;;
-;; When the user starts a run of undos in region,
-;; undo-make-selective-list is called to create the full list of in
-;; region elements.  Each element is adjusted forward chronologically
-;; through undo-deltas to determine if it is in the region.
+;; Treatment of (3 . 4) "b" insertion.
 ;;
-;; In the above example, the insertion of "b" is (3 . 4) in the
-;; buffer-undo-list.  The undo-delta (1 . -2) causes (3 . 4) to become
-;; (5 . 6).  The next three undo-deltas cause no adjustment, so (5
-;; . 6) is assessed as in the region and placed in the selective list.
-;; Notably, the end of region itself adjusts from "2 to 6" to "2 to 5"
-;; due to the selected element.  The "b" insertion is the only element
-;; fully in the region, so in this example undo-make-selective-list
-;; returns (nil (5 . 6)).
+;; If the subsequent "cc" insertion were not undone, the undo-delta (1
+;; . -2) adjusts (3 . 4) to (5 . 6).  The next three undo-deltas do not
+;; overlap with (5 . 6) so that goes into the final selective list.
 ;;
-;; The adjustment of the (7 . 10) insertion of "ddd" shows an edge
-;; case.  It is adjusted through the undo-deltas: ((6 . 2) (6 . -2)).
-;; Normally an undo-delta of (6 . 2) would cause positions after 6 to
-;; adjust by 2.  However, they shouldn't adjust to less than 6, so (7
-;; . 10) adjusts to (6 . 8) due to the first undo delta.
+;; Treatment of (7 . 10) "ddd" insertion.
 ;;
-;; More interesting is how to adjust the "ddd" insertion due to the
-;; next undo-delta: (6 . -2), corresponding to reinsertion of "ad".
-;; If the reinsertion was a manual retyping of "ad", then the total
-;; adjustment should be (7 . 10) -> (6 . 8) -> (8 . 10).  However, if
-;; the reinsertion was due to undo, one might expect the first "d"
-;; character would again be a part of the "ddd" text, meaning its
-;; total adjustment would be (7 . 10) -> (6 . 8) -> (7 . 10).
+;; If the subsequent "ad" deletion were not undone, i.e., the buffer is
+;; still "ccaabdd", the (6 . 2) delta adjusts (7 . 10) to (5 . 8).  But
+;; the floor of 6 hems the entry to (6 . 8).
 ;;
-;; undo-make-selective-list assumes in this situation that "ad" was a
-;; new edit, even if it was inserted because of an undo.
-;; Consequently, if the user undos in region "8 to 10" of the
-;; "ccaabaddd" buffer, they could be surprised that it becomes
-;; "ccaabad", as though the first "d" became detached from the
-;; original "ddd" insertion.  This quirk is a FIXME.
+;; The next delta (6 . -2) corresponds to reinserting "ad", the not
+;; undoing of which, adjusts (6 . 8) to (8 . 10).
+;;
+;; The final "ccaabaddd" could either have resulted from a manual
+;; retyping of "ad" or an undo of the previous step.  A subsequent
+;; undo-in-region 8-10 would yield "ccaabad", which is consistent with
+;; the former, but surprising in the latter since the user would have
+;; expected the full "ddd" insertion be removed.  This quirk is a FIXME.
 
 (defun undo-make-selective-list (start end)
   "Return a list of undo elements for the region START to END.
