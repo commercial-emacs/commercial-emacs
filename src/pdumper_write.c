@@ -2868,8 +2868,7 @@ read_ptr_and_lv (const void *mem,
     }
 }
 
-/* Enqueue for dumping objects referenced by static non-Lisp_Object
-   pointers inside Emacs.  */
+/* Enqueue static non-Lisp_Object pointers.  */
 static void
 drain_user_remembered_data_hot (struct dump_context *ctx)
 {
@@ -2913,9 +2912,8 @@ drain_user_remembered_data_cold (struct dump_context *ctx)
         }
       else
         {
-          /* *mem is a raw pointer to a Lisp object of some sort.
-             The object to which it points should have already been
-             dumped by drain_user_remembered_data_hot.  */
+          /* *mem is a Lisp_Object pointer, the target of which should
+	     have been dumped by drain_user_remembered_data_hot.  */
           void *value;
           Lisp_Object lv;
           enum Lisp_Type type = -sz;
@@ -3409,17 +3407,16 @@ DEFUN ("dump-emacs-portable",
   dump_finalizer_list_head_ptr (ctx, &doomed_finalizers.next);
   drain_user_remembered_data_hot (ctx);
 
-  /* We've already remembered all the objects to which GC roots point,
-     but we have to manually save the list of GC roots itself.  */
+  /* dump_roots only remembers objects to which roots point, not the
+     roots themselves.  */
   dump_metadata_for_pdumper (ctx);
   for (int i = 0; i < staticidx; ++i)
     reloc_to_emacs_ptr (ctx, &staticvec[i], staticvec[i]);
   reloc_immediate_int (ctx, &staticidx, staticidx);
 
-  /* Dump until while we keep finding objects to dump.  We add new
-     objects to the queue by side effect during dumping.
-     We accumulate some types of objects in special lists to get more
-     locality for these object types at runtime.  */
+  /* Dumping enqueues more objects to dump as side effect.  Accumulate
+     some object types in special lists for increased runtime
+     locality.  */
   do
     {
       drain_deferred_hash_tables (ctx);
@@ -3433,20 +3430,16 @@ DEFUN ("dump-emacs-portable",
   ctx->header.hash_list = ctx->offset;
   dump_hash_table_list (ctx);
 
-  /* dump_hash_table_list just adds a new vector to the dump but all
-     its content should already have been in the dump, so it doesn't
-     add anything to any queue.  */
+  /* dump_hash_table_list just adds a containing vector whose contents
+     should already be in the dump, so queue should remain empty.  */
   eassert (queue_empty_p (&ctx->queue)
 	   && NILP (ctx->deferred_hash_tables)
 	   && NILP (ctx->deferred_symbols));
 
   dump_sort_copied_objects (ctx);
 
-  /* While we copy built-in symbols into the Emacs image, these
-     built-in structures refer to non-Lisp heap objects that must live
-     in the dump; we stick these auxiliary data structures at the end
-     of the hot section and use a special hash table to remember them.
-     The actual symbol dump will pick them up below.  */
+  /* Put auxiliary data for built-in symbols at the end of the hot
+     section.  */
   ctx->symbol_aux = make_eq_hash_table ();
   ctx->symbol_cvar = make_eq_hash_table ();
 
