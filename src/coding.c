@@ -6829,7 +6829,7 @@ decode_eol (struct coding_system *coding)
 
 	  if (*p == '\r' && p[1] == '\n')
 	    {
-	      del_range_2 (pos, pos_byte, pos + 1, pos_byte + 1, 0);
+	      del_range_2 (pos, pos_byte, pos + 1, pos_byte + 1);
 	      n++;
 	      pos_end--;
 	    }
@@ -8099,7 +8099,7 @@ decode_coding_object (struct coding_system *coding,
 	  TEMP_SET_PT_BOTH (from, from_byte);
 	  current_buffer->text->inhibit_shrinking = true;
 	  prepare_modify_buffer (from, to, NULL, true);
-	  del_range_2 (from, from_byte, to, to_byte, false);
+	  del_range_2 (from, from_byte, to, to_byte);
 	  coding->src_pos = -chars;
 	  coding->src_pos_byte = -bytes;
 	}
@@ -8334,7 +8334,7 @@ encode_coding_object (struct coding_system *coding,
 	{
 	  set_buffer_internal (XBUFFER (src_object));
 	  saved_pt = PT, saved_pt_byte = PT_BYTE;
-	  del_range_both (from, from_byte, to, to_byte, 1);
+	  del_range_both (from, from_byte, to, to_byte, true);
 	  set_buffer_internal (XBUFFER (coding->src_object));
 	}
 
@@ -8368,8 +8368,7 @@ encode_coding_object (struct coding_system *coding,
 	     to run the after-change hooks yet.  */
 	  prepare_modify_buffer (from, to, &from, true);
 	  coding->src_object = del_range_2 (from, CHAR_TO_BYTE (from),
-					    to, CHAR_TO_BYTE (to),
-					    true);
+					    to, CHAR_TO_BYTE (to));
 	  coding->src_pos = 0;
 	  coding->src_pos_byte = 0;
 	}

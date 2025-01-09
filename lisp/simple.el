@@ -3588,26 +3588,18 @@ Some change-hooks test this variable to do something different.")
            (delete-region beg end))
           ;; Element (apply FUN . ARGS) means call FUN to undo.
           (`(apply . ,fun-args)
-           (let ((orig-buf (current-buffer)))
-             (if (not (integerp (car fun-args)))
-                 (apply fun-args)
-               ;; Long format: (apply DELTA START END FUN . ARGS).
-               (pcase-let* ((`(,delta ,start ,end ,fun . ,args) fun-args)
-                            (start-mark (copy-marker start nil))
-                            (end-mark (copy-marker end t)))
-                 (when (or (> (point-min) start) (< (point-max) end))
-                   (error "Changes to be undone are outside visible portion of buffer"))
-                 (apply fun args) ;; Use `save-current-buffer'?
-                 ;; Check that the function did what the entry
-                 ;; said it would do.
-                 (unless (and (= start start-mark)
-                              (= (+ delta end) end-mark))
-                   (error "Changes to be undone by function different from announced"))
-                 (set-marker start-mark nil)
-                 (set-marker end-mark nil)))
-             (unless (eq orig-buf (current-buffer))
-               (error "Undo function switched buffer"))
-             ))
+           (save-current-buffer
+             (if (integerp (car fun-args))
+                 ;; Long format: (apply DELTA START END FUN . ARGS).
+                 (pcase-let* ((`(,delta ,start ,end ,fun . ,args) fun-args)
+                              (start-mark (copy-marker start nil))
+                              (end-mark (copy-marker end t)))
+                   (apply fun args)
+                   (when (/= start-mark start)
+                     (error "Post-undo start %s not %s" start-mark start))
+                   (when (/= end-mark (+ delta end))
+                     (error "Post-undo end %s not %s+%s" end-mark delta end)))
+               (apply fun-args))))
           ;; Element (STRING . POS) means STRING was deleted.
           (`(,(and string (pred stringp)) . ,(and pos (pred integerp)))
            (let ((valid-marker-adjustments nil)

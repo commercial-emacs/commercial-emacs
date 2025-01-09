@@ -185,8 +185,7 @@ unwind_decompress (void *ddata)
   if (data->start)
     {
       del_range_2 (data->start, data->start, /* byte, char offsets the same */
-                   data->start + data->nbytes, data->start + data->nbytes,
-                   0);
+                   data->start + data->nbytes, data->start + data->nbytes);
       update_compositions (data->start, data->start, CHECK_HEAD);
       /* "Balance" the before-change-functions call, which would
          otherwise be left "hanging".  */
@@ -326,8 +325,7 @@ This function can be called only in unibyte buffers.  */)
   unwind_data.start = 0;
 
   /* Delete the compressed data.  */
-  del_range_2 (istart, istart, /* byte and char offsets are the same */
-               iend, iend, 0);
+  del_range_2 (istart, istart, iend, iend);
 
   signal_after_change (istart, iend - istart, unwind_data.nbytes);
   update_compositions (istart, istart, CHECK_HEAD);

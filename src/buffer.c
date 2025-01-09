@@ -2954,7 +2954,7 @@ current buffer is cleared.  */)
 		 last one, and change the last one to the character
 		 code.  */
 	      bytes--;
-	      del_range_2 (pos, pos, pos + bytes, pos + bytes, 0);
+	      del_range_2 (pos, pos, pos + bytes, pos + bytes);
 	      p = GAP_END_ADDR;
 	      *p++ = c;
 	      pos++;

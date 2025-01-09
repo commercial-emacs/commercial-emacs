@@ -4306,7 +4306,7 @@ are ignored instead of signaling an error.  */)
 
   /* Delete the original text.  */
   del_range_both (PT, PT_BYTE, XFIXNAT (end) + inserted_chars,
-		  iend + decoded_length, 1);
+		  iend + decoded_length, true);
 
   /* If point was outside of the region, restore it exactly; else just
      move to the beginning of the region.  */

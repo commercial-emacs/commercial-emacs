@@ -1240,7 +1240,7 @@ adjust_after_replace (ptrdiff_t from, ptrdiff_t from_byte,
 			       from + len, from_byte + len_byte, false);
 
   if (nchars_del > 0)
-    undo_push_delete (from, prev_text, false);
+    undo_push_delete (from, prev_text);
   undo_push_insert (from, len);
 
   offset_intervals (current_buffer, from, len - nchars_del);
@@ -1405,7 +1405,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   if (!NILP (deletion))
     {
       undo_push_insert (from + SCHARS (deletion), inschars);
-      undo_push_delete (from, deletion, false);
+      undo_push_delete (from, deletion);
     }
 
   GAP_SIZE -= outgoing_insbytes;
@@ -1595,7 +1595,7 @@ replace_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
 void
 del_range (ptrdiff_t from, ptrdiff_t to)
 {
-  del_range_1 (from, to, 1, 0);
+  del_range_1 (from, to, true);
 }
 
 struct safe_del_range_context
@@ -1636,11 +1636,10 @@ safe_del_range (ptrdiff_t from, ptrdiff_t to)
 				    safe_del_range_2));
 }
 
-/* Like del_range; PREPARE says whether to call prepare_modify_buffer.
-   RET_STRING says to return the deleted text. */
+/* Like del_range.  If PREPARE call prepare_modify_buffer.  */
 
 Lisp_Object
-del_range_1 (ptrdiff_t from, ptrdiff_t to, bool prepare, bool ret_string)
+del_range_1 (ptrdiff_t from, ptrdiff_t to, bool prepare)
 {
   ptrdiff_t from_byte, to_byte;
   Lisp_Object deletion;
@@ -1664,7 +1663,7 @@ del_range_1 (ptrdiff_t from, ptrdiff_t to, bool prepare, bool ret_string)
   from_byte = CHAR_TO_BYTE (from);
   to_byte = CHAR_TO_BYTE (to);
 
-  deletion = del_range_2 (from, from_byte, to, to_byte, ret_string);
+  deletion = del_range_2 (from, from_byte, to, to_byte);
   signal_after_change (from, to - from, 0);
   update_compositions (from, from, CHECK_HEAD);
   return deletion;
@@ -1706,7 +1705,7 @@ del_range_byte (ptrdiff_t from_byte, ptrdiff_t to_byte)
       to_byte = CHAR_TO_BYTE (to);
   }
 
-  del_range_2 (from, from_byte, to, to_byte, 0);
+  del_range_2 (from, from_byte, to, to_byte);
   signal_after_change (from, to - from, 0);
   update_compositions (from, from, CHECK_HEAD);
 }
@@ -1750,22 +1749,19 @@ del_range_both (ptrdiff_t from, ptrdiff_t from_byte,
 	to_byte = CHAR_TO_BYTE (to);
     }
 
-  del_range_2 (from, from_byte, to, to_byte, 0);
+  del_range_2 (from, from_byte, to, to_byte);
   signal_after_change (from, to - from, 0);
   update_compositions (from, from, CHECK_HEAD);
 }
 
-/* Delete a range of text, specified both as character positions
-   and byte positions.  FROM and TO are character positions,
-   while FROM_BYTE and TO_BYTE are byte positions.
-   If RET_STRING, the deleted area is returned as a string.  */
+/* Delete a range of text, specified both as character positions and
+   byte positions.  */
 
 Lisp_Object
 del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
-	     ptrdiff_t to, ptrdiff_t to_byte, bool ret_string)
+	     ptrdiff_t to, ptrdiff_t to_byte)
 {
   ptrdiff_t nbytes_del, nchars_del;
-  Lisp_Object deletion;
 #ifdef HAVE_TREE_SITTER
   uint32_t old_end_byte = BUFFER_TO_SITTER (to);
 #endif
@@ -1787,11 +1783,10 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
     emacs_abort ();
 #endif
 
-  deletion = (ret_string || !EQ (BVAR (current_buffer, undo_list), Qt))
-    ? make_buffer_string_both (from, from_byte, to, to_byte, 1)
-    : Qnil;
+  Lisp_Object deletion = make_buffer_string_both (from, from_byte, to, to_byte, 1);
 
-  undo_push_delete (from, deletion, true /* and markers */);
+  undo_push_markers (from, from + SCHARS (deletion));
+  undo_push_delete (from, deletion);
 
   /* Relocate all markers pointing into the new, larger gap to point
      at the end of the text before the gap.  */

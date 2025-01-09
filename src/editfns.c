@@ -2672,7 +2672,7 @@ DEFUN ("delete-and-extract-region", Fdelete_and_extract_region,
   validate_region (&start, &end);
   if (XFIXNUM (start) == XFIXNUM (end))
     return empty_unibyte_string;
-  return del_range_1 (XFIXNUM (start), XFIXNUM (end), 1, 1);
+  return del_range_1 (XFIXNUM (start), XFIXNUM (end), true);
 }
 
 DEFUN ("widen", Fwiden, Swiden, 0, 0, "",

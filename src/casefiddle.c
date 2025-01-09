@@ -539,7 +539,7 @@ casify_region (enum case_action flag, Lisp_Object b, Lisp_Object e)
     return end;
   modify_text (start, end);
   prepare_casing_context (&ctx, flag, true);
-  undo_push_delete (start, make_buffer_string (start, end, true), false);
+  undo_push_delete (start, make_buffer_string (start, end, true));
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     {
       undo_push_insert (start, end - start);

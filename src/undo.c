@@ -73,31 +73,35 @@ undo_push_insert (ptrdiff_t beg, ptrdiff_t length)
    after reinstating deleted text.  For insertions and deletions
    exclusive of the marker, ordinary marker updates suffice.  */
 
-static void
-undo_push_markers (ptrdiff_t from, ptrdiff_t to)
+void
+undo_push_markers (const ptrdiff_t from, const ptrdiff_t to)
 {
-  for (struct Lisp_Marker *m = BUF_MARKERS (current_buffer); m; m = m->next)
+  if (!EQ (BVAR (current_buffer, undo_list), Qt))
     {
-      ptrdiff_t charpos = m->charpos;
-      eassert (charpos <= Z);
+      undo_push_maiden ();
+      for (struct Lisp_Marker *m = BUF_MARKERS (current_buffer); m; m = m->next)
+	{
+	  ptrdiff_t charpos = m->charpos;
+	  eassert (charpos <= Z);
 
-      if (from <= charpos && charpos <= to)
-        {
-          /* insertion_type t/f follows/precedes re-inserted text.  */
-	  ptrdiff_t offset = (m->insertion_type ? to : from) - charpos;
-          if (offset)
-            {
-	      Lisp_Object marker = make_lisp_ptr (m, Lisp_Vectorlike);
-              bset_undo_list (current_buffer,
-			      Fcons (Fcons (marker, make_fixnum (offset)),
-				     BVAR (current_buffer, undo_list)));
-            }
-        }
+	  if (from <= charpos && charpos <= to)
+	    {
+	      /* insertion_type t/f follows/precedes re-inserted text.  */
+	      ptrdiff_t offset = (m->insertion_type ? to : from) - charpos;
+	      if (offset)
+		{
+		  Lisp_Object marker = make_lisp_ptr (m, Lisp_Vectorlike);
+		  bset_undo_list (current_buffer,
+				  Fcons (Fcons (marker, make_fixnum (offset)),
+					 BVAR (current_buffer, undo_list)));
+		}
+	    }
+	}
     }
 }
 
 void
-undo_push_delete (ptrdiff_t beg, Lisp_Object string, bool record_markers)
+undo_push_delete (ptrdiff_t beg, Lisp_Object string)
 {
   if (!EQ (BVAR (current_buffer, undo_list), Qt))
     {
@@ -109,9 +113,6 @@ undo_push_delete (ptrdiff_t beg, Lisp_Object string, bool record_markers)
       else
 	XSETFASTINT (sbeg, beg);
 
-      if (record_markers)
-	undo_push_markers (beg, beg + SCHARS (string));
-
       bset_undo_list (current_buffer,
 		      Fcons (Fcons (string, sbeg), BVAR (current_buffer, undo_list)));
     }
@@ -122,7 +123,7 @@ undo_push_delete (ptrdiff_t beg, Lisp_Object string, bool record_markers)
 void
 undo_push_insdel (ptrdiff_t beg, ptrdiff_t length)
 {
-  undo_push_delete (beg, make_buffer_string (beg, beg + length, true), false);
+  undo_push_delete (beg, make_buffer_string (beg, beg + length, true));
   undo_push_insert (beg, length);
 }
 

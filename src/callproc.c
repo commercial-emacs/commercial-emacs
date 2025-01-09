@@ -834,8 +834,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 				 (process_coding.dst_pos
 				  + process_coding.produced_char),
 				 (process_coding.dst_pos_byte
-				  + process_coding.produced),
-				 0);
+				  + process_coding.produced));
 		  display_on_the_fly = false;
 		  process_coding = saved_coding;
 		  carryover = nread;
