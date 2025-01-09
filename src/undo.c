@@ -47,28 +47,25 @@ undo_push_insert (ptrdiff_t beg, ptrdiff_t length)
 {
   if (!EQ (BVAR (current_buffer, undo_list), Qt))
     {
-      Lisp_Object lbeg, lend;
       undo_push_maiden ();
-
-      /* If this is following another insertion and consecutive with it
-	 in the buffer, combine the two.  */
-      if (CONSP (BVAR (current_buffer, undo_list)))
+      Lisp_Object elt = CAR_SAFE (BVAR (current_buffer, undo_list));
+      if (CONSP (elt)
+	  && FIXNUMP (XCAR (elt))
+	  && FIXNUMP (XCDR (elt))
+	  && XFIXNUM (XCDR (elt)) == beg)
 	{
-	  Lisp_Object elt = XCAR (BVAR (current_buffer, undo_list));
-	  if (CONSP (elt)
-	      && FIXNUMP (XCAR (elt))
-	      && FIXNUMP (XCDR (elt))
-	      && XFIXNUM (XCDR (elt)) == beg)
-	    {
-	      XSETCDR (elt, make_fixnum (beg + length));
-	      return;
-	    }
+	  /* Combinable with last insertion.  */
+	  XSETCDR (elt, make_fixnum (beg + length));
 	}
-
-      XSETFASTINT (lbeg, beg);
-      XSETINT (lend, beg + length);
-      bset_undo_list (current_buffer,
-		      Fcons (Fcons (lbeg, lend), BVAR (current_buffer, undo_list)));
+      else
+	{
+	  Lisp_Object lbeg, lend;
+	  XSETFASTINT (lbeg, beg);
+	  XSETINT (lend, beg + length);
+	  bset_undo_list (current_buffer,
+			  Fcons (Fcons (lbeg, lend),
+				 BVAR (current_buffer, undo_list)));
+	}
     }
 }
 

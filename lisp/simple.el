@@ -3551,8 +3551,7 @@ Some change-hooks test this variable to do something different.")
 (defun primitive-undo (n list)
   "Undo the first N records from LIST, return remaining list."
   (let ((inhibit-read-only t)
-        (orig-list buffer-undo-list)
-        did-apply next)
+        next)
     (dotimes (_i (+ n (if (null (car list)) 1 0))) ;1+ for initial boundary
       (while (setq next (pop list))   ;inner loop per undo boundary
         (pcase next
@@ -3608,7 +3607,7 @@ Some change-hooks test this variable to do something different.")
                  (set-marker end-mark nil)))
              (unless (eq orig-buf (current-buffer))
                (error "Undo function switched buffer"))
-             (setq did-apply t)))
+             ))
           ;; Element (STRING . POS) means STRING was deleted.
           (`(,(and string (pred stringp)) . ,(and pos (pred integerp)))
            (let ((valid-marker-adjustments nil)
@@ -3651,11 +3650,7 @@ Some change-hooks test this variable to do something different.")
              (set-marker marker
                          (- marker offset)
                          (marker-buffer marker))))
-          (_ (error "Unrecognized entry in undo list %S" next)))))
-    (when (and did-apply (eq orig-list buffer-undo-list))
-      ;; add dummy entry to satisfy check in `undo' (the fuq?)
-      (setq buffer-undo-list
-            (cons (list 'apply 'cdr nil) buffer-undo-list))))
+          (_ (error "Unrecognized entry in undo list %S" next))))))
   list)
 
 (defun undo-start (&optional beg end)

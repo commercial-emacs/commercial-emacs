@@ -146,7 +146,7 @@ validate_interval_range (Lisp_Object object, Lisp_Object *begin,
 	    : *end;
 	  *begin = Fmax (2, (Lisp_Object []) { *begin, preceding });
 	  *end = Fmin (2, (Lisp_Object []) { *end, following });
-	  if (XFIXNUM (*begin) > XFIXNUM (*end))
+	  if (XFIXNUM (*begin) >= XFIXNUM (*end))
 	    return false;
 	}
     }

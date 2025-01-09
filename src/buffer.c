@@ -949,7 +949,8 @@ mode_overlay_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_
 				buf->proximity->preceding,
 				buf->proximity->following));
   buf->proximity->current = Qnil;
-  buf->proximity->preceding = build_marker (current_buffer, end - 1, CHAR_TO_BYTE (end - 1));
+  const ptrdiff_t pre = (end == BUF_BEG (buf) ? end : end - 1);
+  buf->proximity->preceding = build_marker (current_buffer, pre, CHAR_TO_BYTE (pre));
   buf->proximity->following = build_marker (current_buffer, end, CHAR_TO_BYTE (end));
 
   if (end <= beg
@@ -963,9 +964,9 @@ mode_overlay_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_
     }
 
   /* Make the demarcating newline read-only.  */
-  Fput_text_property (make_fixnum (end - 1), make_fixnum (end),
+  Fput_text_property (make_fixnum (pre), make_fixnum (end),
 		      Qrear_nonsticky, list1 (Qread_only), Qnil);
-  Fput_text_property (make_fixnum (end - 1), make_fixnum (end),
+  Fput_text_property (make_fixnum (pre), make_fixnum (end),
 		      Qread_only, Qt, Qnil);
   unbind_to (count, Qnil);
   return end;
@@ -1214,8 +1215,8 @@ make_mode__overlay (Lisp_Object args)
 
   const ptrdiff_t obeg1
     = mode_overlay_insert_bumpguard (base,
-				   obeg == BUF_BEG (base) ? obeg : obeg - 1,
-				   obeg);
+				     obeg == BUF_BEG (base) ? obeg : obeg - 1,
+				     obeg);
   oend += (obeg1 - obeg);
   obeg = obeg1;
   oend = mode_overlay_insert_bumpguard (base, obeg, oend);
@@ -3932,9 +3933,9 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
 	{
 	  mode_overlay_delete_bumpguard (obuffer, OVERLAY_END (overlay) - 1);
 	  mode_overlay_delete_bumpguard (obuffer,
-				       OVERLAY_START (overlay) == BUF_BEG (obuffer)
-				       ? OVERLAY_START (overlay)
-				       : OVERLAY_START (overlay) - 1);
+					 OVERLAY_START (overlay) == BUF_BEG (obuffer)
+					 ? OVERLAY_START (overlay)
+					 : OVERLAY_START (overlay) - 1);
 
 	  if (!NILP (OVERLAY_ON_EXIT (overlay)))
 	    call1 (OVERLAY_ON_EXIT (overlay), overlay);
