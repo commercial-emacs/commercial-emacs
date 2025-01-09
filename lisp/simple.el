@@ -3550,10 +3550,12 @@ Some change-hooks test this variable to do something different.")
 
 (defun primitive-undo (n list)
   "Undo the first N records from LIST, return remaining list."
-  (let ((inhibit-read-only t)
+  (let ((outside-narrowing
+         "Changes to be undone are outside visible portion of buffer")
+        (inhibit-read-only t)
         next)
     (dotimes (_i (+ n (if (null (car list)) 1 0))) ;1+ for initial boundary
-      (while (setq next (pop list))   ;inner loop per undo boundary
+      (while (setq next (pop list))     ;inner loop per undo boundary
         (pcase next
           ;; Element INTEGER sets point.
           ((pred integerp) (goto-char next))
@@ -3574,14 +3576,14 @@ Some change-hooks test this variable to do something different.")
           ;; Element (nil PROP VAL BEG . END) is property change.
           (`(nil . ,(or `(,prop ,val ,beg . ,end) pcase--dontcare))
            (when (or (> (point-min) beg) (< (point-max) end))
-             (error "Changes to be undone are outside visible portion of buffer"))
+             (error outside-narrowing))
            (put-text-property beg end prop val))
           ;; Element (BEG . END) means range was inserted.
           (`(,(and beg (pred integerp)) . ,(and end (pred integerp)))
            ;; (and `(,beg . ,end) `(,(pred integerp) . ,(pred integerp)))
            ;; Ideally: `(,(pred integerp beg) . ,(pred integerp end))
            (when (or (> (point-min) beg) (< (point-max) end))
-             (error "Changes to be undone are outside visible portion of buffer"))
+             (error outside-narrowing))
            ;; Set point first thing, so that undoing this undo
            ;; does not send point back to where it is now.
            (goto-char beg)
@@ -3594,6 +3596,8 @@ Some change-hooks test this variable to do something different.")
                  (pcase-let* ((`(,delta ,start ,end ,fun . ,args) fun-args)
                               (start-mark (copy-marker start nil))
                               (end-mark (copy-marker end t)))
+                   (when (or (> (point-min) start) (< (point-max) end))
+                     (error outside-narrowing))
                    (apply fun args)
                    (when (/= start-mark start)
                      (error "Post-undo start %s not %s" start-mark start))
@@ -3602,42 +3606,26 @@ Some change-hooks test this variable to do something different.")
                (apply fun-args))))
           ;; Element (STRING . POS) means STRING was deleted.
           (`(,(and string (pred stringp)) . ,(and pos (pred integerp)))
-           (let ((valid-marker-adjustments nil)
-                 (apos (abs pos)))
-             (when (or (< apos (point-min)) (> apos (point-max)))
-               (error "Changes to be undone are outside visible portion of buffer"))
-             ;; Check that marker adjustments which were recorded
-             ;; with the (STRING . POS) record are still valid, ie
-             ;; the markers haven't moved.  We check their validity
-             ;; before reinserting the string so as we don't need to
-             ;; mind marker insertion-type.
-             (while (and (markerp (car-safe (car list)))
-                         (integerp (cdr-safe (car list))))
-               (let* ((marker-adj (pop list))
-                      (m (car marker-adj)))
-                 (and (eq (marker-buffer m) (current-buffer))
-                      (= apos m)
-                      (push marker-adj valid-marker-adjustments))))
-             ;; Insert string and adjust point
-             (if (< pos 0)
-                 (progn
-                   (goto-char (- pos))
-                   (insert string))
-               (goto-char pos)
-               (insert string)
-               (goto-char pos))
-             ;; Adjust the valid marker adjustments
-             (dolist (adj valid-marker-adjustments)
-               ;; Insert might have invalidated some of the markers
-               ;; via modification hooks.  Update only the currently
-               ;; valid ones (bug#25599).
-               (when (marker-buffer (car adj))
-                 (set-marker (car adj)
-                             (- (car adj) (cdr adj)))))))
-          ;; (MARKER . OFFSET) means a marker MARKER was adjusted by OFFSET.
+           (when (or (< (abs pos) (point-min)) (> (abs pos) (point-max)))
+             (error outside-narrowing))
+           (goto-char (abs pos))
+           (insert string)
+           (when (> pos 0)
+             ;; A negative POS leaves point at insertion's end.
+             (goto-char pos))
+           (while (and (markerp (car-safe (car list)))
+                       (integerp (cdr-safe (car list))))
+             (let* ((marker-offset (pop list))
+                    (marker (car marker-offset))
+                    (offset (cdr marker-offset)))
+               (when (and (eq (marker-buffer marker) (current-buffer))
+                          (= (abs pos) marker))
+                 ;; Marker still relevant
+                 (set-marker marker (- marker offset))))))
+          ;; (MARKER . OFFSET) accompany a (STRING . POS) deletion, and
+          ;; should not occur in its own undo boundary.
           (`(,(and marker (pred markerp)) . ,(and offset (pred integerp)))
-           (warn "Encountered %S entry in undo list with no matching (TEXT . POS) entry"
-                 next)
+           (warn "Encountered lone %S entry in undo list" next)
            (when (marker-buffer marker)
              (set-marker marker
                          (- marker offset)

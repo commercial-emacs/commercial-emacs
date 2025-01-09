@@ -80,23 +80,16 @@ undo_push_markers (const ptrdiff_t from, const ptrdiff_t to)
     {
       undo_push_maiden ();
       for (struct Lisp_Marker *m = BUF_MARKERS (current_buffer); m; m = m->next)
-	{
-	  ptrdiff_t charpos = m->charpos;
-	  eassert (charpos <= Z);
-
-	  if (from <= charpos && charpos <= to)
-	    {
-	      /* insertion_type t/f follows/precedes re-inserted text.  */
-	      ptrdiff_t offset = (m->insertion_type ? to : from) - charpos;
-	      if (offset)
-		{
-		  Lisp_Object marker = make_lisp_ptr (m, Lisp_Vectorlike);
-		  bset_undo_list (current_buffer,
-				  Fcons (Fcons (marker, make_fixnum (offset)),
-					 BVAR (current_buffer, undo_list)));
-		}
-	    }
-	}
+	if (from <= m->charpos && m->charpos <= to)
+	  {
+	    /* insertion_type t/f follows/precedes re-inserted text.  */
+	    ptrdiff_t offset = (m->insertion_type ? to : from) - m->charpos;
+	    if (offset)
+	      bset_undo_list (current_buffer,
+			      Fcons (Fcons (make_lisp_ptr (m, Lisp_Vectorlike),
+					    make_fixnum (offset)),
+				     BVAR (current_buffer, undo_list)));
+	  }
     }
 }
 
