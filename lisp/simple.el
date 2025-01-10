@@ -3608,20 +3608,27 @@ Some change-hooks test this variable to do something different.")
           (`(,(and string (pred stringp)) . ,(and pos (pred integerp)))
            (when (or (< (abs pos) (point-min)) (> (abs pos) (point-max)))
              (error outside-narrowing))
-           (goto-char (abs pos))
-           (insert string)
-           (when (> pos 0)
-             ;; A negative POS leaves point at insertion's end.
-             (goto-char pos))
-           (while (and (markerp (car-safe (car list)))
-                       (integerp (cdr-safe (car list))))
-             (let* ((marker-offset (pop list))
-                    (marker (car marker-offset))
-                    (offset (cdr marker-offset)))
-               (when (and (eq (marker-buffer marker) (current-buffer))
-                          (= (abs pos) marker))
-                 ;; Marker still relevant
-                 (set-marker marker (- marker offset))))))
+           (let (marker-offsets)
+             ;; record markers before the marker-moving insert
+             (while (and (markerp (car-safe (car list)))
+                         (integerp (cdr-safe (car list))))
+               (let* ((marker-offset (pop list))
+                      (marker (car marker-offset)))
+                 (when (and (eq (marker-buffer marker) (current-buffer))
+                            (= (abs pos) marker))
+                   ;; MARKER still relevant
+                   (push marker-offset marker-offsets))))
+             (goto-char (abs pos))
+             (insert string)
+             (when (> pos 0)
+               ;; A negative POS leaves point at insertion's end.
+               (goto-char pos))
+             (dolist (marker-offset marker-offsets)
+               ;; `insert' could invalidate
+               (when-let ((marker (car marker-offset))
+                          (offset (cdr marker-offset))
+                          (b (marker-buffer marker)))
+                 (set-marker marker (- marker offset) b)))))
           ;; (MARKER . OFFSET) accompany a (STRING . POS) deletion, and
           ;; should not occur in its own undo boundary.
           (`(,(and marker (pred markerp)) . ,(and offset (pred integerp)))
