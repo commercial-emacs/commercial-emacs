@@ -99,7 +99,7 @@ undo_push_delete (ptrdiff_t beg, Lisp_Object string)
   if (!EQ (BVAR (current_buffer, undo_list), Qt))
     {
       Lisp_Object car_car
-	= CAR_SAFE (XCAR (BVAR (current_buffer, undo_list)));
+	= CAR_SAFE (CAR (BVAR (current_buffer, undo_list)));
       if (!EQ (Qt, car_car) && !MARKERP (car_car))
 	/* not coming off undo_push_markers */
 	undo_push_maiden ();
