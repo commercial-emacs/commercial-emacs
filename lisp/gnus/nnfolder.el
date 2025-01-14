@@ -739,7 +739,9 @@ deleted.  Point is left where the deleted region was."
 	      (when (setq nnfolder-current-buffer (nnfolder-read-folder group))
 		(set-buffer nnfolder-current-buffer)
 		(push (list group nnfolder-current-buffer)
-		      nnfolder-buffer-alist)))))))))
+		      nnfolder-buffer-alist)
+		(let (kill-buffer-query-functions)
+		  (kill-buffer nnfolder-current-buffer))))))))))
 
 (defun nnfolder-save-mail (group-art-list)
   "Called narrowed to an article."
