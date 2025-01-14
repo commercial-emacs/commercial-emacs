@@ -1643,7 +1643,9 @@ this is a reply."
 		      (gnus-group-get-new-news-this-group nil t)))))
 	      (setq options message-options)
 	      (with-current-buffer cur (setq message-options options))
-	      (kill-buffer (current-buffer)))))))))
+	      (kill-buffer (current-buffer)))
+            (when nnfolder-current-buffer
+              (kill-buffer nnfolder-current-buffer))))))))
 
 (defun gnus-inews-insert-gcc (&optional group)
   "Insert the Gcc to say where the article is to be archived."
