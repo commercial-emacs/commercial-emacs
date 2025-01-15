@@ -2205,6 +2205,9 @@ copy_intervals (INTERVAL tree, ptrdiff_t start, ptrdiff_t length)
   while (got < length)
     {
       i = next_interval (i);
+      /* `clear-string' retains length, admitting null intervals.  */
+      if (!i)
+	break;
       t = split_interval_right (t, prevlen);
       copy_properties (i, t);
       prevlen = LENGTH (i);

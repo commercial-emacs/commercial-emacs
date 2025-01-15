@@ -3238,18 +3238,26 @@ ARRAY is a vector, string, char-table, or bool-vector.  */)
 
 DEFUN ("clear-string", Fclear_string, Sclear_string,
        1, 1, 0,
-       doc: /* Clear the contents of STRING.
-This makes STRING unibyte and may change its length.  */)
+       doc: /* Clear the contents of STRING.  */)
   (Lisp_Object string)
 {
   CHECK_STRING (string);
-  ptrdiff_t len = SBYTES (string);
-  if (len != 0 || STRING_MULTIBYTE (string))
+  CHECK_IMPURE (string, XSTRING (string));
+
+  if (STRING_MULTIBYTE (string))
     {
-      CHECK_IMPURE (string, XSTRING (string));
-      memset (SDATA (string), 0, len);
-      STRING_SET_CHARS (string, len);
+      STRING_SET_CHARS (string, SBYTES (string));
       STRING_SET_UNIBYTE (string);
+    }
+  else
+    eassert (SCHARS (string) == SBYTES (string));
+
+  if (SBYTES (string))
+    {
+      /* f3b24e9 forbids changing original length.  */
+      Fset_text_properties (make_fixnum (0), make_fixnum (SBYTES (string)),
+			    Qnil, string);
+      memset (SDATA (string), 0, SBYTES (string));
     }
   return Qnil;
 }
