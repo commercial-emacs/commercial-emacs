@@ -28,6 +28,7 @@
 (require 'message)
 (require 'gnus-art)
 (require 'cl-extra)
+(require 'nnfolder)
 
 (defcustom gnus-post-method 'current
   "Preferred method for posting Usenet news.
@@ -1563,89 +1564,92 @@ this is a reply."
 	    (unless (gnus-check-server method)
 	      (error "Can't open server %s" (if (stringp method) method
 					      (car method))))
-	    (unless (gnus-request-group group t method)
-	      (gnus-request-create-group group method))
-	    (setq mml-externalize-attachments
-		  (if (stringp gnus-gcc-externalize-attachments)
-		      (string-match gnus-gcc-externalize-attachments group)
-		    gnus-gcc-externalize-attachments))
-            ;; If we want to externalize stuff when GCC-ing, then we
-            ;; can't use the cache, because that has all the contents.
-            (when mml-externalize-attachments
-              (setq encoded-cache nil))
-	    (save-excursion
-	      (nnheader-set-temp-buffer " *acc*")
-	      (setq message-options (with-current-buffer cur message-options))
-	      (insert-buffer-substring cur)
-              (restore-buffer-modified-p nil)
-	      (run-hooks 'gnus-gcc-pre-body-encode-hook)
-	      ;; Avoid re-doing things like GPG-encoding secret parts.
-	      (if (or (buffer-modified-p) (not encoded-cache))
-		  (message-encode-message-body)
-		(erase-buffer)
-		(insert encoded-cache))
-	      (message-remove-header "gcc")
-	      (run-hooks 'gnus-gcc-post-body-encode-hook)
-	      (save-restriction
-		(message-narrow-to-headers)
-		(let* ((newsgroups-field (save-restriction
+            (let ((orig-nnfolder-current-buffer nnfolder-current-buffer))
+	      (unless (gnus-request-group group t method)
+	        (gnus-request-create-group group method))
+	      (setq mml-externalize-attachments
+		    (if (stringp gnus-gcc-externalize-attachments)
+		        (string-match gnus-gcc-externalize-attachments group)
+		      gnus-gcc-externalize-attachments))
+              ;; If we want to externalize stuff when GCC-ing, then we
+              ;; can't use the cache, because that has all the contents.
+              (when mml-externalize-attachments
+                (setq encoded-cache nil))
+	      (save-excursion
+	        (nnheader-set-temp-buffer " *acc*")
+	        (setq message-options (with-current-buffer cur message-options))
+	        (insert-buffer-substring cur)
+                (restore-buffer-modified-p nil)
+	        (run-hooks 'gnus-gcc-pre-body-encode-hook)
+	        ;; Avoid re-doing things like GPG-encoding secret parts.
+	        (if (or (buffer-modified-p) (not encoded-cache))
+		    (message-encode-message-body)
+		  (erase-buffer)
+		  (insert encoded-cache))
+	        (message-remove-header "gcc")
+	        (run-hooks 'gnus-gcc-post-body-encode-hook)
+	        (save-restriction
+		  (message-narrow-to-headers)
+		  (let* ((newsgroups-field (save-restriction
+					     (message-narrow-to-headers-or-head)
+					     (message-fetch-field "Newsgroups")))
+		         (followup-field (save-restriction
 					   (message-narrow-to-headers-or-head)
-					   (message-fetch-field "Newsgroups")))
-		       (followup-field (save-restriction
-					 (message-narrow-to-headers-or-head)
-					 (message-fetch-field "Followup-To")))
-		       ;; BUG: We really need to get the charset for
-		       ;; each name in the Newsgroups and Followup-To
-		       ;; lines to allow crossposting between group
-		       ;; names with incompatible character sets.
-		       ;; -- Per Abrahamsen <abraham@dina.kvl.dk> 2001-10-08.
-		       (group-field-charset
-			(gnus-group-name-charset
-			 method (or newsgroups-field "")))
-		       (followup-field-charset
-			(gnus-group-name-charset
-			 method (or followup-field "")))
-		       (rfc2047-header-encoding-alist
-			(append
-			 (when group-field-charset
-			   (list (cons "Newsgroups" group-field-charset)))
-			 (when followup-field-charset
-			   (list (cons "Followup-To" followup-field-charset)))
-			 rfc2047-header-encoding-alist)))
-		  (mail-encode-encoded-word-buffer)))
-	      (goto-char (point-min))
-	      (when (re-search-forward
-		     (concat "^" (regexp-quote mail-header-separator) "$")
-		     nil t)
-		(replace-match "" t t ))
-	      (when (or (not (gnus-check-backend-function
-			      'request-accept-article group))
-			(not (setq group-art
-				   (gnus-request-accept-article
-				    group method t t))))
-		(gnus-message 1 "Couldn't store article in group %s: %s"
-			      group (gnus-status-message method)))
-	      (when (stringp method)
-		(setq method (gnus-server-to-method method)))
-	      (when (and (listp method)
-			 (gnus-native-method-p method))
-		(setq group (gnus-group-short-name group)))
-	      (when (and group-art
-			 ;; FIXME: Should gcc-mark-as-read work when
-			 ;; Gnus is not running?
-			 (gnus-alive-p))
-                (if gnus-gcc-mark-as-read
-		    (gnus-group-mark-article-read group (cdr group-art))
-		  (with-current-buffer gnus-group-buffer
-		    (let ((gnus-group-marked (list group))
-			  (gnus-get-new-news-hook nil)
-			  (inhibit-read-only t))
-		      (gnus-group-get-new-news-this-group nil t)))))
-	      (setq options message-options)
-	      (with-current-buffer cur (setq message-options options))
-	      (kill-buffer (current-buffer)))
-            (when nnfolder-current-buffer
-              (kill-buffer nnfolder-current-buffer))))))))
+					   (message-fetch-field "Followup-To")))
+		         ;; BUG: We really need to get the charset for
+		         ;; each name in the Newsgroups and Followup-To
+		         ;; lines to allow crossposting between group
+		         ;; names with incompatible character sets.
+		         ;; -- Per Abrahamsen <abraham@dina.kvl.dk> 2001-10-08.
+		         (group-field-charset
+			  (gnus-group-name-charset
+			   method (or newsgroups-field "")))
+		         (followup-field-charset
+			  (gnus-group-name-charset
+			   method (or followup-field "")))
+		         (rfc2047-header-encoding-alist
+			  (append
+			   (when group-field-charset
+			     (list (cons "Newsgroups" group-field-charset)))
+			   (when followup-field-charset
+			     (list (cons "Followup-To" followup-field-charset)))
+			   rfc2047-header-encoding-alist)))
+		    (mail-encode-encoded-word-buffer)))
+	        (goto-char (point-min))
+	        (when (re-search-forward
+		       (concat "^" (regexp-quote mail-header-separator) "$")
+		       nil t)
+		  (replace-match "" t t ))
+	        (when (or (not (gnus-check-backend-function
+			        'request-accept-article group))
+			  (not (setq group-art
+				     (gnus-request-accept-article
+				      group method t t))))
+		  (gnus-message 1 "Couldn't store article in group %s: %s"
+			        group (gnus-status-message method)))
+	        (when (stringp method)
+		  (setq method (gnus-server-to-method method)))
+	        (when (and (listp method)
+			   (gnus-native-method-p method))
+		  (setq group (gnus-group-short-name group)))
+	        (when (and group-art
+			   ;; FIXME: Should gcc-mark-as-read work when
+			   ;; Gnus is not running?
+			   (gnus-alive-p))
+                  (if gnus-gcc-mark-as-read
+		      (gnus-group-mark-article-read group (cdr group-art))
+		    (with-current-buffer gnus-group-buffer
+		      (let ((gnus-group-marked (list group))
+			    (gnus-get-new-news-hook nil)
+			    (inhibit-read-only t))
+		        (gnus-group-get-new-news-this-group nil t)))))
+	        (setq options message-options)
+	        (with-current-buffer cur (setq message-options options))
+	        (kill-buffer (current-buffer)))
+              (unless (eq nnfolder-current-buffer orig-nnfolder-current-buffer)
+                (when (buffer-live-p nnfolder-current-buffer)
+                  (kill-buffer nnfolder-current-buffer))
+                (setq nnfolder-current-buffer orig-nnfolder-current-buffer)))))))))
 
 (defun gnus-inews-insert-gcc (&optional group)
   "Insert the Gcc to say where the article is to be archived."
