@@ -35,6 +35,11 @@
   ;; This should not crash.
   (should-error (funcall '(closure)) :type 'invalid-function))
 
+(ert-deftest eval-tests--bug75593 ()
+  "Check that Bug#75593 has been fixed."
+  ;; This should not crash.
+  (should-error (eval '(ignore) '(foo . t))))
+
 (ert-deftest eval-tests--bugs-24912-and-24913 ()
   "Check that Emacs doesn't accept weird argument lists.
 Bug#24912 and Bug#24913."

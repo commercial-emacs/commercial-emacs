@@ -1,4 +1,4 @@
-;;; fns-tests.el --- tests for src/fns.c  -*- lexical-binding:t -*-
+;;; fns-tests.el --- tests for src/fns.c  -*- lexical-binding:t byte-compile-warnings: (not mutate-constant) -*-
 
 ;; Copyright (C) 2014-2024 Free Software Foundation, Inc.
 
@@ -1759,5 +1759,11 @@
                       (should-not (value< b a))))
                     ;; Undo the flip.
                     (aset b i val)))))))))))
+
+(ert-deftest clear-string-retains-length ()
+  "Bug#75581."
+  (let ((s #("🤗" 0 1 (prop value))))
+    (clear-string s)
+    (ignore (copy-sequence s))))
 
 ;;; fns-tests.el ends here
