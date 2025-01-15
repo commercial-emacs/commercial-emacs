@@ -2238,6 +2238,9 @@ node `(elisp)Eval' for its form.  */)
   (Lisp_Object form, Lisp_Object lexical)
 {
   specpdl_ref count = SPECPDL_INDEX ();
+  /* Permit any LEXICAL but a dotted list.  */
+  if (CONSP (lexical) && NILP (Fproper_list_p (lexical)))
+    signal_error ("Invalid environment", lexical);
   record_lexical_environment ();
   current_thread->lexical_environment = !NILP (Flistp (lexical))
     ? lexical /* dynamic if LEXICAL is nil, bespoke otherwise */
