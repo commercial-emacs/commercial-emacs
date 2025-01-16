@@ -3446,11 +3446,14 @@ undo       redo-y undo-y redo-y undo-y undo-x                undo-x
          (inhibit-region (when (symbolp last-command)
                            (get last-command 'undo-inhibit-region)))
 	 message)
-    (when (or (not (memq last-command '(undo undo-redo)))
-              ;; a timer or filter is undoing
-	      (and pending-undo-list
-		   (not (gethash buffer-undo-list lists-seen-after-undo))))
-      ;; Then start a new run.
+    (when (or
+           ;; If not amidst a run...
+           (not (memq last-command '(undo undo-redo)))
+           ;; ... or an unexhausted run encountered an exogenous change
+           ;; to the buffer...
+           (and pending-undo-list
+                (not (gethash buffer-undo-list lists-seen-after-undo))))
+      ;; ...then start a new run.
       (setq undo-in-region
 	    (and (or (region-active-p) (and arg (not (numberp arg))))
                  (not inhibit-region)))
