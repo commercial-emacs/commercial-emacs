@@ -3891,7 +3891,7 @@ case (with single calls for each)."
 	  (widen)
 	  (unwind-protect
               (let ((pending-undo-list buffer-undo-list))
-                (while (listp pending-undo-list) (undo-more 1)))
+                (while pending-undo-list (undo-more 1)))
             (setq buffer-undo-list (cdr elt))))))))
 
 ;;;; Display-related functions.

@@ -592,7 +592,7 @@
                   :enable (and (not buffer-read-only)
                                (not (eq t buffer-undo-list))
                                (if (eq last-command 'undo)
-                                   (listp pending-undo-list)
+                                   pending-undo-list
                                  (consp buffer-undo-list)))
                   :help "Undo last edits"))
 

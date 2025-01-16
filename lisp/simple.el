@@ -3423,9 +3423,7 @@ undo       redo-y undo-y redo-y undo-y undo-x                undo-x
   :group 'undo)
 
 (defvar pending-undo-list nil
-  "Remaining items within an undo run.
-This is a tertiary variable.  A null value means outside the undo run
-state.  A `t' value indicates undo run exhausted.")
+  "Remaining items within an undo run.")
 
 (define-obsolete-function-alias 'undo--last-change-was-undo-p nil "31.1")
 
@@ -3450,7 +3448,7 @@ state.  A `t' value indicates undo run exhausted.")
 	 message)
     (when (or (not (memq last-command '(undo undo-redo)))
               ;; a timer or filter is undoing
-	      (and (not (eq pending-undo-list t))
+	      (and pending-undo-list
 		   (not (gethash buffer-undo-list lists-seen-after-undo))))
       ;; Then start a new run.
       (setq undo-in-region
@@ -3468,7 +3466,7 @@ state.  A `t' value indicates undo run exhausted.")
 	;; Skip to end of undo-redo-undo-redo chain.
 	(while (when-let ((next (gethash equiv lists-seen-after-undo)))
 		 (setq equiv next)))
-	(setq pending-undo-list (if (consp equiv) equiv t))))
+	(setq pending-undo-list equiv)))
 
     (undo-more (if (numberp arg) (prefix-numeric-value arg) 1))
 
@@ -3539,14 +3537,11 @@ Some change-hooks test this variable to do something different.")
 
 (defun undo-more (n)
   "Assume undo run state, and undo back N boundaries."
-  (unless (listp pending-undo-list)
+  (if pending-undo-list
+      (let ((undo-in-progress t))
+        (setq pending-undo-list (primitive-undo n pending-undo-list)))
     (user-error (concat "No further undo information"
-                        (when undo-in-region " for region"))))
-  (let ((undo-in-progress t))
-    (setq pending-undo-list (or (primitive-undo n pending-undo-list)
-                                ;; sentinel `t' means finished (nil
-                                ;; means outside run state)
-                                t))))
+                        (when undo-in-region " for region")))))
 
 (defun primitive-undo (n list)
   "Undo the first N records from LIST, return remaining list."

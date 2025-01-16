@@ -2744,15 +2744,13 @@ that have been changed along."
       (while (bufferp (setq buf (pop entry)))
 	(when (pop entry)
 	  (with-current-buffer buf
-	    (let (;; (last-undo-buffer buf)
-                  (inhibit-read-only t))
+	    (let ((inhibit-read-only t))
 	      (unless (memq buf org-agenda-undo-has-started-in)
 		(push buf org-agenda-undo-has-started-in)
 		(make-local-variable 'pending-undo-list)
 		(undo-start))
 	      (while (and pending-undo-list
-			  (listp pending-undo-list)
-			  (not (car pending-undo-list)))
+			  (null (car pending-undo-list)))
 		(pop pending-undo-list))
 	      (undo-more 1))))))
     (org-goto-line line)
