@@ -247,6 +247,7 @@
 (require 'compat nil 'noerror)
 (require 'project nil 'noerror)
 (require 'seq)
+(require 'json)
 (eval-when-compile (require 'subr-x))   ;For `string-empty-p'.
 
 ;; Avoid compiler warnings
@@ -2321,12 +2322,6 @@ This is used only for prompt detection."
   :safe 'booleanp
   :version "24.4")
 
-(defcustom python-shell-prompt-detect-failure-warning t
-  "Non-nil enables warnings when detection of prompts fail."
-  :type 'boolean
-  :safe 'booleanp
-  :version "24.4")
-
 (defcustom python-shell-prompt-input-regexps
   '(">>> " "\\.\\.\\. "                 ; Python
     "In \\[[0-9]+\\]: "                 ; IPython
@@ -2660,86 +2655,24 @@ When prompts can be retrieved successfully from the
 `python-shell-interpreter' run with
 `python-shell-interpreter-interactive-arg', returns a list of
 three elements, where the first two are input prompts and the
-last one is an output prompt.  When no prompts can be detected
-and `python-shell-prompt-detect-failure-warning' is non-nil,
-shows a warning with instructions to avoid hangs and returns nil.
-When `python-shell-prompt-detect-enabled' is nil avoids any
-detection and just returns nil."
-  (when python-shell-prompt-detect-enabled
-    (python-shell-with-environment
-      (let* ((code (concat
-                    "import sys\n"
-                    "ps = [getattr(sys, 'ps%s' % i, '') for i in range(1,4)]\n"
-                    "try:\n"
-                    "    import json\n"
-                    "    ps_json = '\\n' + json.dumps(ps)\n"
-                    "except ImportError:\n"
-                    ;; JSON is built manually for compatibility
-                    "    ps_json = '\\n[\"%s\", \"%s\", \"%s\"]\\n' % tuple(ps)\n"
-                    "\n"
-                    "print (ps_json)\n"
-                    "sys.exit(0)\n"))
-             (interpreter python-shell-interpreter)
-             (interpreter-arg python-shell-interpreter-interactive-arg)
-             (output
-              (with-temp-buffer
-                ;; TODO: improve error handling by using
-                ;; `condition-case' and displaying the error message to
-                ;; the user in the no-prompts warning.
-                (ignore-errors
-                  (let ((code-file
-                         ;; Python 2.x on Windows does not handle
-                         ;; carriage returns in unbuffered mode.
-                         (let ((inhibit-eol-conversion (getenv "PYTHONUNBUFFERED")))
-                           (python-shell--save-temp-file code))))
-                    (unwind-protect
-                        ;; Use `process-file' as it is remote-host friendly.
-                        (process-file
-                         interpreter
-                         code-file
-                         '(t nil)
-                         nil
-                         interpreter-arg)
-                      ;; Try to cleanup
-                      (delete-file code-file))))
-                (buffer-string)))
-             (prompts
-              (catch 'prompts
-                (dolist (line (split-string output "\n" t))
-                  (let ((res
-                         ;; Check if current line is a valid JSON array.
-                         (and (string-prefix-p "[\"" line)
-                              (ignore-errors
-                                ;; Return prompts as a list.
-                                (python--parse-json-array line)))))
-                    ;; The list must contain 3 strings, where the first
-                    ;; is the input prompt, the second is the block
-                    ;; prompt and the last one is the output prompt.  The
-                    ;; input prompt is the only one that can't be empty.
-                    (when (and (= (length res) 3)
-                               (cl-every #'stringp res)
-                               (not (string= (car res) "")))
-                      (throw 'prompts res))))
-                nil)))
-        (when (and (not prompts)
-                   python-shell-prompt-detect-failure-warning)
-          (lwarn
-           '(python python-shell-prompt-regexp)
-           :warning
-           (concat
-            "Python shell prompts cannot be detected.\n"
-            "If your emacs session hangs when starting python shells\n"
-            "recover with `keyboard-quit' and then try fixing the\n"
-            "interactive flag for your interpreter by adjusting the\n"
-            "`python-shell-interpreter-interactive-arg' or add regexps\n"
-            "matching shell prompts in the directory-local friendly vars:\n"
-            "  + `python-shell-prompt-regexp'\n"
-            "  + `python-shell-prompt-block-regexp'\n"
-            "  + `python-shell-prompt-output-regexp'\n"
-            "Or alternatively in:\n"
-            "  + `python-shell-prompt-input-regexps'\n"
-            "  + `python-shell-prompt-output-regexps'")))
-        (mapcar #'ansi-color-filter-apply prompts)))))
+last one is an output prompt."
+  (when-let ((enabled python-shell-prompt-detect-enabled)
+             (json
+              (ignore-errors
+                (shell-command-to-string
+                 (format
+                  (concat "echo 'import sys; import json; "
+	                  "print(json.dumps("
+	                  "["
+	                  "getattr(sys, \"ps{}\".format(i), \"\") for i in range(1,4)"
+	                  "]))'"
+	                  "| 2>/dev/null %s %s")
+                  python-shell-interpreter
+                  python-shell-interpreter-interactive-arg))))
+             (prompts (let ((json-array-type 'list))
+                        (json-read-from-string json))))
+    (prog1 prompts
+      (mapc #'ansi-color-filter-apply prompts))))
 
 (defun python-shell-prompt-validate-regexps ()
   "Validate all user provided regexps for prompts.
@@ -3274,6 +3207,7 @@ killed."
       (let* ((proc-buffer-name
               (format (if (not internal) "*%s*" " *%s*") proc-name)))
         (when (not (comint-check-proc proc-buffer-name))
+          (setq python-shell--first-prompt-received-output-buffer nil)
           (let* ((cmdlist (split-string-and-unquote cmd))
                  (interpreter (car cmdlist))
                  (args (cdr cmdlist))
@@ -3292,7 +3226,8 @@ killed."
                   (mapconcat #'identity args " ")))
             (with-current-buffer buffer
               (inferior-python-mode))
-            (and internal (set-process-query-on-exit-flag process nil))))
+            (and internal (set-process-query-on-exit-flag process nil))
+            (python-shell-accept-process-output process 1)))
         (when show
           (pop-to-buffer proc-buffer-name))
         proc-buffer-name))))
@@ -3337,8 +3272,10 @@ process buffer for a list of commands.)"
          (buffer (python-shell-make-comint
                   (or cmd (python-shell-calculate-command))
                   (python-shell-get-process-name dedicated)
-                  show)))
-    (get-buffer-process buffer)))
+                  show))
+         (process (get-buffer-process buffer)))
+    (when (process-live-p process)
+      process)))
 
 (defun python-shell-restart (&optional show)
   "Restart the Python shell.
@@ -3420,19 +3357,8 @@ Arguments CMD, DEDICATED and SHOW are those of `run-python' and
 are used to start the shell.  If those arguments are not
 provided, `run-python' is called interactively and the user will
 be asked for their values."
-  (let ((shell-process (python-shell-get-process)))
-    (when (not shell-process)
-      (if (not cmd)
-          ;; XXX: Refactor code such that calling `run-python'
-          ;; interactively is not needed anymore.
-          (call-interactively 'run-python)
-        (run-python cmd dedicated show)))
-    (or shell-process (python-shell-get-process))))
-
-(make-obsolete
- #'python-shell-get-or-create-process
- "Instead call `python-shell-get-process' and create one if returns nil."
- "25.1")
+  (or (python-shell-get-process)
+      (run-python cmd dedicated show)))
 
 (defvar python-shell-internal-buffer nil
   "Current internal shell buffer for the current buffer.
@@ -3679,7 +3605,7 @@ the python shell:
 
 (declare-function compilation-forget-errors "compile")
 
-(defun python-shell-send-region (start end &optional send-main msg
+(defun python-shell-send-region (start end &optional send-main _msg
                                        no-cookie)
   "Send the region delimited by START and END to inferior Python process.
 When optional argument SEND-MAIN is non-nil, allow execution of
@@ -3693,7 +3619,7 @@ substring to be sent is retrieved using `python-shell-buffer-substring'."
    (list (region-beginning) (region-end) current-prefix-arg t))
   (let* ((string (python-shell-buffer-substring start end (not send-main)
                                                 no-cookie))
-         (process (python-shell-get-process-or-error msg))
+         (process (python-shell-get-or-create-process))
          (original-string (buffer-substring-no-properties start end))
          (_ (string-match "\\`\n*\\(.*\\)" original-string)))
     (message "Sent: %s..." (match-string 1 original-string))
@@ -3701,6 +3627,11 @@ substring to be sent is retrieved using `python-shell-buffer-substring'."
     ;; lines have been removed/added.
     (with-current-buffer (process-buffer process)
       (compilation-forget-errors))
+    (unless (get-buffer-window (python-shell-get-buffer))
+      (display-buffer (python-shell-get-buffer)
+                      (when (> (length (window-list)) 1)
+		        '((display-buffer-use-some-window) .
+                          ((some-window . mru))))))
     (python-shell-send-string string process)
     (deactivate-mark)))
 
@@ -3790,7 +3721,7 @@ t when called interactively."
        msg))))
 
 (defun python-shell-send-file (file-name &optional process temp-file-name
-                                         delete msg)
+                                         delete _msg)
   "Send FILE-NAME to inferior Python PROCESS.
 
 If TEMP-FILE-NAME is passed then that file is used for processing
@@ -3810,7 +3741,7 @@ t when called interactively."
     nil                                 ; temp-file-name
     nil                                 ; delete
     t))                                 ; msg
-  (setq process (or process (python-shell-get-process-or-error msg)))
+  (setq process (or process (python-shell-get-or-create-process)))
   (with-current-buffer (process-buffer process)
     (unless (or temp-file-name
                 (string= (file-remote-p file-name)

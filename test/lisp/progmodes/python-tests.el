@@ -4241,10 +4241,8 @@ and `python-shell-interpreter-args' in the new shell buffer."
           (kill-buffer (get-buffer-create "*Warnings*"))
           (should (not (get-buffer "*Warnings*")))
           (setenv "PYTHONSTARTUP" startup-file)
-          (should python-shell-prompt-detect-failure-warning)
           (should python-shell-prompt-detect-enabled)
-          (should (not (python-shell-prompt-detect)))
-          (should (get-buffer "*Warnings*")))
+          (should (cl-every #'string-empty-p (python-shell-prompt-detect))))
       (ignore-errors (delete-file startup-file)))))
 
 (ert-deftest python-shell-prompt-detect-5 ()
@@ -4255,16 +4253,14 @@ and `python-shell-interpreter-args' in the new shell buffer."
                                "sys.ps1 = ''\n"
                                "sys.ps2 = ''\n"
                                "sys.ps3 = ''\n"))
-         (startup-file (python-shell--save-temp-file startup-code))
-         (python-shell-prompt-detect-failure-warning nil))
+         (startup-file (python-shell--save-temp-file startup-code)))
     (unwind-protect
         (progn
           (kill-buffer (get-buffer-create "*Warnings*"))
           (should (not (get-buffer "*Warnings*")))
           (setenv "PYTHONSTARTUP" startup-file)
-          (should (not python-shell-prompt-detect-failure-warning))
           (should python-shell-prompt-detect-enabled)
-          (should (not (python-shell-prompt-detect)))
+          (should (cl-every #'string-empty-p (python-shell-prompt-detect)))
           (should (not (get-buffer "*Warnings*"))))
       (ignore-errors (delete-file startup-file)))))
 
@@ -4277,14 +4273,12 @@ and `python-shell-interpreter-args' in the new shell buffer."
                                "sys.ps2 = ''\n"
                                "sys.ps3 = ''\n"))
          (startup-file (python-shell--save-temp-file startup-code))
-         (python-shell-prompt-detect-failure-warning t)
          (python-shell-prompt-detect-enabled nil))
     (unwind-protect
         (progn
           (kill-buffer (get-buffer-create "*Warnings*"))
           (should (not (get-buffer "*Warnings*")))
           (setenv "PYTHONSTARTUP" startup-file)
-          (should python-shell-prompt-detect-failure-warning)
           (should (not python-shell-prompt-detect-enabled))
           (should (not (python-shell-prompt-detect)))
           (should (not (get-buffer "*Warnings*"))))
