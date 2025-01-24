@@ -9308,7 +9308,7 @@ move_it_backward (struct it *it, int op_to, int op)
       struct it it_from;
       struct text_pos tpos;
       void *itdata = NULL;
-      ptrdiff_t from_pos = IT_CHARPOS (*it);
+      const ptrdiff_t from_pos = IT_CHARPOS (*it);
       int estimated_slines = (op == MOVE_TO_Y
 			      ? max (1, op_to / default_line_height (it->w))
 			      : max (1, op_to));
@@ -9410,9 +9410,17 @@ move_it_backward (struct it *it, int op_to, int op)
 	       && slines > estimated_slines
 	       && IT_CHARPOS (*it) < ZV)
 	{
-	  /* Common branch where SLINES exceeds estimate (too
-	     far back).  Scooch forward.  */
+	  struct it restore;
+	  void *data = NULL;
+	  SAVE_IT (restore, *it, data);
+
+	  /* Common branch where SLINES exceeds estimate (too far back).
+	     Scooch forward.  */
 	  move_it_dvpos (it, slines - estimated_slines);
+
+	  /* Revert if no move (a multi-line display string).  */
+	  if (IT_CHARPOS (*it) == from_pos)
+	    RESTORE_IT (it, &restore, data);
 	}
       else if (op == MOVE_TO_Y
 	       && ((it->current_y - op_target) >= actual_line_height (it->w, tpos))

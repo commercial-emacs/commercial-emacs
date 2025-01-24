@@ -257,7 +257,8 @@ width of display property."
   (xdisp-tests--visible-buffer
    (save-excursion
      (insert (propertize "a" 'display "bbb\nccc\ndddd\n")))
-   (should (= 3 (vertical-motion 1))))
+   (should (= 3 (vertical-motion 1)))
+   (should (= -3 (vertical-motion -1))))
   (xdisp-tests--visible-buffer
    (insert (mapconcat #'number-to-string (number-sequence 1 5) "") "\n")
    (save-excursion (insert "_this\n"))
