@@ -717,8 +717,7 @@ clone_per_buffer_values (struct buffer *from, struct buffer *to)
 }
 
 
-/* If buffer B has markers to record PT, BEGV and ZV when it is not
-   current, update these markers.  */
+/* Store PT, BEGV, and ZV in the markers created for this purpose.  */
 
 static void
 record_buffer_markers (struct buffer *b)
@@ -738,8 +737,7 @@ record_buffer_markers (struct buffer *b)
 }
 
 
-/* If buffer B has markers to record PT, BEGV and ZV when it is not
-   current, fetch these values into B->begv etc.  */
+/* Set PT, BEGV, and ZV to values stored in record_buffer_markers.  */
 
 static void
 fetch_buffer_markers (struct buffer *b)

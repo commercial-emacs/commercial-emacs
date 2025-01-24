@@ -306,13 +306,7 @@ struct buffer_text
   /* Properties of this buffer's text.  */
   INTERVAL intervals;
 
-  /* The markers that refer to this buffer.
-     This is actually a single marker ---
-     successive elements in its marker `chain'
-     are the other markers referring to this buffer.
-     This is a singly linked unordered list, which means that it's
-     very cheap to add a marker to the list and it's also very cheap
-     to move a marker within a buffer.  */
+  /* Singly linked unordered list.  */
   struct Lisp_Marker *markers;
 
   /* Usually false.  Temporarily true in decode_coding_gap to
