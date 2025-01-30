@@ -77,6 +77,22 @@
                            (cl-search "[js-mode]" (buffer-name b)))
                          (buffer-list)))))
 
+(ert-deftest mode-overlay-error-recovery ()
+  (with-temp-buffer
+    (save-excursion
+      (insert "foo\n"))
+    (make-mode-overlay 1 3 'js-mode)
+    (should (cl-some (lambda (b)
+                       (cl-search "[js-mode]" (buffer-name b)))
+                     (buffer-list)))
+    (should-error (make-mode-overlay 1 3 'python-mode) :type 'user-error)
+    (should (cl-some (lambda (b)
+                       (cl-search "[js-mode]" (buffer-name b)))
+                     (buffer-list)))
+    (should-not (cl-some (lambda (b)
+                           (cl-search "[python-mode]" (buffer-name b)))
+                         (buffer-list)))))
+
 (ert-deftest mode-overlay-test-org ()
   "Dominik's commit afe98df locks down a bespoke font lock scheme."
   (let ((text "

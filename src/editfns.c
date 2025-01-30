@@ -2972,7 +2972,6 @@ usage: (propertize STRING &rest PROPERTIES)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   Lisp_Object properties, string;
-  ptrdiff_t i;
 
   /* Number of args must be odd.  */
   if ((nargs & 1) == 0)
@@ -2984,7 +2983,7 @@ usage: (propertize STRING &rest PROPERTIES)  */)
   CHECK_STRING (args[0]);
   string = Fcopy_sequence (args[0]);
 
-  for (i = 1; i < nargs; i += 2)
+  for (ptrdiff_t i = 1; i < nargs; i += 2)
     properties = Fcons (args[i], Fcons (args[i + 1], properties));
 
   Fadd_text_properties (make_fixnum (0),

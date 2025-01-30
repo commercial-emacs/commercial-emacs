@@ -87,6 +87,8 @@ Lisp_Object Vbuffer_alist;
 
 static Lisp_Object QSFundamental;	/* A string "Fundamental".  */
 
+static Lisp_Object extant_indirects;
+
 static void alloc_buffer_text (struct buffer *, ptrdiff_t);
 static void free_buffer_text (struct buffer *b);
 static void copy_overlays (struct buffer *, struct buffer *);
@@ -912,6 +914,12 @@ Interactively, CLONE and INHIBIT-BUFFER-HOOKS are nil.  */)
 }
 
 static void
+unwind_extant_indirects (void)
+{
+  extant_indirects = Qnil;
+}
+
+static void
 restore_undo_list (Lisp_Object arg)
 {
   bset_undo_list (XBUFFER (XCAR (arg)), XCDR (arg));
@@ -1080,23 +1088,25 @@ DEFUN ("mode-overlay--exit-buffer", Fmake_mode_overlay__exit_buffer,
 static Lisp_Object
 make_mode__overlay_error (Lisp_Object error_val)
 {
-  /* Unless I staticpro a "prospective overlay", I can't know which
-     overlay to delete, nor if I can dispense with proximity.  Can't
-     just call `delete-all-mode-overlays' because faulty overlay was
-     never added.
-  */
   struct buffer *base = current_buffer->base_buffer
     ? current_buffer->base_buffer
     : current_buffer;
+  if (NILP (extant_indirects))
+    {
+      base->proximity = NULL;
+      call0 (Qdelete_all_mode_overlays);
+      /* Since faulty overlay never added, possibly more undoing to do */
+    }
+
   Lisp_Object tail, other;
   FOR_EACH_LIVE_BUFFER (tail, other)
     if (XBUFFER (other)->base_buffer == base
-	&& MODE_OVERLAY_INDIRECT_P (XBUFFER (other)))
+	&& MODE_OVERLAY_INDIRECT_P (XBUFFER (other))
+	&& NILP (Fmemq (other, extant_indirects)))
       {
 	XBUFFER (other)->proximity = NULL; /* otherwise Fkill_buffer infloops */
 	Fkill_buffer (other);
       }
-  base->proximity = NULL;
   xsignal1 (XCAR (error_val), XCDR (error_val));
 }
 
@@ -1265,9 +1275,24 @@ DEFUN ("make-mode--overlay", Fmake_mode__overlay, Smake_mode__overlay,
 The indirect buffer created is distinguished by MODE_OVERLAY_INDIRECT_P.  */)
   (Lisp_Object beg, Lisp_Object end, Lisp_Object mode)
 {
-  return internal_condition_case_1 (&make_mode__overlay,
-				    list3 (beg, end, mode),
-				    Qt, &make_mode__overlay_error);
+  specpdl_ref count = SPECPDL_INDEX ();
+  record_unwind_protect_void (unwind_extant_indirects);
+
+  Lisp_Object tail, other;
+  struct buffer *base = current_buffer->base_buffer
+    ? current_buffer->base_buffer
+    : current_buffer;
+
+  extant_indirects = Qnil;
+  FOR_EACH_LIVE_BUFFER (tail, other)
+    if (XBUFFER (other)->base_buffer == base
+	&& MODE_OVERLAY_INDIRECT_P (XBUFFER (other)))
+      extant_indirects = Fcons (other, extant_indirects);
+  return unbind_to (count,
+		    internal_condition_case_1
+		    (&make_mode__overlay,
+		     list3 (beg, end, mode),
+		     Qt, &make_mode__overlay_error));
 }
 
 DEFUN ("mode-overlay-indirect-p", Fmode_overlay_indirect_p, Smode_overlay_indirect_p, 1, 1, 0,
@@ -5202,6 +5227,7 @@ syms_of_buffer (void)
 
   staticpro (&QSFundamental);
   staticpro (&Vbuffer_alist);
+  staticpro (&extant_indirects);
 
   DEFSYM (Qchoice, "choice");
   DEFSYM (Qleft, "left");
