@@ -999,7 +999,6 @@ mode_overlay_delete_bumpguard (struct buffer *buf, const ptrdiff_t pos)
   buf->proximity->current = Qnil;
   buf->proximity->preceding = build_marker (current_buffer, pos, CHAR_TO_BYTE (pos));
   buf->proximity->following = build_marker (current_buffer, pos, CHAR_TO_BYTE (pos + 1));
-
   Fremove_list_of_text_properties (make_fixnum (pos),
 				   make_fixnum (pos + 1),
 				   list2 (Qrear_nonsticky, Qread_only), b);
@@ -3952,7 +3951,8 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
       itree_remove (obuffer->overlays, XOVERLAY (overlay)->interval);
       /* Now kill mode-overlay buffer associated with OBUFFER.  */
       if (MODE_OVERLAY_INDIRECT_P (obuffer) /* don't touch base buffer! */
-	  && !NILP (plist_get (OVERLAY_PLIST (overlay), Qmode_overlay_p)))
+	  && !NILP (plist_get (OVERLAY_PLIST (overlay), Qmode_overlay_p))
+	  && OVERLAY_END (overlay) > BUF_BEG (obuffer))
 	{
 	  mode_overlay_delete_bumpguard (obuffer, OVERLAY_END (overlay) - 1);
 	  mode_overlay_delete_bumpguard (obuffer,
