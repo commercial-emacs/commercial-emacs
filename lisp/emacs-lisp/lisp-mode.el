@@ -1095,6 +1095,34 @@ is the buffer position of the start of the containing expression."
               ;; in this case calculate-lisp-indent-last-sexp is not nil
               (calculate-lisp-indent-last-sexp
                (or
+                ;; quoted lists?
+                (cl-some (lambda (opener)
+                           (save-excursion
+                             (goto-char opener)
+                             ;; '(foo) or (quote foo)
+                             (when (or (not (equal (point)
+                                                   (save-excursion
+                                                     (backward-prefix-chars)
+                                                     (point))))
+                                       (looking-at-p "(\\(back\\)?quote\\b"))
+                               (goto-char (1+ containing-sexp))
+                               (current-column))))
+                         (elt state 9))
+                ;; formal argument list?
+                (when-let ((last-two (last (elt state 9) 2))
+                           (enough-p (= 2 (length last-two)))
+                           (expr (save-excursion
+                                   (goto-char (1+ (car last-two)))
+                                   (buffer-substring (point)
+                                                     (progn (forward-sexp 1)
+                                                            (point)))))
+                           (indenter (function-get (intern-soft expr)
+                                                   'lisp-indent-function))
+                           (define-p (or (eql indenter 2) ;heuristic
+                                         (eq indenter 'defun))))
+                  (save-excursion
+                    (goto-char (1+ containing-sexp))
+                    (current-column)))
                 ;; try to align the parameters of a known function
                 (and lisp-indent-function
                      (not retry)
@@ -1173,8 +1201,8 @@ STATE is the `parse-partial-sexp' state for current position."
                                     ;; between reading nil and a read error.
                                     ;; We don't care but still, better fix this.
                                     (read (current-buffer)))))
-                   (when (memq head '( cl-flet cl-labels cl-macrolet cl-flet*
-                                       cl-symbol-macrolet))
+                   (when (memq head '(cl-flet cl-labels cl-macrolet cl-flet*
+                                      cl-symbol-macrolet))
                      ;; In what follows, we rely on (point) returning non-nil.
                      (setq local-definitions-starting-point
                            (progn

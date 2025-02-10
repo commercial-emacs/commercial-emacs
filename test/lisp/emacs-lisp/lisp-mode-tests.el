@@ -301,13 +301,46 @@ Expected initialization file: `%s'\"
     (lisp-mode)
     (let ((orig "(defun x ()
   (print (quote ( thingy great
-		  stuff)))
+                 stuff)))
   (print (quote (thingy great
-			stuff))))"))
+                 stuff))))"))
       (insert orig)
       (indent-region (point-min) (point-max))
       (should (equal (buffer-string) orig)))))
 
+(ert-deftest lisp-indent-defun-args ()
+  (with-temp-buffer
+   (emacs-lisp-mode)
+   (let ((orig "
+(defsubst x (foo bar &key baz
+      &allow-other-keys
+     &rest args)
+  \"huzzah\"
+  (ignore foo bar baz args))"))
+     (save-excursion (insert (string-trim-left orig)))
+     (forward-line 1)
+     (call-interactively #'indent-for-tab-command)
+     (should (equal (current-column) 13))
+     (forward-line 1)
+     (call-interactively #'indent-for-tab-command)
+     (should (equal (current-column) 13)))))
+
+(ert-deftest lisp-indent-quoted-list ()
+  (with-temp-buffer
+   (emacs-lisp-mode)
+   (let ((orig "
+(quote (123 def :foo
+  abc))
+'(123 def :foo
+       abc)
+"))
+     (save-excursion (insert (string-trim-left orig)))
+     (forward-line 1)
+     (call-interactively #'indent-for-tab-command)
+     (should (equal (current-column) 8))
+     (forward-line 2)
+     (call-interactively #'indent-for-tab-command)
+     (should (equal (current-column) 2)))))
 
 ;;; Fontification
 
