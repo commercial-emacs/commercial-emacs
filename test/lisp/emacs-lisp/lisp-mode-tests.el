@@ -341,6 +341,22 @@ Expected initialization file: `%s'\"
      (forward-line 2)
      (call-interactively #'indent-for-tab-command)
      (should (equal (current-column) 2)))))
+
+(ert-deftest lisp-indent-quoted-list-in-defmacro ()
+  (with-temp-buffer
+   (emacs-lisp-mode)
+   (let ((orig "
+(defmacro fugazi (&rest forms)
+`(when t
+(progn ,@forms)))
+"))
+     (save-excursion (insert (string-trim-left orig)))
+     (forward-line 1)
+     (call-interactively #'indent-for-tab-command)
+     (should (equal (current-column) 2))
+     (forward-line 1)
+     (call-interactively #'indent-for-tab-command)
+     (should (equal (current-column) 5)))))
 
 ;;; Fontification
 
