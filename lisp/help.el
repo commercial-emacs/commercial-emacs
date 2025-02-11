@@ -2220,7 +2220,9 @@ Return VALUE."
          (help-window-setup
           (temp-buffer-window-show
            (current-buffer)
-           (when (> (length (window-list)) 1)
+           (when (and (> (length (window-list)) 1)
+                      (not (eq (get-buffer (help-buffer))
+                               (window-buffer (selected-window)))))
              '((display-buffer-use-some-window) . ((some-window . mru))))))))))
 
 ;; Called from C, on encountering `help-char' when reading a char.
