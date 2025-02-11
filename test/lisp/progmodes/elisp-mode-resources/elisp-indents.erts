@@ -44,9 +44,9 @@ Name: defun-space
 =-=
 (defun x ()
   (print (quote ( thingy great
-		  stuff)))
+                 stuff)))
   (print (quote (thingy great
-			stuff))))
+                 stuff))))
 =-=-=
 
 Name: defvar-keymap

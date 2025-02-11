@@ -1111,15 +1111,23 @@ is the buffer position of the start of the containing expression."
                 ;; formal argument list?
                 (when-let ((last-two (last (elt state 9) 2))
                            (enough-p (= 2 (length last-two)))
-                           (expr (save-excursion
-                                   (goto-char (1+ (car last-two)))
-                                   (buffer-substring (point)
-                                                     (progn (forward-sexp 1)
-                                                            (point)))))
+                           (expr
+                            (condition-case nil
+                                (save-excursion
+                                 (goto-char (1+ (car last-two)))
+                                 (buffer-substring (point)
+                                                   (progn (forward-sexp 1)
+                                                          (point))))
+                              (scan-error)))
                            (indenter (function-get (intern-soft expr)
                                                    'lisp-indent-function))
                            (define-p (or (eql indenter 2) ;heuristic
-                                         (eq indenter 'defun))))
+                                         (eq indenter 'defun)))
+                           (first-list-after-define-p
+                            (equal (save-excursion
+                                     (goto-char (1+ (car last-two)))
+                                     (ignore-errors (search-forward "(")))
+                                   (1+ (cadr last-two)))))
                   (save-excursion
                     (goto-char (1+ containing-sexp))
                     (current-column)))
