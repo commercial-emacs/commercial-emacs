@@ -3439,6 +3439,8 @@ instead removed from the current item list."
 	     (let ((name (buffer-name x)))
 	       (and (not (ido-ignore-item-p name ido-ignore-buffers))
                     (not (member name visible))
+                    (not (eq x (buffer-base-buffer (get-buffer (car visible)))))
+                    (not (buffer-base-buffer x))
 	            name)))
 	   (buffer-list frame)))))
 
