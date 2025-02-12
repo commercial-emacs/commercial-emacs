@@ -1933,18 +1933,18 @@ This does not change the name of the visited file (if any).  */)
 DEFUN ("other-buffer", Fother_buffer, Sother_buffer, 0, 3, 0,
        doc: /* Return most recently selected buffer other than BUFFER.
 Buffers not visible in windows are preferred to visible buffers, unless
-optional second argument VISIBLE-OK is non-nil.  Ignore the argument
-BUFFER unless it denotes a live buffer.  If the optional third argument
-FRAME specifies a live frame, then use that frame's buffer list instead
-of the selected frame's buffer list.
+optional second argument VISIBLE-OK is non-nil.  If the optional third
+argument FRAME specifies a live frame, then use that frame's buffer list
+instead of the selected frame's buffer list.
 
 The buffer is found by scanning the selected or specified frame's buffer
 list first, followed by the list of all buffers.  If no other buffer
-exists, return the buffer `*scratch*' (creating it if necessary).  */)
+exists, return the buffer "*scratch*".  */)
   (Lisp_Object buffer, Lisp_Object visible_ok, Lisp_Object frame)
 {
   struct frame *f = decode_live_frame (frame);
   Lisp_Object tail = f->buffer_list, pred = f->buffer_predicate;
+  buffer = !NILP (buffer) ? buffer : Fcurrent_buffer ();
   Lisp_Object buf, notsogood = Qnil;
 
   /* Consider buffers that have been seen in the frame first.  */
