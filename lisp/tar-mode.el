@@ -692,12 +692,16 @@ For instance, if mode is #o700, then it produces `rwx------'."
 	    (with-current-buffer data-buf
               (let ((coding-system-for-write 'no-conversion)
                     (write-region-inhibit-fsync t))
-                (when link-desc
-                  (lwarn '(tar link) :warning
-                         "Extracted `%s', %s, as a normal file"
-                         name link-desc))
-                (write-region start end name nil :nomessage)))
-            (set-file-modes name (tar-header-mode descriptor))))))
+                (if-let ((symlink-p (eql 2 (tar-header-link-type descriptor)))
+                         (link-name (tar-header-link-name descriptor)))
+                    (progn (delete-file name)
+                           (make-symbolic-link link-name name))
+                  (when link-desc
+                    (lwarn '(tar link) :warning
+                           "Extracted `%s', %s, as a normal file"
+                           name link-desc))
+                  (write-region start end name nil :nomessage)
+                  (set-file-modes name (tar-header-mode descriptor)))))))))
     (progress-reporter-done reporter)))
 
 (defun tar-summarize-buffer ()
