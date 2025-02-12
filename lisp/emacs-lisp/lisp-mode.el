@@ -1122,10 +1122,11 @@ is the buffer position of the start of the containing expression."
                                                    (progn (forward-sexp 1)
                                                           (point))))
                               (scan-error)))
-                           (indenter (function-get (intern-soft expr)
-                                                   'lisp-indent-function))
-                           (define-p (or (eql indenter 2) ;heuristic
-                                         (eq indenter 'defun)))
+                           (define-p (memq (intern-soft expr)
+                                           '(defun defsubst defmacro
+                                             lambda cl-lambda cl-defmacro
+                                             cl-defsubst cl-destructuring-bind
+                                             cl-defun)))
                            (first-list-after-define-p
                             (equal (save-excursion
                                      (goto-char (1+ (car last-two)))
