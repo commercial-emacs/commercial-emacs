@@ -342,7 +342,7 @@ asynchronously."
         (replace-regexp-in-string
          "-pkg\\.el\\'" ".el"
          (file-name-nondirectory pkg-file))
-        "  -*- no-byte-compile: t -*-\n"
+        "  -*- no-byte-compile:t lexical-binding:t -*-\n"
         (prin1-to-string
          (nconc
           (list 'define-package
