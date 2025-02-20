@@ -1100,7 +1100,7 @@ is the buffer position of the start of the containing expression."
                   (cl-some (lambda (opener)
                              (save-excursion
                                (goto-char opener)
-                               (if (looking-at-p "(\\(defmacro\\|cl-macrolet\\)")
+                               (if (looking-at-p "(\\(defmacro\\|cl-defmacro\\|cl-macrolet\\)")
                                    (throw 'is-macro nil)
                                  ;; '(foo) or (quote foo)
                                  (when (or (not (equal (point)
@@ -1117,16 +1117,18 @@ is the buffer position of the start of the containing expression."
                            (expr
                             (condition-case nil
                                 (save-excursion
-                                 (goto-char (1+ (car last-two)))
-                                 (buffer-substring (point)
-                                                   (progn (forward-sexp 1)
-                                                          (point))))
+                                  (goto-char (1+ (car last-two)))
+                                  (buffer-substring (point)
+                                                    (progn (forward-sexp 1)
+                                                           (point))))
                               (scan-error)))
                            (define-p (memq (intern-soft expr)
                                            '(defun defsubst defmacro
                                              lambda cl-lambda cl-defmacro
                                              cl-defsubst cl-destructuring-bind
-                                             cl-defun)))
+                                             cl-defun cl-defmethod cl-defgeneric
+                                             cl-deftype cl-defstruct
+                                             cl-define-compiler-macro)))
                            (first-list-after-define-p
                             (equal (save-excursion
                                      (goto-char (1+ (car last-two)))
