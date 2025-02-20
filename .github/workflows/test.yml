@@ -101,6 +101,16 @@ jobs:
         ./autogen.sh
         ./configure WERROR_CFLAGS='-Werror' --prefix=$HOME/.local --with-native-compilation
         make -j4 check
+    - name: tar-native-comp
+      if: matrix.gearing == 'native-comp'
+      run: |
+        make install
+        tar zcf ./artifact.tgz -C $HOME -- .local/share/emacs/0.2.1 .local/libexec/emacs/0.2.1 .local/bin/emacs-0.2.1 .local/bin/emacs
+    - uses: actions/upload-artifact@v4
+      if: matrix.gearing == 'native-comp'
+      with:
+        name: commercial-emacs
+        path: ./artifact.tgz
     - name: make-linux
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'Linux')
       run: |
