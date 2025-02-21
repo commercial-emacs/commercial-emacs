@@ -965,8 +965,8 @@ mode_overlay_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_
     {
       /* Patch in newline if one not already at END.  */
       SET_PT (end++);
-      buf->proximity->following = build_marker (current_buffer, end, CHAR_TO_BYTE (end));
       insert_char (10);
+      buf->proximity->following = build_marker (current_buffer, end, CHAR_TO_BYTE (end));
     }
 
   /* Make the demarcating newline read-only.  */
