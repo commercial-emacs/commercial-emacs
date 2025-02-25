@@ -998,7 +998,7 @@ mode_overlay_delete_bumpguard (struct buffer *buf, const ptrdiff_t pos)
 				buf->proximity->following));
   buf->proximity->current = Qnil;
   buf->proximity->preceding = build_marker (current_buffer, pos, CHAR_TO_BYTE (pos));
-  buf->proximity->following = build_marker (current_buffer, pos, CHAR_TO_BYTE (pos + 1));
+  buf->proximity->following = build_marker (current_buffer, pos + 1, CHAR_TO_BYTE (pos + 1));
   Fremove_list_of_text_properties (make_fixnum (pos),
 				   make_fixnum (pos + 1),
 				   list2 (Qrear_nonsticky, Qread_only), b);
@@ -1032,15 +1032,18 @@ mode_overlay_switch_to_buffer (Lisp_Object buf)
   if (!NILP (wstart))
     Fset_window_start (Qnil, wstart, Qnil);
 
-  /* previous_overlay_change scans [BEGV, arg), ergo +1.  */
-  const ptrdiff_t previous = previous_overlay_change (PT + 1, true),
-    next = next_overlay_change (PT, true);
-  current_buffer->proximity->preceding
-    = build_marker (XBUFFER (buf), previous, CHAR_TO_BYTE (previous));
-  current_buffer->proximity->following =
-    (next == ZV && !XBUFFER (buf)->base_buffer)
-    ? Qnil /* MODE_OVERLAY_BASE_P grows without limit.  */
-    : build_marker (XBUFFER (buf), next, CHAR_TO_BYTE (next));
+  if (current_buffer->proximity != NULL)
+    {
+      /* previous_overlay_change scans [BEGV, arg), ergo +1.  */
+      const ptrdiff_t previous = previous_overlay_change (PT + 1, true),
+	next = next_overlay_change (PT, true);
+      current_buffer->proximity->preceding
+	= build_marker (XBUFFER (buf), previous, CHAR_TO_BYTE (previous));
+      current_buffer->proximity->following =
+	(next == ZV && !XBUFFER (buf)->base_buffer)
+	? Qnil /* MODE_OVERLAY_BASE_P grows without limit.  */
+	: build_marker (XBUFFER (buf), next, CHAR_TO_BYTE (next));
+    }
 }
 
 /* True if B can be used as 'other-than-BUFFER' buffer.  */
@@ -3718,39 +3721,27 @@ overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
 void
 adjust_overlays_for_insert (ptrdiff_t pos, ptrdiff_t length, bool before_markers)
 {
-  if (!current_buffer->indirections) /* indirect */
-    itree_insert_gap (current_buffer->overlays, pos, length, before_markers);
-  else /* base */
-    {
-      struct buffer *base = current_buffer->base_buffer
-                            ? current_buffer->base_buffer
-                            : current_buffer;
-      Lisp_Object tail, other;
-      itree_insert_gap (base->overlays, pos, length, before_markers);
-      FOR_EACH_LIVE_BUFFER (tail, other)
-	if (XBUFFER (other)->base_buffer == base
-	    && XBUFFER (other)->overlays != base->overlays)
-	  itree_insert_gap (XBUFFER (other)->overlays, pos, length,
-			    before_markers);
-    }
+  struct buffer *base = current_buffer->base_buffer
+    ? current_buffer->base_buffer
+    : current_buffer;
+  itree_insert_gap (base->overlays, pos, length, before_markers);
+
+  Lisp_Object tail, other;
+  FOR_EACH_LIVE_BUFFER (tail, other)
+    if (XBUFFER (other)->base_buffer == base
+	&& XBUFFER (other)->overlays != base->overlays)
+      itree_insert_gap (XBUFFER (other)->overlays, pos, length,
+			before_markers);
 }
 
 static void
-adjust_overlays_for_delete_in_buffer (struct buffer * buf,
-                                      ptrdiff_t pos, ptrdiff_t length)
+evaporate_overlays (struct itree_tree *overlays, ptrdiff_t pos)
 {
   Lisp_Object hit_list = Qnil;
   struct itree_node *node;
 
-  /* Ideally, the evaporate check would be done directly within
-     `itree_delete_gap`, but that code isn't supposed to know about overlays,
-     only about `itree_node`s, so it would break an abstraction boundary.  */
-  itree_delete_gap (buf->overlays, pos, length);
-
-  /* Delete any zero-sized overlays at position POS, if the `evaporate'
-     property is set.  */
-
-  ITREE_FOREACH (node, buf->overlays, pos, pos, ASCENDING)
+  /* Delete zero-sized overlays if Qevaporate.  */
+  ITREE_FOREACH (node, overlays, pos, pos, ASCENDING)
     {
       if (node->end == pos && node->begin == pos
           && !NILP (Foverlay_get (node->data, Qevaporate)))
@@ -3764,20 +3755,20 @@ adjust_overlays_for_delete_in_buffer (struct buffer * buf,
 void
 adjust_overlays_for_delete (ptrdiff_t pos, ptrdiff_t length)
 {
-  if (!current_buffer->indirections)
-    adjust_overlays_for_delete_in_buffer (current_buffer, pos, length);
-  else
-    {
-      struct buffer *base = current_buffer->base_buffer
-                            ? current_buffer->base_buffer
-                            : current_buffer;
-      Lisp_Object tail, other;
-      adjust_overlays_for_delete_in_buffer (base, pos, length);
-      FOR_EACH_LIVE_BUFFER (tail, other)
-	if (XBUFFER (other)->base_buffer == base
-	    && XBUFFER (other)->overlays != base->overlays)
-          adjust_overlays_for_delete_in_buffer (XBUFFER (other), pos, length);
-    }
+  struct buffer *base = current_buffer->base_buffer
+    ? current_buffer->base_buffer
+    : current_buffer;
+  itree_delete_gap (base->overlays, pos, length);
+  evaporate_overlays (base->overlays, pos);
+
+  Lisp_Object tail, other;
+  FOR_EACH_LIVE_BUFFER (tail, other)
+    if (XBUFFER (other)->base_buffer == base
+	&& XBUFFER (other)->overlays != base->overlays)
+      {
+	itree_delete_gap (XBUFFER (other)->overlays, pos, length);
+	evaporate_overlays (XBUFFER (other)->overlays, pos);
+      }
 }
 
 DEFUN ("overlayp", Foverlayp, Soverlayp, 1, 1, 0,

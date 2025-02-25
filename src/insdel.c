@@ -43,7 +43,7 @@ static void signal_before_change (ptrdiff_t, ptrdiff_t, ptrdiff_t *);
 
 /* Also used in marker.c to enable expensive marker checks.  */
 
-#ifdef MARKER_DEBUG
+#ifdef ENABLE_CHECKING
 
 static void
 check_markers (void)
@@ -64,11 +64,11 @@ check_markers (void)
     }
 }
 
-#else /* not MARKER_DEBUG */
+#else /* not ENABLE_CHECKING */
 
 #define check_markers() do { } while (0)
 
-#endif /* MARKER_DEBUG */
+#endif /* ENABLE_CHECKING */
 
 /* If the selected window's old pointm is adjacent or covered by the
    region from FROM to TO, unsuspend auto hscroll in that window.  */
@@ -100,32 +100,28 @@ void
 adjust_markers_for_delete (ptrdiff_t from, ptrdiff_t from_byte,
 			   ptrdiff_t to, ptrdiff_t to_byte)
 {
-  struct Lisp_Marker *m;
-  ptrdiff_t charpos;
-
   adjust_suspend_auto_hscroll (from, to);
-  for (m = BUF_MARKERS (current_buffer); m; m = m->next)
+  for (struct Lisp_Marker *m = BUF_MARKERS (current_buffer); m; m = m->next)
     {
-      charpos = m->charpos;
-      eassert (charpos <= Z);
-
-      /* If the marker is after the deletion,
-	 relocate by number of chars / bytes deleted.  */
-      if (charpos > to)
+      eassert (m->bytepos >= m->charpos);
+      /* If the marker is after the deletion, relocate by number of
+	 chars deleted.  */
+      if (m->charpos > to)
 	{
 	  m->charpos -= to - from;
 	  m->bytepos -= to_byte - from_byte;
 	}
       /* Here's the case where a marker is inside text being deleted.  */
-      else if (charpos > from)
+      else if (m->charpos > from)
 	{
 	  m->charpos = from;
 	  m->bytepos = from_byte;
 	}
+      eassert (m->bytepos - m->charpos <= Z_BYTE - Z);
+      eassert (m->charpos <= Z);
     }
   adjust_overlays_for_delete (from, to - from);
 }
-
 
 /* Adjust markers for an insertion that stretches from FROM / FROM_BYTE
    to TO / TO_BYTE.  We have to relocate the charpos of every marker
@@ -139,16 +135,14 @@ static void
 adjust_markers_for_insert (ptrdiff_t from, ptrdiff_t from_byte,
 			   ptrdiff_t to, ptrdiff_t to_byte, bool before_markers)
 {
-  struct Lisp_Marker *m;
   ptrdiff_t nchars = to - from;
   ptrdiff_t nbytes = to_byte - from_byte;
 
   adjust_suspend_auto_hscroll (from, to);
-  for (m = BUF_MARKERS (current_buffer); m; m = m->next)
+  for (struct Lisp_Marker *m = BUF_MARKERS (current_buffer); m; m = m->next)
     {
       eassert (m->bytepos >= m->charpos
 	       && m->bytepos - m->charpos <= Z_BYTE - Z);
-
       if (m->bytepos == from_byte)
 	{
 	  if (m->insertion_type || before_markers)
@@ -1788,10 +1782,6 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
   undo_push_markers (from, from + SCHARS (deletion));
   undo_push_delete (from, deletion);
 
-  /* Relocate all markers pointing into the new, larger gap to point
-     at the end of the text before the gap.  */
-  adjust_markers_for_delete (from, from_byte, to, to_byte);
-
   modiff_incr (&MODIFF);
   CHARS_MODIFF = MODIFF;
 
@@ -1819,6 +1809,10 @@ del_range_2 (ptrdiff_t from, ptrdiff_t from_byte,
     BEG_UNCHANGED = GPT - BEG;
   if (Z - GPT < END_UNCHANGED)
     END_UNCHANGED = Z - GPT;
+
+  /* Relocate all markers pointing into the new, larger gap to point
+     at the end of the text before the gap.  */
+  adjust_markers_for_delete (from, from_byte, to, to_byte);
 
   check_markers ();
 
