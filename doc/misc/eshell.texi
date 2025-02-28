@@ -1589,6 +1589,11 @@ wish to paginate long output.  Its value is that of
 @code{comint-pager} if non-@code{nil}; otherwise, it uses the value of
 @code{$PAGER} from the @code{process-environment}.
 
+@vindex $TERM
+@item $TERM
+This variable indicates the terminal type of the eshell.  Its default
+value is @code{eshell-term-name}.
+
 @end table
 
 @xref{Aliases}, for the built-in variables @samp{$*}, @samp{$1},
