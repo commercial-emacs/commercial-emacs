@@ -5713,7 +5713,7 @@ read_process_output (Lisp_Object proc)
       args[1] = proc;
       args[2] = coding->dst_object;
       internal_condition_case_n (read_process_output_call, 3, args,
-				 !NILP (Vdebug_on_error) ? Qnil : Qerror,
+				 !NILP (Vdebug_on_error) ? Qerror : Qnil,
 				 read_process_output_error_handler);
     }
 
@@ -5732,85 +5732,41 @@ Otherwise it discards the output.  */)
   (Lisp_Object proc, Lisp_Object text)
 {
   struct Lisp_Process *p;
-  ptrdiff_t opoint;
-
+  specpdl_ref count = SPECPDL_INDEX ();
   CHECK_PROCESS (proc);
   p = XPROCESS (proc);
   CHECK_STRING (text);
 
-  if (!NILP (p->buffer) && BUFFER_LIVE_P (XBUFFER (p->buffer)))
+  if (BUFFERP (p->buffer) && BUFFER_LIVE_P (XBUFFER (p->buffer)))
     {
-      Lisp_Object old_read_only;
-      ptrdiff_t old_begv, old_zv;
-      ptrdiff_t before, before_byte;
-      ptrdiff_t opoint_byte;
-      struct buffer *b;
-
+      /* read_process_output called record_unwind_current_buffer.  */
       Fset_buffer (p->buffer);
-      opoint = PT;
-      opoint_byte = PT_BYTE;
-      old_read_only = BVAR (current_buffer, read_only);
-      old_begv = BEGV;
-      old_zv = ZV;
+      record_unwind_protect_excursion ();
+      specbind (Qinhibit_read_only, Qt);
 
-      bset_read_only (current_buffer, Qnil);
-
-      /* Insert new output into buffer at the current end-of-output
-	 marker, thus preserving logical ordering of input and output.  */
+      /* Process maintains its own output marker.  */
       if (XMARKER (p->mark)->buffer)
 	set_point_from_marker (p->mark);
-      else
-	SET_PT_BOTH (ZV, ZV_BYTE);
-      before = PT;
-      before_byte = PT_BYTE;
 
-      /* If the output marker is outside of the visible region, save
-	 the restriction and widen.  */
-      if (!(BEGV <= PT && PT <= ZV))
-	Fwiden ();
-
-      /* Adjust the multibyteness of TEXT to that of the buffer.  */
+      /* Adjust multibyteness of TEXT, then insert.  */
       if (NILP (BVAR (current_buffer, enable_multibyte_characters))
 	  != !STRING_MULTIBYTE (text))
 	text = (STRING_MULTIBYTE (text)
 		? Fstring_as_unibyte (text)
 		: Fstring_to_multibyte (text));
-      /* Insert before markers in case we are inserting where
-	 the buffer's mark is, and the user's next command is Meta-y.  */
-      insert_from_string_before_markers (text, 0, 0,
-					 SCHARS (text), SBYTES (text), 0);
+      insert_from_string_before_markers (text, 0, 0, SCHARS (text),
+					 SBYTES (text), 0);
 
-      /* Make sure the process marker's position is valid when the
-	 process buffer is changed in the signal_after_change above.
-	 W3 is known to do that.  */
-      if (BUFFERP (p->buffer)
-	  && (b = XBUFFER (p->buffer), b != current_buffer))
-	set_marker_both (p->mark, p->buffer, BUF_PT (b), BUF_PT_BYTE (b));
-      else
-	set_marker_both (p->mark, p->buffer, PT, PT_BYTE);
-
+      /* In 926b7e5, Hurdy-Gerdy claims "W3" can kill or switch out of
+	 p->buffer via signal_after_change.  So we can't assume PT and
+	 PT_BYTE.  */
+      if (BUFFERP (p->buffer))
+	set_marker_both (p->mark, p->buffer,
+			 BUF_PT (XBUFFER (p->buffer)),
+			 BUF_PT_BYTE (XBUFFER (p->buffer)));
       update_mode_lines = 23;
-
-      /* Make sure opoint and the old restrictions
-	 float ahead of any new text just as point would.  */
-      if (opoint >= before)
-	{
-	  opoint += PT - before;
-	  opoint_byte += PT_BYTE - before_byte;
-	}
-      if (old_begv > before)
-	old_begv += PT - before;
-      if (old_zv >= before)
-	old_zv += PT - before;
-
-      /* If the restriction isn't what it should be, set it.  */
-      if (old_begv != BEGV || old_zv != ZV)
-	Fnarrow_to_region (make_fixnum (old_begv), make_fixnum (old_zv));
-
-      bset_read_only (current_buffer, old_read_only);
-      SET_PT_BOTH (opoint, opoint_byte);
     }
-  return Qnil;
+  return unbind_to (count, Qnil);
 }
 
 /* Sending data to subprocess.  */
