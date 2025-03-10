@@ -161,6 +161,7 @@ if they are quoted with a backslash."
   `(;; for eshell.el
     ("COLUMNS" ,(lambda () (window-body-width nil 'remap)) t t)
     ("LINES" ,(lambda () (window-body-height nil 'remap)) t t)
+    ("TERM" eshell-term-name t)
     ("INSIDE_EMACS" eshell-inside-emacs t)
     ("PAGER" (,(lambda () (or comint-pager (getenv "PAGER")))
               . ,(lambda (_ value)
