@@ -1324,7 +1324,7 @@ prompt for DICTIONARY."
 			  dictionary-default-popup-strategy
 			  'dictionary-process-popup-replies))
 
-(defun dictionary-process-popup-replies (&ignore)
+(defun dictionary-process-popup-replies (_)
   (let ((list (dictionary-simple-split-string (dictionary-read-answer) "\n+")))
 
     (let ((result (mapcar (lambda (item)
@@ -1368,7 +1368,7 @@ prompt for DICTIONARY."
 	(dictionary-do-search word dictionary 'dictionary-read-definition t))
     nil))
 
-(defun dictionary-read-definition (&ignore)
+(defun dictionary-read-definition (_)
   (let ((list (dictionary-simple-split-string (dictionary-read-answer) "\n+")))
     (mapconcat #'identity (cdr list) "\n")))
 
@@ -1389,7 +1389,7 @@ prompt for DICTIONARY."
 (defvar dictionary-tooltip-mouse-event nil
   "Event that triggered the tooltip mode.")
 
-(defun dictionary-display-tooltip (&ignore)
+(defun dictionary-display-tooltip (_)
   "Search the current word in the `dictionary-tooltip-dictionary'."
   (interactive "e")
   (if (and dictionary-tooltip-mode dictionary-tooltip-dictionary)
@@ -1404,7 +1404,7 @@ prompt for DICTIONARY."
     nil))
 
 (defun dictionary-tooltip-track-mouse (event)
-  "Called whenever a dictionary tooltip display is about to be triggered."
+  "Hide current tooltip and setup next tooltip in response to mouse movement EVENT."
   (interactive "e")
   (tooltip-hide)
   (when dictionary-tooltip-mode
@@ -1412,7 +1412,7 @@ prompt for DICTIONARY."
     (tooltip-start-delayed-tip)))
 
 (defun dictionary-switch-tooltip-mode (on)
-  "Turn off or on support for the dictionary tooltip mode.
+  "Turn dictionary tooltip mode off or ON.
 
 It is normally internally called with 1 to enable support for the
 tooltip mode.  The hook function will check the value of the
