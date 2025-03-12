@@ -50,7 +50,11 @@
   "Return new overlay corresponding to indirect buffer of major MODE."
   (interactive
    (list (if (region-active-p) (region-beginning) (point))
-         (if (region-active-p) (region-end) (1+ (point)))
+         (if (region-active-p)
+             (region-end)
+           (if (eq (point) (point-max))
+               (user-error "Cannot create mode overlay at %s" (point))
+             (1+ (point))))
          (intern-soft
           (completing-read
            "Mode: "
@@ -60,7 +64,10 @@
                 (when (provided-mode-derived-p sym '(prog-mode))
                   (push sym modes)))) modes)
            nil t))))
-  (if (or (null mode) (string-empty-p (symbol-name mode)))
+  (if (or (null mode)
+          (string-empty-p (symbol-name mode))
+          (eq beg (point-max))
+          (>= beg end))
       (keyboard-quit)
     ;; Eschew `with-silent-modifications' since precision required.
     (let ((modified (buffer-modified-p))

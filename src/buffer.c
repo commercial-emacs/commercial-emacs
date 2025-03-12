@@ -941,7 +941,7 @@ restore_proximity (Lisp_Object restore)
    newline, insert one and return new END.  */
 
 static ptrdiff_t
-mode_overlay_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_t end)
+mode_overlay_insert_bumpguard (struct buffer *buf, ptrdiff_t end)
 {
   Lisp_Object b; XSETBUFFER (b, buf);
   specpdl_ref count = SPECPDL_INDEX ();
@@ -954,25 +954,21 @@ mode_overlay_insert_bumpguard (struct buffer *buf, const ptrdiff_t beg, ptrdiff_
 				buf->proximity->current,
 				buf->proximity->preceding,
 				buf->proximity->following));
-  buf->proximity->current = Qnil;
-  const ptrdiff_t pre = (end == BUF_BEG (buf) ? end : end - 1);
-  buf->proximity->preceding = build_marker (current_buffer, pre, CHAR_TO_BYTE (pre));
-  buf->proximity->following = build_marker (current_buffer, end, CHAR_TO_BYTE (end));
-
-  if (end <= beg
-      || end == BUF_BEG (buf)
+  if (end == BUF_BEG (buf)
       || !EQ (Fchar_before (make_fixnum (end)), make_fixnum (10)))
     {
       /* Patch in newline if one not already at END.  */
       SET_PT (end++);
       insert_char (10);
-      buf->proximity->following = build_marker (current_buffer, end, CHAR_TO_BYTE (end));
     }
+  buf->proximity->current = Qnil;
+  buf->proximity->preceding = build_marker (current_buffer, end - 1, CHAR_TO_BYTE (end - 1));
+  buf->proximity->following = build_marker (current_buffer, end, CHAR_TO_BYTE (end));
 
   /* Make the demarcating newline read-only.  */
-  Fput_text_property (make_fixnum (pre), make_fixnum (end),
+  Fput_text_property (make_fixnum (end - 1), make_fixnum (end),
 		      Qrear_nonsticky, list1 (Qread_only), Qnil);
-  Fput_text_property (make_fixnum (pre), make_fixnum (end),
+  Fput_text_property (make_fixnum (end - 1), make_fixnum (end),
 		      Qread_only, Qt, Qnil);
   unbind_to (count, Qnil);
   return end;
@@ -1223,13 +1219,10 @@ make_mode__overlay (Lisp_Object args)
   ptrdiff_t obeg = clip_to_bounds (BUF_BEG (base), XFIXNUM (beg), BUF_Z (base));
   ptrdiff_t oend = clip_to_bounds (BUF_BEG (base), XFIXNUM (end), BUF_Z (base));
 
-  const ptrdiff_t obeg1
-    = mode_overlay_insert_bumpguard (base,
-				     obeg == BUF_BEG (base) ? obeg : obeg - 1,
-				     obeg);
+  const ptrdiff_t obeg1 = mode_overlay_insert_bumpguard (base, obeg);
   oend += (obeg1 - obeg);
   obeg = obeg1;
-  oend = mode_overlay_insert_bumpguard (base, obeg, oend);
+  oend = mode_overlay_insert_bumpguard (base, oend);
 
   /* Read-only newline is part of overlay */
   add_buffer_overlay (XBUFFER (buf), XOVERLAY (ov), obeg, oend);

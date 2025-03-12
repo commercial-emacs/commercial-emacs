@@ -67,6 +67,21 @@
        (set-buffer-modified-p nil)
        (kill-buffer))))
 
+(ert-deftest mode-overlay-point-max ()
+  (with-temp-buffer
+    (should-error (call-interactively #'make-mode-overlay))))
+
+(ert-deftest mode-overlay-point-min ()
+  (with-temp-buffer
+    (save-excursion (insert "\n"))
+    (should (= (buffer-size) 1))
+    (make-mode-overlay 1 1 'js-mode)
+    (should (= (buffer-size) 2)) ;newline should have been added
+    (should (get-text-property 1 'read-only))
+    (should (get-text-property 1 'rear-nonsticky))
+    (should (get-text-property 2 'read-only))
+    (should-not (get-text-property 2 'rear-nonsticky))))
+
 (ert-deftest mode-overlay-read-only ()
   (with-temp-buffer
     (save-excursion
