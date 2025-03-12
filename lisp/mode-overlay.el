@@ -50,7 +50,7 @@
   "Return new overlay corresponding to indirect buffer of major MODE."
   (interactive
    (list (if (region-active-p) (region-beginning) (point))
-         (if (region-active-p) (region-end) (point))
+         (if (region-active-p) (region-end) (1+ (point)))
          (intern-soft
           (completing-read
            "Mode: "
