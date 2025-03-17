@@ -267,7 +267,7 @@ dynlib_close (dynlib_handle_ptr h)
   return 0;
 }
 
-#elif defined HAVE_UNISTD_H
+#elif defined HAVE_UNISTD_H /* !defined WINDOWSNT */
 
 /* POSIX systems.  */
 
@@ -323,11 +323,11 @@ dynlib_close (dynlib_handle_ptr h)
 }
 # endif
 
-#else
+#else /* !defined WINDOWSNT && !defined HAVE_UNISTD_H */
 
 #error "No dynamic loading for this system"
 
-#endif
+#endif /* defined WINDOWSNT */
 
 #if !HAVE_DLFUNC
 # define dlfunc dynlib_sym

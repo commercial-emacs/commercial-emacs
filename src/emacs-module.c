@@ -1089,16 +1089,11 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
 {
   dynlib_handle_ptr handle;
   emacs_init_function module_init;
-  void *gpl_sym;
 
   CHECK_STRING (file);
   handle = dynlib_open (SSDATA (file));
   if (!handle)
     xsignal2 (Qmodule_open_failed, file, build_string (dynlib_error ()));
-
-  gpl_sym = dynlib_sym (handle, "plugin_is_GPL_compatible");
-  if (!gpl_sym)
-    xsignal1 (Qmodule_not_gpl_compatible, file);
 
   module_init = (emacs_init_function) dynlib_func (handle, "emacs_module_init");
   if (!module_init)
@@ -1591,12 +1586,6 @@ syms_of_module (void)
 	pure_list (Qmodule_open_failed, Qmodule_load_failed, Qerror));
   Fput (Qmodule_open_failed, Qerror_message,
         build_pure_c_string ("Module could not be opened"));
-
-  DEFSYM (Qmodule_not_gpl_compatible, "module-not-gpl-compatible");
-  Fput (Qmodule_not_gpl_compatible, Qerror_conditions,
-	pure_list (Qmodule_not_gpl_compatible, Qmodule_load_failed, Qerror));
-  Fput (Qmodule_not_gpl_compatible, Qerror_message,
-        build_pure_c_string ("Module is not GPL compatible"));
 
   DEFSYM (Qmissing_module_init_function, "missing-module-init-function");
   Fput (Qmissing_module_init_function, Qerror_conditions,
