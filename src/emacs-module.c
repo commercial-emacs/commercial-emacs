@@ -106,7 +106,7 @@ To add a new module function, proceed as follows:
    objects live because their addresses would have been reused in the
    meantime.  */
 
-
+
 /* Feature tests.  */
 
 #ifdef WINDOWSNT
@@ -117,7 +117,7 @@ To add a new module function, proceed as follows:
 /* Function prototype for the module init function.  */
 typedef int (*emacs_init_function) (struct emacs_runtime *);
 
-
+
 /* Memory management.  */
 
 /* An `emacs_value' is just a pointer to a structure holding an
@@ -154,7 +154,7 @@ struct emacs_value_storage
   struct emacs_value_frame *current;
 };
 
-
+
 /* Private runtime and environment members.  */
 
 /* The private part of an environment stores the current non local exit state
@@ -178,7 +178,7 @@ struct emacs_runtime_private
 {
   emacs_env *env;
 };
-
+
 
 /* Forward declarations.  */
 
@@ -204,7 +204,7 @@ static bool value_storage_contains_p (const struct emacs_value_storage *,
                                       emacs_value, ptrdiff_t *);
 
 static bool module_assertions = false;
-
+
 
 /* Small helper functions.  */
 
@@ -223,7 +223,7 @@ module_decode_utf_8 (const char *str, ptrdiff_t len)
   return s;
 }
 
-
+
 /* Convenience macros for non-local exit handling.  */
 
 /* FIXME: The following implementation for non-local exit handling
@@ -282,7 +282,7 @@ module_decode_utf_8 (const char *str, ptrdiff_t len)
     }									\
   do { } while (false)
 
-
+
 /* Implementation of runtime and environment functions.
 
    These should abide by the following rules:
@@ -1062,7 +1062,7 @@ module_open_channel (emacs_env *env, emacs_value pipe_process)
   return open_channel_for_module (value_to_lisp (pipe_process));
 }
 
-
+
 /* Subroutines.  */
 
 static void
@@ -1220,7 +1220,7 @@ module_function_data (const struct Lisp_Module_Function *function)
   return function->data;
 }
 
-
+
 /* Helper functions.  */
 
 static void
@@ -1290,7 +1290,7 @@ module_out_of_memory (emacs_env *env)
   module_non_local_exit_signal_1 (env, Qerror, Qnil);
 }
 
-
+
 /* Value conversion.  */
 
 /* Convert an `emacs_value' to the corresponding internal object.
@@ -1415,7 +1415,7 @@ mark_module_environment (void *ptr)
       mark_object (&frame->objects[i].v);
 }
 
-
+
 /* Environment lifetime management.  */
 
 /* Must be called before the environment can be used.  Returns another
@@ -1499,7 +1499,7 @@ finalize_runtime_unwind (void *raw_ert)
      unwound separately.  See the logic in Fmodule_load.  */
 }
 
-
+
 /* Non-local exit handling.  */
 
 /* gcc cleanup attribute resets exception stack after internal_handler
@@ -1529,7 +1529,7 @@ module_handle_nonlocal_exit (emacs_env *env, enum nonlocal_exit type,
     }
 }
 
-
+
 /* Support for assertions.  */
 void
 init_module_assertions (bool enable)
@@ -1570,7 +1570,7 @@ module_abort (const char *format, ...)
   emacs_abort ();
 }
 
-
+
 /* Segment initializer.  */
 
 void

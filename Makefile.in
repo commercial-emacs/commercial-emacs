@@ -409,8 +409,8 @@ blessmail: Makefile src
 
 MAKEFILE_NAME = Makefile
 $(MAKEFILE_NAME): config.status $(srcdir)/configure \
-	 $(srcdir)/lib/gnulib.mk.in \
-         $(srcdir)/Makefile.in $(SUBDIR_MAKEFILES_IN) $(CONFIG_STATUS_FILES_IN)
+	$(srcdir)/lib/gnulib.mk.in \
+	$(srcdir)/Makefile.in $(SUBDIR_MAKEFILES_IN) $(CONFIG_STATUS_FILES_IN)
 	MAKE='$(MAKE)' ./config.status
 
 # Don't erase these files if make is interrupted.
