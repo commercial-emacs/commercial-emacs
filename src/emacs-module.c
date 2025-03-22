@@ -95,18 +95,6 @@ To add a new module function, proceed as follows:
 
 #include <intprops.h>
 
-/* We use different strategies for allocating the user-visible objects
-   (struct emacs_runtime, emacs_env, emacs_value), depending on
-   whether the user supplied the -module-assertions flag.  If
-   assertions are disabled, all objects are allocated from the stack.
-   If assertions are enabled, all objects are allocated from the free
-   store, and objects are never freed; this guarantees that they all
-   have different addresses.  We use that for checking which objects
-   are live.  Without unique addresses, we might consider some dead
-   objects live because their addresses would have been reused in the
-   meantime.  */
-
-
 /* Feature tests.  */
 
 #ifdef WINDOWSNT
@@ -120,7 +108,7 @@ typedef int (*emacs_init_function) (struct emacs_runtime *);
 
 /* Memory management.  */
 
-/* An `emacs_value' is just a pointer to a structure holding an
+/* An emacs_value is just a pointer to a structure holding an
    internal Lisp object.  */
 struct emacs_value_tag { Lisp_Object v; };
 
@@ -132,7 +120,7 @@ struct emacs_value_tag { Lisp_Object v; };
 
 enum { value_frame_size = 512 };
 
-/* A block from which `emacs_value' object can be allocated.  */
+/* A block from which emacs_value object can be allocated.  */
 struct emacs_value_frame
 {
   /* Storage for values.  */
@@ -158,7 +146,7 @@ struct emacs_value_storage
 /* Private runtime and environment members.  */
 
 /* The private part of an environment stores the current non local exit state
-   and holds the `emacs_value' objects allocated during the lifetime
+   and holds the emacs_value objects allocated during the lifetime
    of the environment.  */
 struct emacs_env_private
 {
@@ -172,7 +160,7 @@ struct emacs_env_private
   struct emacs_value_storage storage;
 };
 
-/* The private parts of an `emacs_runtime' object contain the initial
+/* The private parts of an emacs_runtime object contain the initial
    environment.  */
 struct emacs_runtime_private
 {
@@ -1105,14 +1093,14 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
   struct emacs_env_private env_priv;
   rt_priv.env = initialize_environment (&env_pub, &env_priv);
 
-  /* If we should use module assertions, reallocate the runtime object
-     from the free store, but never free it.  That way the addresses
-     for two different runtime objects are guaranteed to be distinct,
-     which we can use for checking the liveness of runtime
-     pointers.  */
   struct emacs_runtime *rt;
   if (module_assertions)
     {
+      /* If --module-assertions, persist (for the program lifetime) a
+	 heap object guaranteeing unique address.  Without unique
+	 addresses, we might consider dead objects live if their
+	 addresses were reused in the meantime.
+      */
       rt = xmalloc (sizeof *rt);
       __lsan_ignore_object (rt);
     }
@@ -1288,7 +1276,7 @@ module_out_of_memory (emacs_env *env)
 
 /* Value conversion.  */
 
-/* Convert an `emacs_value' to the corresponding internal object.
+/* Convert an emacs_value to the corresponding internal object.
    Never fails.  */
 
 /* If V was computed from lisp_to_value (O), then return O.
@@ -1329,7 +1317,7 @@ value_to_lisp (emacs_value v)
  ok: return v->v;
 }
 
-/* Convert an internal object to an `emacs_value'.  Allocate storage
+/* Convert an internal object to an emacs_value.  Allocate storage
    from the environment; return NULL if allocation fails.  */
 static emacs_value
 lisp_to_value (emacs_env *env, Lisp_Object o)
@@ -1410,20 +1398,17 @@ mark_module_environment (void *ptr)
       mark_object (&frame->objects[i].v);
 }
 
-
 /* Environment lifetime management.  */
-
-/* Must be called before the environment can be used.  Returns another
-   pointer that callers should use instead of the ENV argument.  If
-   module assertions are disabled, the return value is ENV.  If module
-   assertions are enabled, the return value points to a heap-allocated
-   object.  That object is never freed to guarantee unique
-   addresses.  */
 static emacs_env *
 initialize_environment (emacs_env *env, struct emacs_env_private *priv)
 {
   if (module_assertions)
     {
+      /* If --module-assertions, persist (for the program lifetime) a
+	 heap object guaranteeing unique address.  Without unique
+	 addresses, we might consider dead objects live if their
+	 addresses were reused in the meantime.
+      */
       env = xmalloc (sizeof *env);
       __lsan_ignore_object (env);
     }

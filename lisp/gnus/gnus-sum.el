@@ -4919,7 +4919,7 @@ Unscored articles will be counted as having a score of zero."
   "Return the highest article number in THREAD."
   (apply #'max (mapcar (lambda (header)
 			(mail-header-number header))
-		      (flatten-tree thread))))
+		      (flatten-tree (gnus-thread-header thread)))))
 
 (defun gnus-article-sort-by-most-recent-date (h1 h2)
   "Sort articles by number."
@@ -4949,7 +4949,7 @@ Unscored articles will be counted as having a score of zero."
 	 (mapcar (lambda (header) (float-time
 				   (gnus-date-get-time
 				    (mail-header-date header))))
-		 (flatten-tree thread))))
+		 (flatten-tree (gnus-thread-header thread)))))
 
 (defun gnus-thread-total-score-1 (root)
   ;; This function find the total score of the thread below ROOT.
