@@ -2588,7 +2588,7 @@ init_symbol (Lisp_Object val, Lisp_Object name)
   set_symbol_plist (val, Qnil);
   p->u.s.type = SYMBOL_PLAINVAL;
   SET_SYMBOL_VAL (p, Qunbound);
-  set_symbol_function (val, Qnil);
+  SET_SYMBOL_FUNC (p, Qnil);
   set_symbol_next (val, NULL);
   p->u.s.gcmarkbit = false;
   p->u.s.interned = SYMBOL_UNINTERNED;

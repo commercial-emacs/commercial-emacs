@@ -3902,7 +3902,7 @@ run_window_change_functions_1 (Lisp_Object symbol, Lisp_Object buffer,
 
   if (NILP (buffer))
     funs = Fdefault_value (symbol);
-  else if (!NILP (Fassoc (symbol, BVAR (XBUFFER (buffer), local_var_alist),
+  else if (!NILP (Fassoc (symbol, BVAR (XBUFFER (buffer), local_val_alist),
 			  Qnil)))
     /* Don't run global value buffer-locally.  */
     funs = find_symbol_value (XSYMBOL (symbol), NULL);

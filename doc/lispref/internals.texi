@@ -2299,7 +2299,7 @@ stores the value of @code{buffer-undo-list}.
 The mark for the buffer.  The mark is a marker, hence it is also
 included on the list @code{markers}.  @xref{The Mark}.
 
-@item local_var_alist
+@item local_val_alist
 The association list describing the buffer-local variable bindings of
 this buffer, not including the built-in buffer-local bindings that
 have special slots in the buffer object.  (Those slots are omitted

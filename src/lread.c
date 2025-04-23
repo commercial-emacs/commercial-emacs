@@ -4868,7 +4868,7 @@ defsubr (union Aligned_Lisp_Subr *aname)
   sym = intern_c_string (sname->symbol_name);
   XSETPVECTYPE (sname, PVEC_SUBR);
   XSETSUBR (tem, sname);
-  set_symbol_function (sym, tem);
+  SET_SYMBOL_FUNC (XSYMBOL (sym), tem);
 #ifdef HAVE_NATIVE_COMP
   eassert (NILP (Vcomp_native_version_dir));
   Vcomp_subr_list = Fpurecopy_maybe (Fcons (tem, Vcomp_subr_list));

@@ -381,7 +381,10 @@ struct buffer
   Lisp_Object mark_;
 
   /* Alist of elements (SYMBOL . BUFFER-LOCAL-VALUE) */
-  Lisp_Object local_var_alist_;
+  Lisp_Object local_val_alist_;
+
+  /* Alist of elements (SYMBOL . BUFFER-LOCAL-FUNCTION) */
+  Lisp_Object local_func_alist_;
 
   /* Symbol naming major mode (e.g., lisp-mode).  */
   Lisp_Object major_mode_;
@@ -840,9 +843,14 @@ bset_last_selected_window (struct buffer *b, Lisp_Object val)
   b->last_selected_window_ = val;
 }
 INLINE void
-bset_local_var_alist (struct buffer *b, Lisp_Object val)
+bset_local_val_alist (struct buffer *b, Lisp_Object val)
 {
-  b->local_var_alist_ = val;
+  b->local_val_alist_ = val;
+}
+INLINE void
+bset_local_func_alist (struct buffer *b, Lisp_Object func)
+{
+  b->local_func_alist_ = func;
 }
 INLINE void
 bset_mark_active (struct buffer *b, Lisp_Object val)

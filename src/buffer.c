@@ -93,7 +93,7 @@ static void alloc_buffer_text (struct buffer *, ptrdiff_t);
 static void free_buffer_text (struct buffer *b);
 static void copy_overlays (struct buffer *, struct buffer *);
 static void modify_overlay (struct buffer *, ptrdiff_t, ptrdiff_t);
-static Lisp_Object buffer_lisp_local_variables (struct buffer *, bool);
+static Lisp_Object buffer_lisp_local_values (struct buffer *, bool);
 static Lisp_Object buffer_local_variables_1 (struct buffer *buf, int offset, Lisp_Object sym);
 
 static void
@@ -715,7 +715,7 @@ clone_per_buffer_values (struct buffer *from, struct buffer *to)
 
   /* Get (a copy of) the alist of Lisp-level local variables of FROM
      and install that in TO.  */
-  bset_local_var_alist (to, buffer_lisp_local_variables (from, 1));
+  bset_local_val_alist (to, buffer_lisp_local_values (from, 1));
 }
 
 
@@ -1453,7 +1453,7 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
   bset_case_eqv_table (b, XCHAR_TABLE (Vascii_downcase_table)->extras[2]);
   bset_invisibility_spec (b, Qt);
 
-  Lisp_Object tail = Fcopy_sequence (BVAR (b, local_var_alist));
+  Lisp_Object tail = Fcopy_sequence (BVAR (b, local_val_alist));
   FOR_EACH_TAIL_SAFE (tail)
     {
       Lisp_Object pair = XCAR (tail),
@@ -1486,7 +1486,7 @@ reset_buffer_local_variables (struct buffer *b, bool ignore_perm)
 	}
     }
 
-  eassert (!ignore_perm || NILP (BVAR (b, local_var_alist)));
+  eassert (!ignore_perm || NILP (BVAR (b, local_val_alist)));
 
   /* Douse local_flags bit for killed.  */
   for (int i = 0; i < last_per_buffer_idx; ++i)
@@ -1621,10 +1621,10 @@ is the default binding of the variable.  */)
    by VAR.  */
 
 static Lisp_Object
-buffer_lisp_local_variables (struct buffer *buf, bool clone)
+buffer_lisp_local_values (struct buffer *buf, bool clone)
 {
   Lisp_Object result = Qnil;
-  for (Lisp_Object tail = BVAR (buf, local_var_alist);
+  for (Lisp_Object tail = BVAR (buf, local_val_alist);
        CONSP (tail);
        tail = XCDR (tail))
     {
@@ -1681,7 +1681,7 @@ No argument or nil as argument means use current buffer as BUFFER.  */)
 {
   int offset;
   struct buffer *b = BUFFERP (buffer) ? XBUFFER (buffer) : current_buffer;
-  Lisp_Object result = buffer_lisp_local_variables (b, 0);
+  Lisp_Object result = buffer_lisp_local_values (b, 0);
 
   /* Add all slots.  */
   FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
@@ -2536,7 +2536,7 @@ set_buffer_internal (struct buffer *new_buf)
   */
   if (old_buf)
     {
-      tail = BVAR (old_buf, local_var_alist);
+      tail = BVAR (old_buf, local_val_alist);
       FOR_EACH_TAIL_SAFE (tail)
 	{
 	  Lisp_Object var = XCAR (XCAR (tail));
@@ -2546,7 +2546,7 @@ set_buffer_internal (struct buffer *new_buf)
 
   /* Intersection of OLD_BUF and NEW_BUF blv's switched.  Now do rest
      of NEW_BUF's blv's.  */
-  tail = BVAR (current_buffer, local_var_alist);
+  tail = BVAR (current_buffer, local_val_alist);
   FOR_EACH_TAIL_SAFE (tail)
     {
       Lisp_Object var = XCAR (XCAR (tail));
@@ -4900,7 +4900,8 @@ init_buffer_once (void)
   bset_name (&buffer_slot_map, make_fixnum (0));
   bset_last_name (&buffer_slot_map, make_fixnum (0));
   bset_mark (&buffer_slot_map, make_fixnum (0));
-  bset_local_var_alist (&buffer_slot_map, make_fixnum (0));
+  bset_local_val_alist (&buffer_slot_map, make_fixnum (0));
+  bset_local_func_alist (&buffer_slot_map, make_fixnum (0));
   bset_keymap (&buffer_slot_map, make_fixnum (0));
   bset_downcase_table (&buffer_slot_map, make_fixnum (0));
   bset_upcase_table (&buffer_slot_map, make_fixnum (0));

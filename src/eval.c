@@ -2744,9 +2744,7 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
 {
   Lisp_Object original_fun = fun;
  retry:
-  if (SYMBOLP (fun) && !NILP (fun)
-      && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
-    fun = indirect_function (fun);
+  fun = indirect_function (fun);
 
   if (SUBRP (fun) && !NATIVE_COMP_FUNCTION_DYNP (fun))
     return funcall_subr (XSUBR (fun), numargs, args);

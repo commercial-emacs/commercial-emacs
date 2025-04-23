@@ -351,6 +351,9 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
    (eassert ((sym)->u.s.type == SYMBOL_PLAINVAL), \
     (sym)->u.s.val.value = (v))
+#define lisp_h_SET_SYMBOL_FUNC(sym, f) \
+   (eassert (NILP (f) || SUBRP (f)), \
+    (sym)->u.s.function = (f))
 #define lisp_h_SYMBOL_CONSTANT_P(sym) \
    (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_NOWRITE)
 #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (XSYMBOL (sym)->u.s.trapped_write)
@@ -2066,6 +2069,12 @@ INLINE void
 }
 
 INLINE void
+(SET_SYMBOL_FUNC) (struct Lisp_Symbol *sym, Lisp_Object f)
+{
+  lisp_h_SET_SYMBOL_FUNC (sym, f);
+}
+
+INLINE void
 SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
 {
   eassume (sym->u.s.type == SYMBOL_VARALIAS && v);
@@ -3635,12 +3644,6 @@ set_hash_value_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, Lisp_Object val)
 
 /* Use these functions to set Lisp_Object
    or pointer slots of struct Lisp_Symbol.  */
-
-INLINE void
-set_symbol_function (Lisp_Object sym, Lisp_Object function)
-{
-  XSYMBOL (sym)->u.s.function = function;
-}
 
 INLINE void
 set_symbol_plist (Lisp_Object sym, Lisp_Object plist)
