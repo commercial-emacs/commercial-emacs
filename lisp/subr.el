@@ -201,10 +201,6 @@ buffer-local wherever it is set."
   (list 'progn (list 'defvar var val docstring)
         (list 'make-variable-buffer-local (list 'quote var))))
 
-(defmacro fset-local (var val)
-  "Make VAR buffer-local and binds its buffer-local function slot to VAL."
-  `(fset (make-local-variable ',var) ,val))
-
 (defun buffer-local-boundp (symbol buffer)
   "Return non-nil if SYMBOL is bound in BUFFER.
 This function was a mistake, and is equivalent to the less

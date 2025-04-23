@@ -817,6 +817,14 @@ comparing the subr with a much slower Lisp implementation."
   (should-error (fset 'data-tests--fs-c 'data-tests--fs-d)
                 :type 'cyclic-function-indirection))
 
+(ert-deftest data-tests-fset-local ()
+  (with-temp-buffer
+    (declare-function foo nil)
+    (should-error (call-interactively #'foo))
+    (fset-local 'foo #'ignore)
+    (should-not (call-interactively #'foo)))
+  (should-error (call-interactively #'foo)))
+
 (ert-deftest data-tests-defalias ()
   (defalias 'data-tests--da-fun (lambda () 'baa))
   (declare-function data-tests--da-fun nil)

@@ -2272,23 +2272,15 @@ are available:
                         command-completion-using-modes-and-keymaps-p)
                  (function :tag "Other predicate function")))
 
-(defun execute-extended-command-cycle ()
-  "Choose the next version of the extended command predicates.
-See `extended-command-versions'."
+(defun toggle-extended-command-predicate ()
+  "Return a suitable initial-input for alternative predicate."
   (interactive)
-  (throw 'cycle
-         (cons (minibuffer-contents)
-               (- (point) (minibuffer-prompt-end)))))
-
-(defvar extended-command-versions
-  (list (list "M-x " (lambda () read-extended-command-predicate))
-        (list "M-X " #'command-completion--command-for-this-buffer-function))
-  "Alist of prompts and what the extended command predicate should be.
-This is used by the \\<minibuffer-local-must-match-map>\\[execute-extended-command-cycle] command when reading an extended command.")
+  (throw 'toggle (cons (minibuffer-contents)
+                       (- (point) (minibuffer-prompt-end)))))
 
 (defvar-keymap read-extended-command-mode-map
-  :doc "Local keymap added to the current map when reading an extended command."
-  "M-X" #'execute-extended-command-cycle)
+  :doc "Toggle between M-x and M-X."
+  "M-X" #'toggle-extended-command-predicate)
 
 (define-minor-mode read-extended-command-mode
   "Minor mode used for completion in `read-extended-command'.")
@@ -2296,41 +2288,24 @@ This is used by the \\<minibuffer-local-must-match-map>\\[execute-extended-comma
 (defun read-extended-command (&optional prompt)
   "Read command name to invoke via `execute-extended-command'.
 Use `read-extended-command-predicate' to determine which commands
-to include among completion candidates.
+to include among completion candidates."
+  (let* ((M-x "M-x ")
+         (M-X "M-X ")
+         (prompt (or prompt M-x))
+         input-thus-far)
+    (while (not (stringp input-thus-far))
+      (setq input-thus-far
+            (read-extended-command-1
+             prompt input-thus-far
+             (if (equal prompt M-x)
+                 read-extended-command-predicate
+               (command-completion--command-for-this-buffer-function))))
+      (setq prompt (if (equal prompt M-x) M-X M-x)))
+    input-thus-far))
 
-This function activates the `read-extended-command-mode' minor
-mode when reading the command name."
-  (let ((default-predicate read-extended-command-predicate)
-        (read-extended-command-predicate read-extended-command-predicate)
-        already-typed ret)
-    ;; If we have a prompt (which is the name of the version of the
-    ;; command), then set up the predicate from
-    ;; `extended-command-versions'.
-    (if (not prompt)
-        (setq prompt (caar extended-command-versions))
-      (setq read-extended-command-predicate
-            (funcall (cadr (assoc prompt extended-command-versions)))))
-    ;; Normally this will only execute once.
-    (while (not (stringp ret))
-      (when (consp (setq ret (catch 'cycle
-                               (read-extended-command-1 prompt
-                                                        already-typed))))
-        ;; But if the user hit `M-X', then we `throw'ed out to that
-        ;; `catch', and we cycle to the next setting.
-        (let ((next (or (cadr (memq (assoc prompt extended-command-versions)
-                                    extended-command-versions))
-                        ;; Last one; cycle back to the first.
-                        (car extended-command-versions))))
-          ;; Restore the user's default predicate.
-          (setq read-extended-command-predicate default-predicate)
-          ;; Then calculate the next.
-          (setq prompt (car next)
-                read-extended-command-predicate (funcall (cadr next))
-                already-typed ret))))
-    ret))
-
-(defun read-extended-command-1 (prompt initial-input)
-  (let ((buffer (current-buffer)))
+(defun read-extended-command-1 (prompt initial-input predicate)
+  (let ((buffer (current-buffer))
+        (read-extended-command-predicate predicate))
     (minibuffer-with-setup-hook
         (lambda ()
           (add-hook 'post-self-insert-hook
@@ -2338,7 +2313,6 @@ mode when reading the command name."
                       (setq execute-extended-command--last-typed
                             (minibuffer-contents)))
                     nil 'local)
-          ;; This is so that we define the `M-X' toggling command.
           (read-extended-command-mode)
           (setq-local minibuffer-default-add-function
 	              (lambda ()
@@ -2355,66 +2329,50 @@ mode when reading the command name."
 		          (if def
 		              (cons def (delete def all))
 		            all)))))
-      ;; Read a string, completing from and restricting to the set of
-      ;; all defined commands.  Save the command read on the
-      ;; extended-command history list.
-      (completing-read
-       (concat (cond
-	        ((eq current-prefix-arg '-) "- ")
-	        ((and (consp current-prefix-arg)
-		      (eq (car current-prefix-arg) 4))
-		 "C-u ")
-	        ((and (consp current-prefix-arg)
-		      (integerp (car current-prefix-arg)))
-	         (format "%d " (car current-prefix-arg)))
-	        ((integerp current-prefix-arg)
-	         (format "%d " current-prefix-arg)))
-	       ;; This isn't strictly correct if `execute-extended-command'
-	       ;; is bound to anything else (e.g. [menu]).
-	       ;; It could use (key-description (this-single-command-keys)),
-	       ;; but actually a prompt other than "M-x" would be confusing,
-	       ;; because "M-x" is a well-known prompt to read a command
-	       ;; and it serves as a shorthand for "Extended command: ".
-               (or prompt "M-x "))
-       (lambda (string pred action)
-         (if (and suggest-key-bindings (eq action 'metadata))
-	     '(metadata
-	       (affixation-function . read-extended-command--affixation)
-	       (category . command))
-           (let ((pred
-                  (if (memq action '(nil t))
-                      ;; Exclude from completions obsolete commands
-                      ;; lacking a `current-name', or where `when' is
-                      ;; not the current major version.
-                      (lambda (sym)
-                        (let ((obsolete (get sym 'byte-obsolete-info)))
-                          (and (funcall pred sym)
-                               (or (equal string (symbol-name sym))
-                                   (not obsolete)
-                                   (and
-                                    ;; Has a current-name.
-                                    (functionp (car obsolete))
-                                    ;; when >= emacs-major-version
-                                    (condition-case nil
-                                        (>= (car (version-to-list
-                                                  (caddr obsolete)))
-                                            emacs-major-version)
-                                      ;; If the obsoletion version isn't
-                                      ;; valid, include the command.
-                                      (error t)))))))
-                    pred)))
-             (complete-with-action action obarray string pred))))
-       (lambda (sym)
-         (and (commandp sym)
-              (cond ((null read-extended-command-predicate))
-                    ((functionp read-extended-command-predicate)
-                     ;; Don't let bugs break M-x completion; interpret
-                     ;; them as the absence of a predicate.
-                     (condition-case-unless-debug err
-                         (funcall read-extended-command-predicate sym buffer)
-                       (error (message "read-extended-command-predicate: %s: %s"
-                                       sym (error-message-string err))))))))
-       t initial-input 'extended-command-history))))
+      (catch 'toggle ;thrown by toggle-extended-command-predicate
+        (completing-read ;restrict completions to defined commands
+         (concat (cond
+	          ((eq current-prefix-arg '-) "- ")
+	          ((and (consp current-prefix-arg)
+		        (eq (car current-prefix-arg) 4))
+		   "C-u ")
+	          ((and (consp current-prefix-arg)
+		        (integerp (car current-prefix-arg)))
+	           (format "%d " (car current-prefix-arg)))
+	          ((integerp current-prefix-arg)
+	           (format "%d " current-prefix-arg)))
+                 prompt)
+         (lambda (string pred action)
+           (if (and suggest-key-bindings (eq action 'metadata))
+	       '(metadata
+	         (affixation-function . read-extended-command--affixation)
+	         (category . command))
+             (complete-with-action
+              action obarray string
+              (if (memq action '(nil t))
+                  (lambda (sym)
+                    (and (funcall pred sym)
+                         ;; add an "also not obsolete" condition to PRED
+                         (or (equal string (symbol-name sym))
+                             (let ((obsolete (get sym 'byte-obsolete-info)))
+                               (or (not obsolete)
+                                   (when (functionp (car obsolete))
+                                     (ignore-errors
+                                       (>= (car (version-to-list (caddr obsolete)))
+                                           emacs-major-version))))))))
+                pred))))
+         (lambda (sym)
+           (and (with-current-buffer buffer
+                  (commandp sym))
+                (condition-case-unless-debug err
+                    (funcall (if (functionp read-extended-command-predicate)
+                                 read-extended-command-predicate
+                               (lambda (&rest _args) t))
+                             sym buffer)
+                  (error (prog1 t ;permit any if bad predicate
+                           (message "read-extended-command-predicate: %s: %s"
+                                    sym (error-message-string err)))))))
+         t initial-input 'extended-command-history)))))
 
 (defun command-completion-using-modes-p (symbol buffer)
   "Say whether SYMBOL has been marked as a mode-specific command in BUFFER."

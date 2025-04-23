@@ -4726,11 +4726,10 @@ which is at the core of flex logic.  The extra
 It should accept the same arguments as `completing-read'.")
 
 (defun completing-read-default (prompt collection &optional predicate
-                                       require-match initial-input
-                                       hist def inherit-input-method)
+                                require-match initial-input
+                                hist def inherit-input-method)
   "Default method for reading from the minibuffer with completion.
 See `completing-read' for the meaning of the arguments."
-
   (when (consp initial-input)
     (setq initial-input
           (cons (car initial-input)

@@ -839,7 +839,7 @@ DEFUN ("fboundp", Ffboundp, Sfboundp, 1, 1, 0,
   (Lisp_Object symbol)
 {
   CHECK_SYMBOL (symbol);
-  return NILP (XSYMBOL (symbol)->u.s.function) ? Qnil : Qt;
+  return !NILP (Fsymbol_function (symbol)) ? Qt : Qnil;
 }
 
 DEFUN ("makunbound", Fmakunbound, Smakunbound, 1, 1, 0,
@@ -880,7 +880,7 @@ See also `makunbound'.  */)
   return symbol;
 }
 
-static Lisp_Object
+Lisp_Object
 find_symbol_function (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
 {
   if (!NILP (current_thread->obarray))
@@ -899,17 +899,11 @@ find_symbol_function (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
     }
 
   Lisp_Object result = xsymbol->u.s.function;
-  if (xsymbol->u.s.type == SYMBOL_LOCAL_SOMEWHERE)
-    {
-      struct buffer *b = xbuffer ? xbuffer : current_buffer;
-      Lisp_Object pair = assq_no_quit (make_lisp_ptr (xsymbol, Lisp_Symbol),
-                                       BVAR (b, local_func_alist));
-      if (CONSP (pair))
-        result = XCDR (pair);
-      if (b == current_buffer)
-        /* See find_symbol_value function header.  */
-        switch_buffer_local_context (xsymbol, b);
-    }
+  Lisp_Object pair = assq_no_quit (make_lisp_ptr (xsymbol, Lisp_Symbol),
+				   BVAR (xbuffer ? xbuffer : current_buffer,
+					 local_func_alist));
+  if (CONSP (pair))
+    result = XCDR (pair);
   return result;
 }
 
@@ -943,11 +937,29 @@ Doing that might make Emacs dysfunctional, and might even crash Emacs.  */)
   return name;
 }
 
-static void
-set_symbol_function (Lisp_Object sym, Lisp_Object function, Lisp_Object buffer)
+DEFUN ("fset-local", Ffset_local, Sfset_local, 2, 2, 0,
+       doc: /* Set SYMBOL's buffer-local function definition.  */)
+  (register Lisp_Object symbol, Lisp_Object definition)
 {
-  (void) buffer;
-  XSYMBOL (sym)->u.s.function = function;
+  CHECK_SYMBOL (symbol);
+  if (NILP (symbol) && !NILP (definition))
+    xsignal1 (Qsetting_constant, symbol);
+  eassert (valid_lisp_object_p (definition));
+
+  /* Ensure non-circularity.  */
+  for (Lisp_Object s = definition; SYMBOLP (s) && !NILP (s);
+       s = XSYMBOL (s)->u.s.function)
+    if (EQ (s, symbol))
+      xsignal1 (Qcyclic_function_indirection, symbol);
+
+  Lisp_Object pair = assq_no_quit (symbol, BVAR (current_buffer, local_func_alist));
+  if (!NILP (pair))
+    XSETCDR (pair, definition);
+  else
+    bset_local_func_alist (current_buffer,
+			   Fcons (Fcons (symbol, definition),
+				  BVAR (current_buffer, local_func_alist)));
+  return definition;
 }
 
 DEFUN ("fset", Ffset, Sfset, 2, 2, 0,
@@ -969,15 +981,15 @@ signal a `cyclic-function-indirection' error.  */)
       xsignal1 (Qcyclic_function_indirection, symbol);
 
 #ifdef HAVE_NATIVE_COMP
-  Lisp_Object function = find_symbol_function (XSYMBOL (s), current_buffer);
+  Lisp_Object function = find_symbol_function (XSYMBOL (symbol), current_buffer);
   if (NILP (Vnative_comp_disable_subr_trampolines)
       && SUBRP (function)
-      && EQ (function,  XSYMBOL (symbol)->u.s.function) /* not buffer local */
+      && EQ (function, XSYMBOL (symbol)->u.s.function) /* not buffer local */
       && !NATIVE_COMP_FUNCTIONP (function))
     CALLN (Ffuncall, Qcomp_subr_trampoline_install, symbol);
 #endif
 
-  set_symbol_function (symbol, definition, Qnil);
+  XSYMBOL (symbol)->u.s.function = definition;
   return definition;
 }
 
@@ -1445,7 +1457,7 @@ find_symbol_value (struct Lisp_Symbol *xsymbol, struct buffer *xbuffer)
     case SYMBOL_PER_BUFFER:
     case SYMBOL_KBOARD:
       result = fwd_get (SYMBOL_FWD (xsymbol), b);
-      eassert (!(EQ (result, Qunbound)));
+      eassert (!EQ (result, Qunbound));
       break;
     default:
       emacs_abort ();
@@ -1512,7 +1524,7 @@ locally_bind_new_blv (Lisp_Object variable)
   /* set_internal() won't modify the default binding if
      local_variable_p is true, that is, the buffer has its own bespoke
      local binding.  */
-  eassert (Flocal_variable_p (variable, Fcurrent_buffer ()));
+  eassert (!NILP (Flocal_variable_p (variable, Fcurrent_buffer ())));
   return pair;
 }
 
@@ -2071,6 +2083,11 @@ kill_local_variable_internal (struct Lisp_Symbol *sym, struct buffer *buffer)
     default:
       break;
     }
+
+  /* Delete from LOCAL_FUNC_ALIST.  */
+  Lisp_Object pair = Fassq (variable, BVAR (buffer, local_func_alist));
+  if (!NILP (pair))
+    bset_local_func_alist (buffer, Fdelq (pair, BVAR (buffer, local_func_alist)));
   return variable;
 }
 
@@ -2213,7 +2230,10 @@ Lisp_Object
 indirect_function (Lisp_Object object)
 {
   while (SYMBOLP (object) && !NILP (object))
-    object = Fsymbol_function (object);
+    {
+      maybe_quit ();
+      object = Fsymbol_function (object);
+    }
   return object;
 }
 
@@ -3958,6 +3978,7 @@ syms_of_data (void)
   defsubr (&Sfmakunbound);
   defsubr (&Sboundp);
   defsubr (&Sfboundp);
+  defsubr (&Sfset_local);
   defsubr (&Sfset);
   defsubr (&Sdefalias);
   defsubr (&Ssetplist);

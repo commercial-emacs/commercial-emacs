@@ -2005,12 +2005,8 @@ If the optional argument FOR-CALL-INTERACTIVELY is non-nil,
 then strings and vectors are not accepted.  */)
   (Lisp_Object function, Lisp_Object for_call_interactively)
 {
-  register Lisp_Object fun;
   bool genfun = false; /* If true, we should consult `interactive-form'.  */
-
-  fun = function;
-
-  fun = indirect_function (fun);
+  Lisp_Object fun = indirect_function (function);
   if (NILP (fun))
     return Qnil;
 
@@ -2318,7 +2314,7 @@ eval_form (Lisp_Object form)
       fun = original_fun;
       if (!SYMBOLP (fun))
 	fun = Ffunction (list1 (fun));
-      else if (!NILP (fun) && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
+      else if (!NILP (fun))
 	fun = indirect_function (fun);
 
       if (SUBRP (fun) && !NATIVE_COMP_FUNCTION_DYNP (fun))
@@ -2436,15 +2432,10 @@ usage: (apply FUNCTION &rest ARGUMENTS)  */)
 
   numargs += nargs - 2;
 
-  /* Optimize for no indirection.  */
-  if (SYMBOLP (fun) && !NILP (fun)
-      && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
-    {
-      fun = indirect_function (fun);
-      if (NILP (fun))
-	/* Let funcall get the error.  */
-	fun = args[0];
-    }
+  fun = indirect_function (fun);
+  if (NILP (fun))
+    /* Let funcall get the error.  */
+    fun = args[0];
 
   if (SUBRP (fun) && XSUBR (fun)->max_args > numargs
       /* Don't hide an error by adding missing arguments.  */
@@ -2745,33 +2736,28 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
   Lisp_Object original_fun = fun;
  retry:
   fun = indirect_function (fun);
-
   if (SUBRP (fun) && !NATIVE_COMP_FUNCTION_DYNP (fun))
     return funcall_subr (XSUBR (fun), numargs, args);
   else if (CLOSUREP (fun)
 	   || NATIVE_COMP_FUNCTION_DYNP (fun)
 	   || MODULE_FUNCTIONP (fun))
     return funcall_lambda (fun, numargs, args);
-  else
+  else if (NILP (fun))
+    xsignal1 (Qvoid_function, original_fun);
+  else if (!CONSP (fun))
+    xsignal1 (Qinvalid_function, original_fun);
+  else if (!SYMBOLP (XCAR (fun)))
+    xsignal1 (Qinvalid_function, original_fun);
+  else if (EQ (XCAR (fun), Qlambda))
+    return funcall_lambda (fun, numargs, args);
+  else if (EQ (XCAR (fun), Qautoload))
     {
-      if (NILP (fun))
-	xsignal1 (Qvoid_function, original_fun);
-      if (!CONSP (fun))
-	xsignal1 (Qinvalid_function, original_fun);
-      Lisp_Object funcar = XCAR (fun);
-      if (!SYMBOLP (funcar))
-	xsignal1 (Qinvalid_function, original_fun);
-      if (EQ (funcar, Qlambda))
-	return funcall_lambda (fun, numargs, args);
-      else if (EQ (funcar, Qautoload))
-	{
-	  Fautoload_do_load (fun, original_fun, Qnil);
-	  fun = original_fun;
-	  goto retry;
-	}
-      else
-	xsignal1 (Qinvalid_function, original_fun);
+      Fautoload_do_load (fun, original_fun, Qnil);
+      fun = original_fun;
+      goto retry;
     }
+  else
+    xsignal1 (Qinvalid_function, original_fun);
 }
 
 DEFUN ("funcall", Ffuncall, Sfuncall, 1, MANY, 0,
@@ -3036,23 +3022,12 @@ of args.  MAX is the maximum number, or the symbol `many', for a
 function with `&rest' args, or `unevalled' for a special form.  */)
   (Lisp_Object function)
 {
-  Lisp_Object original;
+  Lisp_Object original = function;
   Lisp_Object funcar;
   Lisp_Object result;
 
-  original = function;
-
  retry:
-
-  /* Optimize for no indirection.  */
-  function = original;
-  if (SYMBOLP (function) && !NILP (function))
-    {
-      function = XSYMBOL (function)->u.s.function;
-      if (SYMBOLP (function))
-	function = indirect_function (function);
-    }
-
+  function = indirect_function (original);
   if (CONSP (function) && EQ (XCAR (function), Qmacro))
     function = XCDR (function);
 

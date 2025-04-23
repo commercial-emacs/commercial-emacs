@@ -772,7 +772,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 
 	    Lisp_Object original_fun = call_fun;
 	    if (SYMBOLP (call_fun))
-	      call_fun = XSYMBOL (call_fun)->u.s.function;
+	      call_fun = Fsymbol_function (call_fun);
 	    if (CLOSUREP (call_fun))
 	      {
 		Lisp_Object template = AREF (call_fun, CLOSURE_ARGLIST);

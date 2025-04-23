@@ -1064,10 +1064,7 @@ resolve_fun (Lisp_Object fun)
     {
       /* Attempt to resolve the function as far as possible ahead of time,
 	 to avoid having to do it for each call.  */
-      Lisp_Object f = XSYMBOL (fun)->u.s.function;
-      if (SYMBOLP (f))
-	/* Function was an alias; use slow-path resolution.  */
-	f = indirect_function (f);
+      Lisp_Object f = indirect_function (fun);
       /* Don't resolve to an autoload spec; that would be very slow.  */
       if (!NILP (f) && !(CONSP (f) && EQ (XCAR (f), Qautoload)))
 	fun = f;

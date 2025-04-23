@@ -683,7 +683,7 @@ struct Lisp_Symbol
       /* Next symbol in obarray bucket, if the symbol is interned.  */
       struct Lisp_Symbol *next;
 
-      /* Irrevocably made `make-buffer-local-variable' */
+      /* Irrevocably made `make-variable-buffer-local' */
       bool_bf buffer_local_only : 1;
 
       /* Independently varying buffer local default.  Qunbound if not
@@ -3803,6 +3803,7 @@ extern void notify_variable_watchers (Lisp_Object, Lisp_Object,
 				      Lisp_Object, Lisp_Object);
 extern Lisp_Object indirect_function (Lisp_Object);
 extern Lisp_Object find_symbol_value (struct Lisp_Symbol *, struct buffer *);
+extern Lisp_Object find_symbol_function (struct Lisp_Symbol *, struct buffer *);
 
 enum {
   Cmp_Bit_EQ,
