@@ -2923,7 +2923,7 @@ read_char (int commandflag, Lisp_Object map,
 	    resize_mini_window (XWINDOW (minibuf_window), false);
 	}
       else if (FUNCTIONP (Vclear_message_function))
-        clear_message (1, 0);
+	clear_message (1, 0);
     }
 
  reread_for_input_method:

@@ -2230,10 +2230,7 @@ Lisp_Object
 indirect_function (Lisp_Object object)
 {
   while (SYMBOLP (object) && !NILP (object))
-    {
-      maybe_quit ();
-      object = Fsymbol_function (object);
-    }
+    object = Fsymbol_function (object);
   return object;
 }
 
