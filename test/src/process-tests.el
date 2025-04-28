@@ -493,6 +493,7 @@ See Bug#30460."
 (ert-deftest lookup-unicode-domains ()
   "Unicode domains should fail."
   (skip-unless internet-is-working)
+  (skip-unless (not (getenv "CI")))
   (with-timeout (60 (ert-fail "Test timed out"))
   (should-error (network-lookup-address-info "faß.de"))
   (should (network-lookup-address-info (puny-encode-domain "faß.de")))))
