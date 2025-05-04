@@ -9432,6 +9432,7 @@ move_it_backward (struct it *it, int op_to, int op)
 	}
       else if (op == MOVE_TO_Y
 	       && ((op_target - it->current_y) >= actual_line_height (it->w, tpos))
+	       && IT_CHARPOS (*it) > BEGV
 	       && IT_CHARPOS (*it) < ZV)
 	{
 	  /* Common branch where SLINES exceeds estimate (too far back).
