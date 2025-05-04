@@ -6100,7 +6100,7 @@ recursively."
                                   (append
                                    (split-string-shell-command
                                     python-interpreter-args)
-                                   `("-c" ,python--list-imports)
+                                   `("-Pc" ,python--list-imports)
                                     (list (or name "")))))
                        (with-current-buffer buffer
                          (apply #'call-process
@@ -6109,7 +6109,7 @@ recursively."
                                 (append
                                  (split-string-shell-command
                                   python-interpreter-args)
-                                 `("-c" ,python--list-imports)
+                                 `("-Pc" ,python--list-imports)
                                  (list (or name ""))
                                  (mapcar #'file-local-name source))))))
              lines)
@@ -6157,7 +6157,7 @@ Return non-nil if the buffer was actually modified."
                                (append
                                  (split-string-shell-command
                                   python-interpreter-args)
-                                 '("-m" "isort" "-")
+                                 '("-Pm" "isort" "-")
                                  args)))
                 (tick (buffer-chars-modified-tick)))
             (unless (eq 0 status)
@@ -6235,7 +6235,7 @@ asking."
                   (append
                    (split-string-shell-command
                     python-interpreter-args)
-                   '("-m" "pyflakes"))))
+                   '("-Pm" "pyflakes"))))
         (goto-char (point-min))
         (when (looking-at-p ".* No module named pyflakes$")
           (error "%s couldn't find pyflakes" python-interpreter))
