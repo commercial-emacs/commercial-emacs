@@ -868,6 +868,44 @@ The following commands are available:
 (when (bound-and-true-p tab-prefix-map)
   (define-key tab-prefix-map "p" #'project-other-tab-command))
 
+;;;###autoload
+(defun other-project-prefix ()
+  "\"Switch\" to another project before running an Emacs command.
+Makes sure the next command invoked asks for the project to run it in."
+  (interactive)
+  (prefix-command-preserve-state)
+  (letrec ((depth (minibuffer-depth))
+           (echofun (lambda () "[switch-project]"))
+           (around-fun
+            (lambda (command &rest _args)
+              (advice-remove this-command around-fun)
+              (unless (or (eq this-command 'other-project-prefix)
+                          (eq last-command-event help-char))
+                (let ((root (funcall project-prompter)))
+                  (if (or (string-prefix-p "project-"
+                                           (symbol-name this-command))
+                          (get this-command 'project-aware))
+                      (let ((project-current-directory-override root))
+                        (call-interactively command))
+                    (let ((default-directory root))
+                      (call-interactively command)))))))
+           (prefun
+            (lambda ()
+              (unless (> (minibuffer-depth) depth)
+                (remove-hook 'pre-command-hook prefun)
+                (remove-hook 'prefix-command-echo-keystrokes-functions echofun)
+                (when (and this-command (symbolp this-command))
+                  (advice-add this-command :around around-fun))))))
+    (add-hook 'pre-command-hook prefun)
+    (add-hook 'prefix-command-echo-keystrokes-functions echofun)
+    (let ((map (make-sparse-keymap)))
+      (set-keymap-parent map project-prefix-map)
+      ;; Doesn't work ;-(
+      ;; (define-key map (vector help-char)
+      ;;             (lambda () (interactive) (help-form-show)))
+      (set-transient-map map))
+    (message (concat "Type " (project--keymap-prompt) " or any global key"))))
+
 (declare-function grep-read-files "grep")
 (declare-function xref--find-ignores-arguments "xref")
 
