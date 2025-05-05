@@ -1087,7 +1087,8 @@ window_box_edges (struct window *w, int *top_left_x, int *top_left_y,
 static int
 line_bottom_y (struct it it, int fallback_height)
 {
-  int line_top_y = it.current_y;
+  eassert (fallback_height >= 0);
+  const int line_top_y = it.current_y;
   int line_height = it.max_ascent + it.max_descent;
 
   if (!line_height)
@@ -1096,6 +1097,7 @@ line_bottom_y (struct it it, int fallback_height)
 	{
 	  move_it_dvpos (&it, 1);
 	  line_height = it.current_y - line_top_y;
+	  eassert (line_height >= 0);
 	}
     }
 
@@ -1110,6 +1112,7 @@ line_bottom_y (struct it it, int fallback_height)
       PRODUCE_GLYPHS (&it);
       it.glyph_row = row;
       line_height = it.ascent + it.descent;
+      eassert (line_height >= 0);
     }
 
   if (!line_height)
@@ -9432,7 +9435,6 @@ move_it_backward (struct it *it, int op_to, int op)
 	}
       else if (op == MOVE_TO_Y
 	       && ((op_target - it->current_y) >= actual_line_height (it->w, tpos))
-	       && IT_CHARPOS (*it) > BEGV
 	       && IT_CHARPOS (*it) < ZV)
 	{
 	  /* Common branch where SLINES exceeds estimate (too far back).
