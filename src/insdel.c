@@ -719,30 +719,6 @@ count_combining_after (const unsigned char *string,
 
 #endif
 
-/* Falsify monospace if more than one char script.  */
-static void
-detect_multi_script (struct buffer *buf, const unsigned char *string, ptrdiff_t nbytes)
-{
-  if (!NILP (BVAR (buf, enable_multibyte_characters))
-      && buf->text->monospace)
-    for (int len, offset = 0; offset < nbytes; offset += len)
-    {
-      Lisp_Object script
-	= CHAR_TABLE_REF (Vchar_script_table,
-			  string_char_and_length (&string[offset], &len));
-      if (!NILP (script))
-	{
-	  if (NILP (BVAR (buf, initial_char_script)))
-	    bset_initial_char_script (buf, script);
-	  else if (!EQ (script, BVAR (buf, initial_char_script)))
-	    {
-	      buf->text->monospace = false;
-	      break;
-	    }
-	}
-    }
-}
-
 /* Put bidi processing on notice if just inserted C is R2L.  */
 
 static void
@@ -828,7 +804,6 @@ insert_1_both (const char *string,
     END_UNCHANGED = Z - GPT;
 
   detect_bidi (current_buffer, (unsigned char *) string, nbytes);
-  detect_multi_script (current_buffer, (unsigned char *) string, nbytes);
 
   adjust_markers_for_insert (PT, PT_BYTE,
 			     PT + nchars, PT_BYTE + nbytes,
@@ -960,10 +935,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
     END_UNCHANGED = Z - GPT;
 
   if (STRING_MULTIBYTE (string))
-    {
-      detect_bidi (current_buffer, (unsigned char *) SDATA (string), nbytes);
-      detect_multi_script (current_buffer, (unsigned char *) SDATA (string), nbytes);
-    }
+    detect_bidi (current_buffer, (unsigned char *) SDATA (string), nbytes);
 
   adjust_markers_for_insert (PT, PT_BYTE, PT + nchars,
 			     PT_BYTE + outgoing_nbytes,
@@ -994,7 +966,10 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
    GAP_BEG_ADDR (if not text_at_gap_tail).
    Contrary to insert_from_gap, this does not invalidate any cache,
    nor update any markers, nor record any buffer modification information
-   of any sort.  */
+   of any sort.
+
+   Bad naming: "from" means "at the point of," not "source."
+*/
 void
 insert_from_gap_1 (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
 {
@@ -1019,7 +994,10 @@ insert_from_gap_1 (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
 
 /* Insert a sequence of NCHARS chars which occupy NBYTES bytes
    starting at GAP_END_ADDR - NBYTES (if text_at_gap_tail) and at
-   GAP_BEG_ADDR (if not text_at_gap_tail).  */
+   GAP_BEG_ADDR (if not text_at_gap_tail).
+
+   Bad naming: "from" means "at the point of," not "source."
+*/
 
 void
 insert_from_gap (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)

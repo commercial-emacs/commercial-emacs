@@ -4823,7 +4823,6 @@ by calling `format-decode', which see.  */)
 	  /* unwinds following insert_from_gap_1.  */
 	  record_unwind_protect (decide_coding_unwind, unwind_data);
 
-          /* Confusing: "from" means "at the point of."  */
           insert_from_gap_1 (inserted, inserted, false);
 
 	  if (inserted > 0 && !NILP (Vset_auto_coding_function))

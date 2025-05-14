@@ -8346,15 +8346,32 @@ get_element_from_buffer (struct it *it)
 
       /* Get the next character, maybe multibyte.  */
       p = BYTE_POS_ADDR (IT_BYTEPOS (*it));
-      if (it->multibyte_p && !ASCII_CHAR_P (*p))
-	it->c = string_char_and_length (p, &it->len);
-      else
+      if (!it->multibyte_p || ASCII_CHAR_P (*p))
 	it->c = *p, it->len = 1;
+      else
+	it->c = string_char_and_length (p, &it->len);
 
       /* Record what we have and where it came from.  */
       it->what = IT_CHARACTER;
       it->object = it->w->contents;
       it->position = it->current.pos;
+
+      /* Falsify monospace for heterogenous script, e.g., latin, han.  */
+      if (BUFFERP (it->object)
+	  && !NILP (BVAR (XBUFFER (it->object), enable_multibyte_characters))
+	  && XBUFFER (it->object)->text->monospace)
+	{
+	  Lisp_Object script = CHAR_TABLE_REF (Vchar_script_table, it->c);
+	  if (!NILP (script))
+	    {
+	      Lisp_Object initial_char_script
+		= BVAR (XBUFFER (it->object), initial_char_script);
+	      if (NILP (initial_char_script))
+		bset_initial_char_script (XBUFFER (it->object), script);
+	      else if (!EQ (script, initial_char_script))
+		XBUFFER (it->object)->text->monospace = false;
+	    }
+	}
 
       /* Normally we return the character found above, except when we
 	 really want to return an ellipsis for selective display.  */
