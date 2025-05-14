@@ -7682,8 +7682,8 @@ set_iterator_to_next (struct it *it, bool reseat_p)
    or `\003'.
 
    IT->dpvec holds the glyphs to return as characters.
-   IT->saved_face_id holds the face id before the display vector--it
-   is restored into IT->face_id in set_iterator_to_next.  */
+   IT->saved_face_id holds the face id before the display vector.
+   It is restored into IT->face_id in set_iterator_to_next.  */
 
 static bool
 get_element_from_display_vector (struct it *it)
@@ -29022,9 +29022,9 @@ gui_produce_glyphs (struct it *it)
           break;
         }
 
-      /* if (monospace_p */
-      /* 	  && it->pixel_width != FRAME_COLUMN_WIDTH (it->f)) */
-      /* 	XBUFFER (it->object)->text->monospace = false; */
+      /* if (BUFFERP (it->object) && XBUFFER (it->object)->text->monospace) */
+      /* 	XBUFFER (it->object)->text->monospace = */
+      /* 	  (it->pixel_width == FRAME_COLUMN_WIDTH (it->f)); */
 
       if (FONT_TOO_HIGH (font))
         {
