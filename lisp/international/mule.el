@@ -2006,7 +2006,7 @@ use \"coding: 'raw-text\" instead." :warning)
 See `find-auto-coding' for how the coding system is found.
 Return nil if an invalid coding system is found.
 
-The variable `set-auto-coding-function' (which see) is set to this
+The variable `set-auto-coding-function' is set to this
 function by default."
   (let ((found (find-auto-coding filename size)))
     (if (and found (coding-system-p (car found)))

@@ -4806,11 +4806,10 @@ by calling `format-decode', which see.  */)
 	coding_system = Vcoding_system_for_read;
       else
 	{
-	  /* Since we are sure that the current buffer was empty
-	     before the insertion, we can toggle
-	     enable-multibyte-characters directly here without taking
-	     care of marker adjustment.  By this way, we can run Lisp
-	     program safely before decoding the inserted text.  */
+	  /* Since the buffer was empty before the insertion, we can
+	     toggle enable-multibyte-characters without adjusting
+	     markers.  In this way, we can safely run Lisp before before
+	     decoding the inserted text.  */
           Lisp_Object multibyte
             = BVAR (current_buffer, enable_multibyte_characters);
           Lisp_Object unwind_data
@@ -4821,28 +4820,26 @@ by calling `format-decode', which see.  */)
 
 	  bset_enable_multibyte_characters (current_buffer, Qnil);
 	  bset_undo_list (current_buffer, Qt);
+	  /* unwinds following insert_from_gap_1.  */
 	  record_unwind_protect (decide_coding_unwind, unwind_data);
 
-          /* Make the text read part of the buffer.  */
+          /* Confusing: "from" means "at the point of."  */
           insert_from_gap_1 (inserted, inserted, false);
 
 	  if (inserted > 0 && !NILP (Vset_auto_coding_function))
-	    {
-	      coding_system = call2 (Vset_auto_coding_function,
-				     filename, make_fixnum (inserted));
-	    }
+	    coding_system = call2 (Vset_auto_coding_function,
+				   filename, make_fixnum (inserted));
 
 	  if (NILP (coding_system))
 	    {
-	      /* If the coding system is not yet decided, check
-		 file-coding-system-alist.  */
+	      /* Then find one in file-coding-system-alist.  */
 	      coding_system = CALLN (Ffind_operation_coding_system,
 				     Qinsert_file_contents, orig_filename,
 				     visit, beg, end, Qnil);
 	      if (CONSP (coding_system))
 		coding_system = XCAR (coding_system);
 	    }
-          /* Move the text back to the gap.  */
+
 	  unbind_to (count1, Qnil);
           inserted = XFIXNUM (XCAR (unwind_data));
         }

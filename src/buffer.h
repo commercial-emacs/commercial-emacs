@@ -450,6 +450,9 @@ struct buffer
   /* Non-nil means display ctl chars with uparrow.  */
   Lisp_Object ctl_arrow_;
 
+  /* Falsify monospace_p if multiple scripts, e.g., latin, han.  */
+  Lisp_Object initial_char_script_;
+
   /* Non-nil means reorder bidirectional text for display in the
      visual order.  */
   Lisp_Object bidi_display_reordering_;
@@ -767,6 +770,11 @@ XBUFFER (Lisp_Object a)
 /* Most code should use these functions to set Lisp fields in struct
    buffer.  (Some setters that are private to a single .c file are
    defined as static in those files.)  */
+INLINE void
+bset_initial_char_script (struct buffer *b, Lisp_Object val)
+{
+  b->initial_char_script_ = val;
+}
 INLINE void
 bset_bidi_display_reordering (struct buffer *b, Lisp_Object val)
 {

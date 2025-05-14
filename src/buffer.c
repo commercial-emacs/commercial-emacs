@@ -2797,6 +2797,7 @@ results, see Info node `(elisp)Swapping Text'.  */)
   swapfield_ (mark, Lisp_Object);
   swapfield_ (mark_active, Lisp_Object); /* Belongs with the `mark'.  */
   swapfield_ (enable_multibyte_characters, Lisp_Object);
+  swapfield_ (initial_char_script, Lisp_Object);
   swapfield_ (bidi_display_reordering, Lisp_Object);
   swapfield_ (bidi_paragraph_direction, Lisp_Object);
   swapfield_ (bidi_paragraph_separate_re, Lisp_Object);
@@ -4932,6 +4933,7 @@ init_buffer_once (void)
   XSETFASTINT (BVAR (&buffer_slot_map, syntax_table), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_slot_map, cache_long_scans), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_slot_map, category_table), idx); ++idx;
+  XSETFASTINT (BVAR (&buffer_slot_map, initial_char_script), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_slot_map, bidi_display_reordering), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_slot_map, bidi_paragraph_direction), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_slot_map, bidi_paragraph_separate_re), idx); ++idx;
@@ -5012,6 +5014,7 @@ init_buffer_once (void)
   bset_truncate_lines (&buffer_slot_defaults, Qnil);
   bset_word_wrap (&buffer_slot_defaults, Qnil);
   bset_ctl_arrow (&buffer_slot_defaults, Qt);
+  bset_initial_char_script (&buffer_slot_defaults, Qnil);
   bset_bidi_display_reordering (&buffer_slot_defaults, Qnil);
   bset_bidi_paragraph_direction (&buffer_slot_defaults, Qnil);
   bset_bidi_paragraph_start_re (&buffer_slot_defaults, Qnil);
@@ -5439,6 +5442,10 @@ an alternative encoding is selected by `select-safe-coding-system', which see.
 The variable `coding-system-for-write', if non-nil, overrides this variable.
 
 This variable is never applied to a way of decoding a file while reading it.  */);
+
+  DEFVAR_PER_BUFFER ("initial-char-script",
+		     &BVAR (current_buffer, initial_char_script), Qnil,
+		     doc: /* Char script of first inserted character.  */);
 
   DEFVAR_PER_BUFFER ("bidi-display-reordering",
 		     &BVAR (current_buffer, bidi_display_reordering), Qnil,
