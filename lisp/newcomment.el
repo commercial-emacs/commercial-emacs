@@ -1504,9 +1504,10 @@ unless optional argument SOFT is non-nil."
                                     (cadr (assoc comment-style
                                                  comment-styles))))
                      ;; Recreate comment-continue from comment-start.
-                     ;; FIXME: wrong if comment-continue was set explicitly!
                      ;; FIXME: use prev line's continuation if available.
-                     (comment-continue nil))
+                     (comment-continue (if (local-variable-p 'comment-continue)
+                                           comment-continue
+                                         nil)))
                 (comment-indent continuep))
 	      (save-excursion
 		(let ((pt (point)))
