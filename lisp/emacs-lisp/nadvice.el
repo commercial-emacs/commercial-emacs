@@ -93,17 +93,30 @@ DOC is a string where \"FUNCTION\" and \"OLDFUN\" are expected.")
      (format "This %s has %s advice: "
              (if macrop "macro" "function")
              how)
-     (let ((fun (advice--car flist)))
-       (if (symbolp fun) (format-message "`%S'." fun)
-         (let* ((name (cdr (assq 'name (advice--props flist))))
-                (doc (documentation fun t))
-                (usage (help-split-fundoc doc function)))
-           (if usage (setq doc (cdr usage)))
-           (if name
-               (if doc
-                   (format "%s\n%s" name doc)
-                 (format "%s" name))
-             (or doc "No documentation")))))
+     (let* ((fun (advice--car flist))
+            (doc (documentation fun t))
+            (usage (help-split-fundoc doc function))
+            name)
+       (if usage (setq doc (cdr usage)))
+       (if (symbolp fun)
+           (if doc
+               (concat
+                (format-message "`%S'\n" fun)
+                ;; Remove first line possibly added by
+                ;; `ad-make-single-advice-docstring' for
+                ;; legacy advices.
+                (if (string-match
+                     "^\\(?:Before\\|Around\\|After\\)-advice `.*?':\n"
+                     doc)
+                    (substring doc (match-end 0))
+                  doc))
+             (format-message "`%S'." fun))
+         (setq name (cdr (assq 'name (advice--props flist))))
+         (if name
+             (if doc
+                 (format "%s\n%s" name doc)
+               (format "%s" name))
+           (or doc "No documentation"))))
      "\n"
      (and
       (eq how :override)
@@ -155,10 +168,22 @@ DOC is a string where \"FUNCTION\" and \"OLDFUN\" are expected.")
       (help-add-fundoc-usage
        (with-temp-buffer
          (when before
+           (insert
+            (propertize
+             (concat "This " (if macrop "macro" "function") " is advised.")
+             'face 'font-lock-warning-face))
+           (ensure-empty-lines 1)
            (insert before)
            (ensure-empty-lines 1))
          (when origdoc
            (insert origdoc))
+         (when (not before)
+           (ensure-empty-lines 1)
+           (insert
+            (propertize
+             (concat "This " (if macrop "macro" "function") " is advised.")
+             'face 'font-lock-warning-face))
+           (ensure-empty-lines 1))
          (when after
            (ensure-empty-lines 1)
            (insert after))
