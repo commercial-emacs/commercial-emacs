@@ -2704,12 +2704,17 @@ before assigning any PLACEs to the corresponding values.
 
 \(fn PLACE VAL PLACE VAL ...)"
   (declare (debug setf))
-  (let ((p args) (simple t) (vars nil))
+  (let ((p args) (simple t) (vars nil)
+        (smacros (alist-get :cl-symbol-macros macroexpand-all-environment)))
     (while p
-      (if (or (not (symbolp (car p))) (cl--expr-depends-p (nth 1 p) vars))
-	  (setq simple nil))
-      (if (memq (car p) vars)
-	  (error "Destination duplicated in psetf: %s" (car p)))
+      (when (or (not (symbolp (car p)))
+                (assq (car p) smacros)
+                (and (symbolp (nth 1 p))
+                     (assq (nth 1 p) smacros))
+                (cl--expr-depends-p (nth 1 p) vars))
+	(setq simple nil))
+      (when (memq (car p) vars)
+	(error "Destination duplicated in psetf: %s" (car p)))
       (push (pop p) vars)
       (or p (error "Odd number of arguments to cl-psetf"))
       (pop p))
