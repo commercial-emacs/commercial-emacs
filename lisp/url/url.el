@@ -243,8 +243,7 @@ If INHIBIT-COOKIES is non-nil, refuse to store cookies.  If
 TIMEOUT is passed, it should be a number that says (in seconds)
 how long to wait for a response before giving up."
   (url-do-setup)
-  (let* (;; Ensure we can stop during connection setup (bug#71295).
-         (url-asynchronous (not (null timeout)))
+  (let* ((url-asynchronous (when timeout t)) ;allow stop in setup (bug#71295)
          data-buffer
          (callback (lambda (&rest _args)
                      (setq data-buffer (current-buffer))
@@ -256,46 +255,35 @@ how long to wait for a response before giving up."
                              url callback nil silent inhibit-cookies
                              (when timeout
                                (list :timeout timeout)))))
-    (if (not proc-buffer)
-        (url-debug 'retrieval "Synchronous fetching unnecessary %s" url)
-      (unwind-protect
-          (catch 'done
-            (while (not data-buffer)
-              (when (and timeout (time-less-p timeout
-                                              (time-since start-time)))
-                (url-debug 'retrieval "Timed out %s (after %ss)" url
-                           (float-time (time-since start-time)))
-                (throw 'done 'timeout))
-	      (url-debug 'retrieval
-		         "Spinning in url-retrieve-synchronously: nil (%S)"
-		         proc-buffer)
-              (when-let ((redirect-buffer
-                          (buffer-local-value 'url-redirect-buffer
-                                              proc-buffer)))
-                (unless (eq redirect-buffer proc-buffer)
-                  (url-debug
-                   'retrieval "Redirect in url-retrieve-synchronously: %S -> %S"
-		   proc-buffer redirect-buffer)
-                  (let (kill-buffer-query-functions)
-                    (kill-buffer proc-buffer))
-                  ;; Accommodate hack in commit 55d1d8b.
-                  (setq proc-buffer redirect-buffer)))
-              (when-let ((proc (get-buffer-process proc-buffer)))
-                (when (memq (process-status proc)
-                            '(closed exit signal failed))
-                  ;; Process sentinel vagaries occasionally cause
-                  ;; url-retrieve to fail calling callback.
-                  (unless data-buffer
-                    (url-debug 'retrieval "Dead process %s" url)
-		    (throw 'done 'exception))))
-              ;; Querying over consumer internet in the US takes 100
-              ;; ms, so split the difference.
-              (accept-process-output nil 0.05)))
-        ;; Kill the process buffer on redirects.
-        (when (and data-buffer
-                   (not (eq data-buffer proc-buffer)))
+    (while (and (not data-buffer)
+                proc-buffer
+                (or (not timeout)
+                    (< (float-time (time-since start-time)) timeout)
+                    (prog1 nil
+                      (url-debug 'retrieval "Timed out %s (after %ss)" url
+                                 (float-time (time-since start-time))))))
+      (url-debug 'retrieval
+		 "Spinning in url-retrieve-synchronously: nil (%S)"
+		 proc-buffer)
+      (when-let ((redirect-buffer (buffer-local-value 'url-redirect-buffer
+                                                      proc-buffer)))
+        (unless (eq redirect-buffer proc-buffer)
+          (url-debug 'retrieval "Redirect in url-retrieve-synchronously: %S -> %S"
+	             proc-buffer redirect-buffer)
           (let (kill-buffer-query-functions)
-            (kill-buffer proc-buffer)))))
+            (kill-buffer proc-buffer))
+          ;; Accommodate hack in commit 55d1d8b.
+          (setq proc-buffer redirect-buffer)))
+      (accept-process-output (get-buffer-process proc-buffer) 0.05))
+    (unless data-buffer
+      (when-let ((proc (get-buffer-process proc-buffer))
+                 (dead-p (memq (process-status proc)
+                               '(closed exit signal failed))))
+        (url-debug 'retrieval "Dead process %s" url)))
+    (when (and data-buffer (not (eq data-buffer proc-buffer)))
+      ;; Kill the process buffer on redirects.
+      (let (kill-buffer-query-functions)
+        (kill-buffer proc-buffer)))
     data-buffer))
 
 ;; url-mm-callback called from url-mm, which requires mm-decode.
