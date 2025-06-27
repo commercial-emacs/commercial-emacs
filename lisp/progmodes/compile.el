@@ -2537,7 +2537,7 @@ and runs `compilation-filter-hook'."
               ;; now use window-point-insertion-type instead.
               (if (not compilation-max-output-line-length)
                   (insert ansi-string)
-                (dolist (line (string-lines ansi-string nil t))
+                (dolist (line (string-lines ansi-string t t))
                   (compilation--insert-abbreviated-line
                    line compilation-max-output-line-length)))
               (when compilation-hidden-output
