@@ -324,55 +324,6 @@ expression, in which case we want to handle forms differently."
      ;; nil here indicates that this is not a special autoload form.
      (t nil))))
 
-(defun loaddefs-generate--make-prefixes (defs file)
-  ;; Remove the defs that obey the rule that file foo.el (or
-  ;; foo-mode.el) uses "foo-" as prefix.  Then compute a small set of
-  ;; prefixes that cover all the remaining definitions.
-  (let* ((tree (let ((tree radix-tree-empty))
-                 (dolist (def defs)
-                   (setq tree (radix-tree-insert tree def t)))
-                 tree))
-         (prefixes nil))
-    ;; Get the root prefixes, that we should include in any case.
-    (radix-tree-iter-subtrees
-     tree (lambda (prefix subtree)
-            (push (cons prefix subtree) prefixes)))
-    ;; In some cases, the root prefixes are too short, e.g. if you define
-    ;; "cc-helper" and "c-mode", you'll get "c" in the root prefixes.
-    (dolist (pair (prog1 prefixes (setq prefixes nil)))
-      (let ((s (car pair)))
-        (if (or (and (> (length s) 2)   ; Long enough!
-                     ;; But don't use "def" from deffoo-pkg-thing.
-                     (not (string= "def" s)))
-                (string-match ".[[:punct:]]\\'" s) ;A real (tho short) prefix?
-                (radix-tree-lookup (cdr pair) "")) ;Nothing to expand!
-            (push pair prefixes)                   ;Keep it as is.
-          (radix-tree-iter-subtrees
-           (cdr pair) (lambda (prefix subtree)
-                        (push (cons (concat s prefix) subtree) prefixes))))))
-    (when prefixes
-      (let ((strings
-             (mapcar
-              (lambda (x)
-                (let ((prefix (car x)))
-                  (if (or (> (length prefix) 2) ;Long enough!
-                          (and (eq (length prefix) 2)
-                               (string-match "[[:punct:]]" prefix)))
-                      prefix
-                    ;; Some packages really don't follow the rules.
-                    ;; Drop the most egregious cases such as the
-                    ;; one-letter prefixes.
-                    (let ((dropped ()))
-                      (radix-tree-iter-mappings
-                       (cdr x) (lambda (s _)
-                                 (push (concat prefix s) dropped)))
-                      (message "%s:0: Warning: Not registering prefix \"%s\".  Affects: %S"
-                               file prefix dropped)
-                      nil))))
-              prefixes)))
-        `(register-definition-prefixes ,file ',(sort (delq nil strings)
-						     'string<))))))
-
 (defun loaddefs-generate--parse-file (file main-outfile &optional package-data)
   "Examining FILE for ;;;###autoload statements.
 MAIN-OUTFILE is the main loaddefs file these statements are
@@ -495,27 +446,27 @@ don't include."
                             (buffer-substring (point) (line-end-position)))
                       defs)))))
 
-        (when (and autoload-compute-prefixes
-                   compute-prefixes)
+        (when (and autoload-compute-prefixes compute-prefixes)
           (with-demoted-errors "%S"
-            (when-let
-                ((form (loaddefs-generate--compute-prefixes load-name)))
+            (when-let ((prefixes (loaddefs-generate--compute-prefixes load-name)))
               ;; This output needs to always go in the main loaddefs.el,
               ;; regardless of `generated-autoload-file'.
-              (push (list main-outfile file form) defs))))))
+              (push (list main-outfile file prefixes) defs))))))
     defs))
 
 (defun loaddefs-generate--compute-prefixes (load-name)
+  "Return the register-definition-prefixes postscript."
   (goto-char (point-min))
-  (let ((prefs nil)
-        (temp-obarray (obarray-make)))
-    ;; Trailing space avoids forward declarations (defvar <foo>).
+  (let ((empty-obarray (obarray-make))
+        defs prefix-trees)
+    ;; Regexp hack to pull all definitions.  Trailing space avoids forward
+    ;; declarations like (defvar foo).
     (while (re-search-forward
             "^(\\(def[^ \t\n]+\\)[ \t\n]+['(]*\\([^' ()\"\n]+\\)[\n \t]" nil t)
       (unless (member (match-string 1) autoload-ignored-definitions)
         (let* ((name (match-string-no-properties 2))
-               ;; Consider `read-symbol-shorthands'.
-               (probe (let ((obarray temp-obarray))
+               ;; Consider read-symbol-shorthands.
+               (probe (let ((obarray empty-obarray))
                         (car (read-from-string name)))))
           (when (symbolp probe)
             (setq name (symbol-name probe))
@@ -525,8 +476,52 @@ don't include."
                         (progn
                           (forward-line -1)
                           (not (looking-at ";;;###autoload")))))
-              (push name prefs))))))
-    (loaddefs-generate--make-prefixes prefs load-name)))
+              (push name defs))))))
+
+    ;; Compute set of prefixes after removing the "foo-" defs from foo.el.
+    (radix-tree-iter-subtrees
+     (let ((tree radix-tree-empty))
+       (dolist (def defs)
+         (setq tree (radix-tree-insert tree def t)))
+       tree)
+     (lambda (prefix subtree)
+       (push (cons prefix subtree) prefix-trees)))
+
+    ;; In some cases, the prefixes are too short, e.g. if you define
+    ;; "cc-helper" and "c-mode", you'll get "c".
+    (dolist (pair (prog1 prefix-trees (setq prefix-trees nil)))
+      (let ((prefix (car pair))
+            (tree (cdr pair)))
+        (if (or (and (> (length prefix) 2) ; Long enough!
+                     ;; But don't use "def" from deffoo-pkg-thing.
+                     (not (string= "def" prefix)))
+                (string-match ".[[:punct:]]\\'" prefix) ;A real (tho short) prefix?
+                (radix-tree-lookup tree "")) ;Nothing to expand!
+            (push pair prefix-trees)                   ;Keep it as is.
+          (radix-tree-iter-subtrees
+           tree (lambda (prefix* subtree)
+                  (push (cons (concat prefix prefix*) subtree)
+                        prefix-trees))))))
+
+    ;; Some packages really don't follow the rules.  Drop the most
+    ;; egregious cases such as the one-letter prefixes.
+    (dolist (pair (prog1 prefix-trees (setq prefix-trees nil)))
+      (let ((prefix (car pair))
+            (tree (cdr pair)))
+        (if (or (> (length prefix) 2)   ;Long enough!
+                (and (eq (length prefix) 2)
+                     (string-match "[[:punct:]]" prefix)))
+            (push pair prefix-trees)
+          (let (dropped)
+            (radix-tree-iter-mappings
+             tree (lambda (prefix* _)
+                    (push (concat prefix* prefix) dropped)))
+            (message "%s:0: Warning: Not registering prefix \"%s\".  Affects: %S"
+                     load-name prefix dropped)))))
+
+    (when prefix-trees
+      `(register-definition-prefixes ,load-name ',(sort (mapcar #'car prefix-trees)
+						   'string<)))))
 
 (defun loaddefs-generate--rubric (file &optional type feature compile shorthands)
   "Return a string giving the appropriate autoload rubric for FILE.
