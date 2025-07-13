@@ -3370,8 +3370,6 @@ Return non-nil if caller must prepare the summary buffer."
         (when (gnus-group-quit-config gnus-newsgroup-name)
           (set (make-local-variable 'gnus-single-article-buffer) nil))
         (turn-on-gnus-mailing-list-mode)
-        ;; These functions don't currently depend on GROUP, but might in
-        ;; the future.
         (gnus-update-format-specifications 'summary 'summary-mode 'summary-dummy)
         (gnus-update-summary-mark-positions)
         ;; Set any local variables in the group parameters.
@@ -3780,31 +3778,30 @@ If KILL-BUFFER, it should be a buffer that's killed once the new
 summary buffer has been generated.
 If BACKWARD, move point to the previous group in the group buffer
 If SELECT-ARTICLES, only select those articles from GROUP."
-  (let (result)
-    (while (and group
-		(null (setq result
-			    (let ((gnus-auto-select-next nil))
-			      (or (gnus-summary-read-group-1
-				   group show-all no-article
-				   kill-buffer no-display
-				   select-articles)
-				  (setq show-all nil
-					select-articles nil)))))
-		(eq gnus-auto-select-next 'quietly))
+  (catch 'done
+    (while t
+      (if-let ((result
+                (let (gnus-auto-select-next)
+                  (gnus-summary-read-group-1 group show-all no-article
+		                             kill-buffer no-display
+		                             select-articles))))
+          (throw 'done result)
+        (setq show-all nil
+	      select-articles nil))
+      (unless (eq gnus-auto-select-next 'quietly)
+        (throw 'done nil))
       (set-buffer gnus-group-buffer)
-      ;; The entry function called above goes to the next
-      ;; group automatically, so we go two groups back
-      ;; if we are searching for the previous group.
       (when backward
+        ;; twice prev to compensate for implicit next
 	(gnus-group-prev-unread-group 2))
-      (if (equal group (gnus-group-group-name))
-          (setq group nil)
-	(setq group (gnus-group-group-name))))
-    result))
+      (let ((group* (gnus-group-group-name)))
+        (if (equal group group*)
+            (throw 'done nil)
+	  (setq group group*))))))
 
 (defun gnus-summary-read-group-1 (group show-all no-article
-					kill-buffer no-display
-					&optional select-articles)
+				  kill-buffer no-display
+				  &optional select-articles)
   "Display articles and threads in a Summary buffer for GROUP.
 
 Calls `gnus-summary-setup-buffer' to create the

@@ -509,7 +509,7 @@ don't include."
   (goto-char (point-min))
   (let ((prefs nil)
         (temp-obarray (obarray-make)))
-    ;; Avoid (defvar <foo>) by requiring a trailing space.
+    ;; Trailing space avoids forward declarations (defvar <foo>).
     (while (re-search-forward
             "^(\\(def[^ \t\n]+\\)[ \t\n]+['(]*\\([^' ()\"\n]+\\)[\n \t]" nil t)
       (unless (member (match-string 1) autoload-ignored-definitions)
