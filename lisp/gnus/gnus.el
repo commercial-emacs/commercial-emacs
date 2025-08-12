@@ -3430,19 +3430,9 @@ that that variable is buffer-local to the summary buffers."
       (pop opened))
     out))
 
-(defun gnus-archive-server-wanted-p ()
-  "Say whether the user wants to use the archive server."
-  (cond
-   ((or (not gnus-message-archive-method)
-	(not gnus-message-archive-group))
-    nil)
-   ((and gnus-message-archive-method gnus-message-archive-group)
-    t)
-   (t
-    (let ((active (cadr (assq 'nnfolder-active-file
-			      gnus-message-archive-method))))
-      (and active
-	   (file-exists-p active))))))
+(defsubst gnus-archive-server-wanted-p ()
+  "Silliness."
+  (and gnus-message-archive-method gnus-message-archive-group))
 
 (defsubst gnus-method-to-server-name (method)
   (concat

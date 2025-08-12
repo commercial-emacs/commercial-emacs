@@ -413,8 +413,6 @@ void
 add_read_fd (int fd, fd_callback func, void *data)
 {
   add_keyboard_wait_descriptor (fd);
-
-  eassert (0 <= fd && fd < FD_SETSIZE);
   fd_callback_info[fd].func = func;
   fd_callback_info[fd].data = data;
 }
@@ -458,13 +456,8 @@ void
 delete_read_fd (int fd)
 {
   delete_keyboard_wait_descriptor (fd);
-
-  eassert (0 <= fd && fd < FD_SETSIZE);
   if (fd_callback_info[fd].flags == 0)
-    {
-      fd_callback_info[fd].func = 0;
-      fd_callback_info[fd].data = 0;
-    }
+    memset (&fd_callback_info[fd], 0, sizeof (struct fd_callback_data));
 }
 
 /* Add a file descriptor FD to be monitored for when write is possible.
@@ -485,10 +478,8 @@ add_write_fd (int fd, fd_callback func, void *data)
 static void
 recompute_max_desc (void)
 {
-  int fd;
-
   eassert (max_desc < FD_SETSIZE);
-  for (fd = max_desc; fd >= 0; --fd)
+  for (int fd = max_desc; fd >= 0; --fd)
     {
       if (fd_callback_info[fd].flags != 0)
 	{
@@ -508,9 +499,7 @@ delete_write_fd (int fd)
   fd_callback_info[fd].flags &= ~FOR_WRITE;
   if (fd_callback_info[fd].flags == 0)
     {
-      fd_callback_info[fd].func = 0;
-      fd_callback_info[fd].data = 0;
-
+      memset (&fd_callback_info[fd], 0, sizeof (struct fd_callback_data));
       if (fd == max_desc)
 	recompute_max_desc ();
     }
@@ -7164,9 +7153,7 @@ void
 delete_keyboard_wait_descriptor (int desc)
 {
   eassert (desc >= 0 && desc < FD_SETSIZE);
-
-  memset (&fd_callback_info[desc], 0, sizeof (struct fd_callback_data));
-
+  fd_callback_info[desc].flags &= ~(FOR_READ | KEYBOARD_FD | PROCESS_FD);
   if (desc == max_desc)
     recompute_max_desc ();
 }
