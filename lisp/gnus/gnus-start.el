@@ -1407,8 +1407,7 @@ actually exists.  If DONT-SUB-CHECK or DONT-CHECK, don't let the
 backend check whether the group actually exists."
   (setq method (or method (gnus-find-method-for-group group)))
   (when (gnus-check-server method)
-    (when scan
-      (gnus-check-backend-function 'request-scan (car method))
+    (when (and scan (gnus-check-backend-function 'request-scan (car method)))
       (gnus-request-scan group method))
     (when (and (gnus-request-group group
                                    (or dont-sub-check dont-check)
