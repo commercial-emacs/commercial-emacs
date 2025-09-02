@@ -5580,8 +5580,14 @@ error_handler_common (void)
 {
   Vinhibit_quit = Qt;
   update_echo_area ();
+  intmax_t restore = process_error_pause_time;
   if (process_error_pause_time > 0)
-    Fsleep_for (make_fixnum (process_error_pause_time), Qnil);
+    {
+      /* Avoid infinitely recursing error_handler_common.  */
+      process_error_pause_time = 0;
+      Fsleep_for (make_fixnum (process_error_pause_time), Qnil);
+    }
+  process_error_pause_time = restore;
   return Qt;
 }
 
