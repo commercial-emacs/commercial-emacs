@@ -51,7 +51,6 @@ lwlibdir = ../lwlib
 config_h = config.h $(srcdir)/conf_post.h
 
 HAVE_NATIVE_COMP = @HAVE_NATIVE_COMP@
-NATIVE_COMPILATION_AOT = @NATIVE_COMPILATION_AOT@
 
 ## Flags to pass for profiling builds
 PROFILING_CFLAGS = @PROFILING_CFLAGS@

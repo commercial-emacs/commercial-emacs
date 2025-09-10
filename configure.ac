@@ -926,28 +926,20 @@ AC_ARG_ENABLE([gcc-warnings],
 	   [gl_gcc_warnings=warn-only],
 	   [gl_GCC_VERSION_IFELSE([5], [3], [gl_gcc_warnings=warn-only])])])])])
 
-NATIVE_COMPILATION_AOT=no
 AC_ARG_WITH([native-compilation],
   [AS_HELP_STRING([--with-native-compilation@<:@=TYPE@:>@],
-                  [compile with Emacs Lisp native compiler support.  The TYPE
-		   'yes' (or empty) means to enable it and compile natively
-		   preloaded Lisp files; 'no' means to disable it;
-		   'aot' will make the build process compile all the Lisp
-		   files in the tree natively ahead of time.  (This will
-		   usually be quite slow.)])],
+                  [compile with Emacs Lisp native compiler support.])],
   [
   case $withval in
      aot)
        withval=yes
-       NATIVE_COMPILATION_AOT=yes
        ;;
      yes|no) ;;
      *)      AC_MSG_ERROR([bad value $withval for native-compilation option]) ;;
    esac
    with_native_compilation=$withval],
-  [with_native_compilation=no]
+  [with_native_compilation=yes]
 )
-AC_SUBST([NATIVE_COMPILATION_AOT])
 
 AC_ARG_ENABLE([check-lisp-object-type],
   [AS_HELP_STRING([--enable-check-lisp-object-type],
