@@ -122,7 +122,7 @@ jobs:
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'macOS')
       run: |
         ./autogen.sh
-        ./configure --prefix=$HOME/.local --with-tree-sitter
+        ./configure --prefix=$HOME/.local --with-tree-sitter --without-native-compilation
         make -j4 check
         ! grep -qi skipped test/src/tree-sitter-tests.log && grep -qi passed test/src/tree-sitter-tests.log && echo tree-sitter tested
     - uses: msys2/setup-msys2@v2.23.0
@@ -150,7 +150,7 @@ jobs:
       if: startsWith(runner.os, 'windows')
       run: |
         bash ./autogen.sh
-        bash ./configure --prefix=$HOME/.local --without-dbus
+        bash ./configure --prefix=$HOME/.local --without-dbus --without-native-compilation
         make -j4 -C src
     - name: elisp-benchmarks
       if: matrix.gearing == 'standard' && startsWith(runner.os, 'Linux')
