@@ -1739,19 +1739,18 @@ If the directory was in the list before the removal, save the
 result in `project-list-file'.  Announce the project's removal
 from the list using REPORT-MESSAGE, which is a format string
 passed to `message' as its first argument."
-  (if-let ((ent (assoc (abbreviate-file-name project-root) project--list))
-           (killed-p (or (not (file-exists-p project-root))
-                         (with-temp-buffer
-                           (let* ((default-directory project-root)
-                                  (to-delete (project-current)))
-                             (project-kill-buffers (not confirm))
-                             (cl-some #'buffer-live-p
-                                      (project-buffers to-delete)))))))
-      (progn
-        (setq project--list (delq ent project--list))
-        (message "Removed project %s" project-root)
-        (project--write-project-list))
-    (message "Kept project %s" project-root)))
+  (if (or (not (file-exists-p project-root))
+          (null (with-temp-buffer
+                  (let* ((default-directory project-root)
+                         (to-delete (project-current)))
+                    (project-kill-buffers (not confirm))
+                    (cl-some #'buffer-live-p
+                             (project-buffers to-delete))))))
+      (progn (setq project--list (delq ent project--list))
+             (message "Removed project %s" project-root)
+             (project--write-project-list))
+    (message "Could not remove project %s, project buffers persist"
+             project-root)))
 
 ;;;###autoload
 (defun project-forget-project (project-root &optional confirm)
@@ -1777,7 +1776,7 @@ with PROJECT-ROOT unless CONFIRM directs otherwise."
 
 (defun project-prompt-project-dir ()
   "Prompt the user for a directory that is one of the known project roots.
-It's also possible to enter an arbitrary directory not in the list."
+For an as-yet registered project, type \"...\""
   (let* (dir
          (from (project--most-recent-project))
          (dir-choice "... (choose a dir)")
@@ -1812,7 +1811,7 @@ It's also possible to enter an arbitrary directory not in the list."
   "Prompt the user for a project, by name, that is one of the known project roots.
 The project is chosen among projects known from the project list,
 see `project-list-file'.
-It's also possible to enter an arbitrary directory not in the list."
+For an as-yet registered project, type \"...\""
   (let* ((dir-choice "... (choose a dir)")
          (choices
           (let (ret)
