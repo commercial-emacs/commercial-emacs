@@ -1740,13 +1740,20 @@ result in `project-list-file'.  Announce the project's removal
 from the list using REPORT-MESSAGE, which is a format string
 passed to `message' as its first argument."
   (if (or (not (file-exists-p project-root))
+          ;; without with-temp-buffer, arbitrary current buffer would
+          ;; yield project-root as default-directory
           (null (with-temp-buffer
                   (let* ((default-directory project-root)
                          (to-delete (project-current)))
                     (project-kill-buffers (not confirm))
-                    (cl-some #'buffer-live-p
+                    (cl-some (lambda (b)
+                               ;; live and not this current temp buffer
+                               (and (buffer-live-p b)
+                                    (not (string-prefix-p " " (buffer-name)))))
                              (project-buffers to-delete))))))
-      (progn (setq project--list (delq ent project--list))
+      (progn (setq project--list
+                   (delq (assoc (abbreviate-file-name project-root) project--list)
+                         project--list))
              (message "Removed project %s" project-root)
              (project--write-project-list))
     (message "Could not remove project %s, project buffers persist"
