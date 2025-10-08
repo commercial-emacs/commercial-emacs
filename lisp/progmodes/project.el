@@ -733,7 +733,8 @@ DIRS must contain directory names."
          (modules (when (and (not (project--vc-merge-submodules-p root))
                              (not (project--submodule-p root)))
                     (mapcar (lambda (m) (format "%s%s/" root m))
-                            (project--git-submodules))))
+                            (let ((default-directory root))
+                              (project--git-submodules)))))
          bufs)
     (dolist (buf (buffer-list))
       (when-let ((dir (expand-file-name (buffer-local-value 'default-directory buf)))
@@ -1519,25 +1520,11 @@ If FILES-ONLY is non-nil, only show the file-visiting buffers."
                            (member (current-buffer)
                                    (project-buffers ',project)))))))
 
-(defcustom project-kill-buffer-conditions
-  '(buffer-file-name    ; All file-visiting buffers are included.
-    ;; Most of temp and logging buffers (aside from hidden ones):
-    (and
-     (major-mode . fundamental-mode)
-     "\\`[^ ]")
-    ;; non-text buffer such as xref, occur, vc, log, ...
-    (and (derived-mode . special-mode)
-         (not (major-mode . help-mode))
-         (not (derived-mode . gnus-mode)))
-    (derived-mode . compilation-mode)
-    (derived-mode . dired-mode)
-    (derived-mode . diff-mode)
-    (derived-mode . comint-mode)
-    (derived-mode . eshell-mode)
-    (derived-mode . change-log-mode))
+(defcustom project-kill-buffer-conditions '(t)
   "List of conditions to kill buffers related to a project.
 This list is used by `project-kill-buffers'.
 Each condition is either:
+- t, immediate match
 - a regular expression, to match a buffer name,
 - a predicate function that takes a buffer object as argument
   and returns non-nil if the buffer should be killed,
@@ -1588,6 +1575,7 @@ form of CONDITIONS."
   (catch 'match
     (dolist (c conditions)
       (when (cond
+             ((eq c t) t)
              ((stringp c)
               (string-match-p c (buffer-name buf)))
              ((functionp c)
@@ -1614,11 +1602,16 @@ form of CONDITIONS."
   "Return list of buffers in project PR to kill.
 What buffers should or should not be killed is described
 in `project-kill-buffer-conditions'."
-  (let (bufs)
-    (dolist (buf (project-buffers pr))
-      (when (project--buffer-check buf project-kill-buffer-conditions)
-        (push buf bufs)))
-    bufs))
+  (let ((base-project (when-let ((default-directory
+                                  (file-name-as-directory (getenv "PWD"))))
+                        (project-current))))
+    (seq-filter (lambda (b)
+                  (project--buffer-check b project-kill-buffer-conditions))
+                ;; heinous hack to avoid killing scratch, messages, etc.
+                (seq-filter (if (equal pr base-project)
+                                #'buffer-file-name
+                              #'identity)
+                            (project-buffers pr)))))
 
 ;;;###autoload
 (defun project-kill-buffers (&optional no-confirm)
