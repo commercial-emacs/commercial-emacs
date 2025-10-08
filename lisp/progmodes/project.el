@@ -1604,11 +1604,13 @@ What buffers should or should not be killed is described
 in `project-kill-buffer-conditions'."
   (let ((base-project (when-let ((default-directory
                                   (file-name-as-directory (getenv "PWD"))))
-                        (project-current))))
+                        (project-current)))
+        (normalize (lambda (f) (expand-file-name (file-name-as-directory f)))))
     (seq-filter (lambda (b)
                   (project--buffer-check b project-kill-buffer-conditions))
                 ;; heinous hack to avoid killing scratch, messages, etc.
-                (seq-filter (if (equal pr base-project)
+                (seq-filter (if (equal (funcall normalize (project-root pr))
+                                       (funcall normalize (project-root base-project)))
                                 #'buffer-file-name
                               #'identity)
                             (project-buffers pr)))))
