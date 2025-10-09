@@ -1743,7 +1743,6 @@ passed to `message' as its first argument."
                          (to-delete (project-current)))
                     (project-kill-buffers (not confirm))
                     (cl-some (lambda (b)
-                               ;; live and not this current temp buffer
                                (and (buffer-live-p b) (buffer-file-name b)))
                              (project-buffers to-delete))))))
       (progn (setq project--list
