@@ -242,7 +242,7 @@ Under MAYBE-PROMPT, calls `project-get-project'."
       (prog1 pr (when pr (project-remember-project pr))))))
 
 (defsubst project--find-in-directory (dir)
-  (run-hook-with-args-until-success 'project-find-functions dir))
+  (run-hook-with-args-until-success 'project-find-functions (file-name-as-directory dir)))
 
 (defvar project--within-roots-fallback nil)
 
@@ -1610,7 +1610,8 @@ in `project-kill-buffer-conditions'."
                   (project--buffer-check b project-kill-buffer-conditions))
                 ;; heinous hack to avoid killing scratch, messages, etc.
                 (seq-filter (if (equal (funcall normalize (project-root pr))
-                                       (funcall normalize (project-root base-project)))
+                                       (and base-project
+                                            (funcall normalize (project-root base-project))))
                                 #'buffer-file-name
                               #'identity)
                             (project-buffers pr)))))
@@ -1736,15 +1737,14 @@ from the list using REPORT-MESSAGE, which is a format string
 passed to `message' as its first argument."
   (if (or (not (file-exists-p project-root))
           ;; without with-temp-buffer, arbitrary current buffer would
-          ;; yield project-root as default-directory
+          ;; yield default-directory as project-root
           (null (with-temp-buffer
                   (let* ((default-directory project-root)
                          (to-delete (project-current)))
                     (project-kill-buffers (not confirm))
                     (cl-some (lambda (b)
                                ;; live and not this current temp buffer
-                               (and (buffer-live-p b)
-                                    (not (string-prefix-p " " (buffer-name)))))
+                               (and (buffer-live-p b) (buffer-file-name b)))
                              (project-buffers to-delete))))))
       (progn (setq project--list
                    (delq (assoc (abbreviate-file-name project-root) project--list)
@@ -1804,10 +1804,11 @@ For an as-yet registered project, type \"...\""
                                     (format " (default %s)" default)
                                   "")))
                        choices nil t nil nil default))))
-    (if (equal dir dir-choice)
-        (read-directory-name (project--annotate-prompt from "Select directory: ")
-                             default-directory nil t)
-      dir)))
+    (file-name-as-directory
+     (if (equal dir dir-choice)
+         (read-directory-name (project--annotate-prompt from "Select directory: ")
+                              default-directory nil t)
+       dir))))
 
 (defun project-prompt-project-name ()
   "Prompt the user for a project, by name, that is one of the known project roots.
