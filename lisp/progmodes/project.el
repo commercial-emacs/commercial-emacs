@@ -1777,7 +1777,9 @@ with PROJECT-ROOT unless CONFIRM directs otherwise."
 
 (defun project-prompt-project-dir ()
   "Prompt the user for a directory that is one of the known project roots.
-For an as-yet registered project, type \"...\""
+For an as-yet registered project, type \"...\" This unorthodox,
+surprising, and probably broken behavior needs removal with extreme
+prejudice."
   (let* (dir
          (from (project--most-recent-project))
          (dir-choice "... (choose a dir)")

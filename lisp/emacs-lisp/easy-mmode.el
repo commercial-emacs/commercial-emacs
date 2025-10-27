@@ -439,6 +439,22 @@ No problems result if this variable is not bound.
                                nil
                                ,(unless (eq mode modefun) `',modefun))))))))
 
+(defun easy-mmode--escape-quotes (string)
+  "Stopgap for frustration of anonymous lambda with quotes in TURN-ON.
+
+Needs to go upstream."
+  (with-temp-buffer
+    (insert string)
+    (goto-char (point-min))
+    ;; Escape grave accents (`) that aren't already escaped
+    (while (re-search-forward "\\(?:[^\\]\\|^\\)\\(`\\)" nil t)
+      (replace-match "\\\\=`" nil nil nil 1))
+    ;; Escape apostrophes (') that aren't already escaped
+    (goto-char (point-min))
+    (while (re-search-forward "\\(?:[^\\]\\|^\\)\\('\\)" nil t)
+      (replace-match "\\\\='" nil nil nil 1))
+    (buffer-string)))
+
 ;;;
 ;;; make global minor mode
 ;;;
@@ -540,9 +556,9 @@ on if the hook has explicitly disabled it.
                   "If called from Lisp, toggle the mode if ARG is `toggle'.
 Enable the mode if ARG is nil, omitted, or is a positive number.
 Disable the mode if ARG is a negative number.\n\n"
-                  (internal--format-docstring-line
-                   "%s is enabled in all buffers where `%s' would do it."
-                   pretty-name turn-on)
+                  (easy-mmode--escape-quotes (internal--format-docstring-line
+                    "%s is enabled in all buffers where `%s' would do it."
+                    pretty-name turn-on))
                   "\n\n"
                   (internal--format-docstring-line
                    "See `%s' for more information on %s."
