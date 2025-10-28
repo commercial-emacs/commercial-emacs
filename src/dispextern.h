@@ -1793,6 +1793,7 @@ enum face_id
   WINDOW_DIVIDER_FACE_ID,
   WINDOW_DIVIDER_FIRST_PIXEL_FACE_ID,
   WINDOW_DIVIDER_LAST_PIXEL_FACE_ID,
+  WINDOW_BORDER_FACE_ID,
   INTERNAL_BORDER_FACE_ID,
   CHILD_FRAME_BORDER_FACE_ID,
   TAB_BAR_FACE_ID,
@@ -2947,6 +2948,10 @@ struct redisplay_interface
   void (*draw_window_divider) (struct window *w,
 			       int x_0, int x_1, int y_0, int y_1);
 
+  /* Draw a border rectangle around window W from (X0,Y0) to (X1,Y1).  */
+  void (*draw_window_border) (struct window *w,
+			      int x_0, int y_0, int x_1, int y_1, int width);
+
   /* Shift display of frame F to make room for inserted glyphs.
      The area at pixel (X,Y) of width WIDTH and height HEIGHT is
      shifted right by SHIFT_BY pixels.  */
@@ -3401,6 +3406,7 @@ extern void gui_update_cursor (struct frame *, bool);
 extern void gui_clear_cursor (struct window *);
 extern void gui_draw_vertical_border (struct window *w);
 extern void gui_draw_right_divider (struct window *w);
+extern void gui_draw_window_border (struct window *w);
 
 extern int get_glyph_string_clip_rects (struct glyph_string *,
                                         NativeRectangle *, int);

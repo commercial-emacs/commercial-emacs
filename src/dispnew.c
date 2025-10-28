@@ -3921,6 +3921,10 @@ gui_update_window_end (struct window *w, bool cursor_on_p,
 	  else
 	    gui_draw_vertical_border (w);
 	}
+
+      /* Draw window border if enabled.  */
+      gui_draw_window_border (w);
+
       unblock_input ();
     }
 

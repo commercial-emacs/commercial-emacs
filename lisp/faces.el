@@ -2847,6 +2847,14 @@ the same as `window-divider' face."
   :group 'window-divider
   :group 'basic-faces)
 
+(defface window-border
+  '((t :foreground "blue"))
+  "Basic face for borders around selected windows.
+This face is used to draw a rectangular border around the selected
+window when window borders are enabled via `set-window-border'."
+  :version "30.1"
+  :group 'basic-faces)
+
 (defface internal-border
     '((t nil))
   "Basic face for the internal border.

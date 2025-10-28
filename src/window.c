@@ -4527,6 +4527,7 @@ make_window (void)
   w->nrows_scale_factor = w->ncols_scale_factor = 1;
   w->left_fringe_width = w->right_fringe_width = -1;
   w->mode_line_height = w->tab_line_height = w->header_line_height = -1;
+  w->border_width = -1;
 #ifdef HAVE_WINDOW_SYSTEM
   w->phys_cursor_type = NO_CURSOR;
   w->phys_cursor_width = -1;
@@ -8063,6 +8064,44 @@ PERSISTENT), see `set-window-fringes'.  */)
 		w->fringes_persistent ? Qt : Qnil);
 }
 
+DEFUN ("set-window-border", Fset_window_border, Sset_window_border,
+       2, 2, 0,
+       doc: /* Set border width of WINDOW to WIDTH pixels.
+WINDOW must be a live window and defaults to the selected one.
+WIDTH specifies the border width in pixels.  A WIDTH of 0 means no border.
+A positive WIDTH draws a border around the window when it is selected.
+Return t if the border was changed, nil otherwise.  */)
+  (Lisp_Object window, Lisp_Object width)
+{
+  struct window *w = decode_live_window (window);
+  int border_width;
+
+  CHECK_FIXNUM (width);
+  border_width = XFIXNUM (width);
+
+  if (border_width < 0)
+    border_width = 0;
+
+  if (w->border_width != border_width)
+    {
+      w->border_width = border_width;
+      adjust_frame_glyphs (XFRAME (WINDOW_FRAME (w)));
+      return Qt;
+    }
+
+  return Qnil;
+}
+
+DEFUN ("window-border", Fwindow_border, Swindow_border,
+       0, 1, 0,
+       doc: /* Return border width of WINDOW in pixels.
+WINDOW must be a live window and defaults to the selected one.  */)
+  (Lisp_Object window)
+{
+  struct window *w = decode_live_window (window);
+  return make_fixnum (WINDOW_BORDER_WIDTH (w));
+}
+
 DEFUN ("set-window-cursor-type", Fset_window_cursor_type,
        Sset_window_cursor_type, 2, 2, 0,
        doc: /* Set the `cursor-type' of WINDOW to TYPE.
@@ -9025,6 +9064,8 @@ Elisp for testing purposes only.  */);
   defsubr (&Swindow_margins);
   defsubr (&Sset_window_fringes);
   defsubr (&Swindow_fringes);
+  defsubr (&Sset_window_border);
+  defsubr (&Swindow_border);
   defsubr (&Sset_window_scroll_bars);
   defsubr (&Swindow_scroll_bars);
   defsubr (&Swindow_vscroll);

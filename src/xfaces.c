@@ -5028,6 +5028,7 @@ lookup_basic_face (struct window *w, struct frame *f, int face_id)
     case VERTICAL_BORDER_FACE_ID: 	name = Qvertical_border; 	break;
     case WINDOW_DIVIDER_FIRST_PIXEL_FACE_ID:	name = Qwindow_divider_first_pixel;	break;
     case WINDOW_DIVIDER_LAST_PIXEL_FACE_ID:	name = Qwindow_divider_last_pixel;	break;
+    case WINDOW_BORDER_FACE_ID:		name = Qwindow_border;		break;
     case INTERNAL_BORDER_FACE_ID:	name = Qinternal_border; 	break;
     case CHILD_FRAME_BORDER_FACE_ID:	name = Qchild_frame_border; 	break;
 
@@ -5770,6 +5771,7 @@ realize_basic_faces (struct frame *f)
 			  WINDOW_DIVIDER_FIRST_PIXEL_FACE_ID);
       realize_named_face (f, Qwindow_divider_last_pixel,
 			  WINDOW_DIVIDER_LAST_PIXEL_FACE_ID);
+      realize_named_face (f, Qwindow_border, WINDOW_BORDER_FACE_ID);
       realize_named_face (f, Qinternal_border, INTERNAL_BORDER_FACE_ID);
       realize_named_face (f, Qchild_frame_border, CHILD_FRAME_BORDER_FACE_ID);
       realize_named_face (f, Qtab_bar, TAB_BAR_FACE_ID);
@@ -7333,6 +7335,7 @@ syms_of_xfaces (void)
   DEFSYM (Qwindow_divider, "window-divider");
   DEFSYM (Qwindow_divider_first_pixel, "window-divider-first-pixel");
   DEFSYM (Qwindow_divider_last_pixel, "window-divider-last-pixel");
+  DEFSYM (Qwindow_border, "window-border");
   DEFSYM (Qinternal_border, "internal-border");
   DEFSYM (Qchild_frame_border, "child-frame-border");
 

@@ -361,6 +361,12 @@ struct window
     /* Effective height of the tab line, or -1 if not known.  */
     int tab_line_height;
 
+    /* Width of the window border in pixels.
+       A value of -1 means no border (use default).
+       A value of 0 means no border.
+       Positive values specify border width.  */
+    int border_width;
+
     /* Z - the buffer position of the last glyph in the current
        matrix of W.  Only valid if window_end_valid is true.  */
     ptrdiff_t window_end_pos;
@@ -848,6 +854,12 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 
 #define WINDOW_FRINGES_WIDTH(W)		\
   (WINDOW_LEFT_FRINGE_WIDTH (W) + WINDOW_RIGHT_FRINGE_WIDTH (W))
+
+/* Window border width in pixels.  */
+#define WINDOW_BORDER_WIDTH(W)			\
+  ((W)->border_width >= 0			\
+   ? (W)->border_width				\
+   : 0)
 
 /* Are fringes outside display margins in window W.  */
 #define WINDOW_HAS_FRINGES_OUTSIDE_MARGINS(W)	\
