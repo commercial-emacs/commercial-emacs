@@ -1055,9 +1055,7 @@ window_body_height (struct window *w, enum window_body_unit pixelwise)
 		   : 0)
 		- WINDOW_MODE_LINE_HEIGHT (w)
 		- WINDOW_BOTTOM_DIVIDER_WIDTH (w)
-		- (WINDOW_BORDER_WIDTH (w) > 0
-		   ? 2 * WINDOW_BORDER_WIDTH (w)
-		   : 0));
+		- 2 * WINDOW_BORDER_WIDTH (w));
 
   int denom = 1;
   if (pixelwise == WINDOW_BODY_IN_REMAPPED_CHARS)
@@ -1104,9 +1102,7 @@ window_body_width (struct window *w, enum window_body_unit pixelwise)
 		- (FRAME_WINDOW_P (f)
 		   ? WINDOW_FRINGES_WIDTH (w)
 		   : 0)
-	       - (WINDOW_BORDER_WIDTH (w) > 0
-		  ? 2 * WINDOW_BORDER_WIDTH (w)
-		  : 0));
+	       - 2 * WINDOW_BORDER_WIDTH (w));
 
   int denom = 1;
   if (pixelwise == WINDOW_BODY_IN_REMAPPED_CHARS)
