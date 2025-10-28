@@ -5204,6 +5204,13 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 	  dx = xret = wx;
 	  dy = yret = wy;
 	}
+      else if (part == ON_WINDOW_BORDER)
+	{
+	  posn = Qwindow_border;
+	  width = WINDOW_BORDER_WIDTH (w);
+	  dx = xret = wx;
+	  dy = yret = wy;
+	}
 
       /* For clicks in the text area, fringes, margins, or vertical
 	 scroll bar, call buffer_posn_from_coords to extract TEXTPOS,
@@ -11769,6 +11776,7 @@ syms_of_keyboard (void)
   DEFSYM (Qvertical_line, "vertical-line");
   DEFSYM (Qright_divider, "right-divider");
   DEFSYM (Qbottom_divider, "bottom-divider");
+  DEFSYM (Qwindow_border, "window-border");
 
   DEFSYM (Qmouse_fixup_help_message, "mouse-fixup-help-message");
 
