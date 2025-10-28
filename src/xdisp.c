@@ -32066,6 +32066,11 @@ note_mouse_highlight (struct frame *f, int x, int y)
       }
     else
       cursor = FRAME_OUTPUT_DATA (f)->nontext_cursor;
+  else if (part == ON_WINDOW_BORDER)
+    {
+      cursor = FRAME_OUTPUT_DATA (f)->nontext_cursor;
+      goto set_cursor;
+    }
   else if (part == ON_LEFT_FRINGE || part == ON_RIGHT_FRINGE)
     {
       cursor = FRAME_OUTPUT_DATA (f)->nontext_cursor;
