@@ -2501,6 +2501,19 @@ remember_mouse_glyph (struct frame *f, int gx, int gy, NativeRectangle *rect)
       height = WINDOW_BOTTOM_DIVIDER_WIDTH (w);
       goto add_edge;
 
+    case ON_WINDOW_BORDER:
+      /* Window border is drawn around the text area, account for all
+	 the decorations to position it correctly.  */
+      gx = WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (w) + WINDOW_LEFT_FRINGE_WIDTH (w);
+      width = WINDOW_BORDER_WIDTH (w);
+      gy = WINDOW_TOP_EDGE_Y (w) + WINDOW_TAB_LINE_HEIGHT (w)
+	+ WINDOW_HEADER_LINE_HEIGHT (w);
+      height = (WINDOW_PIXEL_HEIGHT (w)
+		- WINDOW_TAB_LINE_HEIGHT (w)
+		- WINDOW_HEADER_LINE_HEIGHT (w)
+		- WINDOW_MODE_LINE_HEIGHT (w));
+      goto add_edge;
+
     default:
       ;
     virtual_glyph:
