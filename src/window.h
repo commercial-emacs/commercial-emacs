@@ -1040,22 +1040,22 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 
 /* Pixel height of window W without mode line, bottom scroll bar and
    bottom divider.  */
-#define WINDOW_BOX_HEIGHT_NO_MODE_LINE(W)			\
-  (WINDOW_PIXEL_HEIGHT (W)					\
-   - WINDOW_BOTTOM_DIVIDER_WIDTH (W)				\
-   - WINDOW_SCROLL_BAR_AREA_HEIGHT (W)				\
-   - WINDOW_MODE_LINE_HEIGHT (W)				\
+#define WINDOW_BOX_HEIGHT_NO_MODE_LINE(W)				\
+  (WINDOW_PIXEL_HEIGHT (W)						\
+   - WINDOW_BOTTOM_DIVIDER_WIDTH (W)					\
+   - WINDOW_SCROLL_BAR_AREA_HEIGHT (W)					\
+   - WINDOW_MODE_LINE_HEIGHT (W)					\
    - (WINDOW_BORDER_WIDTH (W) > 0 ? 2 * WINDOW_BORDER_WIDTH (W) : 0))
 
 /* Pixel height of window W without mode and header/tab line and bottom
    divider.  */
-#define WINDOW_BOX_TEXT_HEIGHT(W)				\
-  (WINDOW_PIXEL_HEIGHT (W)					\
-   - WINDOW_BOTTOM_DIVIDER_WIDTH (W)				\
-   - WINDOW_SCROLL_BAR_AREA_HEIGHT (W)				\
-   - WINDOW_MODE_LINE_HEIGHT (W)				\
-   - WINDOW_HEADER_LINE_HEIGHT (W)				\
-   - WINDOW_TAB_LINE_HEIGHT (W)					\
+#define WINDOW_BOX_TEXT_HEIGHT(W)					\
+  (WINDOW_PIXEL_HEIGHT (W)						\
+   - WINDOW_BOTTOM_DIVIDER_WIDTH (W)					\
+   - WINDOW_SCROLL_BAR_AREA_HEIGHT (W)					\
+   - WINDOW_MODE_LINE_HEIGHT (W)					\
+   - WINDOW_HEADER_LINE_HEIGHT (W)					\
+   - WINDOW_TAB_LINE_HEIGHT (W)						\
    - (WINDOW_BORDER_WIDTH (W) > 0 ? 2 * WINDOW_BORDER_WIDTH (W) : 0))
 
 /* Return the frame position where the horizontal scroll bar of window W
