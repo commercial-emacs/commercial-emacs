@@ -1324,6 +1324,7 @@ window so that the location of point moves off-window.  */)
       ON_RIGHT_DIVIDER;
    if it is on the window's horizontal divider, return
       ON_BOTTOM_DIVIDER;
+   if it is on the window's border, return ON_WINDOW_BORDER;
    if it is in the window's text area, return ON_TEXT;
    if it is on the window's modeline, return ON_MODE_LINE;
    if it is on the border between the window and its right sibling,
