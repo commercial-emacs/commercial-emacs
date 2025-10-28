@@ -1548,6 +1548,9 @@ window_relative_x_coord (struct window *w, enum window_part part, int x)
 	      + ((WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w))
 		 ? WINDOW_RIGHT_FRINGE_WIDTH (w) : 0));
 
+    case ON_WINDOW_BORDER:
+      return x - left_x;
+
     case ON_NOTHING:
     case ON_VERTICAL_BORDER:
     case ON_VERTICAL_SCROLL_BAR:
@@ -1574,6 +1577,7 @@ If COORDINATES are in the text portion of WINDOW,
    the coordinates relative to the window are returned.
 If they are in the bottom divider of WINDOW, `bottom-divider' is returned.
 If they are in the right divider of WINDOW, `right-divider' is returned.
+If they are in the window border of WINDOW, `window-border' is returned.
 If they are in the mode line of WINDOW, `mode-line' is returned.
 If they are in the header line of WINDOW, `header-line' is returned.
 If they are in the tab line of WINDOW, `tab-line' is returned.
@@ -1649,6 +1653,9 @@ If they are in the windows's left or right marginal areas, `left-margin'\n\
 
     case ON_BOTTOM_DIVIDER:
       return Qbottom_divider;
+
+    case ON_WINDOW_BORDER:
+      return Qwindow_border;
 
     default:
       emacs_abort ();
