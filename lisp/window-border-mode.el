@@ -12,7 +12,7 @@
 
 ;;; Code:
 
-(defcustom window-border-width 2
+(defcustom window-border-width 1
   "Width of the border around the selected window in pixels."
   :type 'integer
   :group 'windows)
