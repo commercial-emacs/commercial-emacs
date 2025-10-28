@@ -852,6 +852,10 @@ window_text_bottom_y (struct window *w)
 
   bottom_y -= WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
 
+  /* Account for window border at the bottom.  */
+  if (WINDOW_BORDER_WIDTH (w) > 0)
+    bottom_y -= WINDOW_BORDER_WIDTH (w);
+
   return bottom_y;
 }
 
@@ -868,6 +872,10 @@ window_box_width (struct window *w, enum glyph_row_area area)
     {
       width -= WINDOW_SCROLL_BAR_AREA_WIDTH (w);
       width -= WINDOW_RIGHT_DIVIDER_WIDTH (w);
+
+      /* Account for window border if present (left and right).  */
+      if (WINDOW_BORDER_WIDTH (w) > 0)
+	width -= 2 * WINDOW_BORDER_WIDTH (w);
 
       if (area == TEXT_AREA)
 	width -= (WINDOW_MARGINS_WIDTH (w)
@@ -897,6 +905,10 @@ window_box_height (struct window *w)
 
   height -= WINDOW_BOTTOM_DIVIDER_WIDTH (w);
   height -= WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
+
+  /* Account for window border if present (top and bottom).  */
+  if (WINDOW_BORDER_WIDTH (w) > 0)
+    height -= 2 * WINDOW_BORDER_WIDTH (w);
 
   /* Note: the code below that determines the mode-line/header-line/tab-line
      height is essentially the same as that contained in the macro
@@ -974,6 +986,10 @@ window_box_left_offset (struct window *w, enum glyph_row_area area)
     return 0;
 
   x = WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (w);
+
+  /* Account for window border on the left.  */
+  if (WINDOW_BORDER_WIDTH (w) > 0)
+    x += WINDOW_BORDER_WIDTH (w);
 
   if (area == TEXT_AREA)
     x += (WINDOW_LEFT_FRINGE_WIDTH (w)
@@ -1056,6 +1072,9 @@ window_box (struct window *w, enum glyph_row_area area, int *box_x,
   if (box_y)
     {
       *box_y = WINDOW_TOP_EDGE_Y (w);
+      /* Account for window border on the top.  */
+      if (WINDOW_BORDER_WIDTH (w) > 0)
+	*box_y += WINDOW_BORDER_WIDTH (w);
       if (window_wants_tab_line (w))
 	*box_y += CURRENT_TAB_LINE_HEIGHT (w);
       if (window_wants_header_line (w))

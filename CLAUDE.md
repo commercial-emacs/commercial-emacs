@@ -66,3 +66,14 @@ Tests use ERT (Emacs Lisp Regression Testing). Key tags:
 - `:unstable` - Development tests
 
 Test results are stored in `<filename>.log` files.
+
+## Code Style
+
+### Emacs Lisp Comments
+- **Inline (end-of-line) comments**: Use one semicolon with whitespace before the semicolon, but NO space after it:
+  ```elisp
+  (setq foo 'bar) ;Preferred style for inline comments
+  ```
+- **Separate-line comments**: Use two semicolons with a space (traditional style):
+  ```elisp
+  ;; This is a separate line comment

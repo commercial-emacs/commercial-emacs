@@ -186,7 +186,8 @@ enum window_part
   ON_VERTICAL_SCROLL_BAR,
   ON_HORIZONTAL_SCROLL_BAR,
   ON_RIGHT_DIVIDER,
-  ON_BOTTOM_DIVIDER
+  ON_BOTTOM_DIVIDER,
+  ON_WINDOW_BORDER
 };
 
 /* Number of bits allocated to store fringe bitmap numbers.  */

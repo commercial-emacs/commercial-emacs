@@ -1054,7 +1054,10 @@ window_body_height (struct window *w, enum window_body_unit pixelwise)
 		   ? WINDOW_SCROLL_BAR_AREA_HEIGHT (w)
 		   : 0)
 		- WINDOW_MODE_LINE_HEIGHT (w)
-		- WINDOW_BOTTOM_DIVIDER_WIDTH (w));
+		- WINDOW_BOTTOM_DIVIDER_WIDTH (w)
+		- (WINDOW_BORDER_WIDTH (w) > 0
+		   ? 2 * WINDOW_BORDER_WIDTH (w)
+		   : 0));
 
   int denom = 1;
   if (pixelwise == WINDOW_BODY_IN_REMAPPED_CHARS)
@@ -1100,7 +1103,10 @@ window_body_width (struct window *w, enum window_body_unit pixelwise)
 		- WINDOW_MARGINS_WIDTH (w)
 		- (FRAME_WINDOW_P (f)
 		   ? WINDOW_FRINGES_WIDTH (w)
-		   : 0));
+		   : 0)
+	       - (WINDOW_BORDER_WIDTH (w) > 0
+		  ? 2 * WINDOW_BORDER_WIDTH (w)
+		  : 0));
 
   int denom = 1;
   if (pixelwise == WINDOW_BODY_IN_REMAPPED_CHARS)
@@ -1354,6 +1360,36 @@ coordinates_in_window (register struct window *w, int x, int y)
   /* Outside any interesting row or column?  */
   if (y < top_y || y >= bottom_y || x < left_x || x >= right_x)
     return ON_NOTHING;
+
+  /* On window border?  Check all four sides.  */
+  if (WINDOW_BORDER_WIDTH (w) > 0)
+    {
+      int border_width = WINDOW_BORDER_WIDTH (w);
+      int text_left = left_x + WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (w)
+	+ WINDOW_LEFT_FRINGE_WIDTH (w);
+      int text_right = right_x - WINDOW_RIGHT_SCROLL_BAR_AREA_WIDTH (w)
+	- WINDOW_RIGHT_FRINGE_WIDTH (w);
+      int text_top = top_y + WINDOW_TAB_LINE_HEIGHT (w)
+	+ WINDOW_HEADER_LINE_HEIGHT (w);
+      int text_bottom = bottom_y - WINDOW_MODE_LINE_HEIGHT (w);
+
+      /* Top border */
+      if (y >= text_top && y < text_top + border_width
+	  && x >= text_left && x < text_right)
+	return ON_WINDOW_BORDER;
+      /* Bottom border */
+      if (y >= text_bottom - border_width && y < text_bottom
+	  && x >= text_left && x < text_right)
+	return ON_WINDOW_BORDER;
+      /* Left border */
+      if (x >= text_left && x < text_left + border_width
+	  && y >= text_top && y < text_bottom)
+	return ON_WINDOW_BORDER;
+      /* Right border */
+      if (x >= text_right - border_width && x < text_right
+	  && y >= text_top && y < text_bottom)
+	return ON_WINDOW_BORDER;
+    }
 
   /* On the horizontal window divider (which prevails the vertical
      divider)?  */
