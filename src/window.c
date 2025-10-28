@@ -1255,6 +1255,17 @@ WINDOW must be a live window and defaults to the selected one.  */)
   return make_fixnum (WINDOW_BOTTOM_DIVIDER_WIDTH (decode_live_window (window)));
 }
 
+DEFUN ("window-border-width", Fwindow_border_width,
+       Swindow_border_width, 0, 1, 0,
+       doc: /* Return the width in pixels of WINDOW's border.
+WINDOW must be a live window and defaults to the selected one.
+Returns -1 if the window has no explicit border width set, 0 if there
+is no border, or a positive value indicating the border width in pixels.  */)
+  (Lisp_Object window)
+{
+  return make_fixnum (decode_live_window (window)->border_width);
+}
+
 DEFUN ("window-scroll-bar-width", Fwindow_scroll_bar_width,
        Swindow_scroll_bar_width, 0, 1, 0,
        doc: /* Return the width in pixels of WINDOW's vertical scrollbar.
@@ -8128,16 +8139,6 @@ Return t if the border was changed, nil otherwise.  */)
   return Qnil;
 }
 
-DEFUN ("window-border", Fwindow_border, Swindow_border,
-       0, 1, 0,
-       doc: /* Return border width of WINDOW in pixels.
-WINDOW must be a live window and defaults to the selected one.  */)
-  (Lisp_Object window)
-{
-  struct window *w = decode_live_window (window);
-  return make_fixnum (WINDOW_BORDER_WIDTH (w));
-}
-
 DEFUN ("set-window-cursor-type", Fset_window_cursor_type,
        Sset_window_cursor_type, 2, 2, 0,
        doc: /* Set the `cursor-type' of WINDOW to TYPE.
@@ -9055,6 +9056,7 @@ Elisp for testing purposes only.  */);
   defsubr (&Swindow_tab_line_height);
   defsubr (&Swindow_right_divider_width);
   defsubr (&Swindow_bottom_divider_width);
+  defsubr (&Swindow_border_width);
   defsubr (&Swindow_scroll_bar_width);
   defsubr (&Swindow_scroll_bar_height);
   defsubr (&Scoordinates_in_window_p);
@@ -9101,7 +9103,6 @@ Elisp for testing purposes only.  */);
   defsubr (&Sset_window_fringes);
   defsubr (&Swindow_fringes);
   defsubr (&Sset_window_border);
-  defsubr (&Swindow_border);
   defsubr (&Sset_window_scroll_bars);
   defsubr (&Swindow_scroll_bars);
   defsubr (&Swindow_vscroll);
