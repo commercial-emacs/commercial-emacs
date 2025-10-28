@@ -7144,7 +7144,7 @@ x_draw_window_border (struct window *w, int x0, int y0, int x1, int y1, int widt
     text_left += WINDOW_SCROLL_BAR_AREA_WIDTH (w);
 
   int text_top = WINDOW_TOP_EDGE_Y (w) + WINDOW_HEADER_LINE_HEIGHT (w) + WINDOW_TAB_LINE_HEIGHT (w);
-  int text_bottom = WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_MODE_LINE_HEIGHT (w);
+  int text_bottom = WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_MODE_LINE_HEIGHT (w) - WINDOW_BOTTOM_DIVIDER_WIDTH (w);
 
   XSetForeground (display, f->output_data.x->normal_gc, color);
 
