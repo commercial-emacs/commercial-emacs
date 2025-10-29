@@ -7122,47 +7122,45 @@ x_draw_window_divider (struct window *w, int x0, int x1, int y0, int y1)
     }
 }
 
-/* Draw a rectangular border around window W.  */
+/* Clear a rectangular border, presumably around a window.  */
 
 static void
-x_draw_window_border (struct window *w, int x0, int y0, int x1, int y1, int width)
+x_clear_rectangular_frame (struct frame *f, int x, int y, int w, int h, int thickness)
 {
-  struct frame *f = XFRAME (WINDOW_FRAME (w));
-  struct face *face = FACE_FROM_ID_OR_NULL (f, WINDOW_BORDER_FACE_ID);
-  unsigned long color = face ? face->foreground : FRAME_FOREGROUND_PIXEL (f);
+  // top
+  x_clear_rectangle (f, f->output_data.x->normal_gc,
+		     x, y, w, thickness, false);
+  // bottom
+  x_clear_rectangle (f, f->output_data.x->normal_gc,
+		     x, h - thickness, w, thickness, false);
+  // left
+  x_clear_rectangle (f, f->output_data.x->normal_gc,
+		     x, y, thickness, h, false);
+  // right
+  x_clear_rectangle (f, f->output_data.x->normal_gc,
+		     x + w - thickness, y, thickness, h, false);
+}
+
+/* Draw a rectangular border, presumably around a window.  */
+
+static void
+x_draw_rectangular_frame (struct frame *f, unsigned long color,
+			  int x, int y, int w, int h, int thickness)
+{
   Display *display = FRAME_X_DISPLAY (f);
-
-  if (width <= 0)
-    return;
-
-  /* Adjust coordinates to not overlap scroll bars or fringes */
-  int text_left = WINDOW_LEFT_EDGE_X (w) + WINDOW_LEFT_FRINGE_WIDTH (w);
-  int text_right = WINDOW_RIGHT_EDGE_X (w) - WINDOW_RIGHT_FRINGE_WIDTH (w);
-  if (WINDOW_HAS_VERTICAL_SCROLL_BAR_ON_RIGHT (w))
-    text_right -= WINDOW_SCROLL_BAR_AREA_WIDTH (w);
-  else if (WINDOW_HAS_VERTICAL_SCROLL_BAR_ON_LEFT (w))
-    text_left += WINDOW_SCROLL_BAR_AREA_WIDTH (w);
-
-  int text_top = WINDOW_TOP_EDGE_Y (w) + WINDOW_HEADER_LINE_HEIGHT (w) + WINDOW_TAB_LINE_HEIGHT (w);
-  int text_bottom = WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_MODE_LINE_HEIGHT (w) - WINDOW_BOTTOM_DIVIDER_WIDTH (w);
-
   XSetForeground (display, f->output_data.x->normal_gc, color);
-
-  /* Draw top border */
+  // top
   x_fill_rectangle (f, f->output_data.x->normal_gc,
-		    text_left, text_top, text_right - text_left, width, false);
-
-  /* Draw bottom border */
+		    x, y, w, thickness, false);
+  // bottom
   x_fill_rectangle (f, f->output_data.x->normal_gc,
-		    text_left, text_bottom - width, text_right - text_left, width, false);
-
-  /* Draw left border */
+		    x, h - thickness, w, thickness, false);
+  // left
   x_fill_rectangle (f, f->output_data.x->normal_gc,
-		    text_left, text_top, width, text_bottom - text_top, false);
-
-  /* Draw right border */
+		    x, y, thickness, h, false);
+  // right
   x_fill_rectangle (f, f->output_data.x->normal_gc,
-		    text_right - width, text_top, width, text_bottom - text_top, false);
+		    x + w - thickness, y, thickness, h, false);
 }
 
 #ifdef HAVE_XDBE
@@ -7522,7 +7520,7 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
 	{
 	  XSetBackground (display, face->gc, face->background);
 	  x_clear_rectangle (f, face->gc, p->bx, p->by, p->nx, p->ny,
-			   true);
+			     true);
 	  XSetForeground (display, face->gc, face->foreground);
 	}
     }
@@ -31366,7 +31364,8 @@ static struct redisplay_interface x_redisplay_interface =
     x_draw_window_cursor,
     x_draw_vertical_window_border,
     x_draw_window_divider,
-    x_draw_window_border,
+    x_draw_rectangular_frame,
+    x_clear_rectangular_frame,
     x_shift_glyphs_for_insert, /* Never called; see comment in function.  */
     x_show_hourglass,
     x_hide_hourglass,

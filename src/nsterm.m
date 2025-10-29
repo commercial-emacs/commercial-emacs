@@ -5417,6 +5417,8 @@ static struct redisplay_interface ns_redisplay_interface =
   ns_draw_window_cursor,
   ns_draw_vertical_window_border,
   ns_draw_window_divider,
+  NULL, /* draw rectangular frame */
+  NULL, /* clear rectangular frame */
   ns_shift_glyphs_for_insert,
   ns_show_hourglass,
   ns_hide_hourglass,

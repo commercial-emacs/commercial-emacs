@@ -3158,6 +3158,8 @@ static struct redisplay_interface haiku_redisplay_interface =
     haiku_draw_window_cursor,
     haiku_draw_vertical_window_border,
     haiku_draw_window_divider,
+    NULL, /* draw rectangular frame */
+    NULL, /* clear rectangular frame */
     NULL, /* shift glyphs for insert */
     haiku_show_hourglass,
     haiku_hide_hourglass,

@@ -18016,15 +18016,15 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	    gui_draw_vertical_border (w);
 	}
 
-      /* Draw window border if enabled.  */
-      gui_draw_window_border (w);
-
       unblock_input ();
       update_end (f);
     }
 
   if (WINDOW_BOTTOM_DIVIDER_WIDTH (w))
     gui_draw_bottom_divider (w);
+
+  gui_update_window_border (w);
+
 #endif /* HAVE_WINDOW_SYSTEM */
 
   /* We go to this label, with fonts_changed set, if it is
@@ -32810,37 +32810,40 @@ gui_draw_bottom_divider (struct window *w)
     }
 }
 
-/* Draw a border around window W if it has a non-zero border width.
-   This draws all four sides: top, bottom, left, and right.
-   Only draws for the selected window.  */
-
 void
-gui_draw_window_border (struct window *w)
+gui_update_window_border (struct window *w)
 {
+  if (w->mini
+      || w->pseudo_window_p
+      || WINDOW_BORDER_WIDTH (w) <= 0)
+    return;
+
   struct frame *f = XFRAME (WINDOW_FRAME (w));
-  int border_width = WINDOW_BORDER_WIDTH (w);
-
-  if (w->mini || w->pseudo_window_p)
-    return;
-
-  /* Don't draw borders for internal windows (parent containers).  */
-  if (NILP (w->contents) || !BUFFERP (w->contents))
-    return;
-
-  /* Only draw for selected window.  For non-selected windows with
-     border_width > 0, we skip drawing but still track that they need
-     redrawing when they become selected.  */
-  if (border_width > 0
-      && EQ (w->frame, selected_frame)
-      && w == XWINDOW (selected_window)
-      && FRAME_RIF (f)->draw_window_border)
+  if (f == XFRAME (selected_frame)
+      && w == XWINDOW (selected_window))
     {
-      int x0 = WINDOW_LEFT_EDGE_X (w);
-      int x1 = WINDOW_RIGHT_EDGE_X (w);
-      int y0 = WINDOW_TOP_EDGE_Y (w);
-      int y1 = WINDOW_BOTTOM_EDGE_Y (w);
-
-      FRAME_RIF (f)->draw_window_border (w, x0, y0, x1, y1, border_width);
+      if (FRAME_RIF (f)->draw_rectangular_frame)
+	{
+	  struct face *face = FACE_FROM_ID_OR_NULL (f, WINDOW_BORDER_FACE_ID);
+	  unsigned long color = face ? face->foreground : FRAME_FOREGROUND_PIXEL (f);
+	  FRAME_RIF (f)->draw_rectangular_frame
+	    (f, color,
+	     WINDOW_LEFT_EDGE_X (w),
+	     WINDOW_TOP_EDGE_Y (w),
+	     WINDOW_RIGHT_EDGE_X (w) - WINDOW_LEFT_EDGE_X (w),
+	     WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_TOP_EDGE_Y (w),
+	     WINDOW_BORDER_WIDTH (w));
+	}
+    }
+  else if (FRAME_RIF (f)->clear_rectangular_frame)
+    {
+      FRAME_RIF (f)->clear_rectangular_frame
+	(f,
+	 WINDOW_LEFT_EDGE_X (w),
+	 WINDOW_TOP_EDGE_Y (w),
+	 WINDOW_RIGHT_EDGE_X (w) - WINDOW_LEFT_EDGE_X (w),
+	 WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_TOP_EDGE_Y (w),
+	 WINDOW_BORDER_WIDTH (w));
     }
 }
 
@@ -32992,8 +32995,7 @@ expose_window (struct window *w, const Emacs_Rectangle *fr)
 	  if (WINDOW_BOTTOM_DIVIDER_WIDTH (w))
 	    gui_draw_bottom_divider (w);
 
-	  /* Draw window border if enabled.  */
-	  gui_draw_window_border (w);
+	  gui_update_window_border (w);
 
 	  /* Turn the cursor on again.  */
 	  if (cursor_cleared_p

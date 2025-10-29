@@ -7517,6 +7517,8 @@ static struct redisplay_interface w32_redisplay_interface =
   w32_draw_window_cursor,
   w32_draw_vertical_window_border,
   w32_draw_window_divider,
+  NULL, /* draw rectangular frame */
+  NULL, /* clear rectangular frame */
   w32_shift_glyphs_for_insert,
   w32_show_hourglass,
   w32_hide_hourglass,

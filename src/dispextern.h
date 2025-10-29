@@ -2941,17 +2941,21 @@ struct redisplay_interface
 			      enum text_cursor_kinds cursor_type,
 			      int cursor_width, bool on_p, bool active_p);
 
-  /* Draw vertical border for window W from (X,Y_0) to (X,Y_1).  */
+  /* Draw vertical border for window W from (X, Y0) to (X, Y1).  */
   void (*draw_vertical_window_border) (struct window *w,
-                                       int x, int y_0, int y_1);
+                                       int x, int y0, int y1);
 
-  /* Draw window divider for window W from (X_0, Y_0) to (X_1, ,Y_1).  */
+  /* Draw window divider for window W from (X0, Y0) to (X1,Y1).  */
   void (*draw_window_divider) (struct window *w,
-			       int x_0, int x_1, int y_0, int y_1);
+			       int x0, int x1, int y0, int y1);
 
-  /* Draw a border rectangle around window W from (X0,Y0) to (X1,Y1).  */
-  void (*draw_window_border) (struct window *w,
-			      int x_0, int y_0, int x_1, int y_1, int width);
+  /* Draw at origin X, Y. */
+  void (*draw_rectangular_frame) (struct frame *f, unsigned long color,
+				  int x, int y, int width, int height, int thickness);
+
+  /* Clear at origin X, Y. */
+  void (*clear_rectangular_frame) (struct frame *f, int x, int y,
+				   int width, int height, int thickness);
 
   /* Shift display of frame F to make room for inserted glyphs.
      The area at pixel (X,Y) of width WIDTH and height HEIGHT is
@@ -3407,7 +3411,7 @@ extern void gui_update_cursor (struct frame *, bool);
 extern void gui_clear_cursor (struct window *);
 extern void gui_draw_vertical_border (struct window *w);
 extern void gui_draw_right_divider (struct window *w);
-extern void gui_draw_window_border (struct window *w);
+extern void gui_update_window_border (struct window *w);
 
 extern int get_glyph_string_clip_rects (struct glyph_string *,
                                         NativeRectangle *, int);

@@ -1361,14 +1361,14 @@ coordinates_in_window (register struct window *w, int x, int y)
   /* On window border?  Check all four sides.  */
   if (WINDOW_BORDER_WIDTH (w) > 0)
     {
-      int border_width = WINDOW_BORDER_WIDTH (w);
-      int text_left = left_x + WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (w)
-	+ WINDOW_LEFT_FRINGE_WIDTH (w);
-      int text_right = right_x - WINDOW_RIGHT_SCROLL_BAR_AREA_WIDTH (w)
+      int text_left = left_x + WINDOW_BORDER_WIDTH (w)
+	+ WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (w) + WINDOW_LEFT_FRINGE_WIDTH (w);
+      int text_right = right_x - WINDOW_BORDER_WIDTH (w)
+	- WINDOW_RIGHT_SCROLL_BAR_AREA_WIDTH (w)
 	- WINDOW_RIGHT_FRINGE_WIDTH (w);
-      int text_top = top_y + WINDOW_TAB_LINE_HEIGHT (w)
+      int text_top = top_y + WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w)
 	+ WINDOW_HEADER_LINE_HEIGHT (w);
-      int text_bottom = bottom_y - WINDOW_MODE_LINE_HEIGHT (w);
+      int text_bottom = bottom_y - WINDOW_MODE_LINE_HEIGHT (w) - WINDOW_BORDER_WIDTH (w);
 
       /* Top border */
       if (y >= text_top && y < text_top + border_width

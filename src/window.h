@@ -361,10 +361,8 @@ struct window
     /* Effective height of the tab line, or -1 if not known.  */
     int tab_line_height;
 
-    /* Width of the window border in pixels.
-       A value of -1 means no border (use default).
-       A value of 0 means no border.
-       Positive values specify border width.  */
+    /* Width of the window border in pixels.  A nonpositive value means
+       no border.  */
     int border_width;
 
     /* Z - the buffer position of the last glyph in the current
@@ -562,26 +560,25 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 
 /* General window layout:
 
-   LEFT_EDGE_COL         RIGHT_EDGE_COL
-   |                                  |
-   |                                  |
-   |  BOX_LEFT_EDGE_COL               |
-   |  |           BOX_RIGHT_EDGE_COL  |
-   |  |                            |  |
-   v  v                            v  v
-   <-><-><---><-----------><---><-><->
-    ^  ^   ^        ^        ^   ^  ^
-    |  |   |        |        |   |  |
-    |  |   |        |        |   |  +-- RIGHT_SCROLL_BAR_COLS
-    |  |   |        |        |   +----- RIGHT_FRINGE_WIDTH
-    |  |   |        |        +--------- RIGHT_MARGIN_COLS
-    |  |   |        |
-    |  |   |        +------------------ TEXT_AREA_COLS
-    |  |   |
-    |  |   +--------------------------- LEFT_MARGIN_COLS
-    |  +------------------------------- LEFT_FRINGE_WIDTH
-    +---------------------------------- LEFT_SCROLL_BAR_COLS
-
+   LEFT_EDGE_COL                RIGHT_EDGE_COL
+   |     BOX_LEFT_EDGE_COL                  |
+   |     |           BOX_RIGHT_EDGE_COL     |
+   |     |                            |     |
+   v     v                            v     v
+   <-><-><-><---><-----------><---><-><-><->
+    ^  ^  ^   ^        ^        ^   ^  ^  ^
+    |  |  |   |        |        |   |  |  |
+    |  |  |   |        |        |   |  |  |
+    |  |  |   |        |        |   |  |  +- WINDOW_BORDER_WIDTH
+    |  |  |   |        |        |   |  +---- RIGHT_SCROLL_BAR_COLS
+    |  |  |   |        |        |   +------- RIGHT_FRINGE_WIDTH
+    |  |  |   |        |        +----------- RIGHT_MARGIN_COLS
+    |  |  |   |        |
+    |  |  |   |        +-------------------- TEXT_AREA_COLS
+    |  |  |   +----------------------------- LEFT_MARGIN_COLS
+    |  |  +--------------------------------- LEFT_FRINGE_WIDTH
+    |  +------------------------------------ LEFT_SCROLL_BAR_COLS
+    +--------------------------------------- WINDOW_BORDER_WIDTH
 */
 
 
@@ -631,7 +628,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
   FRAME_LINE_HEIGHT (WINDOW_XFRAME (W))
 
 /* Return the pixel width of window W.  This includes dividers, scroll
-   bars, fringes and margins, if any.  */
+   bars, fringes, borders, and margins, if any.  */
 #define WINDOW_PIXEL_WIDTH(W) (W)->pixel_width
 
 /* Return the pixel height of window W.  This includes dividers, scroll
