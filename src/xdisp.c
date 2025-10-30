@@ -977,15 +977,12 @@ window_box_height (struct window *w)
 int
 window_box_left_offset (struct window *w, enum glyph_row_area area)
 {
-  int x;
+  int x = WINDOW_BORDER_WIDTH;
 
   if (w->pseudo_window_p)
     return 0;
 
-  x = WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (w);
-
-  /* Account for window border on the left.  */
-  x += WINDOW_BORDER_WIDTH;
+  x += WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (w);
 
   if (area == TEXT_AREA)
     x += (WINDOW_LEFT_FRINGE_WIDTH (w)
@@ -18001,6 +17998,9 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
     }
 
 #ifdef HAVE_WINDOW_SYSTEM
+
+  gui_update_window_border (w);
+
   if (FRAME_WINDOW_P (f)
       && update_window_fringes (w, (just_this_one_p
 				    || (!used_current_matrix_p && !overlay_arrow_seen)
@@ -18022,9 +18022,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 
   if (WINDOW_BOTTOM_DIVIDER_WIDTH (w))
     gui_draw_bottom_divider (w);
-
-  gui_update_window_border (w);
-
 #endif /* HAVE_WINDOW_SYSTEM */
 
   /* We go to this label, with fonts_changed set, if it is
@@ -18032,10 +18029,9 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
      We have to redeem the scroll bar even in this case,
      because the loop in redisplay_internal expects that.  */
  need_larger_matrices:
-  ;
+  (void) 0;
  finish_scroll_bars:
-
-   if (WINDOW_HAS_VERTICAL_SCROLL_BAR (w) || WINDOW_HAS_HORIZONTAL_SCROLL_BAR (w))
+  if (WINDOW_HAS_VERTICAL_SCROLL_BAR (w) || WINDOW_HAS_HORIZONTAL_SCROLL_BAR (w))
     {
       if (WINDOW_HAS_VERTICAL_SCROLL_BAR (w))
 	/* Set the thumb's position and size.  */
@@ -18048,7 +18044,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       /* Note that we actually used the scroll bar attached to this
 	 window, so it shouldn't be deleted at the end of redisplay.  */
       if (FRAME_TERMINAL (f)->redeem_scroll_bar_hook)
-        (*FRAME_TERMINAL (f)->redeem_scroll_bar_hook) (w);
+	(*FRAME_TERMINAL (f)->redeem_scroll_bar_hook) (w);
     }
 
   /* Restore current_buffer and value of point in it.  The window

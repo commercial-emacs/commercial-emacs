@@ -28,6 +28,6 @@
     (window-border--primitive 0))
   (redraw-display))
 
-(provide 'window-border-mode)
+(provide 'window-border)
 
-;;; window-border-mode.el ends here
+;;; window-border.el ends here
