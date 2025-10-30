@@ -4749,11 +4749,15 @@ window_resize_check (struct window *w, bool horflag)
 static void
 window_resize_apply (struct window *w, bool horflag)
 {
-  struct window *c;
   int edge;
   int unit = (horflag
 	      ? FRAME_COLUMN_WIDTH (WINDOW_XFRAME (w))
 	      : FRAME_LINE_HEIGHT (WINDOW_XFRAME (w)));
+
+  Lisp_Object restore_selected_window = selected_window;
+  selected_window = Qnil; /* force gui_update_window_border to clear */
+  gui_update_window_border (w);
+  selected_window = restore_selected_window;
 
   /* Note: Assigning new_normal requires that the new total size of the
      parent window has been set *before*.  */
@@ -4778,7 +4782,7 @@ window_resize_apply (struct window *w, bool horflag)
 
   if (WINDOW_VERTICAL_COMBINATION_P (w))
     {
-      c = XWINDOW (w->contents);
+      struct window *c = XWINDOW (w->contents);
       while (c)
 	{
 	  if (horflag)
@@ -4800,7 +4804,7 @@ window_resize_apply (struct window *w, bool horflag)
     }
   else if (WINDOW_HORIZONTAL_COMBINATION_P (w))
     {
-      c = XWINDOW (w->contents);
+      struct window *c = XWINDOW (w->contents);
       while (c)
 	{
 	  if (horflag)

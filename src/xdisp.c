@@ -32815,7 +32815,9 @@ gui_update_window_border (struct window *w)
     return;
 
   struct frame *f = XFRAME (WINDOW_FRAME (w));
-  if (f == XFRAME (selected_frame)
+  if (FRAMEP (selected_frame)
+      && f == XFRAME (selected_frame)
+      && WINDOWP (selected_window)
       && w == XWINDOW (selected_window))
     {
       if (FRAME_RIF (f)->draw_rectangular_frame)
