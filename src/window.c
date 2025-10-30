@@ -4777,7 +4777,6 @@ window_resize_apply (struct window *w, bool horflag)
     }
 
   if (WINDOW_VERTICAL_COMBINATION_P (w))
-    /* W is a vertical combination.  */
     {
       c = XWINDOW (w->contents);
       while (c)
@@ -4800,7 +4799,6 @@ window_resize_apply (struct window *w, bool horflag)
 	}
     }
   else if (WINDOW_HORIZONTAL_COMBINATION_P (w))
-    /* W is a horizontal combination.  */
     {
       c = XWINDOW (w->contents);
       while (c)

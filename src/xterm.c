@@ -7132,7 +7132,7 @@ x_clear_rectangular_frame (struct frame *f, int x, int y, int w, int h, int thic
 		     x, y, w, thickness, false);
   // bottom
   x_clear_rectangle (f, f->output_data.x->normal_gc,
-		     x, h - thickness, w, thickness, false);
+		     x, y + h - thickness, w, thickness, false);
   // left
   x_clear_rectangle (f, f->output_data.x->normal_gc,
 		     x, y, thickness, h, false);
@@ -7154,7 +7154,7 @@ x_draw_rectangular_frame (struct frame *f, unsigned long color,
 		    x, y, w, thickness, false);
   // bottom
   x_fill_rectangle (f, f->output_data.x->normal_gc,
-		    x, h - thickness, w, thickness, false);
+		    x, y + h - thickness, w, thickness, false);
   // left
   x_fill_rectangle (f, f->output_data.x->normal_gc,
 		    x, y, thickness, h, false);
