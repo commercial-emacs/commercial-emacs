@@ -2848,7 +2848,11 @@ the same as `window-divider' face."
   :group 'basic-faces)
 
 (defface window-border
-  '((t :foreground "blue"))
+  '((((class color grayscale) (min-colors 88) (background light))
+     :foreground "blue")
+    (((class color grayscale) (min-colors 88) (background dark))
+     :foreground "cyan")
+    (t :foreground "blue"))
   "Basic face for borders around selected windows.
 This face is used to draw a rectangular border around the selected
 window when window borders are enabled via `set-window-border'."

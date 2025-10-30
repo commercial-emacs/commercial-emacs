@@ -7,11 +7,6 @@
   :type 'natnum
   :group 'windows)
 
-(defcustom window-border-color "#0000ff"
-  "Color for the selected window's border."
-  :type 'color
-  :group 'windows)
-
 ;;;###autoload
 (define-minor-mode window-border-mode
   "Highlight the selected window with a rectangular border."
