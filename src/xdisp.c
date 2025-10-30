@@ -971,8 +971,8 @@ window_box_height (struct window *w)
 }
 
 /* Return the window-relative coordinate of the left edge of display
-   area AREA of window W.  ANY_AREA means return the left edge of the
-   whole window, to the right of the left fringe of W.  */
+   area AREA of window W.  ANY_AREA means return the left edge after
+   the window border and left scrollbar.  */
 
 int
 window_box_left_offset (struct window *w, enum glyph_row_area area)
@@ -1016,22 +1016,15 @@ window_box_right_offset (struct window *w, enum glyph_row_area area)
 }
 
 /* Return the frame-relative coordinate of the left edge of display
-   area AREA of window W.  ANY_AREA means return the left edge of the
-   whole window, to the right of the left fringe of W.  */
+   area AREA of window W.  */
 
 int
 window_box_left (struct window *w, enum glyph_row_area area)
 {
   struct frame *f = XFRAME (w->frame);
-  int x;
-
-  if (w->pseudo_window_p)
-    return FRAME_INTERNAL_BORDER_WIDTH (f);
-
-  x = (WINDOW_LEFT_EDGE_X (w)
-       + window_box_left_offset (w, area));
-
-  return x;
+  return w->pseudo_window_p
+    ? FRAME_INTERNAL_BORDER_WIDTH (f)
+    : WINDOW_LEFT_EDGE_X (w) + window_box_left_offset (w, area);
 }
 
 
@@ -1064,9 +1057,7 @@ window_box (struct window *w, enum glyph_row_area area, int *box_x,
     *box_x = window_box_left (w, area);
   if (box_y)
     {
-      *box_y = WINDOW_TOP_EDGE_Y (w);
-      /* Account for window border on the top.  */
-      *box_y += WINDOW_BORDER_WIDTH;
+      *box_y = WINDOW_TOP_EDGE_Y (w) + WINDOW_BORDER_WIDTH;
       if (window_wants_tab_line (w))
 	*box_y += CURRENT_TAB_LINE_HEIGHT (w);
       if (window_wants_header_line (w))

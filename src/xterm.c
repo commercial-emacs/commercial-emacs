@@ -11350,30 +11350,40 @@ x_scroll_run (struct window *w, struct run *run)
 
   /* Get frame-relative bounding box of the text display area of W,
      without mode lines.  Include in this box the left and right
-     fringe of W.  */
+     fringe of W, but not the window border.  */
   window_box (w, ANY_AREA, &x, &y, &width, &height);
 
   from_y = WINDOW_TO_FRAME_PIXEL_Y (w, run->current_y);
   to_y = WINDOW_TO_FRAME_PIXEL_Y (w, run->desired_y);
   bottom_y = y + height;
 
-  if (to_y < from_y)
+  if (to_y < from_y) /* Scrolling up (PgDn) */
     {
-      /* Scrolling up.  Make sure we don't copy part of the mode
-	 line at the bottom.  */
+      /* Avoid copying the mode line at bottom.*/
       if (from_y + run->height > bottom_y)
 	height = bottom_y - from_y;
       else
 	height = run->height;
     }
-  else
+  else /* Scrolling down (PgUp)  */
     {
-      /* Scrolling down.  Make sure we don't copy over the mode line.
-	 at the bottom.  */
-      if (to_y + run->height > bottom_y)
-	height = bottom_y - to_y;
+      /* Y is right after the border.  If FROM_Y is before it, then
+	 we'd copy border pixels, so shift it down.  */
+      if (from_y < y)
+	{
+	  from_y = y;
+	  height = run->height - (y - from_y);
+	  eassert (to_y + height <= bottom_y);
+	}
+      else if (to_y + height > bottom_y)
+	{
+	  /* Avoid copying over the mode line at bottom.*/
+	  height = bottom_y - to_y;
+	}
       else
-	height = run->height;
+	{
+	  height = run->height;
+	}
     }
 
   block_input ();

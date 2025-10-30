@@ -1572,7 +1572,7 @@ for instance using the window manager, then this produces a quit and
 
   /* Note that xw_popup_dialog can call menu code, so
      Vmenu_updating_frame should be set (Bug#17891).  */
-  eassume (f && FRAME_LIVE_P (f));
+  eassert (f && FRAME_LIVE_P (f));
   XSETFRAME (Vmenu_updating_frame, f);
 
   /* Force a redisplay before showing the dialog.  If a frame is created
