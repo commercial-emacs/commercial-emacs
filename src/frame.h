@@ -927,7 +927,7 @@ default_pixels_per_inch_y (void)
 #endif
 
 /* True if frame F is still alive (not deleted).  */
-#define FRAME_LIVE_P(f) ((f)->terminal != 0)
+#define FRAME_LIVE_P(f) (FRAME_TERMINAL(f) != 0)
 
 /* True if frame F is a minibuffer-only frame.  */
 #define FRAME_MINIBUF_ONLY_P(f) \
