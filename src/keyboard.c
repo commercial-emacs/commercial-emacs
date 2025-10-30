@@ -5207,7 +5207,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
       else if (part == ON_WINDOW_BORDER)
 	{
 	  posn = Qwindow_border;
-	  width = WINDOW_BORDER_WIDTH (w);
+	  width = WINDOW_BORDER_WIDTH;
 	  dx = xret = wx;
 	  dy = yret = wy;
 	}

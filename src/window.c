@@ -105,6 +105,8 @@ Lisp_Object minibuf_window;
    shown as the selected window when the minibuffer is selected.  */
 Lisp_Object minibuf_selected_window;
 
+int window_border_width;
+
 /* Incremented for each window created.  */
 static EMACS_INT sequence_number;
 
@@ -1055,7 +1057,7 @@ window_body_height (struct window *w, enum window_body_unit pixelwise)
 		   : 0)
 		- WINDOW_MODE_LINE_HEIGHT (w)
 		- WINDOW_BOTTOM_DIVIDER_WIDTH (w)
-		- 2 * WINDOW_BORDER_WIDTH (w));
+		- 2 * WINDOW_BORDER_WIDTH);
 
   int denom = 1;
   if (pixelwise == WINDOW_BODY_IN_REMAPPED_CHARS)
@@ -1102,7 +1104,7 @@ window_body_width (struct window *w, enum window_body_unit pixelwise)
 		- (FRAME_WINDOW_P (f)
 		   ? WINDOW_FRINGES_WIDTH (w)
 		   : 0)
-	       - 2 * WINDOW_BORDER_WIDTH (w));
+	       - 2 * WINDOW_BORDER_WIDTH);
 
   int denom = 1;
   if (pixelwise == WINDOW_BODY_IN_REMAPPED_CHARS)
@@ -1358,35 +1360,22 @@ coordinates_in_window (register struct window *w, int x, int y)
   if (y < top_y || y >= bottom_y || x < left_x || x >= right_x)
     return ON_NOTHING;
 
-  /* On window border?  Check all four sides.  */
-  if (WINDOW_BORDER_WIDTH (w) > 0)
-    {
-      int text_left = left_x + WINDOW_BORDER_WIDTH (w)
-	+ WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (w) + WINDOW_LEFT_FRINGE_WIDTH (w);
-      int text_right = right_x - WINDOW_BORDER_WIDTH (w)
-	- WINDOW_RIGHT_SCROLL_BAR_AREA_WIDTH (w)
-	- WINDOW_RIGHT_FRINGE_WIDTH (w);
-      int text_top = top_y + WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w)
-	+ WINDOW_HEADER_LINE_HEIGHT (w);
-      int text_bottom = bottom_y - WINDOW_MODE_LINE_HEIGHT (w) - WINDOW_BORDER_WIDTH (w);
-
-      /* Top border */
-      if (y >= text_top && y < text_top + border_width
-	  && x >= text_left && x < text_right)
-	return ON_WINDOW_BORDER;
-      /* Bottom border */
-      if (y >= text_bottom - border_width && y < text_bottom
-	  && x >= text_left && x < text_right)
-	return ON_WINDOW_BORDER;
-      /* Left border */
-      if (x >= text_left && x < text_left + border_width
-	  && y >= text_top && y < text_bottom)
-	return ON_WINDOW_BORDER;
-      /* Right border */
-      if (x >= text_right - border_width && x < text_right
-	  && y >= text_top && y < text_bottom)
-	return ON_WINDOW_BORDER;
-    }
+  /* Top border */
+  if (y >= top_y && y < top_y + WINDOW_BORDER_WIDTH
+      && x >= left_x && x < right_x)
+    return ON_WINDOW_BORDER;
+  /* Bottom border */
+  if (y >= bottom_y - WINDOW_BORDER_WIDTH && y < bottom_y
+      && x >= left_x && x < right_x)
+    return ON_WINDOW_BORDER;
+  /* Left border */
+  if (x >= left_x && x < left_x + WINDOW_BORDER_WIDTH
+      && y >= top_y && y < bottom_y)
+    return ON_WINDOW_BORDER;
+  /* Right border */
+  if (x >= right_x - WINDOW_BORDER_WIDTH && x < right_x
+      && y >= top_y && y < bottom_y)
+    return ON_WINDOW_BORDER;
 
   /* On the horizontal window divider (which prevails the vertical
      divider)?  */
@@ -4567,7 +4556,6 @@ make_window (void)
   w->nrows_scale_factor = w->ncols_scale_factor = 1;
   w->left_fringe_width = w->right_fringe_width = -1;
   w->mode_line_height = w->tab_line_height = w->header_line_height = -1;
-  w->border_width = -1;
 #ifdef HAVE_WINDOW_SYSTEM
   w->phys_cursor_type = NO_CURSOR;
   w->phys_cursor_width = -1;
@@ -7808,7 +7796,7 @@ save_window_save (Lisp_Object window, struct Lisp_Vector *vector, ptrdiff_t i)
 	{
 	  bool window_point_insertion_type
 	    = !NILP (find_symbol_value (XSYMBOL (Qwindow_point_insertion_type),
-					 XBUFFER (w->contents)));
+					XBUFFER (w->contents)));
 
 	  /* Save w's value of point in the window configuration.  If w
 	     is the selected window, then get the value of point from
@@ -8104,56 +8092,6 @@ PERSISTENT), see `set-window-fringes'.  */)
 		w->fringes_persistent ? Qt : Qnil);
 }
 
-DEFUN ("set-window-border", Fset_window_border, Sset_window_border,
-       2, 2, 0,
-       doc: /* Set border width of WINDOW to WIDTH pixels.
-WINDOW must be a live window and defaults to the selected one.
-WIDTH specifies the border width in pixels.  A WIDTH of 0 means no border.
-A positive WIDTH draws a border around the window when it is selected.
-Return t if the border was changed, nil otherwise.  */)
-  (Lisp_Object window, Lisp_Object width)
-{
-  struct window *w = decode_live_window (window);
-  int border_width;
-
-  CHECK_FIXNUM (width);
-  border_width = XFIXNUM (width);
-
-  if (border_width < 0)
-    border_width = 0;
-
-  if (w->border_width != border_width)
-    {
-      w->border_width = border_width;
-      adjust_frame_glyphs (XFRAME (WINDOW_FRAME (w)));
-      return Qt;
-    }
-
-  return Qnil;
-}
-
-DEFUN ("window-border", Fwindow_border, Swindow_border,
-       0, 1, 0,
-       doc: /* Return the width in pixels of WINDOW's border.
-WINDOW must be a live window and defaults to the selected one.
-Returns -1 if the window has no explicit border width set, 0 if there
-is no border, or a positive value indicating the border width in pixels.  */)
-  (Lisp_Object window)
-{
-  return make_fixnum (decode_live_window (window)->border_width);
-}
-
-DEFUN ("window-border-width", Fwindow_border_width,
-       Swindow_border_width, 0, 1, 0,
-       doc: /* Return the width in pixels of WINDOW's border.
-This function is an alias for `window-border', provided for consistency
-with `window-right-divider-width' and `window-bottom-divider-width'.
-WINDOW must be a live window and defaults to the selected one.  */)
-  (Lisp_Object window)
-{
-  return Fwindow_border (window);
-}
-
 DEFUN ("set-window-cursor-type", Fset_window_cursor_type,
        Sset_window_cursor_type, 2, 2, 0,
        doc: /* Set the `cursor-type' of WINDOW to TYPE.
@@ -8199,6 +8137,28 @@ WINDOW must be a live window and defaults to the selected one.  */)
   (Lisp_Object window)
 {
   return decode_live_window (window)->cursor_type;
+}
+
+
+/***********************************************************************
+			    Borders
+ ***********************************************************************/
+
+DEFUN ("window-border--primitive", Fwindow_border__primitive,
+       Swindow_border__primitive, 1, 1, 0,
+       doc: /* Activate window borders.  */)
+  (Lisp_Object width)
+{
+  bool window_border_mode_p
+    = !NILP (find_symbol_value (XSYMBOL (Qwindow_border_mode), NULL));
+  CHECK_FIXNUM (width);
+  window_border_width = XFIXNUM (width);
+  /* Enforce consistency */
+  if ((bool) window_border_width != window_border_mode_p)
+    set_internal (Qwindow_border_mode,
+		  window_border_width ? Qt : Qnil,
+		  Qnil, SET_INTERNAL_SET);
+  return find_symbol_value (XSYMBOL (Qwindow_border_mode), NULL);
 }
 
 
@@ -8684,6 +8644,7 @@ syms_of_window (void)
   DEFSYM (Qdedicated, "dedicated");
   DEFSYM (Qquit_restore, "quit-restore");
   DEFSYM (Qquit_restore_prev, "quit-restore-prev");
+  DEFSYM (Qwindow_border_mode, "window-border-mode");
 
   DEFVAR_LISP ("temp-buffer-show-function", Vtemp_buffer_show_function,
 	       doc: /* Non-nil means call as function to display a help buffer.
@@ -9116,9 +9077,6 @@ Elisp for testing purposes only.  */);
   defsubr (&Swindow_margins);
   defsubr (&Sset_window_fringes);
   defsubr (&Swindow_fringes);
-  defsubr (&Sset_window_border);
-  defsubr (&Swindow_border);
-  defsubr (&Swindow_border_width);
   defsubr (&Sset_window_scroll_bars);
   defsubr (&Swindow_scroll_bars);
   defsubr (&Swindow_vscroll);
@@ -9137,4 +9095,5 @@ Elisp for testing purposes only.  */);
   defsubr (&Swindow_discard_buffer);
   defsubr (&Swindow_cursor_type);
   defsubr (&Sset_window_cursor_type);
+  defsubr (&Swindow_border__primitive);
 }

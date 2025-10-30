@@ -853,7 +853,7 @@ window_text_bottom_y (struct window *w)
   bottom_y -= WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
 
   /* Account for window border at the bottom.  */
-  bottom_y -= WINDOW_BORDER_WIDTH (w);
+  bottom_y -= WINDOW_BORDER_WIDTH;
 
   return bottom_y;
 }
@@ -873,7 +873,7 @@ window_box_width (struct window *w, enum glyph_row_area area)
       width -= WINDOW_RIGHT_DIVIDER_WIDTH (w);
 
       /* Account for window border if present (left and right).  */
-      width -= 2 * WINDOW_BORDER_WIDTH (w);
+      width -= 2 * WINDOW_BORDER_WIDTH;
 
       if (area == TEXT_AREA)
 	width -= (WINDOW_MARGINS_WIDTH (w)
@@ -905,7 +905,7 @@ window_box_height (struct window *w)
   height -= WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
 
   /* Account for window border if present (top and bottom).  */
-  height -= 2 * WINDOW_BORDER_WIDTH (w);
+  height -= 2 * WINDOW_BORDER_WIDTH;
 
   /* Note: the code below that determines the mode-line/header-line/tab-line
      height is essentially the same as that contained in the macro
@@ -985,7 +985,7 @@ window_box_left_offset (struct window *w, enum glyph_row_area area)
   x = WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (w);
 
   /* Account for window border on the left.  */
-  x += WINDOW_BORDER_WIDTH (w);
+  x += WINDOW_BORDER_WIDTH;
 
   if (area == TEXT_AREA)
     x += (WINDOW_LEFT_FRINGE_WIDTH (w)
@@ -1069,7 +1069,7 @@ window_box (struct window *w, enum glyph_row_area area, int *box_x,
     {
       *box_y = WINDOW_TOP_EDGE_Y (w);
       /* Account for window border on the top.  */
-      *box_y += WINDOW_BORDER_WIDTH (w);
+      *box_y += WINDOW_BORDER_WIDTH;
       if (window_wants_tab_line (w))
 	*box_y += CURRENT_TAB_LINE_HEIGHT (w);
       if (window_wants_header_line (w))
@@ -2505,7 +2505,7 @@ remember_mouse_glyph (struct frame *f, int gx, int gy, NativeRectangle *rect)
       /* Window border is drawn around the text area, account for all
 	 the decorations to position it correctly.  */
       gx = WINDOW_LEFT_SCROLL_BAR_AREA_WIDTH (w) + WINDOW_LEFT_FRINGE_WIDTH (w);
-      width = WINDOW_BORDER_WIDTH (w);
+      width = WINDOW_BORDER_WIDTH;
       gy = WINDOW_TOP_EDGE_Y (w) + WINDOW_TAB_LINE_HEIGHT (w)
 	+ WINDOW_HEADER_LINE_HEIGHT (w);
       height = (WINDOW_PIXEL_HEIGHT (w)
@@ -32815,7 +32815,7 @@ gui_update_window_border (struct window *w)
 {
   if (w->mini
       || w->pseudo_window_p
-      || WINDOW_BORDER_WIDTH (w) <= 0)
+      || WINDOW_BORDER_WIDTH <= 0)
     return;
 
   struct frame *f = XFRAME (WINDOW_FRAME (w));
@@ -32832,7 +32832,7 @@ gui_update_window_border (struct window *w)
 	     WINDOW_TOP_EDGE_Y (w),
 	     WINDOW_RIGHT_EDGE_X (w) - WINDOW_LEFT_EDGE_X (w),
 	     WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_TOP_EDGE_Y (w),
-	     WINDOW_BORDER_WIDTH (w));
+	     WINDOW_BORDER_WIDTH);
 	}
     }
   else if (FRAME_RIF (f)->clear_rectangular_frame)
@@ -32843,7 +32843,7 @@ gui_update_window_border (struct window *w)
 	 WINDOW_TOP_EDGE_Y (w),
 	 WINDOW_RIGHT_EDGE_X (w) - WINDOW_LEFT_EDGE_X (w),
 	 WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_TOP_EDGE_Y (w),
-	 WINDOW_BORDER_WIDTH (w));
+	 WINDOW_BORDER_WIDTH);
     }
 }
 

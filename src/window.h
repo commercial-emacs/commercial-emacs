@@ -361,10 +361,6 @@ struct window
     /* Effective height of the tab line, or -1 if not known.  */
     int tab_line_height;
 
-    /* Width of the window border in pixels.  A nonpositive value means
-       no border.  */
-    int border_width;
-
     /* Z - the buffer position of the last glyph in the current
        matrix of W.  Only valid if window_end_valid is true.  */
     ptrdiff_t window_end_pos;
@@ -852,11 +848,8 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 #define WINDOW_FRINGES_WIDTH(W)		\
   (WINDOW_LEFT_FRINGE_WIDTH (W) + WINDOW_RIGHT_FRINGE_WIDTH (W))
 
-/* Window border width in pixels.  */
-#define WINDOW_BORDER_WIDTH(W)			\
-  ((W)->border_width >= 0			\
-   ? (W)->border_width				\
-   : 0)
+/* An all-caps analogue to blend in with other width define's.  */
+#define WINDOW_BORDER_WIDTH (window_border_width)
 
 /* Are fringes outside display margins in window W.  */
 #define WINDOW_HAS_FRINGES_OUTSIDE_MARGINS(W)	\
@@ -1042,7 +1035,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
    - WINDOW_BOTTOM_DIVIDER_WIDTH (W)			\
    - WINDOW_SCROLL_BAR_AREA_HEIGHT (W)			\
    - WINDOW_MODE_LINE_HEIGHT (W)			\
-   - 2 * WINDOW_BORDER_WIDTH (W))
+   - 2 * WINDOW_BORDER_WIDTH)
 
 /* Pixel height of window W without mode and header/tab line and bottom
    divider.  */
@@ -1053,7 +1046,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
    - WINDOW_MODE_LINE_HEIGHT (W)			\
    - WINDOW_HEADER_LINE_HEIGHT (W)			\
    - WINDOW_TAB_LINE_HEIGHT (W)				\
-   - 2 * WINDOW_BORDER_WIDTH (W))
+   - 2 * WINDOW_BORDER_WIDTH)
 
 /* Return the frame position where the horizontal scroll bar of window W
    starts.  */
@@ -1146,6 +1139,12 @@ extern int update_mode_lines;
    `redisplay--all-windows-cause'.  */
 
 extern int windows_or_buffers_changed;
+
+/* `window-border-width' is a defcustom user setting.  Assigning it to
+   WINDOW_BORDER_WIDTH (defaults to zero) activates the window
+   border.  */
+
+extern int window_border_width;
 
 /* The main redisplay routine usually only redisplays the selected-window,
    so when something's changed elsewhere, we call one of the functions below
