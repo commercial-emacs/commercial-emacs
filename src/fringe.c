@@ -652,7 +652,7 @@ draw_fringe_bitmap_1 (struct window *w, struct glyph_row *row, int left_p, int o
   /* Clear left fringe if no bitmap to draw or if bitmap doesn't fill
      the fringe.  */
   p.bx = -1;
-  header_line_height = WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w) +
+  header_line_height = WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w) +
     WINDOW_HEADER_LINE_HEIGHT (w);
   p.by = WINDOW_TO_FRAME_PIXEL_Y (w, max (header_line_height, row->y));
   p.ny = row->visible_height;
@@ -1118,7 +1118,7 @@ update_window_fringes (struct window *w, bool keep_current_p)
 	      struct glyph_row *row1;
 	      int top_ind_max_y;
 
-	      top_ind_min_y = WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w)
+	      top_ind_min_y = WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w)
 		+ WINDOW_HEADER_LINE_HEIGHT (w);
 	      top_ind_max_y = top_ind_min_y + fb->height;
 	      if (top_ind_max_y > yb)
@@ -1177,7 +1177,7 @@ update_window_fringes (struct window *w, bool keep_current_p)
 	      bot_ind_max_y = row->y + row->visible_height;
 	      bot_ind_min_y = bot_ind_max_y - fb->height;
 	      bot_ind_min_y = max (bot_ind_min_y,
-				   WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w)
+				   WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w)
 				   + WINDOW_HEADER_LINE_HEIGHT (w));
 
 	      for (y = row->y, rn = bot_ind_rn - 1;

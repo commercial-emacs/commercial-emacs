@@ -849,7 +849,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
   (WINDOW_LEFT_FRINGE_WIDTH (W) + WINDOW_RIGHT_FRINGE_WIDTH (W))
 
 /* An all-caps analogue to blend in with other width define's.  */
-#define WINDOW_BORDER_WIDTH (window_border_width)
+#define WINDOW_BORDER_WIDTH(W) ((W)->mini ? 0 : window_border_width)
 
 /* Are fringes outside display margins in window W.  */
 #define WINDOW_HAS_FRINGES_OUTSIDE_MARGINS(W)	\
@@ -965,8 +965,8 @@ wset_next_buffers (struct window *w, Lisp_Object val)
    starts.  */
 #define WINDOW_SCROLL_BAR_AREA_X(W)		\
   (WINDOW_HAS_VERTICAL_SCROLL_BAR_ON_RIGHT (W)	\
-   ? (WINDOW_BOX_RIGHT_EDGE_X (W) - WINDOW_BORDER_WIDTH) \
-   : (WINDOW_LEFT_EDGE_X (W) + WINDOW_BORDER_WIDTH))
+   ? (WINDOW_BOX_RIGHT_EDGE_X (W) - WINDOW_BORDER_WIDTH (W)) \
+   : (WINDOW_LEFT_EDGE_X (W) + WINDOW_BORDER_WIDTH (W)))
 
 /* Height that a scroll bar in window W should have, if there is one.
    Measured in pixels.  If scroll bars are turned off, this is still
@@ -1035,7 +1035,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
    - WINDOW_BOTTOM_DIVIDER_WIDTH (W)			\
    - WINDOW_SCROLL_BAR_AREA_HEIGHT (W)			\
    - WINDOW_MODE_LINE_HEIGHT (W)			\
-   - WINDOW_BORDER_WIDTH)
+   - WINDOW_BORDER_WIDTH (W))
 
 /* Pixel height of window W without mode and header/tab line and bottom
    divider.  */

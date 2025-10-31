@@ -1057,7 +1057,7 @@ window_body_height (struct window *w, enum window_body_unit pixelwise)
 		   : 0)
 		- WINDOW_MODE_LINE_HEIGHT (w)
 		- WINDOW_BOTTOM_DIVIDER_WIDTH (w)
-		- 2 * WINDOW_BORDER_WIDTH);
+		- 2 * WINDOW_BORDER_WIDTH (w));
 
   int denom = 1;
   if (pixelwise == WINDOW_BODY_IN_REMAPPED_CHARS)
@@ -1104,7 +1104,7 @@ window_body_width (struct window *w, enum window_body_unit pixelwise)
 		- (FRAME_WINDOW_P (f)
 		   ? WINDOW_FRINGES_WIDTH (w)
 		   : 0)
-	       - 2 * WINDOW_BORDER_WIDTH);
+	       - 2 * WINDOW_BORDER_WIDTH (w));
 
   int denom = 1;
   if (pixelwise == WINDOW_BODY_IN_REMAPPED_CHARS)
@@ -1361,19 +1361,19 @@ coordinates_in_window (register struct window *w, int x, int y)
     return ON_NOTHING;
 
   /* Top border */
-  if (y >= top_y && y < top_y + WINDOW_BORDER_WIDTH
+  if (y >= top_y && y < top_y + WINDOW_BORDER_WIDTH (w)
       && x >= left_x && x < right_x)
     return ON_WINDOW_BORDER;
   /* Bottom border */
-  if (y >= bottom_y - WINDOW_BORDER_WIDTH && y < bottom_y
+  if (y >= bottom_y - WINDOW_BORDER_WIDTH (w) && y < bottom_y
       && x >= left_x && x < right_x)
     return ON_WINDOW_BORDER;
   /* Left border */
-  if (x >= left_x && x < left_x + WINDOW_BORDER_WIDTH
+  if (x >= left_x && x < left_x + WINDOW_BORDER_WIDTH (w)
       && y >= top_y && y < bottom_y)
     return ON_WINDOW_BORDER;
   /* Right border */
-  if (x >= right_x - WINDOW_BORDER_WIDTH && x < right_x
+  if (x >= right_x - WINDOW_BORDER_WIDTH (w) && x < right_x
       && y >= top_y && y < bottom_y)
     return ON_WINDOW_BORDER;
 
@@ -2113,7 +2113,7 @@ Return nil if window display is not up-to-date.  In that case, use
       return (row->enabled_p
 	      ? list4i (row->height,
 			0, /* not accurate */
-			(WINDOW_BORDER_WIDTH
+			(WINDOW_BORDER_WIDTH (w)
 			 + WINDOW_TAB_LINE_HEIGHT (w)
 			 + WINDOW_HEADER_LINE_HEIGHT (w)
 			 + window_text_bottom_y (w)),
@@ -2202,7 +2202,7 @@ though when run from an idle timer with a delay of zero seconds.  */)
   Lisp_Object rows = Qnil;
   int window_width = NILP (body)
     ? w->pixel_width : window_body_width (w, WINDOW_BODY_IN_PIXELS);
-  int subtract = NILP (body) ? 0 : (WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w) + WINDOW_HEADER_LINE_HEIGHT (w));
+  int subtract = NILP (body) ? 0 : (WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w) + WINDOW_HEADER_LINE_HEIGHT (w));
   bool invert = !NILP (inverse);
   bool left_flag = !NILP (left);
 
@@ -6148,7 +6148,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       if (IT_CHARPOS (it) == PT
 	  && it.current_y >= this_scroll_margin
 	  && it.current_y <= (last_y
-			      - WINDOW_BORDER_WIDTH
+			      - WINDOW_BORDER_WIDTH (w)
 			      - WINDOW_TAB_LINE_HEIGHT (w)
 			      - WINDOW_HEADER_LINE_HEIGHT (w))
 	  && (NILP (Vscroll_preserve_screen_position)
@@ -6166,7 +6166,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 		 is necessary because we set it.current_y to 0, above.  */
 	      move_it_forward (&it, -1,
 			       (goal_y
-				- WINDOW_BORDER_WIDTH
+				- WINDOW_BORDER_WIDTH (w)
 				- WINDOW_TAB_LINE_HEIGHT (w)
 				- WINDOW_HEADER_LINE_HEIGHT (w)),
 			       MOVE_TO_Y,
@@ -6201,7 +6201,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 			  it.y is relative to the bottom of the header
 			  line, see above.  */
 		       (it.last_visible_y
-			- WINDOW_BORDER_WIDTH
+			- WINDOW_BORDER_WIDTH (w)
 			- WINDOW_TAB_LINE_HEIGHT (w)
 			- WINDOW_HEADER_LINE_HEIGHT (w)
 			- partial_line_height (&it) - this_scroll_margin - 1),
@@ -6241,14 +6241,14 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       /* See if point is on a partially visible line at the end.  */
       if (it.what == IT_EOB)
 	partial_p = (it.current_y + it.ascent + it.descent) >
-	  (it.last_visible_y - this_scroll_margin - WINDOW_BORDER_WIDTH
+	  (it.last_visible_y - this_scroll_margin - WINDOW_BORDER_WIDTH (w)
 	   - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w));
       else
 	{
 	  move_it_dvpos (&it, 1);
 	  partial_p =
 	    (it.current_y >
-	     (it.last_visible_y - this_scroll_margin - WINDOW_BORDER_WIDTH
+	     (it.last_visible_y - this_scroll_margin - WINDOW_BORDER_WIDTH (w)
 	      - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w)));
 	}
 
@@ -8226,7 +8226,7 @@ set_window_scroll_bars (struct window *w, Lisp_Object width,
 
       /* Don't change anything if new scroll bar won't fit.  */
       if ((WINDOW_PIXEL_HEIGHT (w)
-	   - WINDOW_BORDER_WIDTH
+	   - WINDOW_BORDER_WIDTH (w)
 	   - WINDOW_TAB_LINE_HEIGHT (w)
 	   - WINDOW_HEADER_LINE_HEIGHT (w)
 	   - WINDOW_MODE_LINE_HEIGHT (w)

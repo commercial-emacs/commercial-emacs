@@ -1130,7 +1130,7 @@ struct glyph_row *matrix_row (struct glyph_matrix *, int);
   ((ROW)->height != (ROW)->visible_height)
 
 #define MR_PARTIALLY_VISIBLE_AT_TOP(W, ROW)  \
-  ((ROW)->y < WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (W) + WINDOW_HEADER_LINE_HEIGHT (W))
+  ((ROW)->y < WINDOW_BORDER_WIDTH (W) + WINDOW_TAB_LINE_HEIGHT (W) + WINDOW_HEADER_LINE_HEIGHT (W))
 
 #define MR_PARTIALLY_VISIBLE_AT_BOTTOM(W, ROW)  \
   (((ROW)->y + (ROW)->height - (ROW)->extra_line_spacing) \

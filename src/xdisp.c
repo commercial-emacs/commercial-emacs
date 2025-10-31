@@ -853,7 +853,7 @@ window_text_bottom_y (struct window *w)
   bottom_y -= WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
 
   /* Account for window border at the bottom.  */
-  bottom_y -= WINDOW_BORDER_WIDTH;
+  bottom_y -= WINDOW_BORDER_WIDTH (w);
 
   return bottom_y;
 }
@@ -873,7 +873,7 @@ window_box_width (struct window *w, enum glyph_row_area area)
       width -= WINDOW_RIGHT_DIVIDER_WIDTH (w);
 
       /* Account for window border if present (left and right).  */
-      width -= 2 * WINDOW_BORDER_WIDTH;
+      width -= 2 * WINDOW_BORDER_WIDTH (w);
 
       if (area == TEXT_AREA)
 	width -= (WINDOW_MARGINS_WIDTH (w)
@@ -903,7 +903,7 @@ window_box_height (struct window *w)
 
   height -= WINDOW_BOTTOM_DIVIDER_WIDTH (w);
   height -= WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
-  height -= 2 * WINDOW_BORDER_WIDTH;
+  height -= 2 * WINDOW_BORDER_WIDTH (w);
 
   /* Note: the code below that determines the mode-line/header-line/tab-line
      height is essentially the same as that contained in the macro
@@ -975,7 +975,7 @@ window_box_height (struct window *w)
 int
 window_box_left_offset (struct window *w, enum glyph_row_area area)
 {
-  int x = WINDOW_BORDER_WIDTH;
+  int x = WINDOW_BORDER_WIDTH (w);
 
   if (w->pseudo_window_p)
     return 0;
@@ -1055,7 +1055,7 @@ window_box (struct window *w, enum glyph_row_area area, int *box_x,
     *box_x = window_box_left (w, area);
   if (box_y)
     {
-      *box_y = WINDOW_TOP_EDGE_Y (w) + WINDOW_BORDER_WIDTH;
+      *box_y = WINDOW_TOP_EDGE_Y (w) + WINDOW_BORDER_WIDTH (w);
       if (window_wants_tab_line (w))
 	*box_y += CURRENT_TAB_LINE_HEIGHT (w);
       if (window_wants_header_line (w))
@@ -1379,7 +1379,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
     {
       int top_x = it.current_x;
       int top_y = it.current_y;
-      int window_top_y = WINDOW_BORDER_WIDTH +
+      int window_top_y = WINDOW_BORDER_WIDTH (w) +
 	WINDOW_TAB_LINE_HEIGHT (w) + WINDOW_HEADER_LINE_HEIGHT (w);
       int bottom_y = line_bottom_y (it, last_height);
 
@@ -1635,7 +1635,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
 			   - it.last_visible_y));
 	  *rowh = max (0, (min (it2.current_y + it2.max_ascent + it2.max_descent,
 				it.last_visible_y)
-			   - max (max (max (it2.current_y, WINDOW_BORDER_WIDTH),
+			   - max (max (max (it2.current_y, WINDOW_BORDER_WIDTH (w)),
 				       WINDOW_TAB_LINE_HEIGHT (w)),
 				  WINDOW_HEADER_LINE_HEIGHT (w))));
 	  *vpos = it2.vpos;
@@ -2050,7 +2050,7 @@ get_glyph_string_clip_rects (struct glyph_string *s, NativeRectangle *rects, int
      intentionally draws over other lines.  */
   if (s->for_overlaps)
     {
-      r.y = WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (s->w) +
+      r.y = WINDOW_BORDER_WIDTH (s->w) + WINDOW_TAB_LINE_HEIGHT (s->w) +
 	WINDOW_HEADER_LINE_HEIGHT (s->w);
       r.height = window_text_bottom_y (s->w) - r.y;
 
@@ -2078,7 +2078,7 @@ get_glyph_string_clip_rects (struct glyph_string *s, NativeRectangle *rects, int
 	 partially visible lines at the top of a window.  */
       if (!s->row->full_width_p
 	  && MATRIX_ROW_PARTIALLY_VISIBLE_AT_TOP_P (s->w, s->row))
-	r.y = WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (s->w) +
+	r.y = WINDOW_BORDER_WIDTH (s->w) + WINDOW_TAB_LINE_HEIGHT (s->w) +
 	  WINDOW_HEADER_LINE_HEIGHT (s->w);
       else
 	r.y = max (0, s->row->y);
@@ -2256,7 +2256,7 @@ get_phys_cursor_geometry (struct window *w, struct glyph_row *row,
   h = min (h, row->height);
   h0 = min (h0, ascent + glyph->descent);
 
-  y0 = WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w) + WINDOW_HEADER_LINE_HEIGHT (w);
+  y0 = WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w) + WINDOW_HEADER_LINE_HEIGHT (w);
   if (y < y0)
     {
       h = max (h - (y0 - y) + 1, h0);
@@ -2497,7 +2497,7 @@ remember_mouse_glyph (struct frame *f, int gx, int gy, NativeRectangle *rect)
 
     case ON_WINDOW_BORDER:
       gx = gy = 0;
-      width = height = WINDOW_BORDER_WIDTH;
+      width = height = WINDOW_BORDER_WIDTH (w);
       goto add_edge;
 
     default:
@@ -2821,7 +2821,7 @@ init_iterator (struct it *it, struct window *w,
 
       it->tab_line_p = window_wants_tab_line (w);
       it->header_line_p = window_wants_header_line (w);
-      body_height = WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w) +
+      body_height = WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w) +
 	WINDOW_HEADER_LINE_HEIGHT (w);
       it->current_y = body_height + w->vscroll;
     }
@@ -9761,7 +9761,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
   x = min (x, max_x);
 
   /* Subtract tab- and header-line included by start_move_it().  */
-  y = it.current_y + it.max_ascent + it.max_descent - WINDOW_BORDER_WIDTH
+  y = it.current_y + it.max_ascent + it.max_descent - WINDOW_BORDER_WIDTH (w)
     - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
   y = min (y, max_y);
 
@@ -17648,7 +17648,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	      centering_position = it.last_visible_y
 		- pt_offset
 		- (frame_line_height * (1 + margin + last_line_misfit)
-		   + WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w)
+		   + WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w)
 		   + WINDOW_HEADER_LINE_HEIGHT (w));
 	      /* Don't let point enter the scroll margin near top of
 		 the window.  */
@@ -18361,7 +18361,7 @@ try_window_reusing_current_matrix (struct window *w)
 	    (start_row + i)->enabled_p = false;
 
 	  /* Re-compute Y positions.  */
-	  min_y = WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w) +
+	  min_y = WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w) +
 	    WINDOW_HEADER_LINE_HEIGHT (w);
 	  max_y = it.last_visible_y;
 	  for (row = start_row + nrows_scrolled;
@@ -18466,7 +18466,7 @@ try_window_reusing_current_matrix (struct window *w)
       it.vpos = (MATRIX_ROW_VPOS (first_row_to_display, w->current_matrix)
 		 - nrows_scrolled);
       it.current_y = (first_row_to_display->y - first_reusable_row->y
-		      + WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w)
+		      + WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w)
 		      + WINDOW_HEADER_LINE_HEIGHT (w));
 
       /* Display lines beginning with first_row_to_display in the
@@ -18500,7 +18500,7 @@ try_window_reusing_current_matrix (struct window *w)
 
       /* Scroll the display.  */
       run.current_y = first_reusable_row->y;
-      run.desired_y = WINDOW_BORDER_WIDTH
+      run.desired_y = WINDOW_BORDER_WIDTH (w)
 	+ WINDOW_TAB_LINE_HEIGHT (w)
 	+ WINDOW_HEADER_LINE_HEIGHT (w);
       run.height = it.last_visible_y - run.current_y;
@@ -18520,7 +18520,7 @@ try_window_reusing_current_matrix (struct window *w)
 
       /* Adjust Y positions of reused rows.  */
       bottom_row = MATRIX_BOTTOM_TEXT_ROW (w->current_matrix, w);
-      min_y = WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w) +
+      min_y = WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w) +
 	WINDOW_HEADER_LINE_HEIGHT (w);
       max_y = it.last_visible_y;
       for (row = first_reusable_row; row < first_row_to_display; ++row)
@@ -19916,7 +19916,7 @@ compute_line_metrics (struct it *it)
       /* Compute how much of the line is visible.  */
       row->visible_height = row->height;
 
-      min_y = WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (it->w) +
+      min_y = WINDOW_BORDER_WIDTH (it->w) + WINDOW_TAB_LINE_HEIGHT (it->w) +
 	WINDOW_HEADER_LINE_HEIGHT (it->w);
       max_y = WINDOW_BOX_HEIGHT_NO_MODE_LINE (it->w);
 
@@ -29613,7 +29613,7 @@ gui_clear_end_of_line (struct window *w, struct glyph_row *updated_row,
       to_x += area_left;
     }
 
-  min_y = WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w) +
+  min_y = WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w) +
     WINDOW_HEADER_LINE_HEIGHT (w);
   from_y = WINDOW_TO_FRAME_PIXEL_Y (w, max (min_y, w->output_cursor.y));
   to_y = WINDOW_TO_FRAME_PIXEL_Y (w, to_y);
@@ -30138,7 +30138,7 @@ erase_phys_cursor (struct window *w)
 	  x = 0;
 	}
       width = min (width, window_box_width (w, TEXT_AREA) - x);
-      y = WINDOW_TO_FRAME_PIXEL_Y (w, max (WINDOW_TAB_LINE_HEIGHT (w), max (WINDOW_HEADER_LINE_HEIGHT (w), max(WINDOW_BORDER_WIDTH, cursor_row->y))));
+      y = WINDOW_TO_FRAME_PIXEL_Y (w, max (WINDOW_TAB_LINE_HEIGHT (w), max (WINDOW_HEADER_LINE_HEIGHT (w), max(WINDOW_BORDER_WIDTH (w), cursor_row->y))));
       x = WINDOW_TEXT_TO_FRAME_PIXEL_X (w, x);
 
       if (width > 0)
@@ -32807,7 +32807,7 @@ gui_update_window_border (struct window *w)
 {
   if (w->mini
       || w->pseudo_window_p
-      || WINDOW_BORDER_WIDTH <= 0)
+      || WINDOW_BORDER_WIDTH (w) <= 0)
     return;
 
   struct frame *f = XFRAME (WINDOW_FRAME (w));
@@ -32826,7 +32826,7 @@ gui_update_window_border (struct window *w)
 	     WINDOW_TOP_EDGE_Y (w),
 	     WINDOW_RIGHT_EDGE_X (w) - WINDOW_LEFT_EDGE_X (w),
 	     WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_TOP_EDGE_Y (w),
-	     WINDOW_BORDER_WIDTH);
+	     WINDOW_BORDER_WIDTH (w));
 	}
     }
   else if (FRAME_RIF (f)->clear_rectangular_frame)
@@ -32837,7 +32837,7 @@ gui_update_window_border (struct window *w)
 	 WINDOW_TOP_EDGE_Y (w),
 	 WINDOW_RIGHT_EDGE_X (w) - WINDOW_LEFT_EDGE_X (w),
 	 WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_TOP_EDGE_Y (w),
-	 WINDOW_BORDER_WIDTH);
+	 WINDOW_BORDER_WIDTH (w));
     }
 }
 
