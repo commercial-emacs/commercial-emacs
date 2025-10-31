@@ -25,6 +25,7 @@ This is a fork of GNU Emacs called "Commercial Emacs" with several performance a
 ## Development Commands
 
 ### Building
+- Don't build the application.  Don't ask me if I want to build either.
 - `./autogen.sh` - Generate configure script (required for fresh checkouts)
 - `./configure --prefix=$HOME/.local` - Configure build
 - `make -j4` - Build Emacs (use appropriate -j value for your system)
