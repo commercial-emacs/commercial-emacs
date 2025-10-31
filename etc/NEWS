@@ -1682,6 +1682,10 @@ command passed as arguments to 'env'.  If you pass any initial
 arguments of the form 'VAR=VALUE', 'env' will first set 'VAR' to
 'VALUE' before running the command.
 
++++
+*** Eshell's 'TERM' env var uses 'eshell-term-name' as default.
+The eshell's 'TERM' environment variable uses 'eshell-term-name' as default.
+
 ---
 *** Eshell's 'umask' command now supports setting the mask symbolically.
 Now, you can pass an argument like "u+w,o-r" to Eshell's 'umask'
