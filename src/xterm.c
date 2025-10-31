@@ -11357,7 +11357,8 @@ x_scroll_run (struct window *w, struct run *run)
   to_y = WINDOW_TO_FRAME_PIXEL_Y (w, run->desired_y);
   bottom_y = y + height;
 
-  /* Avoid copying the mode line at bottom.*/
+  /* Overstepping doesn't seem to happen in practice, but if so, avoid
+     copying top portion of mode line.  */
   int run_height = run->height;
   if (to_y < from_y)  /* Scrolling up (PgDn) */
     {

@@ -5100,7 +5100,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
       if (part == ON_TEXT)
 	{
 	  xret = mx - window_box_left (w, TEXT_AREA);
-	  yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
+	  yret = wy - WINDOW_BORDER_WIDTH - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
 	}
       /* For mode line and header line clicks, return X, Y relative to
 	 the left window edge.  Use mode_line_string to look for a
@@ -5143,7 +5143,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 	  if (STRINGP (string))
 	    string_info = Fcons (string, make_fixnum (charpos));
 	  xret = wx;
-	  yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
+	  yret = wy - WINDOW_BORDER_WIDTH - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
 	}
       else if (part == ON_LEFT_FRINGE)
 	{
@@ -5153,7 +5153,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 	  dx = wx
 	    - (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
 	       ? 0 : window_box_width (w, LEFT_MARGIN_AREA));
-	  dy = yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
+	  dy = yret = wy - WINDOW_BORDER_WIDTH - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
 	}
       else if (part == ON_RIGHT_FRINGE)
 	{
@@ -5166,7 +5166,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 	    - (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
 	       ? window_box_width (w, RIGHT_MARGIN_AREA)
 	       : 0);
-	  dy = yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
+	  dy = yret = wy - WINDOW_BORDER_WIDTH - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
 	}
       else if (part == ON_VERTICAL_BORDER)
 	{

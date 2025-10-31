@@ -5,7 +5,15 @@
 (defcustom window-border-width 2
   "Width of the border around the selected window in pixels."
   :type 'natnum
-  :group 'windows)
+  :group 'windows
+  :set (lambda (sym val)
+         (let ((max-height (/ (frame-char-height) 2)))
+           (when (or (< val 1) (> val max-height))
+             (user-error "window-border-width must be between 1 and %d" max-height))
+           (set-default sym val)
+           (when (bound-and-true-p window-border-mode)
+             (window-border-mode -1)
+             (window-border-mode 1)))))
 
 ;;;###autoload
 (define-minor-mode window-border-mode

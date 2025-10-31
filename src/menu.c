@@ -1256,6 +1256,7 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
 	       area, see keyboard.c:make_lispy_position.  */
 	    xpos = window_box_left (win, TEXT_AREA);
 	    ypos = (WINDOW_TOP_EDGE_Y (win)
+		    + WINDOW_BORDER_WIDTH
 		    + WINDOW_TAB_LINE_HEIGHT (win)
 		    + WINDOW_HEADER_LINE_HEIGHT (win));
 	  }

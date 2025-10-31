@@ -2110,13 +2110,14 @@ Return nil if window display is not up-to-date.  In that case, use
   if (EQ (line, Qmode_line))
     {
       row = MATRIX_MODE_LINE_ROW (w->current_matrix);
-      return (row->enabled_p ?
-	      list4i (row->height,
-		      0, /* not accurate */
-		      (WINDOW_TAB_LINE_HEIGHT (w)
-		       + WINDOW_HEADER_LINE_HEIGHT (w)
-		       + window_text_bottom_y (w)),
-		      0)
+      return (row->enabled_p
+	      ? list4i (row->height,
+			0, /* not accurate */
+			(WINDOW_BORDER_WIDTH
+			 + WINDOW_TAB_LINE_HEIGHT (w)
+			 + WINDOW_HEADER_LINE_HEIGHT (w)
+			 + window_text_bottom_y (w)),
+			0)
 	      : Qnil);
     }
 
@@ -2201,9 +2202,7 @@ though when run from an idle timer with a delay of zero seconds.  */)
   Lisp_Object rows = Qnil;
   int window_width = NILP (body)
     ? w->pixel_width : window_body_width (w, WINDOW_BODY_IN_PIXELS);
-  int tab_line_height = WINDOW_TAB_LINE_HEIGHT (w);
-  int header_line_height = WINDOW_HEADER_LINE_HEIGHT (w);
-  int subtract = NILP (body) ? 0 : (tab_line_height + header_line_height);
+  int subtract = NILP (body) ? 0 : (WINDOW_BORDER_WIDTH + WINDOW_TAB_LINE_HEIGHT (w) + WINDOW_HEADER_LINE_HEIGHT (w));
   bool invert = !NILP (inverse);
   bool left_flag = !NILP (left);
 
@@ -6148,8 +6147,10 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       move_it_forward (&it, PT, -1, MOVE_TO_POS, NULL);
       if (IT_CHARPOS (it) == PT
 	  && it.current_y >= this_scroll_margin
-	  && it.current_y <= last_y - WINDOW_TAB_LINE_HEIGHT (w)
-				    - WINDOW_HEADER_LINE_HEIGHT (w)
+	  && it.current_y <= (last_y
+			      - WINDOW_BORDER_WIDTH
+			      - WINDOW_TAB_LINE_HEIGHT (w)
+			      - WINDOW_HEADER_LINE_HEIGHT (w))
 	  && (NILP (Vscroll_preserve_screen_position)
 	      || EQ (Vscroll_preserve_screen_position, Qt)))
 	/* We found PT at a legitimate height.  Leave it alone.  */
@@ -6164,7 +6165,9 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	      /* If we have a header line, take account of it.  This
 		 is necessary because we set it.current_y to 0, above.  */
 	      move_it_forward (&it, -1,
-			       (goal_y - WINDOW_TAB_LINE_HEIGHT (w)
+			       (goal_y
+				- WINDOW_BORDER_WIDTH
+				- WINDOW_TAB_LINE_HEIGHT (w)
 				- WINDOW_HEADER_LINE_HEIGHT (w)),
 			       MOVE_TO_Y,
 			       NULL);
@@ -6197,7 +6200,9 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 		       /* We subtract WINDOW_HEADER_LINE_HEIGHT because
 			  it.y is relative to the bottom of the header
 			  line, see above.  */
-		       (it.last_visible_y - WINDOW_TAB_LINE_HEIGHT (w)
+		       (it.last_visible_y
+			- WINDOW_BORDER_WIDTH
+			- WINDOW_TAB_LINE_HEIGHT (w)
 			- WINDOW_HEADER_LINE_HEIGHT (w)
 			- partial_line_height (&it) - this_scroll_margin - 1),
 		       MOVE_TO_POS | MOVE_TO_Y,
@@ -6235,17 +6240,16 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 
       /* See if point is on a partially visible line at the end.  */
       if (it.what == IT_EOB)
-	partial_p =
-	  it.current_y + it.ascent + it.descent
-	  > it.last_visible_y - this_scroll_margin
-	  - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
+	partial_p = (it.current_y + it.ascent + it.descent) >
+	  (it.last_visible_y - this_scroll_margin - WINDOW_BORDER_WIDTH
+	   - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w));
       else
 	{
 	  move_it_dvpos (&it, 1);
 	  partial_p =
-	    it.current_y
-	    > it.last_visible_y - this_scroll_margin
-	      - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
+	    (it.current_y >
+	     (it.last_visible_y - this_scroll_margin - WINDOW_BORDER_WIDTH
+	      - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w)));
 	}
 
       if (charpos == PT && !partial_p
@@ -8222,6 +8226,7 @@ set_window_scroll_bars (struct window *w, Lisp_Object width,
 
       /* Don't change anything if new scroll bar won't fit.  */
       if ((WINDOW_PIXEL_HEIGHT (w)
+	   - WINDOW_BORDER_WIDTH
 	   - WINDOW_TAB_LINE_HEIGHT (w)
 	   - WINDOW_HEADER_LINE_HEIGHT (w)
 	   - WINDOW_MODE_LINE_HEIGHT (w)
