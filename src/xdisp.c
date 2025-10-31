@@ -903,8 +903,6 @@ window_box_height (struct window *w)
 
   height -= WINDOW_BOTTOM_DIVIDER_WIDTH (w);
   height -= WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
-
-  /* Account for window border if present (top and bottom).  */
   height -= 2 * WINDOW_BORDER_WIDTH;
 
   /* Note: the code below that determines the mode-line/header-line/tab-line

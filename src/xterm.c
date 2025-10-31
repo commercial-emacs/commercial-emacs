@@ -11357,33 +11357,17 @@ x_scroll_run (struct window *w, struct run *run)
   to_y = WINDOW_TO_FRAME_PIXEL_Y (w, run->desired_y);
   bottom_y = y + height;
 
-  if (to_y < from_y) /* Scrolling up (PgDn) */
+  /* Avoid copying the mode line at bottom.*/
+  int run_height = run->height;
+  if (to_y < from_y)  /* Scrolling up (PgDn) */
     {
-      /* Avoid copying the mode line at bottom.*/
-      if (from_y + run->height > bottom_y)
-	height = bottom_y - from_y;
-      else
-	height = run->height;
+      if (from_y + run_height > bottom_y)
+	run_height = bottom_y - from_y;
     }
-  else /* Scrolling down (PgUp)  */
+  else /* Scrolling down (PgUp) */
     {
-      /* Y is right after the border.  If FROM_Y is before it, then
-	 we'd copy border pixels, so shift it down.  */
-      if (from_y < y)
-	{
-	  from_y = y;
-	  height = run->height - (y - from_y);
-	  eassert (to_y + height <= bottom_y);
-	}
-      else if (to_y + height > bottom_y)
-	{
-	  /* Avoid copying over the mode line at bottom.*/
-	  height = bottom_y - to_y;
-	}
-      else
-	{
-	  height = run->height;
-	}
+      if (to_y + run_height > bottom_y)
+	run_height = bottom_y - to_y;
     }
 
   block_input ();
@@ -11417,7 +11401,7 @@ x_scroll_run (struct window *w, struct run *run)
 	      r1.x = w->pixel_left;
 	      r1.y = from_y;
 	      r1.width = w->pixel_width;
-	      r1.height = height;
+	      r1.height = run_height;
 	      r2 = r1;
 	      r2.y = window_y;
 	      r2.height = window_height;
@@ -11506,9 +11490,9 @@ x_scroll_run (struct window *w, struct run *run)
 		     FRAME_X_DRAWABLE (f), FRAME_X_DRAWABLE (f),
 		     f->output_data.x->normal_gc,
 		     x, from_y,
-		     width, height,
+		     width, run_height,
 		     x, to_y);
-	  cairo_surface_mark_dirty_rectangle (surface, x, to_y, width, height);
+	  cairo_surface_mark_dirty_rectangle (surface, x, to_y, width, run_height);
 	}
 #ifdef USE_CAIRO_XCB_SURFACE
       else if (cairo_surface_get_type (surface) == CAIRO_SURFACE_TYPE_XCB)
@@ -11518,8 +11502,8 @@ x_scroll_run (struct window *w, struct run *run)
 			 (xcb_drawable_t) FRAME_X_DRAWABLE (f),
 			 (xcb_drawable_t) FRAME_X_DRAWABLE (f),
 			 (xcb_gcontext_t) XGContextFromGC (f->output_data.x->normal_gc),
-			 x, from_y, x, to_y, width, height);
-	  cairo_surface_mark_dirty_rectangle (surface, x, to_y, width, height);
+			 x, from_y, x, to_y, width, run_height);
+	  cairo_surface_mark_dirty_rectangle (surface, x, to_y, width, run_height);
 	}
 #endif
       else
@@ -11527,7 +11511,7 @@ x_scroll_run (struct window *w, struct run *run)
 	  cairo_surface_t *s
 	    = cairo_surface_create_similar (surface,
 					    cairo_surface_get_content (surface),
-					    width, height);
+					    width, run_height);
 	  cairo_t *cr = cairo_create (s);
 	  cairo_set_source_surface (cr, surface, -x, -from_y);
 	  cairo_paint (cr);
@@ -11537,7 +11521,7 @@ x_scroll_run (struct window *w, struct run *run)
 	  cairo_save (cr);
 	  cairo_set_source_surface (cr, s, x, to_y);
 	  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
-	  cairo_rectangle (cr, x, to_y, width, height);
+	  cairo_rectangle (cr, x, to_y, width, run_height);
 	  cairo_fill (cr);
 	  cairo_restore (cr);
 	  cairo_surface_destroy (s);
@@ -11549,7 +11533,7 @@ x_scroll_run (struct window *w, struct run *run)
 	       FRAME_X_DRAWABLE (f), FRAME_X_DRAWABLE (f),
 	       f->output_data.x->normal_gc,
 	       x, from_y,
-	       width, height,
+	       width, run_height,
 	       x, to_y);
 
   unblock_input ();
