@@ -3790,7 +3790,7 @@ update_window (struct window *w, bool force_p)
 	 that can be scrolled.  */
       if (tab_line_row && tab_line_row->enabled_p)
 	{
-	  tab_line_row->y = 0;
+	  tab_line_row->y = WINDOW_BORDER_WIDTH (w);
 	  update_window_line (w, 0, &mouse_face_overwritten_p);
 	}
 
@@ -3799,7 +3799,8 @@ update_window (struct window *w, bool force_p)
 	 that can be scrolled.  */
       if (header_line_row && header_line_row->enabled_p)
 	{
-	  header_line_row->y = tab_line_row ? CURRENT_TAB_LINE_HEIGHT (w) : 0;
+	  header_line_row->y = WINDOW_BORDER_WIDTH (w)
+	    + (tab_line_row ? CURRENT_TAB_LINE_HEIGHT (w) : 0);
 	  update_window_line (w, tab_line_row ? 1 : 0, &mouse_face_overwritten_p);
 	}
 

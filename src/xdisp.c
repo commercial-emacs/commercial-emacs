@@ -860,7 +860,7 @@ window_text_bottom_y (struct window *w)
 
 /* Return the pixel width of display area AREA of window W.
    ANY_AREA means return the total width of W, not including
-   fringes to the left and right of the window.  */
+   the window border and fringes.  */
 
 int
 window_box_width (struct window *w, enum glyph_row_area area)
@@ -871,8 +871,6 @@ window_box_width (struct window *w, enum glyph_row_area area)
     {
       width -= WINDOW_SCROLL_BAR_AREA_WIDTH (w);
       width -= WINDOW_RIGHT_DIVIDER_WIDTH (w);
-
-      /* Account for window border if present (left and right).  */
       width -= 2 * WINDOW_BORDER_WIDTH (w);
 
       if (area == TEXT_AREA)
@@ -2628,7 +2626,7 @@ init_iterator (struct it *it, struct window *w,
 	       struct glyph_row *row, enum face_id base_face_id)
 {
   enum face_id remapped_base_face_id = base_face_id;
-  int body_width = 0, body_height = 0;
+  int body_height = 0;
 
   eassert (w != NULL && it != NULL);
   eassert (charpos < 0 || (charpos >= BUF_BEG (current_buffer)
@@ -2781,16 +2779,9 @@ init_iterator (struct it *it, struct window *w,
   it->area = TEXT_AREA;
 
   /* Get the dimensions of the so-called display area.  */
-  if (base_face_id != DEFAULT_FACE_ID)
+  if (base_face_id == DEFAULT_FACE_ID)
     {
-      /* Mode lines, menu bar, tab bar.  No fringes.  */
-      body_width = WINDOW_PIXEL_WIDTH (w);
-      it->first_visible_x = 0;
-      it->last_visible_x = it->first_visible_x + body_width;
-    }
-  else
-    {
-      /* Main editing pane.  Has fringes. */
+      /* Main editing pane has fringes... */
       it->first_visible_x =
 	FRAME_COLUMN_WIDTH (it->f) * window_hscroll_limited (w, it->f);
 
@@ -2801,7 +2792,7 @@ init_iterator (struct it *it, struct window *w,
 	    FRAME_COLUMN_WIDTH (it->f) * max (0, w->min_hscroll);
 	}
 
-      body_width = window_box_width (w, TEXT_AREA);
+      int body_width = window_box_width (w, TEXT_AREA);
       it->last_visible_x = it->first_visible_x + body_width;
 
       if (!w->pseudo_window_p
@@ -2825,6 +2816,12 @@ init_iterator (struct it *it, struct window *w,
 	WINDOW_HEADER_LINE_HEIGHT (w);
       it->current_y = body_height + w->vscroll;
     }
+  else
+    {
+      /* ... mode lines, menu bar, tab bar have no fringes.  */
+      it->first_visible_x = 0;
+      it->last_visible_x = WINDOW_PIXEL_WIDTH (w);
+    }
 
   /* Leave room for a border glyph.  */
   if (!FRAME_WINDOW_P (it->f)
@@ -2837,24 +2834,18 @@ init_iterator (struct it *it, struct window *w,
       && body_height != w->old_body_pixel_height)
     FRAME_WINDOW_CHANGE (it->f) = true;
 
-  /* For mode lines and alike, arrange for the first glyph having a
-     left box line if the face specifies a box.  */
+  /* If we have a boxed mode line, make the first character appear
+     with a left box line.  */
   if (base_face_id != DEFAULT_FACE_ID)
     {
-      struct face *face;
-
       it->face_id = remapped_base_face_id;
-
-      /* If we have a boxed mode line, make the first character appear
-	 with a left box line.  */
-      face = FACE_FROM_ID_OR_NULL (it->f, remapped_base_face_id);
+      struct face *face = FACE_FROM_ID_OR_NULL (it->f, it->face_id);
       if (face && face->box != FACE_NO_BOX)
 	{
 	  int box_thickness = face->box_vertical_line_width;
 	  it->face_box_p = true;
 	  it->start_of_box_run_p = true;
-	  /* Make sure we will have enough horizontal space to add the
-	     right box line at the end.  */
+	  /* Ensure enough space at end for right box line.  */
 	  if (box_thickness > 0)
 	    it->last_visible_x -= box_thickness;
 	}
@@ -23631,6 +23622,10 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
      current frame's keyboard.  */
   push_kboard (FRAME_KBOARD (it.f));
   record_unwind_save_match_data ();
+
+  if (WINDOW_BORDER_WIDTH (w))
+    display_string ("", Qnil, Qnil, 0, 0, &it, DISP_INFINITY, -1,
+		    WINDOW_BORDER_WIDTH (w), 0);
 
   if (NILP (Vmode_line_compact)
       || face_id == HEADER_LINE_FACE_ID
