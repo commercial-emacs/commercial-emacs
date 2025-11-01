@@ -20,6 +20,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'window-border)
 
 (defmacro xdisp-tests--visible-buffer (&rest body)
   (declare (debug t) (indent 0))
@@ -455,5 +456,70 @@ Bug present here and in GNU since it doesn't sustain a rerun."
                                                (length wrap-prefix)))
                                 (length v))))
                     (get-text-property (point) 'display))))))
+
+(ert-deftest xdisp-tests--window-border-mode-x-only ()
+  "window-border-mode should only work on X window system."
+  (skip-unless (not noninteractive))
+  (let ((window-border-mode nil))
+    (if (eq window-system 'x)
+        (progn
+          (window-border-mode 1)
+          (should window-border-mode)
+          (window-border-mode -1)
+          (should-not window-border-mode))
+      (should-error (window-border-mode 1) :type 'user-error))))
+
+(ert-deftest xdisp-tests--window-border-width-validation ()
+  "window-border-width must be a positive integer within range."
+  (skip-unless (not noninteractive))
+  (skip-unless (eq window-system 'x))
+  (let ((window-border-width 2)
+        (window-border-mode nil)
+        (max-height (/ (frame-char-height) 2)))
+    (should-error (customize-set-variable 'window-border-width 0) :type 'user-error)
+    (should-error (customize-set-variable 'window-border-width -1) :type 'user-error)
+    (should-error (customize-set-variable 'window-border-width (1+ max-height)) :type 'user-error)
+    (customize-set-variable 'window-border-width 1)
+    (should (= window-border-width 1))
+    (customize-set-variable 'window-border-width max-height)
+    (should (= window-border-width max-height))))
+
+(ert-deftest xdisp-tests--window-border-mode-toggle ()
+  "Toggling window-border-mode should work correctly."
+  (skip-unless (not noninteractive))
+  (skip-unless (eq window-system 'x))
+  (let ((window-border-mode nil))
+    (window-border-mode 1)
+    (should window-border-mode)
+    (window-border-mode -1)
+    (should-not window-border-mode)
+    (window-border-mode 1)
+    (should window-border-mode)
+    (window-border-mode 0)
+    (should-not window-border-mode)))
+
+(ert-deftest xdisp-tests--window-border-width-change ()
+  "Changing window-border-width while mode is active should restart mode."
+  (skip-unless (not noninteractive))
+  (skip-unless (eq window-system 'x))
+  (let ((window-border-width 2)
+        (window-border-mode nil))
+    (window-border-mode 1)
+    (should window-border-mode)
+    (customize-set-variable 'window-border-width 3)
+    (should window-border-mode)
+    (should (= window-border-width 3))
+    (window-border-mode -1)))
+
+(ert-deftest xdisp-tests--window-border-invalid-width-disables-mode ()
+  "Setting invalid width when mode enabled should disable mode."
+  (skip-unless (not noninteractive))
+  (skip-unless (eq window-system 'x))
+  (let ((window-border-width 2))
+    (window-border-mode 1)
+    (should window-border-mode)
+    (let ((window-border-width nil))
+      (should-error (window-border-mode 1) :type 'user-error)
+      (should-not window-border-mode))))
 
 ;;; xdisp-tests.el ends here
