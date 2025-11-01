@@ -2397,14 +2397,15 @@ remember_mouse_glyph (struct frame *f, int gx, int gy, NativeRectangle *rect)
 	      gx += (x / width) * width;
 	    }
 
-	  if (part != ON_MODE_LINE && part != ON_HEADER_LINE
+	  if (part != ON_MODE_LINE
+	      && part != ON_HEADER_LINE
 	      && part != ON_TAB_LINE)
 	    {
 	      gx += window_box_left_offset (w, area);
 	      /* Don't expand over the modeline to make sure the vertical
 		 drag cursor is shown early enough.  */
 	      height = min (height,
-			    max (0, WINDOW_BOX_HEIGHT_NO_MODE_LINE (w) - gy));
+			    max (0, WINDOW_Y_MODE_LINE (w) - gy));
 	    }
 	}
       else
@@ -2413,11 +2414,12 @@ remember_mouse_glyph (struct frame *f, int gx, int gy, NativeRectangle *rect)
 	  gx = (x / width) * width;
 	  y -= gy;
 	  gy += (y / height) * height;
-	  if (part != ON_MODE_LINE && part != ON_HEADER_LINE
+	  if (part != ON_MODE_LINE
+	      && part != ON_HEADER_LINE
 	      && part != ON_TAB_LINE)
 	    /* See comment above.  */
 	    height = min (height,
-			  max (0, WINDOW_BOX_HEIGHT_NO_MODE_LINE (w) - gy));
+			  max (0, WINDOW_Y_MODE_LINE (w) - gy));
 	}
       break;
 
@@ -17319,7 +17321,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	{
 	  /* Point does appear, but on a line partly visible at end of window.
 	     Move it back to a fully-visible line.  */
-	  new_y = WINDOW_BOX_HEIGHT_NO_MODE_LINE (w);
+	  new_y = WINDOW_Y_MODE_LINE (w);
 	}
       else if (w->cursor.vpos >= 0)
 	{
@@ -19909,7 +19911,7 @@ compute_line_metrics (struct it *it)
 
       min_y = WINDOW_BORDER_WIDTH (it->w) + WINDOW_TAB_LINE_HEIGHT (it->w) +
 	WINDOW_HEADER_LINE_HEIGHT (it->w);
-      max_y = WINDOW_BOX_HEIGHT_NO_MODE_LINE (it->w);
+      max_y = WINDOW_Y_MODE_LINE (it->w);
 
       if (row->y < min_y)
 	row->visible_height -= min_y - row->y;
@@ -23315,7 +23317,7 @@ display_menu_bar (struct window *w)
       row = it.glyph_row;
       delta_height
 	= ((row->y + row->height)
-	   - WINDOW_BOX_HEIGHT_NO_MODE_LINE (menu_window));
+	   - WINDOW_Y_MODE_LINE (menu_window));
 
       if (delta_height != 0)
         {
@@ -25759,7 +25761,7 @@ calc_pixel_width_or_height (double *res, struct it *it, Lisp_Object prop,
 	  return OK_PIXELS (width_p
 			    ? (window_box_width (it->w, TEXT_AREA)
 			       - lnum_pixel_width)
-			    : WINDOW_BOX_HEIGHT_NO_MODE_LINE (it->w));
+			    : WINDOW_Y_MODE_LINE (it->w));
 
       /* ':align_to'.  First time we compute the value, window
 	 elements are interpreted as the position of the element's
@@ -32820,7 +32822,7 @@ gui_update_window_border (struct window *w)
 	     WINDOW_LEFT_EDGE_X (w),
 	     WINDOW_TOP_EDGE_Y (w),
 	     WINDOW_RIGHT_EDGE_X (w) - WINDOW_LEFT_EDGE_X (w),
-	     WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_TOP_EDGE_Y (w),
+	     WINDOW_PIXEL_HEIGHT (w) - WINDOW_BORDER_WIDTH (w),
 	     WINDOW_BORDER_WIDTH (w));
 	}
     }
