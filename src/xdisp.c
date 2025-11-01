@@ -852,7 +852,6 @@ window_text_bottom_y (struct window *w)
 
   bottom_y -= WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
 
-  /* Account for window border at the bottom.  */
   bottom_y -= WINDOW_BORDER_WIDTH (w);
 
   return bottom_y;

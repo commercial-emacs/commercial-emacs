@@ -1365,16 +1365,17 @@ coordinates_in_window (register struct window *w, int x, int y)
       && x >= left_x && x < right_x)
     return ON_WINDOW_BORDER;
   /* Bottom border */
-  if (y >= bottom_y - WINDOW_BORDER_WIDTH (w) && y < bottom_y
+  if (y >= top_y + WINDOW_Y_MODE_LINE (w) - WINDOW_BORDER_WIDTH (w)
+      && y < top_y + WINDOW_Y_MODE_LINE (w)
       && x >= left_x && x < right_x)
     return ON_WINDOW_BORDER;
   /* Left border */
   if (x >= left_x && x < left_x + WINDOW_BORDER_WIDTH (w)
-      && y >= top_y && y < bottom_y)
+      && y >= top_y && y < top_y + WINDOW_Y_MODE_LINE (w))
     return ON_WINDOW_BORDER;
   /* Right border */
   if (x >= right_x - WINDOW_BORDER_WIDTH (w) && x < right_x
-      && y >= top_y && y < bottom_y)
+      && y >= top_y && y < top_y + WINDOW_Y_MODE_LINE (w))
     return ON_WINDOW_BORDER;
 
   /* On the horizontal window divider (which prevails the vertical
