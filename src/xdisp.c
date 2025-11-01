@@ -32822,7 +32822,7 @@ gui_update_window_border (struct window *w)
 	     WINDOW_LEFT_EDGE_X (w),
 	     WINDOW_TOP_EDGE_Y (w),
 	     WINDOW_RIGHT_EDGE_X (w) - WINDOW_LEFT_EDGE_X (w),
-	     WINDOW_PIXEL_HEIGHT (w) - WINDOW_BORDER_WIDTH (w),
+	     WINDOW_Y_MODE_LINE (w),
 	     WINDOW_BORDER_WIDTH (w));
 	}
     }
@@ -32833,7 +32833,7 @@ gui_update_window_border (struct window *w)
 	 WINDOW_LEFT_EDGE_X (w),
 	 WINDOW_TOP_EDGE_Y (w),
 	 WINDOW_RIGHT_EDGE_X (w) - WINDOW_LEFT_EDGE_X (w),
-	 WINDOW_BOTTOM_EDGE_Y (w) - WINDOW_TOP_EDGE_Y (w),
+	 WINDOW_Y_MODE_LINE (w),
 	 WINDOW_BORDER_WIDTH (w));
     }
 }
