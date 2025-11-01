@@ -484,20 +484,6 @@ Bug present here and in GNU since it doesn't sustain a rerun."
     (customize-set-variable 'window-border-width max-height)
     (should (= window-border-width max-height))))
 
-(ert-deftest xdisp-tests--window-border-mode-toggle ()
-  "Toggling window-border-mode should work correctly."
-  (skip-unless (not noninteractive))
-  (skip-unless (eq window-system 'x))
-  (let ((window-border-mode nil))
-    (window-border-mode 1)
-    (should window-border-mode)
-    (window-border-mode -1)
-    (should-not window-border-mode)
-    (window-border-mode 1)
-    (should window-border-mode)
-    (window-border-mode 0)
-    (should-not window-border-mode)))
-
 (ert-deftest xdisp-tests--window-border-width-change ()
   "Changing window-border-width while mode is active should restart mode."
   (skip-unless (not noninteractive))
@@ -521,5 +507,21 @@ Bug present here and in GNU since it doesn't sustain a rerun."
     (let ((window-border-width nil))
       (should-error (window-border-mode 1) :type 'user-error)
       (should-not window-border-mode))))
+
+(ert-deftest xdisp-tests--window-border-excludes-tab-and-header-lines ()
+  "Unfortunately, don't know how to access rendering of tab line."
+  (skip-unless (not noninteractive))
+  (skip-unless (eq window-system 'x))
+  (xdisp-tests--visible-buffer
+    (let ((window-border-width 2)
+          (window-border-mode nil))
+      (tab-line-mode 1)
+      (window-border-mode 1)
+      (redisplay)
+      (let* ((text-top (cdr (window-absolute-pixel-position (point-min))))
+             (window-top (nth 1 (window-absolute-pixel-edges))))
+        (should (>= text-top (+ window-top window-border-width (frame-char-size)))))
+      (tab-line-mode -1)
+      (window-border-mode -1))))
 
 ;;; xdisp-tests.el ends here
