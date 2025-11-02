@@ -758,7 +758,7 @@ shift_glyph_matrix (struct window *w, struct glyph_matrix *matrix, int start, in
   eassert (end >= 0 && end <= matrix->nrows);
 
   min_y = WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w) + WINDOW_HEADER_LINE_HEIGHT (w);
-  max_y = WINDOW_Y_MODE_LINE (w);
+  max_y = WINDOW_Y_BOTTOM_BORDER (w);
 
   for (; start < end; ++start)
     {
@@ -898,7 +898,7 @@ blank_row (struct window *w, struct glyph_row *row, int y)
   int min_y, max_y;
 
   min_y = WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w) + WINDOW_HEADER_LINE_HEIGHT (w);
-  max_y = WINDOW_Y_MODE_LINE (w);
+  max_y = WINDOW_Y_BOTTOM_BORDER (w);
 
   clear_glyph_row (row);
   row->y = y;

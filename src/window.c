@@ -1365,17 +1365,17 @@ coordinates_in_window (register struct window *w, int x, int y)
       && x >= left_x && x < right_x)
     return ON_WINDOW_BORDER;
   /* Bottom border */
-  if (y >= top_y + WINDOW_Y_MODE_LINE (w) - WINDOW_BORDER_WIDTH (w)
-      && y < top_y + WINDOW_Y_MODE_LINE (w)
+  if (y >= top_y + WINDOW_Y_BOTTOM_BORDER (w)
+      && y < top_y + WINDOW_Y_BOTTOM_BORDER (w) + WINDOW_BORDER_WIDTH (w)
       && x >= left_x && x < right_x)
     return ON_WINDOW_BORDER;
   /* Left border */
   if (x >= left_x && x < left_x + WINDOW_BORDER_WIDTH (w)
-      && y >= top_y && y < top_y + WINDOW_Y_MODE_LINE (w))
+      && y >= top_y && y < top_y + WINDOW_Y_BOTTOM_BORDER (w))
     return ON_WINDOW_BORDER;
   /* Right border */
   if (x >= right_x - WINDOW_BORDER_WIDTH (w) && x < right_x
-      && y >= top_y && y < top_y + WINDOW_Y_MODE_LINE (w))
+      && y >= top_y && y < top_y + WINDOW_Y_BOTTOM_BORDER (w))
     return ON_WINDOW_BORDER;
 
   /* On the horizontal window divider (which prevails the vertical
@@ -8227,7 +8227,7 @@ set_window_scroll_bars (struct window *w, Lisp_Object width,
 
       /* Don't change anything if new scroll bar won't fit.  */
       if ((WINDOW_PIXEL_HEIGHT (w)
-	   - WINDOW_BORDER_WIDTH (w)
+	   - 2 * WINDOW_BORDER_WIDTH (w)
 	   - WINDOW_TAB_LINE_HEIGHT (w)
 	   - WINDOW_HEADER_LINE_HEIGHT (w)
 	   - WINDOW_MODE_LINE_HEIGHT (w)

@@ -1134,7 +1134,7 @@ struct glyph_row *matrix_row (struct glyph_matrix *, int);
 
 #define MR_PARTIALLY_VISIBLE_AT_BOTTOM(W, ROW)  \
   (((ROW)->y + (ROW)->height - (ROW)->extra_line_spacing) \
-   > WINDOW_Y_MODE_LINE (W))
+   > WINDOW_Y_BOTTOM_BORDER (W))
 
 /* Non-zero if ROW is not completely visible in window W.  */
 

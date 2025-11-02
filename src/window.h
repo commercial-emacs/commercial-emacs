@@ -780,9 +780,9 @@ wset_next_buffers (struct window *w, Lisp_Object val)
    + WINDOW_TOP_PIXEL_EDGE (W))
 
 /* Return the frame y-position before which window W ends.  */
-#define WINDOW_BOTTOM_EDGE_Y(W)				   \
-  (((WINDOW_MENU_BAR_P (W) || WINDOW_TAB_BAR_P (W) || WINDOW_TOOL_BAR_P (W))	   \
-    ? 0 : FRAME_INTERNAL_BORDER_WIDTH (WINDOW_XFRAME (W))) \
+#define WINDOW_BOTTOM_EDGE_Y(W)						\
+  (((WINDOW_MENU_BAR_P (W) || WINDOW_TAB_BAR_P (W) || WINDOW_TOOL_BAR_P (W)) \
+    ? 0 : FRAME_INTERNAL_BORDER_WIDTH (WINDOW_XFRAME (W)))		\
    + WINDOW_BOTTOM_PIXEL_EDGE (W))
 
 /* Return the pixel value where the text (or left fringe) in window W
@@ -1030,17 +1030,17 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 
 /* Pixel height of window W without mode line, bottom scroll bar and
    bottom divider.  */
-#define WINDOW_Y_MODE_LINE(W)			\
+#define WINDOW_Y_BOTTOM_BORDER(W)		\
   (WINDOW_PIXEL_HEIGHT (W)			\
    - WINDOW_BOTTOM_DIVIDER_WIDTH (W)		\
-   - WINDOW_SCROLL_BAR_AREA_HEIGHT (W)		\
    - WINDOW_MODE_LINE_HEIGHT (W)		\
+   - WINDOW_SCROLL_BAR_AREA_HEIGHT (W)		\
    - WINDOW_BORDER_WIDTH (W))
 
 /* Pixel height of window W without mode and header/tab line and bottom
    divider.  */
 #define WINDOW_BOX_TEXT_HEIGHT(W)		\
-  (WINDOW_Y_MODE_LINE (W)			\
+  (WINDOW_Y_BOTTOM_BORDER (W)			\
    - WINDOW_HEADER_LINE_HEIGHT (W)		\
    - WINDOW_TAB_LINE_HEIGHT (W)			\
    - WINDOW_BORDER_WIDTH (W))
@@ -1050,7 +1050,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 #define WINDOW_SCROLL_BAR_AREA_Y(W)			\
   (WINDOW_TOP_EDGE_Y (W)				\
    + (WINDOW_HAS_HORIZONTAL_SCROLL_BAR (W)		\
-      ? WINDOW_Y_MODE_LINE (W) : 0))
+      ? WINDOW_Y_BOTTOM_BORDER (W) : 0))
 
 /* Convert window W relative pixel X to frame pixel coordinates.  */
 #define WINDOW_TO_FRAME_PIXEL_X(W, X)	\
