@@ -797,8 +797,10 @@ If QUIT is non-nil (interactively, with prefix argument), also
 quit the *xref* buffer."
   (interactive "P")
   (let* ((buffer (current-buffer))
-         (xref (or (xref--item-at-point)
-                   (user-error "Choose a reference to visit")))
+         (xref (condition-case err
+                   (xref--item-at-point)
+                 (args-out-of-range (user-error "No xrefs found"))
+                 (error (user-error "Choose a reference to visit"))))
          (xref-current-item xref))
     (xref--set-arrow)
     (xref--show-location (xref-item-location xref) (if quit 'quit t))

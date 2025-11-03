@@ -929,9 +929,9 @@ requires quoting, e.g. `\\[quoted-insert]<space>'."
   (unless files
     (user-error "Empty file list"))
   (let ((xrefs (xref-matches-in-files regexp files)))
-    (unless xrefs
-      (user-error "No matches for: %s" regexp))
-    xrefs))
+    (prog1 xrefs
+      (unless xrefs
+        (message "No matches for: %s" regexp)))))
 
 (defvar project-regexp-history-variable 'grep-regexp-history)
 
