@@ -1,15 +1,10 @@
 ;;; eldoc.el --- Show function arglist or variable docstring in echo area  -*- lexical-binding:t; -*-
 
-;; Copyright (C) 1996-2024 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2025 Free Software Foundation, Inc.
 
 ;; Author: Noah Friedman <friedman@splode.com>
 ;; Keywords: extensions
 ;; Created: 1995-10-06
-;; Version: 1.15.0
-;; Package-Requires: ((emacs "26.3"))
-
-;; This is a GNU ELPA :core package.  Avoid functionality that is not
-;; compatible with the version of Emacs recorded above.
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -197,7 +192,6 @@ printed after commands contained in this obarray."
 	      obarray)
     cmds))
 
-
 ;;;###autoload
 (define-minor-mode eldoc-mode
   "Toggle echo area display of Lisp objects at point (ElDoc mode).
@@ -207,7 +201,8 @@ area displays information about a function or variable in the
 text where point is.  If point is on a documented variable, it
 displays the first line of that variable's doc string.  Otherwise
 it displays the argument list of the function called in the
-expression point is on." :lighter eldoc-minor-mode-string
+expression point is on."
+  :lighter eldoc-minor-mode-string
   (setq eldoc-last-message nil)
   (if eldoc-mode
       (if (not (eldoc--supported-p))
@@ -228,11 +223,6 @@ expression point is on." :lighter eldoc-minor-mode-string
   :initialize 'custom-initialize-delay
   :init-value t
   :group 'lisp
-  ;; For `read--expression', the usual global mode mechanism of
-  ;; `change-major-mode-hook' runs in the minibuffer before
-  ;; `eldoc-documentation-strategy' is set, so `turn-on-eldoc-mode'
-  ;; does nothing.  Configure and enable eldoc from
-  ;; `eval-expression-minibuffer-setup-hook' instead.
   (if global-eldoc-mode
       (add-hook 'eval-expression-minibuffer-setup-hook
                 #'eldoc--eval-expression-setup)
@@ -240,29 +230,20 @@ expression point is on." :lighter eldoc-minor-mode-string
                  #'eldoc--eval-expression-setup)))
 
 (defun eldoc--eval-expression-setup ()
-  ;; Setup `eldoc', similar to `emacs-lisp-mode'.  FIXME: Call
-  ;; `emacs-lisp-mode' itself?
-  (cond ((<= emacs-major-version 27)
-         (declare-function elisp-eldoc-documentation-function "elisp-mode")
-         (with-no-warnings
-           (add-function :before-until (local 'eldoc-documentation-function)
-                         #'elisp-eldoc-documentation-function)))
-        (t (add-hook 'eldoc-documentation-functions
-                     #'elisp-eldoc-var-docstring nil t)
-           (add-hook 'eldoc-documentation-functions
-                     #'elisp-eldoc-funcall nil t)
-           (setq-local eldoc-documentation-strategy
-                       'eldoc-documentation-default)))
+  "Always nice to have eldoc hints for M-:"
+  (add-hook 'eldoc-documentation-functions
+            #'elisp-eldoc-var-docstring nil t)
+  (add-hook 'eldoc-documentation-functions
+            #'elisp-eldoc-funcall nil t)
+  (setq-local eldoc-documentation-strategy
+              'eldoc-documentation-default)
   (eldoc-mode 1))
 
 ;;;###autoload
 (defun turn-on-eldoc-mode ()
-  "Turn on `eldoc-mode' if the buffer has ElDoc support enabled.
-See `eldoc-documentation-strategy' for more detail."
   (when (eldoc--supported-p)
     (eldoc-mode 1)))
 
-
 (defun eldoc-schedule-timer ()
   (run-with-idle-timer
    eldoc-idle-delay nil
@@ -392,7 +373,7 @@ Also store it in `eldoc-last-message' and return that value."
                 (not (pos-visible-in-window-p
                       (overlay-end show-paren--overlay)))))))
 
-
+
 (defvar eldoc-documentation-functions nil
   "Hook of functions that produce doc strings.
 
@@ -714,23 +695,12 @@ This is meant to be used as a value for `eldoc-documentation-strategy'."
                         nil)))
   t)
 
-;; JT@2020-07-10: ElDoc is pre-loaded, so in Emacs < 28 we can't
-;; make the "old" `eldoc-documentation-function' point to the new
-;; `eldoc-documentation-strategy', so we do the reverse.  This allows
-;; for ElDoc to be loaded in those older Emacs versions and work with
-;; whomever (major-modes, extensions, user) sets one or the other
-;; variable.
 (defmacro eldoc--documentation-strategy-defcustom
     (main secondary value docstring &rest more)
   "Defcustom helper macro for sorting `eldoc-documentation-strategy'."
   (declare (indent 2))
-  `(if (< emacs-major-version 28)
-       (progn
-         (defcustom ,secondary ,value ,docstring ,@more)
-         (define-obsolete-variable-alias ',main ',secondary "eldoc-1.1.0"))
-       (progn
-         (defcustom ,main ,value ,docstring  ,@more)
-         (defvaralias ',secondary ',main ,docstring))))
+  `(progn (defcustom ,main ,value ,docstring  ,@more)
+          (defvaralias ',secondary ',main ,docstring)))
 
 (eldoc--documentation-strategy-defcustom eldoc-documentation-strategy
     eldoc-documentation-function
@@ -809,10 +779,6 @@ before a higher priority one.")
 ;; `describe-symbol' for some reason.
 (defvar eldoc--make-callback nil "Helper for function `eldoc--make-callback'.")
 
-;; JT@2020-07-08: the below docstring for the internal function
-;; `eldoc--invoke-strategy' could be moved to
-;; `eldoc-documentation-strategy' or thereabouts if/when we decide to
-;; extend or publish the `make-callback' protocol.
 (defun eldoc--make-callback (method origin)
   "Make callback suitable for `eldoc-documentation-functions'.
 The return value is a function FN whose lambda list is (STRING
@@ -939,7 +905,7 @@ the docstrings eventually produced, using
              (setq eldoc--last-request-state token)
              (eldoc--invoke-strategy nil))))))
 
-
+
 ;; This section only affects ElDoc output to the echo area, as in
 ;; `eldoc-display-in-echo-area'.
 ;;
