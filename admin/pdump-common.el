@@ -118,12 +118,6 @@
     (load "loaddefs")
   (load "ldefs-boot"))
 
-(let ((new (make-hash-table :test #'equal)))
-  ;; Now that loaddefs has populated definition-prefixes, purify its contents.
-  (maphash (lambda (k v) (puthash (purify-if-dumping k) (purify-if-dumping v) new))
-           definition-prefixes)
-  (setq definition-prefixes new))
-
 (load "button")                  ;After loaddefs, because of define-minor-mode!
 (load "emacs-lisp/cl-preloaded")
 (load "emacs-lisp/oclosure")          ;Used by cl-generic

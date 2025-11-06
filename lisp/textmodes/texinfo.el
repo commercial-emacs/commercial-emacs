@@ -61,12 +61,12 @@
   :group 'docs)
 
 ;;;###autoload
-(defcustom texinfo-open-quote (purify-if-dumping "``")
+(defcustom texinfo-open-quote "``"
   "String inserted by typing \\[texinfo-insert-quote] to open a quotation."
   :type 'string)
 
 ;;;###autoload
-(defcustom texinfo-close-quote (purify-if-dumping "''")
+(defcustom texinfo-close-quote "''"
   "String inserted by typing \\[texinfo-insert-quote] to close a quotation."
   :type 'string)
 

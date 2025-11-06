@@ -270,7 +270,7 @@
 ;;;###autoload
 (add-to-list 'auto-mode-alist (cons python--auto-mode-alist-regexp 'python-mode))
 ;;;###autoload
-(add-to-list 'interpreter-mode-alist (cons (purify-if-dumping "python[0-9.]*") 'python-mode))
+(add-to-list 'interpreter-mode-alist (cons "python[0-9.]*" 'python-mode))
 
 (defgroup python nil
   "Python Language's flying circus support for Emacs."

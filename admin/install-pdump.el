@@ -44,7 +44,6 @@
       (sort (copy-sequence load-path)
             (lambda (a b) (< (length a) (length b)))))))
  load-history)
-(setq load-history (mapcar #'purify-if-dumping load-history))
 
 ;; formerly load--fixup-all-elns
 (when (featurep 'native-compile)

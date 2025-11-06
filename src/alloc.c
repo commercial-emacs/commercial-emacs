@@ -3912,13 +3912,6 @@ purecopy (Lisp_Object obj)
   return !NILP (pooled) ? pooled : obj;
 }
 
-DEFUN ("purify-if-dumping", Fpurecopy_maybe, Spurecopy_maybe, 1, 1, 0,
-       doc: /* Monnier's half-measure to reduce pdump footprint.  */)
-  (Lisp_Object obj)
-{
-  return NILP (Vpdumper__pure_pool) ? obj : purecopy (obj);
-}
-
 /* Put an entry in staticvec, pointing at the variable with address
    VARADDRESS.  */
 

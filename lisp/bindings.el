@@ -412,15 +412,12 @@ of the menu's data."
      ;; Keymaps can't be made pure otherwise users can't remove/add elements
      ;; from/to them any more.
      ((keymapp item) item)
-     ((stringp (car item))
-      (if (keymapp (cdr item))
-          (cons (purify-if-dumping (car item)) (cdr item))
-        (purify-if-dumping item)))
+     ((stringp (car item) item))
      ((eq 'menu-item (car item))
       (if (keymapp (nth 2 item))
-          `(menu-item ,(purify-if-dumping (nth 1 item)) ,(nth 2 item)
-                      ,@(purify-if-dumping (nthcdr 3 item)))
-        (purify-if-dumping item)))
+          `(menu-item ,(nth 1 item) ,(nth 2 item)
+                      ,@(nthcdr 3 item))
+        item))
      (t (message "non-menu-item: %S" item) item))))
 
 (defvar mode-line-mode-menu (make-sparse-keymap "Minor Modes") "\
@@ -671,8 +668,8 @@ text properties for face, help-echo, and local-map to it."
   (list (propertize fmt
 		    'face 'mode-line-buffer-id
 		    'help-echo
-		    (purify-if-dumping "Buffer name
-mouse-1: Previous buffer\nmouse-3: Next buffer")
+		    "Buffer name
+mouse-1: Previous buffer\nmouse-3: Next buffer"
 		    'mouse-face 'mode-line-highlight
 		    'local-map mode-line-buffer-identification-keymap)))
 

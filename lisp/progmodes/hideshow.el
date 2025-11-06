@@ -254,7 +254,6 @@ This has effect only if `search-invisible' is set to `open'."
 
 ;;;###autoload
 (defvar hs-special-modes-alist
-  (mapcar #'purify-if-dumping
   '((c-mode "{" "}" "/[*/]" nil nil)
     (c-ts-mode "{" "}" "/[*/]" nil nil)
     (c++-mode "{" "}" "/[*/]" nil nil)
@@ -266,7 +265,7 @@ This has effect only if `search-invisible' is set to `open'."
     (js-ts-mode "{" "}" "/[*/]" nil)
     (mhtml-mode "{\\|<[^/>]*?" "}\\|</[^/>]*[^/]>" "<!--" mhtml-forward nil)
     ;; Add more support here.
-    ))
+    )
   "Alist for initializing the hideshow variables for different modes.
 Each element has the form
   (MODE START END COMMENT-START FORWARD-SEXP-FUNC ADJUST-BEG-FUNC
