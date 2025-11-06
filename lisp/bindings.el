@@ -412,7 +412,7 @@ of the menu's data."
      ;; Keymaps can't be made pure otherwise users can't remove/add elements
      ;; from/to them any more.
      ((keymapp item) item)
-     ((stringp (car item) item))
+     ((stringp (car item)) item)
      ((eq 'menu-item (car item))
       (if (keymapp (nth 2 item))
           `(menu-item ,(nth 1 item) ,(nth 2 item)
