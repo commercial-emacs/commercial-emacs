@@ -27,7 +27,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keyboard.h"
 #include "syntax.h"
 #include "window.h"
-#include "puresize.h"
 
 /* Define BYTE_CODE_SAFE true to enable some minor sanity checking,
    useful for debugging the byte compiler.  It defaults to false.  */
@@ -1614,7 +1613,6 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 		record_in_backtrace (Qsetcar, &TOP, 2);
 		wrong_type_argument (Qconsp, cell);
 	      }
-	    CHECK_IMPURE (cell, XCONS (cell));
 	    XSETCAR (cell, newval);
 	    TOP = newval;
 	    NEXT;
@@ -1629,7 +1627,6 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 		record_in_backtrace (Qsetcdr, &TOP, 2);
 		wrong_type_argument (Qconsp, cell);
 	      }
-	    CHECK_IMPURE (cell, XCONS (cell));
 	    XSETCDR (cell, newval);
 	    TOP = newval;
 	    NEXT;

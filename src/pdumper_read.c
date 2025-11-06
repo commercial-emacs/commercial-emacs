@@ -174,7 +174,7 @@ reloc_dump (const struct dump_header *const header, const enum reloc_phase phase
 		XSETSUBR (tem, subr);
 		Lisp_Object *fixup =
 		  &(comp_u->data_imp_relocs[XFIXNUM (lambda_data_idx)]);
-		eassert (EQ (*fixup, Qlambda_fixup));
+		eassert (EQ (*fixup, Q__lambda_fixup));
 		*fixup = tem;
 		Fputhash (tem, Qt, comp_u->lambda_gc_guard_h);
 	      }
