@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-22.04, macos-13, windows-latest]
+        os: [ubuntu-22.04, macos-13, windows-2022]
         gearing: [standard]
         include:
           - os: ubuntu-22.04
