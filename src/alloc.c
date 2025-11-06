@@ -3707,15 +3707,6 @@ make_pure_string (const char *data, ptrdiff_t nchars,
   return string;
 }
 
-/* Return a cons allocated from pure space.  Give it pure copies
-   of CAR as car and CDR as cdr.  */
-
-Lisp_Object
-pure_cons (Lisp_Object car, Lisp_Object cdr)
-{
-  return Fcons (car, cdr);
-}
-
 /* Return a vector with room for LEN Lisp_Objects allocated from
    pure space.  */
 

@@ -4177,7 +4177,6 @@ build_string (const char *str)
 }
 
 extern Lisp_Object make_obarray (unsigned);
-extern Lisp_Object pure_cons (Lisp_Object, Lisp_Object);
 extern Lisp_Object initialize_vector (ptrdiff_t, Lisp_Object);
 extern struct Lisp_String *(*static_string_allocator) (void);
 extern struct Lisp_Vector *(*static_vector_allocator) (ptrdiff_t, bool);
