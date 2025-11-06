@@ -1895,12 +1895,12 @@ init_callproc (void)
       Vexec_directory = Ffile_name_as_directory (tem);
 #endif /* not MSDOS */
 
-      /* Maybe use ../etc as well as ../lib-src.  */
-      if (data_dir == 0)
+      if (!data_dir)
 	{
 	  tem = Fexpand_file_name (build_string ("etc"),
 				   Vinstallation_directory);
 	  Vdoc_directory = Ffile_name_as_directory (tem);
+	  Vdata_directory = Vdoc_directory;
 	}
     }
 
@@ -1911,7 +1911,7 @@ init_callproc (void)
 
      Instead, if these files are not in the nominal place, we try the
      source directory.  */
-  if (data_dir == 0)
+  if (!data_dir)
     {
       Lisp_Object tem, srcdir;
       Lisp_Object lispdir = Fcar (decode_env_path (0, PATH_DUMPLOADSEARCH, 0));
