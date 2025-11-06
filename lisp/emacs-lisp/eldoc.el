@@ -695,16 +695,7 @@ This is meant to be used as a value for `eldoc-documentation-strategy'."
                         nil)))
   t)
 
-(defmacro eldoc--documentation-strategy-defcustom
-    (main secondary value docstring &rest more)
-  "Defcustom helper macro for sorting `eldoc-documentation-strategy'."
-  (declare (indent 2))
-  `(progn (defcustom ,main ,value ,docstring  ,@more)
-          (defvaralias ',secondary ',main ,docstring)))
-
-(eldoc--documentation-strategy-defcustom eldoc-documentation-strategy
-    eldoc-documentation-function
-  #'eldoc-documentation-default
+(defcustom eldoc-documentation-strategy #'eldoc-documentation-default
   "How to collect and display results of `eldoc-documentation-functions'.
 
 This variable controls how to call the functions in the special hook
@@ -751,6 +742,8 @@ all."
                 (function-item eldoc-documentation-enthusiast)
                 (function :tag "Other function"))
   :version "28.1")
+
+(defvaralias 'eldoc-documentation-function 'eldoc-documentation-strategy)
 
 (defun eldoc--supported-p ()
   "Non-nil if an ElDoc function is set for this buffer."
