@@ -84,7 +84,6 @@ GEN.*autoloads|\
 ^Dumping finger|\
 ^Byte counts|\
 ^Reloc counts|\
-^Pure-hashed|\
 ^cp -f temacs|\
 ^rm -f bootstrap|\
 ^Dump complete|\

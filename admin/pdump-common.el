@@ -382,26 +382,6 @@
               (when (subr-primitive-p (symbol-function f))
                 (puthash f (func-arity f) comp-subr-arities-h)))))
 
-(when pdumper--pure-pool
-  (let ((strings 0)
-        (vectors 0)
-        (bytecodes 0)
-        (conses 0)
-        (others 0))
-    (maphash (lambda (k v)
-               (cond
-                ((stringp k) (setq strings (1+ strings)))
-                ((vectorp k) (setq vectors (1+ vectors)))
-                ((consp k)   (setq conses  (1+ conses)))
-                ((byte-code-function-p v) (setq bytecodes (1+ bytecodes)))
-                (t           (setq others  (1+ others)))))
-             pdumper--pure-pool)
-    (message "Pure-hashed: %d strings, %d vectors, %d conses, %d bytecodes, %d others"
-             strings vectors conses bytecodes others)))
-
-(unless (garbage-collect)
-  (setq pure-space-overflow t))
-
 ;; Local Variables:
 ;; no-byte-compile: t
 ;; no-update-autoloads: t
