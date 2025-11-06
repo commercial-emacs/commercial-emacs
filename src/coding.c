@@ -11779,7 +11779,7 @@ syms_of_coding (void)
   /* Error signaled when there's a problem with detecting a coding system.  */
   DEFSYM (Qcoding_system_error, "coding-system-error");
   Fput (Qcoding_system_error, Qerror_conditions,
-	pure_list (Qcoding_system_error, Qerror));
+	list (Qcoding_system_error, Qerror));
   Fput (Qcoding_system_error, Qerror_message,
 	build_string ("Invalid coding system"));
 

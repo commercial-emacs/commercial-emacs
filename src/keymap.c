@@ -3352,12 +3352,12 @@ syms_of_keymap (void)
   current_global_map = Qnil;
   staticpro (&current_global_map);
 
-  exclude_keys = pure_list
-    (pure_cons (build_string ("DEL"), build_string ("\\d")),
-     pure_cons (build_string ("TAB"), build_string ("\\t")),
-     pure_cons (build_string ("RET"), build_string ("\\r")),
-     pure_cons (build_string ("ESC"), build_string ("\\e")),
-     pure_cons (build_string ("SPC"), build_string (" ")));
+  exclude_keys = list
+    (Fcons (build_string ("DEL"), build_string ("\\d")),
+     Fcons (build_string ("TAB"), build_string ("\\t")),
+     Fcons (build_string ("RET"), build_string ("\\r")),
+     Fcons (build_string ("ESC"), build_string ("\\e")),
+     Fcons (build_string ("SPC"), build_string (" ")));
   staticpro (&exclude_keys);
 
   DEFVAR_LISP ("minibuffer-local-map", Vminibuffer_local_map,
@@ -3419,13 +3419,13 @@ that describe key bindings.  That is why the default is nil.  */);
   DEFSYM (Qmode_line, "mode-line");
 
   staticpro (&Vmouse_events);
-  Vmouse_events = pure_list (Qmenu_bar, Qtab_bar, Qtool_bar,
-			     Qtab_line, Qheader_line, Qmode_line,
-			     intern_c_string ("mouse-1"),
-			     intern_c_string ("mouse-2"),
-			     intern_c_string ("mouse-3"),
-			     intern_c_string ("mouse-4"),
-			     intern_c_string ("mouse-5"));
+  Vmouse_events = list (Qmenu_bar, Qtab_bar, Qtool_bar,
+			Qtab_line, Qheader_line, Qmode_line,
+			intern_c_string ("mouse-1"),
+			intern_c_string ("mouse-2"),
+			intern_c_string ("mouse-3"),
+			intern_c_string ("mouse-4"),
+			intern_c_string ("mouse-5"));
 
   /* Keymap used for minibuffers when doing completion.  */
   /* Keymap used for minibuffers when doing completion and require a match.  */

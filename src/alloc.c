@@ -1800,17 +1800,6 @@ listn (ptrdiff_t count, Lisp_Object arg1, ...)
   return val;
 }
 
-/* Make a pure list of COUNT Lisp_Objects, where ARG1 is the first one.  */
-Lisp_Object
-pure_listn (ptrdiff_t count, Lisp_Object arg1, ...)
-{
-  va_list ap;
-  va_start (ap, arg1);
-  Lisp_Object val = cons_listn (count, arg1, pure_cons, ap);
-  va_end (ap);
-  return val;
-}
-
 DEFUN ("list", Flist, Slist, 0, MANY, 0,
        doc: /* Return a newly created list with specified arguments as elements.
 Allows any number of arguments, including zero.
@@ -3718,60 +3707,13 @@ make_pure_string (const char *data, ptrdiff_t nchars,
   return string;
 }
 
-static Lisp_Object purecopy (Lisp_Object obj);
-
 /* Return a cons allocated from pure space.  Give it pure copies
    of CAR as car and CDR as cdr.  */
 
 Lisp_Object
 pure_cons (Lisp_Object car, Lisp_Object cdr)
 {
-  Lisp_Object new;
-  struct Lisp_Cons *p = pure_alloc (sizeof *p, 0);
-  XSETCONS (new, p);
-  XSETCAR (new, purecopy (car));
-  XSETCDR (new, purecopy (cdr));
-  return new;
-}
-
-/* Value is a float object with value NUM allocated from pure space.  */
-
-static Lisp_Object
-make_pure_float (double num)
-{
-  Lisp_Object new;
-  struct Lisp_Float *p = pure_alloc (sizeof *p, 0);
-  XSETFLOAT (new, p);
-  XFLOAT_INIT (new, num);
-  return new;
-}
-
-/* Value is a bignum object with value VALUE allocated from pure
-   space.  */
-
-static Lisp_Object
-make_pure_bignum (Lisp_Object value)
-{
-  mpz_t const *n = xbignum_val (value);
-  size_t i, nlimbs = mpz_size (*n);
-  size_t nbytes = nlimbs * sizeof (mp_limb_t);
-  mp_limb_t *pure_limbs;
-  mp_size_t new_size;
-
-  struct Lisp_Bignum *b = pure_alloc (sizeof *b, 0);
-  XSETPVECTYPESIZE (b, PVEC_BIGNUM, 0, VECSIZE (struct Lisp_Bignum));
-
-  pure_limbs = pure_alloc (nbytes, 0);
-  for (i = 0; i < nlimbs; ++i)
-    pure_limbs[i] = mpz_getlimbn (*n, i);
-
-  new_size = nlimbs;
-  if (mpz_sgn (*n) < 0)
-    new_size = -new_size;
-
-  mpz_roinit_n (b->value, pure_limbs, new_size);
-
-  return make_lisp_ptr (b, Lisp_Vectorlike);
+  return Fcons (car, cdr);
 }
 
 /* Return a vector with room for LEN Lisp_Objects allocated from
@@ -3788,108 +3730,11 @@ make_pure_vector (ptrdiff_t len)
   return new;
 }
 
-static struct Lisp_Hash_Table *
-purecopy_hash_table (struct Lisp_Hash_Table *table)
-{
-  eassert (table->weakness == Weak_None);
-  eassert (table->purecopy);
-
-  struct Lisp_Hash_Table *pure = pure_alloc (sizeof *pure, 0);
-  *pure = *table;
-  pure->mutable = false;
-
-  if (table->table_size > 0)
-    {
-      ptrdiff_t hash_bytes = table->table_size * sizeof *table->hash;
-      pure->hash = pure_alloc (hash_bytes, (int)sizeof *table->hash);
-      memcpy (pure->hash, table->hash, hash_bytes);
-
-      ptrdiff_t next_bytes = table->table_size * sizeof *table->next;
-      pure->next = pure_alloc (next_bytes, (int)sizeof *table->next);
-      memcpy (pure->next, table->next, next_bytes);
-
-      ptrdiff_t nvalues = table->table_size * 2;
-      ptrdiff_t kv_bytes = nvalues * sizeof *table->key_and_value;
-      pure->key_and_value = pure_alloc (kv_bytes,
-					(int)sizeof *table->key_and_value);
-      for (ptrdiff_t i = 0; i < nvalues; i++)
-	pure->key_and_value[i] = purecopy (table->key_and_value[i]);
-
-      ptrdiff_t index_bytes = hash_table_index_size (table)
-	                      * sizeof *table->index;
-      pure->index = pure_alloc (index_bytes, (int)sizeof *table->index);
-      memcpy (pure->index, table->index, index_bytes);
-    }
-
-  return pure;
-}
-
 static struct pinned_object
 {
   Lisp_Object object;
   struct pinned_object *next;
 } *pinned_objects;
-
-static Lisp_Object
-purecopy (Lisp_Object obj)
-{
-  if (PURE_P (XPNTR (obj)))
-    return obj;
-
-  Lisp_Object pooled = !NILP (Vpdumper__pure_pool)
-    ? Fgethash (obj, Vpdumper__pure_pool, Qnil)
-    : Qnil;
-
-  if (!NILP (pooled))
-    (void) pooled;
-  else if (CONSP (obj))
-    pooled = pure_cons (XCAR (obj), XCDR (obj));
-  else if (FLOATP (obj))
-    pooled = make_pure_float (XFLOAT_DATA (obj));
-  else if (STRINGP (obj))
-    pooled = make_pure_string (SSDATA (obj), SCHARS (obj),
-			       SBYTES (obj),
-			       STRING_MULTIBYTE (obj));
-  else if (HASH_TABLE_P (obj))
-    {
-      struct Lisp_Hash_Table *table = XHASH_TABLE (obj);
-      /* Do not purify hash tables which haven't been defined with
-         :purecopy as non-nil or are weak - they aren't guaranteed to
-         not change.  */
-      if (table->weakness != Weak_None || !table->purecopy)
-        {
-          /* Instead, add the hash table to the list of pinned objects,
-             so that it will be marked during GC.  */
-          struct pinned_object *o = xmalloc (sizeof *o);
-          o->object = obj;
-          o->next = pinned_objects;
-          pinned_objects = o;
-          return obj; /* !!! */
-        }
-      pooled = make_lisp_hash_table (purecopy_hash_table (table));
-    }
-  else if (CLOSUREP (obj) || VECTORP (obj) || RECORDP (obj))
-    {
-      struct Lisp_Vector *objp = XVECTOR (obj);
-      ptrdiff_t nbytes = vector_nbytes (objp);
-      struct Lisp_Vector *vec = pure_alloc (nbytes, 0);
-      ptrdiff_t size = ASIZE (obj);
-      if (size & PSEUDOVECTOR_FLAG)
-	size &= PSEUDOVECTOR_SIZE_MASK;
-      memcpy (vec, objp, nbytes);
-      /* Byte code strings must be pinned.  */
-      if (CLOSUREP (obj) && size >= 2 && STRINGP (vec->contents[1])
-	  && !STRING_MULTIBYTE (vec->contents[1]))
-	pin_string (vec->contents[1]);
-      XSETVECTOR (pooled, vec);
-    }
-  else if (BIGNUMP (obj))
-    pooled = make_pure_bignum (obj);
-
-  if (!NILP (Vpdumper__pure_pool))
-    Fputhash (pooled, pooled, Vpdumper__pure_pool);
-  return !NILP (pooled) ? pooled : obj;
-}
 
 DEFUN ("purify-if-dumping", Fpurecopy_maybe, Spurecopy_maybe, 1, 1, 0,
        doc: /* Monnier's half-measure to reduce pdump footprint.  */)

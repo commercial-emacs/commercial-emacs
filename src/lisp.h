@@ -4104,11 +4104,8 @@ extern Lisp_Object list4 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object list5 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object,
 			  Lisp_Object);
 extern Lisp_Object listn (ptrdiff_t, Lisp_Object, ...);
-extern Lisp_Object pure_listn (ptrdiff_t, Lisp_Object, ...);
 #define list(...) \
   listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
-#define pure_list(...) \
-  pure_listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
 
 /* Build a frequently used 1/2/3/4-integer lists.  */
 

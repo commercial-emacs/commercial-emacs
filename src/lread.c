@@ -3861,9 +3861,7 @@ read0 (Lisp_Object readcharfun, bool annotated)
 		  : nbytes);
 	if (uninterned_symbol)
 	  {
-	    Lisp_Object name = !NILP (Vpdumper__pure_pool)
-	      ? make_pure_string (read_buffer, nchars, nbytes, multibyte)
-	      : make_specified_string (read_buffer, nbytes, multibyte);
+	    Lisp_Object name = make_specified_string (read_buffer, nbytes, multibyte);
 	    result = Fmake_symbol (name);
 	  }
 	else

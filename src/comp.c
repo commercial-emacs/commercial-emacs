@@ -4972,46 +4972,46 @@ syms_of_comp (void)
   /* To be signaled by the compiler.  */
   DEFSYM (Qnative_compiler_error, "native-compiler-error");
   Fput (Qnative_compiler_error, Qerror_conditions,
-	pure_list (Qnative_compiler_error, Qerror));
+	list (Qnative_compiler_error, Qerror));
   Fput (Qnative_compiler_error, Qerror_message,
         build_string ("Native compiler error"));
 
   DEFSYM (Qnative_ice, "native-ice");
   Fput (Qnative_ice, Qerror_conditions,
-	pure_list (Qnative_ice, Qnative_compiler_error, Qerror));
+	list (Qnative_ice, Qnative_compiler_error, Qerror));
   Fput (Qnative_ice, Qerror_message,
         build_string ("Internal native compiler error"));
 
   /* By the load machinery.  */
   DEFSYM (Qnative_lisp_load_failed, "native-lisp-load-failed");
   Fput (Qnative_lisp_load_failed, Qerror_conditions,
-	pure_list (Qnative_lisp_load_failed, Qerror));
+	list (Qnative_lisp_load_failed, Qerror));
   Fput (Qnative_lisp_load_failed, Qerror_message,
         build_string ("Native elisp load failed"));
 
   DEFSYM (Qnative_lisp_wrong_reloc, "native-lisp-wrong-reloc");
   Fput (Qnative_lisp_wrong_reloc, Qerror_conditions,
-	pure_list (Qnative_lisp_wrong_reloc, Qnative_lisp_load_failed, Qerror));
+	list (Qnative_lisp_wrong_reloc, Qnative_lisp_load_failed, Qerror));
   Fput (Qnative_lisp_wrong_reloc, Qerror_message,
         build_string ("Primitive redefined or wrong relocation"));
 
   DEFSYM (Qwrong_register_subr_call, "wrong-register-subr-call");
   Fput (Qwrong_register_subr_call, Qerror_conditions,
-	pure_list (Qwrong_register_subr_call, Qnative_lisp_load_failed, Qerror));
+	list (Qwrong_register_subr_call, Qnative_lisp_load_failed, Qerror));
   Fput (Qwrong_register_subr_call, Qerror_message,
         build_string ("comp--register-subr can only be called during "
 			    "native lisp load phase."));
 
   DEFSYM (Qnative_lisp_file_inconsistent, "native-lisp-file-inconsistent");
   Fput (Qnative_lisp_file_inconsistent, Qerror_conditions,
-	pure_list (Qnative_lisp_file_inconsistent, Qnative_lisp_load_failed, Qerror));
+	list (Qnative_lisp_file_inconsistent, Qnative_lisp_load_failed, Qerror));
   Fput (Qnative_lisp_file_inconsistent, Qerror_message,
         build_string ("eln file inconsistent with current runtime "
 			     "configuration, please recompile"));
 
   DEFSYM (Qcomp_sanitizer_error, "comp-sanitizer-error");
   Fput (Qcomp_sanitizer_error, Qerror_conditions,
-	pure_list (Qcomp_sanitizer_error, Qerror));
+	list (Qcomp_sanitizer_error, Qerror));
   Fput (Qcomp_sanitizer_error, Qerror_message,
         build_string ("Native code sanitizer runtime error"));
 

@@ -3783,7 +3783,7 @@ syms_of_data (void)
   DEFSYM (Qaref, "aref");
   DEFSYM (Qaset, "aset");
 
-  error_tail = pure_cons (Qerror, Qnil);
+  error_tail = Fcons (Qerror, Qnil);
 
   /* ERROR is used as a signaler for random errors for which nothing else is
      right.  */
@@ -3794,11 +3794,11 @@ syms_of_data (void)
 	build_string ("error"));
 
 #define PUT_ERROR(sym, tail, msg)			\
-  Fput (sym, Qerror_conditions, pure_cons (sym, tail)); \
+  Fput (sym, Qerror_conditions, Fcons (sym, tail)); \
   Fput (sym, Qerror_message, build_string (msg))
 
   PUT_ERROR (Qquit, Qnil, "Quit");
-  PUT_ERROR (Qminibuffer_quit, pure_cons (Qquit, Qnil), "Quit");
+  PUT_ERROR (Qminibuffer_quit, Fcons (Qquit, Qnil), "Quit");
 
   PUT_ERROR (Quser_error, error_tail, "");
   PUT_ERROR (Qwrong_length_argument, error_tail, "Wrong length argument");
@@ -3825,14 +3825,14 @@ syms_of_data (void)
   PUT_ERROR (Qno_catch, error_tail, "No catch for tag");
   PUT_ERROR (Qend_of_file, error_tail, "End of file during parsing");
 
-  arith_tail = pure_cons (Qarith_error, error_tail);
+  arith_tail = Fcons (Qarith_error, error_tail);
   Fput (Qarith_error, Qerror_conditions, arith_tail);
   Fput (Qarith_error, Qerror_message, build_string ("Arithmetic error"));
 
   PUT_ERROR (Qbeginning_of_buffer, error_tail, "Beginning of buffer");
   PUT_ERROR (Qend_of_buffer, error_tail, "End of buffer");
   PUT_ERROR (Qbuffer_read_only, error_tail, "Buffer is read-only");
-  PUT_ERROR (Qtext_read_only, pure_cons (Qbuffer_read_only, error_tail),
+  PUT_ERROR (Qtext_read_only, Fcons (Qbuffer_read_only, error_tail),
 	     "Text is read-only");
   PUT_ERROR (Qinhibited_interaction, error_tail,
 	     "User interaction while inhibited");
@@ -3854,7 +3854,7 @@ syms_of_data (void)
 	     "Arithmetic overflow error");
   PUT_ERROR (Qunderflow_error, Fcons (Qrange_error, arith_tail),
 	     "Arithmetic underflow error");
-  recursion_tail = pure_cons (Qrecursion_error, error_tail);
+  recursion_tail = Fcons (Qrecursion_error, error_tail);
   Fput (Qrecursion_error, Qerror_conditions, recursion_tail);
   Fput (Qrecursion_error, Qerror_message, build_string
        ("Excessive recursive calling error"));

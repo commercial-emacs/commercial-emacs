@@ -10772,7 +10772,7 @@ syms_of_w32fns (void)
   DEFSYM (Qjson, "json");
 
   Fput (Qundefined_color, Qerror_conditions,
-	pure_list (Qundefined_color, Qerror));
+	list (Qundefined_color, Qerror));
   Fput (Qundefined_color, Qerror_message,
 	build_string ("Undefined color"));
 

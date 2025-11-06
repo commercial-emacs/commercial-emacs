@@ -5258,7 +5258,7 @@ syms_of_buffer (void)
 	       Qoverwrite_mode_binary));
 
   Fput (Qprotected_field, Qerror_conditions,
-	pure_list (Qprotected_field, Qerror));
+	list (Qprotected_field, Qerror));
   Fput (Qprotected_field, Qerror_message,
 	build_string ("Attempt to modify a protected field"));
 

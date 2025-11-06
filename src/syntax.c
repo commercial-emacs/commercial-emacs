@@ -3715,7 +3715,7 @@ syms_of_syntax (void)
 
   DEFSYM (Qscan_error, "scan-error");
   Fput (Qscan_error, Qerror_conditions,
-	pure_list (Qscan_error, Qerror));
+	list (Qscan_error, Qerror));
   Fput (Qscan_error, Qerror_message,
 	build_string ("Scan error"));
 
