@@ -1911,7 +1911,7 @@ syms_of_dbusbind (void)
   Fput (Qdbus_error, Qerror_conditions,
 	list2 (Qdbus_error, Qerror));
   Fput (Qdbus_error, Qerror_message,
-	build_pure_c_string ("D-Bus error"));
+	build_string ("D-Bus error"));
 
   /* Lisp symbols of the system and session buses.  */
   DEFSYM (QCsystem, ":system");
@@ -1957,7 +1957,7 @@ syms_of_dbusbind (void)
 	       Vdbus_compiled_version,
     doc: /* The version of D-Bus Emacs is compiled against.  */);
 #ifdef DBUS_VERSION_STRING
-  Vdbus_compiled_version = build_pure_c_string (DBUS_VERSION_STRING);
+  Vdbus_compiled_version = build_string (DBUS_VERSION_STRING);
 #else
   Vdbus_compiled_version = Qnil;
 #endif

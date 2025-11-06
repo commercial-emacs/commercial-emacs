@@ -4377,7 +4377,7 @@ intern_c_string (const char *str)
   return SYMBOLP (val)
     ? val
     : intern_driver (!NILP (Vpdumper__pure_pool)
-		     ? make_pure_c_string (str, len)
+		     ? make_string (str, len)
 		     : make_string (str, len),
 		     obarray, val);
 }
@@ -4398,7 +4398,7 @@ static void
 define_symbol (Lisp_Object sym, char const *str)
 {
   ptrdiff_t len = strlen (str);
-  Lisp_Object string = make_pure_c_string (str, len);
+  Lisp_Object string = make_string (str, len);
   init_symbol (sym, string);
 
   /* Qunbound is uninterned, thus distinct from the symbol 'unbound.  */
@@ -5203,23 +5203,23 @@ This list includes suffixes for both compiled and source Emacs Lisp files.
 This list should not include the empty string.
 `load' and related functions try to append these suffixes, in order,
 to the specified file name if a suffix is allowed or required.  */);
-  Vload_suffixes = list2 (build_pure_c_string (".elc"),
-			  build_pure_c_string (".el"));
+  Vload_suffixes = list2 (build_string (".elc"),
+			  build_string (".el"));
 #ifdef HAVE_NATIVE_COMP
-  Vload_suffixes = Fcons (build_pure_c_string (NATIVE_SUFFIX), Vload_suffixes);
+  Vload_suffixes = Fcons (build_string (NATIVE_SUFFIX), Vload_suffixes);
 #endif
 #ifdef HAVE_MODULES
-  Vload_suffixes = Fcons (build_pure_c_string (MODULES_SUFFIX), Vload_suffixes);
+  Vload_suffixes = Fcons (build_string (MODULES_SUFFIX), Vload_suffixes);
 #ifdef MODULES_SECONDARY_SUFFIX
   Vload_suffixes =
-    Fcons (build_pure_c_string (MODULES_SECONDARY_SUFFIX), Vload_suffixes);
+    Fcons (build_string (MODULES_SECONDARY_SUFFIX), Vload_suffixes);
 #endif
 #endif
 
   DEFVAR_LISP ("module-file-suffix", Vmodule_file_suffix,
 	       doc: /* Suffix of loadable module file, or nil if modules are not supported.  */);
 #ifdef HAVE_MODULES
-  Vmodule_file_suffix = build_pure_c_string (MODULES_SUFFIX);
+  Vmodule_file_suffix = build_string (MODULES_SUFFIX);
 #else
   Vmodule_file_suffix = Qnil;
 #endif
@@ -5229,9 +5229,9 @@ to the specified file name if a suffix is allowed or required.  */);
 
 #ifndef MSDOS
   Vdynamic_library_suffixes
-    = Fcons (build_pure_c_string (DYNAMIC_LIB_SECONDARY_SUFFIX), Qnil);
+    = Fcons (build_string (DYNAMIC_LIB_SECONDARY_SUFFIX), Qnil);
   Vdynamic_library_suffixes
-    = Fcons (build_pure_c_string (DYNAMIC_LIB_SUFFIX),
+    = Fcons (build_string (DYNAMIC_LIB_SUFFIX),
 	     Vdynamic_library_suffixes);
 #else
   Vdynamic_library_suffixes = Qnil;
@@ -5376,7 +5376,7 @@ from the file, and matches them against this regular expression.
 When the regular expression matches, the file is considered to be safe
 to load.  */);
   Vbytecomp_version_regexp
-    = build_pure_c_string
+    = build_string
         ("^;;;.\\(?:in Emacs version\\|bytecomp version FSF\\)");
 
   DEFSYM (Qlexical_binding, "lexical-binding");
@@ -5422,7 +5422,7 @@ For internal use only.  */);
 #if !IEEE_FLOATING_POINT
   for (int negative = 0; negative < 2; negative++)
     {
-      not_a_number[negative] = build_pure_c_string (&"-0.0e+NaN"[!negative]);
+      not_a_number[negative] = build_string (&"-0.0e+NaN"[!negative]);
       staticpro (&not_a_number[negative]);
     }
 #endif

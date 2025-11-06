@@ -4985,8 +4985,8 @@ init_buffer_once (void)
   buffer_slot_symbols.window_count = 0;
   set_buffer_intervals (&buffer_slot_defaults, NULL);
   set_buffer_intervals (&buffer_slot_symbols, NULL);
-  bset_name (&buffer_slot_defaults, build_pure_c_string (" *buffer-defaults*"));
-  bset_name (&buffer_slot_symbols, build_pure_c_string (" *buffer-local-symbols*"));
+  bset_name (&buffer_slot_defaults, build_string (" *buffer-defaults*"));
+  bset_name (&buffer_slot_symbols, build_string (" *buffer-local-symbols*"));
   BUFFER_PVEC_INIT (&buffer_slot_defaults);
   BUFFER_PVEC_INIT (&buffer_slot_symbols);
 
@@ -4994,7 +4994,7 @@ init_buffer_once (void)
      Must do these before making the first buffer!
      Real setup is done in bindings.el
   */
-  bset_mode_line_format (&buffer_slot_defaults, build_pure_c_string ("%-"));
+  bset_mode_line_format (&buffer_slot_defaults, build_string ("%-"));
   bset_header_line_format (&buffer_slot_defaults, Qnil);
   bset_tab_line_format (&buffer_slot_defaults, Qnil);
   bset_abbrev_mode (&buffer_slot_defaults, Qnil);
@@ -5052,7 +5052,7 @@ init_buffer_once (void)
   current_buffer = 0;
   pdumper_remember (&current_buffer, Lisp_Vectorlike);
 
-  QSFundamental = build_pure_c_string ("Fundamental");
+  QSFundamental = build_string ("Fundamental");
 
   DEFSYM (Qfundamental_mode, "fundamental-mode");
   bset_major_mode (&buffer_slot_defaults, Qfundamental_mode);
@@ -5064,10 +5064,10 @@ init_buffer_once (void)
   DEFSYM (Qkill_buffer_hook, "kill-buffer-hook");
   Fput (Qkill_buffer_hook, Qpermanent_local, Qt);
 
-  Vprin1_to_string_buffer = Fget_buffer_create (build_pure_c_string (" prin1"), Qt);
+  Vprin1_to_string_buffer = Fget_buffer_create (build_string (" prin1"), Qt);
   Vbuffer_alist = Qnil;
 
-  Fset_buffer (Fget_buffer_create (build_pure_c_string ("*scratch*"), Qnil));
+  Fset_buffer (Fget_buffer_create (build_string ("*scratch*"), Qnil));
 
   inhibit_modification_hooks = false;
 }
@@ -5260,7 +5260,7 @@ syms_of_buffer (void)
   Fput (Qprotected_field, Qerror_conditions,
 	pure_list (Qprotected_field, Qerror));
   Fput (Qprotected_field, Qerror_message,
-	build_pure_c_string ("Attempt to modify a protected field"));
+	build_string ("Attempt to modify a protected field"));
 
   DEFSYM (Qclone_indirect_buffer_hook, "clone-indirect-buffer-hook");
 

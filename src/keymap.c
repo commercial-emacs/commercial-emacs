@@ -3353,11 +3353,11 @@ syms_of_keymap (void)
   staticpro (&current_global_map);
 
   exclude_keys = pure_list
-    (pure_cons (build_pure_c_string ("DEL"), build_pure_c_string ("\\d")),
-     pure_cons (build_pure_c_string ("TAB"), build_pure_c_string ("\\t")),
-     pure_cons (build_pure_c_string ("RET"), build_pure_c_string ("\\r")),
-     pure_cons (build_pure_c_string ("ESC"), build_pure_c_string ("\\e")),
-     pure_cons (build_pure_c_string ("SPC"), build_pure_c_string (" ")));
+    (pure_cons (build_string ("DEL"), build_string ("\\d")),
+     pure_cons (build_string ("TAB"), build_string ("\\t")),
+     pure_cons (build_string ("RET"), build_string ("\\r")),
+     pure_cons (build_string ("ESC"), build_string ("\\e")),
+     pure_cons (build_string ("SPC"), build_string (" ")));
   staticpro (&exclude_keys);
 
   DEFVAR_LISP ("minibuffer-local-map", Vminibuffer_local_map,

@@ -4161,7 +4161,6 @@ build_unibyte_string (const char *str)
 extern Lisp_Object make_multibyte_string (const char *, ptrdiff_t, ptrdiff_t);
 extern Lisp_Object make_event_array (ptrdiff_t, Lisp_Object *);
 extern Lisp_Object make_pure_string (const char *, ptrdiff_t, ptrdiff_t, bool);
-extern Lisp_Object make_pure_c_string (const char *, ptrdiff_t);
 extern void pin_string (Lisp_Object string);
 
 INLINE Lisp_Object
@@ -4169,14 +4168,6 @@ make_specified_string (const char *contents, ptrdiff_t nbytes, bool multibyte)
 {
   return multibyte ? make_multibyte_string (contents, -1, nbytes)
     : make_unibyte_string (contents, nbytes);
-}
-
-/* Make a string allocated in pure space, use STR as string data.  */
-
-INLINE Lisp_Object
-build_pure_c_string (const char *str)
-{
-  return make_pure_c_string (str, strlen (str));
 }
 
 /* Make a string from the data at STR, treating it as multibyte if the

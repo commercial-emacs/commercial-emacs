@@ -1835,7 +1835,7 @@ define_error (Lisp_Object name, const char *message, Lisp_Object parent)
   eassert (!NILP (Fmemq (parent, parent_conditions)));
   eassert (NILP (Fmemq (name, parent_conditions)));
   Fput (name, Qerror_conditions, pure_cons (name, parent_conditions));
-  Fput (name, Qerror_message, build_pure_c_string (message));
+  Fput (name, Qerror_message, build_string (message));
 }
 
 /* Use this for arithmetic overflow, e.g., when an integer result is
@@ -3998,7 +3998,7 @@ Don't set this unless you're sure that can't happen.  */);
      also use something like Fcons (Qnil, Qnil), but json.c treats any
      cons cell as error data, so use an uninterned symbol instead.  */
   Qcatch_all_memory_full
-    = Fmake_symbol (build_pure_c_string ("catch-all-memory-full"));
+    = Fmake_symbol (build_string ("catch-all-memory-full"));
 
   staticpro (&list_of_t);
   list_of_t = list1 (Qt);

@@ -3791,11 +3791,11 @@ syms_of_data (void)
   Fput (Qerror, Qerror_conditions,
 	error_tail);
   Fput (Qerror, Qerror_message,
-	build_pure_c_string ("error"));
+	build_string ("error"));
 
 #define PUT_ERROR(sym, tail, msg)			\
   Fput (sym, Qerror_conditions, pure_cons (sym, tail)); \
-  Fput (sym, Qerror_message, build_pure_c_string (msg))
+  Fput (sym, Qerror_message, build_string (msg))
 
   PUT_ERROR (Qquit, Qnil, "Quit");
   PUT_ERROR (Qminibuffer_quit, pure_cons (Qquit, Qnil), "Quit");
@@ -3827,7 +3827,7 @@ syms_of_data (void)
 
   arith_tail = pure_cons (Qarith_error, error_tail);
   Fput (Qarith_error, Qerror_conditions, arith_tail);
-  Fput (Qarith_error, Qerror_message, build_pure_c_string ("Arithmetic error"));
+  Fput (Qarith_error, Qerror_message, build_string ("Arithmetic error"));
 
   PUT_ERROR (Qbeginning_of_buffer, error_tail, "Beginning of buffer");
   PUT_ERROR (Qend_of_buffer, error_tail, "End of buffer");
@@ -3856,7 +3856,7 @@ syms_of_data (void)
 	     "Arithmetic underflow error");
   recursion_tail = pure_cons (Qrecursion_error, error_tail);
   Fput (Qrecursion_error, Qerror_conditions, recursion_tail);
-  Fput (Qrecursion_error, Qerror_message, build_pure_c_string
+  Fput (Qrecursion_error, Qerror_message, build_string
        ("Excessive recursive calling error"));
 
   PUT_ERROR (Qexcessive_variable_binding, recursion_tail,

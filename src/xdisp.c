@@ -33460,7 +33460,7 @@ See also `overlay-arrow-string'.  */);
   DEFVAR_LISP ("overlay-arrow-string", Voverlay_arrow_string,
     doc: /* String to display as an arrow in text-mode frames.
 See also `overlay-arrow-position'.  */);
-  Voverlay_arrow_string = build_pure_c_string ("=>");
+  Voverlay_arrow_string = build_string ("=>");
 
   DEFVAR_LISP ("overlay-arrow-variable-list", Voverlay_arrow_variable_list,
     doc: /* List of variables (symbols) which hold markers for overlay arrows.
@@ -33602,12 +33602,12 @@ iconified frames.  */);
      Oracle Developer Studio 12.6.  */
   Lisp_Object icon_title_name_format
     = pure_list (empty_unibyte_string,
-		 build_pure_c_string ("%b - Commercial Emacs at "),
+		 build_string ("%b - Commercial Emacs at "),
 		 intern_c_string ("system-name"));
   Vicon_title_format
     = Vframe_title_format
     = pure_list (intern_c_string ("multiple-frames"),
-		 build_pure_c_string ("%b"),
+		 build_string ("%b"),
 		 icon_title_name_format);
 
   DEFVAR_LISP ("message-log-max", Vmessage_log_max,

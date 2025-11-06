@@ -3718,22 +3718,6 @@ make_pure_string (const char *data, ptrdiff_t nchars,
   return string;
 }
 
-/* Return a string allocated in pure space.  Do not
-   allocate the string data, just point to DATA.  */
-
-Lisp_Object
-make_pure_c_string (const char *data, ptrdiff_t nchars)
-{
-  Lisp_Object string;
-  struct Lisp_String *s = pure_alloc (sizeof *s, 0);
-  s->u.s.size = nchars;
-  s->u.s.size_byte = Sdata_Pure;
-  s->u.s.data = (unsigned char *) data;
-  s->u.s.intervals = NULL;
-  XSETSTRING (string, s);
-  return string;
-}
-
 static Lisp_Object purecopy (Lisp_Object obj);
 
 /* Return a cons allocated from pure space.  Give it pure copies
