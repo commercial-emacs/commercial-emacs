@@ -90,22 +90,21 @@ excluding `ask') if drop is successful, nil if not."
   :group 'x)
 
 (defcustom x-dnd-known-types
-  (mapcar 'purecopy
-          '("XdndDirectSave0"
-            "text/uri-list"
-            "text/x-moz-url"
-            "_NETSCAPE_URL"
-            "FILE_NAME"
-            "UTF8_STRING"
-            "text/plain;charset=UTF-8"
-            "text/plain;charset=utf-8"
-            "text/unicode"
-            "text/plain"
-            "COMPOUND_TEXT"
-            "STRING"
-            "TEXT"
-            "DndTypeFile"
-            "DndTypeText"))
+  '("XdndDirectSave0"
+    "text/uri-list"
+    "text/x-moz-url"
+    "_NETSCAPE_URL"
+    "FILE_NAME"
+    "UTF8_STRING"
+    "text/plain;charset=UTF-8"
+    "text/plain;charset=utf-8"
+    "text/unicode"
+    "text/plain"
+    "COMPOUND_TEXT"
+    "STRING"
+    "TEXT"
+    "DndTypeFile"
+    "DndTypeText")
   "The types accepted by default for dropped data.
 The types are chosen in the order they appear in the list."
   :version "22.1"

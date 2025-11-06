@@ -44,7 +44,6 @@
 
 ;;;###autoload
 (defcustom holiday-general-holidays
-  (mapcar 'purecopy
   '((holiday-fixed 1 1 "New Year's Day")
     (holiday-float 1 1 3 "Martin Luther King Day")
     (holiday-fixed 2 2 "Groundhog Day")
@@ -61,7 +60,7 @@
     (holiday-float 10 1 2 "Columbus Day")
     (holiday-fixed 10 31 "Halloween")
     (holiday-fixed 11 11 "Veteran's Day")
-    (holiday-float 11 4 4 "Thanksgiving")))
+    (holiday-float 11 4 4 "Thanksgiving"))
   "General holidays.  Default value is for the United States.
 See the documentation for `calendar-holidays' for details."
   :type 'sexp)
@@ -70,18 +69,17 @@ See the documentation for `calendar-holidays' for details."
 
 ;;;###autoload
 (defcustom holiday-oriental-holidays
-  (mapcar 'purecopy
   '((holiday-chinese-new-year)
     (if calendar-chinese-all-holidays-flag
-        (append
-         (holiday-chinese 1 15 "Lantern Festival")
-         (holiday-chinese-qingming)
-         (holiday-chinese 5  5 "Dragon Boat Festival")
-         (holiday-chinese 7  7 "Double Seventh Festival")
-         (holiday-chinese 8 15 "Mid-Autumn Festival")
-         (holiday-chinese 9  9 "Double Ninth Festival")
-         (holiday-chinese-winter-solstice)
-         ))))
+     (append
+      (holiday-chinese 1 15 "Lantern Festival")
+      (holiday-chinese-qingming)
+      (holiday-chinese 5  5 "Dragon Boat Festival")
+      (holiday-chinese 7  7 "Double Seventh Festival")
+      (holiday-chinese 8 15 "Mid-Autumn Festival")
+      (holiday-chinese 9  9 "Double Ninth Festival")
+      (holiday-chinese-winter-solstice)
+      )))
   "Oriental holidays.
 See the documentation for `calendar-holidays' for details."
   :version "23.1"                       ; added more holidays
@@ -107,14 +105,13 @@ See the documentation for `calendar-holidays' for details."
 
 ;;;###autoload
 (defcustom holiday-hebrew-holidays
-  (mapcar 'purecopy
   '((holiday-hebrew-passover)
     (holiday-hebrew-rosh-hashanah)
     (holiday-hebrew-hanukkah)
     (if calendar-hebrew-all-holidays-flag
-        (append
-         (holiday-hebrew-tisha-b-av)
-         (holiday-hebrew-misc)))))
+     (append
+      (holiday-hebrew-tisha-b-av)
+      (holiday-hebrew-misc))))
   "Jewish holidays.
 See the documentation for `calendar-holidays' for details."
   :type 'sexp
@@ -125,16 +122,15 @@ See the documentation for `calendar-holidays' for details."
 
 ;;;###autoload
 (defcustom holiday-christian-holidays
-  (mapcar 'purecopy
   '((holiday-easter-etc)    ; respects calendar-christian-all-holidays-flag
     (holiday-fixed 12 25 "Christmas")
     (if calendar-christian-all-holidays-flag
-        (append
-         (holiday-fixed 1 6 "Epiphany")
-         (holiday-julian 12 25 "Christmas (Julian calendar)")
-         (holiday-greek-orthodox-easter)
-         (holiday-fixed 8 15 "Assumption")
-         (holiday-advent 0 "Advent")))))
+     (append
+      (holiday-fixed 1 6 "Epiphany")
+      (holiday-julian 12 25 "Christmas (Julian calendar)")
+      (holiday-greek-orthodox-easter)
+      (holiday-fixed 8 15 "Assumption")
+      (holiday-advent 0 "Advent"))))
   "Christian holidays.
 See the documentation for `calendar-holidays' for details."
   :type 'sexp)
@@ -143,18 +139,17 @@ See the documentation for `calendar-holidays' for details."
 
 ;;;###autoload
 (defcustom holiday-islamic-holidays
-  (mapcar 'purecopy
   '((holiday-islamic-new-year)
     (holiday-islamic 9 1 "Ramadan Begins")
     (if calendar-islamic-all-holidays-flag
-        (append
-         (holiday-islamic 1 10 "Ashura")
-         (holiday-islamic 3 12 "Mulad-al-Nabi")
-         (holiday-islamic 7 26 "Shab-e-Mi'raj")
-         (holiday-islamic 8 15 "Shab-e-Bara't")
-         (holiday-islamic 9 27 "Shab-e Qadr")
-         (holiday-islamic 10 1 "Id-al-Fitr")
-         (holiday-islamic 12 10 "Id-al-Adha")))))
+     (append
+      (holiday-islamic 1 10 "Ashura")
+      (holiday-islamic 3 12 "Mulad-al-Nabi")
+      (holiday-islamic 7 26 "Shab-e-Mi'raj")
+      (holiday-islamic 8 15 "Shab-e-Bara't")
+      (holiday-islamic 9 27 "Shab-e Qadr")
+      (holiday-islamic 10 1 "Id-al-Fitr")
+      (holiday-islamic 12 10 "Id-al-Adha"))))
   "Islamic holidays.
 See the documentation for `calendar-holidays' for details."
   :type 'sexp)
@@ -163,7 +158,6 @@ See the documentation for `calendar-holidays' for details."
 
 ;;;###autoload
 (defcustom holiday-bahai-holidays
-  (mapcar 'purecopy
   '((holiday-bahai-new-year)
     (holiday-bahai-ridvan)      ; respects calendar-bahai-all-holidays-flag
     (holiday-fixed  5 23 "Declaration of the Báb")
@@ -172,9 +166,9 @@ See the documentation for `calendar-holidays' for details."
     (holiday-fixed 10 20 "Birth of the Báb")
     (holiday-fixed 11 12 "Birth of Bahá’u’lláh")
     (if calendar-bahai-all-holidays-flag
-        (append
-         (holiday-fixed 11 26 "Day of the Covenant")
-         (holiday-fixed 11 28 "Ascension of `Abdu’l-Bahá")))))
+     (append
+      (holiday-fixed 11 26 "Day of the Covenant")
+      (holiday-fixed 11 28 "Ascension of `Abdu’l-Bahá"))))
   "Bahá’í holidays.
 See the documentation for `calendar-holidays' for details."
   :type 'sexp)
@@ -183,18 +177,17 @@ See the documentation for `calendar-holidays' for details."
 
 ;;;###autoload
 (defcustom holiday-solar-holidays
-  (mapcar 'purecopy
   '((solar-equinoxes-solstices)
     (holiday-sexp calendar-daylight-savings-starts
-                  (format "Daylight Saving Time Begins %s"
-                          (solar-time-string
-                           (/ calendar-daylight-savings-starts-time (float 60))
-                           calendar-standard-time-zone-name)))
+     (format "Daylight Saving Time Begins %s"
+      (solar-time-string
+       (/ calendar-daylight-savings-starts-time (float 60))
+       calendar-standard-time-zone-name)))
     (holiday-sexp calendar-daylight-savings-ends
-                  (format "Daylight Saving Time Ends %s"
-                          (solar-time-string
-                           (/ calendar-daylight-savings-ends-time (float 60))
-                           calendar-daylight-time-zone-name)))))
+     (format "Daylight Saving Time Ends %s"
+      (solar-time-string
+       (/ calendar-daylight-savings-ends-time (float 60))
+       calendar-daylight-time-zone-name))))
   "Sun-related holidays.
 See the documentation for `calendar-holidays' for details."
   :type 'sexp)

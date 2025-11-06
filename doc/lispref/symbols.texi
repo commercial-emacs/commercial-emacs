@@ -588,14 +588,6 @@ If the value is non-@code{nil}, the named function should not be
 deleted from the local value of a hook variable when changing major
 modes.  @xref{Setting Hooks}.
 
-@item pure
-@cindex @code{pure} property
-If the value is non-@code{nil}, the named function is considered to be
-pure (@pxref{What Is a Function}).  Calls with constant arguments can
-be evaluated at compile time.  This may shift run time errors to
-compile time.  Not to be confused with pure storage (@pxref{Pure
-Storage}).
-
 @item risky-local-variable
 If the value is non-@code{nil}, the named variable is considered risky
 as a file-local variable.  @xref{File Local Variables}.

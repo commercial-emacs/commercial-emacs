@@ -403,8 +403,7 @@ the symbol `mode-line-format-right-align' is processed by
 (defun bindings--define-key (map key item)
   "Define KEY in keymap MAP according to ITEM from a menu.
 This is like `define-key', but it takes the definition from the
-specified menu item, and makes pure copies of as much as possible
-of the menu's data."
+specified menu item."
   (declare (indent 2))
   (define-key map key
     (cond
@@ -843,8 +842,6 @@ Actually, STRING need not be a string; any mode-line construct is
 okay.  See `mode-line-format'.")
 ;;;###autoload
 (put 'minor-mode-alist 'risky-local-variable t)
-;; Don't use purecopy here--some people want to change these strings,
-;; also string properties are lost when put into pure space.
 (setq minor-mode-alist
       '((abbrev-mode " Abbrev")
         (overwrite-mode overwrite-mode)
@@ -862,14 +859,10 @@ okay.  See `mode-line-format'.")
 (setq completion-ignored-extensions
       (append
        (cond ((memq system-type '(ms-dos windows-nt))
-	      (mapcar 'purecopy
 	      '(".o" "~" ".bin" ".bak" ".obj" ".map" ".ico" ".pif" ".lnk"
-		".a" ".ln" ".blg" ".bbl" ".dll" ".drv" ".vxd" ".386")))
+		".a" ".ln" ".blg" ".bbl" ".dll" ".drv" ".vxd" ".386"))
 	     (t
-	      (mapcar 'purecopy
-	      '(".o" "~" ".bin" ".lbin" ".so"
-		".a" ".ln" ".blg" ".bbl"))))
-       (mapcar 'purecopy
+	      '(".o" "~" ".bin" ".lbin" ".so" ".a" ".ln" ".blg" ".bbl")))
        '(".elc" ".eln" ".lof"
 	 ".glo" ".idx" ".lot"
 	 ;; VCS metadata directories
@@ -899,7 +892,7 @@ okay.  See `mode-line-format'.")
 	 ".cp" ".fn" ".ky" ".pg" ".tp" ".vr"
 	 ".cps" ".fns" ".kys" ".pgs" ".tps" ".vrs"
 	 ;; Python byte-compiled
-	 ".pyc" ".pyo"))))
+	 ".pyc" ".pyo")))
 
 ;; Suffixes used for executables.
 (setq exec-suffixes

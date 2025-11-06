@@ -3239,13 +3239,13 @@ See also `auto-mode-alist'.")
 ;; because we are duplicating info from auto-mode-alist.
 ;; TODO many elements of this list are also in auto-coding-alist.
 (defvar inhibit-local-variables-regexps
-  (mapcar 'purecopy '("\\.tar\\'" "\\.t[bg]z\\'"
-		      "\\.arc\\'" "\\.zip\\'" "\\.lzh\\'" "\\.lha\\'"
-		      "\\.zoo\\'" "\\.[jew]ar\\'" "\\.xpi\\'" "\\.rar\\'"
-		      "\\.7z\\'"
-		      "\\.sx[dmicw]\\'" "\\.odt\\'"
-		      "\\.diff\\'" "\\.patch\\'"
-		      "\\.tiff?\\'" "\\.gif\\'" "\\.png\\'" "\\.jpe?g\\'"))
+  '("\\.tar\\'" "\\.t[bg]z\\'"
+    "\\.arc\\'" "\\.zip\\'" "\\.lzh\\'" "\\.lha\\'"
+    "\\.zoo\\'" "\\.[jew]ar\\'" "\\.xpi\\'" "\\.rar\\'"
+    "\\.7z\\'"
+    "\\.sx[dmicw]\\'" "\\.odt\\'"
+    "\\.diff\\'" "\\.patch\\'"
+    "\\.tiff?\\'" "\\.gif\\'" "\\.png\\'" "\\.jpe?g\\'")
   "List of regexps matching file names in which to ignore local variables.
 This includes `-*-' lines as well as trailing \"Local Variables\" sections.
 Files matching this list are typically binary file formats.

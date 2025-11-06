@@ -1504,13 +1504,12 @@ This setting is effective for the next communication only."
 ;;; X selections
 
 (defvar ctext-non-standard-encodings-alist
-  (mapcar 'purecopy
   '(("big5-0" big5 2 big5)
     ("ISO8859-14" iso-8859-14 1 latin-iso8859-14)
     ("ISO8859-15" iso-8859-15 1 latin-iso8859-15)
     ("gbk-0" gbk 2 chinese-gbk)
     ("koi8-r" koi8-r 1 koi8-r)
-    ("microsoft-cp1251" windows-1251 1 windows-1251)))
+    ("microsoft-cp1251" windows-1251 1 windows-1251))
   "Alist of non-standard encoding names vs the corresponding usages in CTEXT.
 
 It controls how extended segments of a compound text are handled

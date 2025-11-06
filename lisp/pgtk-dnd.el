@@ -77,15 +77,15 @@ if drop is successful, nil if not."
   :group 'pgtk)
 
 (defcustom pgtk-dnd-known-types
-  (mapcar 'purecopy '("text/uri-list"
-                      "FILE_NAME"
-                      "UTF8_STRING"
-                      "text/plain;charset=UTF-8"
-                      "text/plain;charset=utf-8"
-                      "text/plain"
-                      "COMPOUND_TEXT"
-                      "STRING"
-                      "TEXT"))
+  '("text/uri-list"
+    "FILE_NAME"
+    "UTF8_STRING"
+    "text/plain;charset=UTF-8"
+    "text/plain;charset=utf-8"
+    "text/plain"
+    "COMPOUND_TEXT"
+    "STRING"
+    "TEXT")
   "The types accepted by default for dropped data.
 The types are chosen in the order they appear in the list."
   :version "22.1"

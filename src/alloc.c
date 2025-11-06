@@ -3804,8 +3804,6 @@ make_pure_vector (ptrdiff_t len)
   return new;
 }
 
-/* Copy all contents and parameters of TABLE to a new table allocated
-   from pure space, return the purified table.  */
 static struct Lisp_Hash_Table *
 purecopy_hash_table (struct Lisp_Hash_Table *table)
 {

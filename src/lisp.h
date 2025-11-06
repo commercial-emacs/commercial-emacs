@@ -3884,7 +3884,7 @@ extern char *extract_data_from_object (Lisp_Object, ptrdiff_t *, ptrdiff_t *);
 EMACS_UINT hash_string (char const *, ptrdiff_t);
 EMACS_UINT sxhash (Lisp_Object);
 Lisp_Object make_hash_table (const struct hash_table_test *, EMACS_INT,
-                             hash_table_weakness_t, bool);
+                             hash_table_weakness_t);
 Lisp_Object hash_table_weakness_symbol (hash_table_weakness_t weak);
 ptrdiff_t hash_lookup (struct Lisp_Hash_Table *, Lisp_Object);
 ptrdiff_t hash_lookup_get_hash (struct Lisp_Hash_Table *h, Lisp_Object key,

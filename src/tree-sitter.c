@@ -85,8 +85,7 @@ tree_sitter_language_functor (Lisp_Object progmode)
 
   if (NILP (cache))
     {
-      cache = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE,
-			       Weak_None, false);
+      cache = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None);
       staticpro (&cache);
     }
 
@@ -1241,8 +1240,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 
   if (NILP (cache))
     {
-      cache = make_hash_table (&hashtest_equal, DEFAULT_HASH_SIZE,
-			       Weak_None, false);
+      cache = make_hash_table (&hashtest_equal, DEFAULT_HASH_SIZE, Weak_None);
       staticpro (&cache);
     }
   h = XHASH_TABLE (cache);
@@ -1439,7 +1437,7 @@ Every line between CALC_BEG and CALC_END must have a cons pair entry.  */)
 			 sitter_end);
 
       Lisp_Object capture_name_to_tsnode =
-	make_hash_table (&hashtest_eq, 10, Weak_None, false);
+	make_hash_table (&hashtest_eq, 10, Weak_None);
       Lisp_Object obarray = make_obarray (3);
       const Lisp_Object root_node = Ftree_sitter_root_node (Fcurrent_buffer ());
       ptrdiff_t line_target =

@@ -2085,7 +2085,6 @@ dump_hash_table (struct dump_context *ctx, Lisp_Object object)
   dump_pseudovector (ctx, &out->header, &hash->header);
   DUMP_FIELD_COPY (out, hash, count);
   DUMP_FIELD_COPY (out, hash, weakness);
-  DUMP_FIELD_COPY (out, hash, purecopy);
   DUMP_FIELD_COPY (out, hash, mutable);
   DUMP_FIELD_COPY (out, hash, frozen_test);
   eassert (hash->next_weak == NULL);

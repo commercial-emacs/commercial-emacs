@@ -99,7 +99,6 @@ a font height that isn't optimal."
 ;; unavailable, and we fall back on the courier and helv families,
 ;; which are generally available.
 (defcustom face-font-family-alternatives
-  (mapcar (lambda (arg) (mapcar 'purecopy arg))
   '(("Monospace" "courier" "fixed")
 
     ;; Monospace Serif is an Emacs invention, intended to work around
@@ -134,7 +133,7 @@ a font height that isn't optimal."
     ("courier" "CMU Typewriter Text" "fixed")
 
     ("Sans Serif" "helv" "helvetica" "arial" "fixed")
-    ("helv" "helvetica" "arial" "fixed")))
+    ("helv" "helvetica" "arial" "fixed"))
   "Alist of alternative font family names.
 Each element has the form (FAMILY ALTERNATIVE1 ALTERNATIVE2 ...).
 If fonts of family FAMILY can't be loaded, try ALTERNATIVE1, then
@@ -149,7 +148,6 @@ ALTERNATIVE2 etc."
 
 ;; This is defined originally in xfaces.c.
 (defcustom face-font-registry-alternatives
-  (mapcar (lambda (arg) (mapcar 'purecopy arg))
   (if (featurep 'w32)
       '(("iso8859-1" "ms-oemlatin")
 	("gb2312.1980" "gb2312" "gbk" "gb18030")
@@ -159,7 +157,7 @@ ALTERNATIVE2 etc."
     '(("gb2312.1980" "gb2312.80&gb8565.88" "gbk" "gb18030")
       ("jisx0208.1990" "jisx0208.1983" "jisx0208.1978")
       ("ksc5601.1989" "ksx1001.1992" "ksc5601.1987")
-      ("muletibetan-2" "muletibetan-0"))))
+      ("muletibetan-2" "muletibetan-0")))
   "Alist of alternative font registry names.
 Each element has the form (REGISTRY ALTERNATIVE1 ALTERNATIVE2 ...).
 If fonts of registry REGISTRY can be loaded, font selection

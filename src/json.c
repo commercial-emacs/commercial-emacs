@@ -1480,7 +1480,7 @@ json_parse_object (struct json_parser *parser)
     }
 
   const EMACS_INT hint = (parser->object_workspace_current - first) / 2;
-  Lisp_Object dedupe = make_hash_table (&hashtest_equal, hint, Weak_None, false);
+  Lisp_Object dedupe = make_hash_table (&hashtest_equal, hint, Weak_None);
   struct Lisp_Hash_Table *xdedupe = XHASH_TABLE (dedupe);
   for (size_t i = first;
        i < parser->object_workspace_current;
@@ -1503,7 +1503,7 @@ json_parse_object (struct json_parser *parser)
     {
     case json_object_hashtable:
       {
-	result = make_hash_table (&hashtest_equal, hint, Weak_None, false);
+	result = make_hash_table (&hashtest_equal, hint, Weak_None);
 	struct Lisp_Hash_Table *xresult = XHASH_TABLE (result);
 	DOHASH_SAFE (xdedupe, where)
 	  {

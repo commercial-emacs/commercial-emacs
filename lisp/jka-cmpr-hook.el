@@ -201,16 +201,15 @@ options through Custom does this automatically."
   ;; uncomp-message uncomp-prog uncomp-args
   ;; can-append strip-extension-flag file-magic-bytes
   ;; uncompress-function]
-  (mapcar 'purecopy
   `(["\\.Z\\'"
      "compressing"    "compress"     ("-c")
      ;; gzip is more common than uncompress. It can only read, not write.
      "uncompressing"  "gzip"   ("-c" "-q" "-d")
      nil t "\037\235"
      zlib-decompress-region]
-     ;; Formerly, these had an additional arg "-c", but that fails with
-     ;; "Version 0.1pl2, 29-Aug-97." (RedHat 5.1 GNU/Linux) and
-     ;; "Version 0.9.0b, 9-Sept-98".
+    ;; Formerly, these had an additional arg "-c", but that fails with
+    ;; "Version 0.1pl2, 29-Aug-97." (RedHat 5.1 GNU/Linux) and
+    ;; "Version 0.9.0b, 9-Sept-98".
     ["\\.bz2\\'"
      "bzip2ing"        "bzip2"         nil
      "bunzip2ing"      "bzip2"         ("-d")
@@ -260,7 +259,7 @@ options through Custom does this automatically."
     ["\\.tzst\\'"
      "zstd compressing"   "zstd"         ("-c" "-q")
      "zstd uncompressing" "zstd"         ("-c" "-q" "-d")
-     t nil "\050\265\057\375"]))
+     t nil "\050\265\057\375"])
 
   "List of vectors that describe available compression techniques.
 Each element, which describes a compression technique, is a vector of

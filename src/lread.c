@@ -1962,11 +1962,11 @@ readevalloop (Lisp_Object readcharfun,
       if (!HASH_TABLE_P (read_objects_map)
 	  || XHASH_TABLE (read_objects_map)->count)
 	read_objects_map
-	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
+	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None);
       if (!HASH_TABLE_P (read_objects_completed)
 	  || XHASH_TABLE (read_objects_completed)->count)
 	read_objects_completed
-	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
+	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None);
       if (!NILP (Vpdumper__pure_pool) && c == '(')
 	val = read0 (readcharfun, false);
       else
@@ -2198,11 +2198,11 @@ read_internal_start (Lisp_Object stream, Lisp_Object start,
   if (!HASH_TABLE_P (read_objects_map)
       || XHASH_TABLE (read_objects_map)->count)
     read_objects_map
-      = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
+      = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None);
   if (!HASH_TABLE_P (read_objects_completed)
       || XHASH_TABLE (read_objects_completed)->count)
     read_objects_completed
-      = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
+      = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None);
 
   if (STRINGP (stream)
       || ((CONSP (stream) && STRINGP (XCAR (stream)))))
