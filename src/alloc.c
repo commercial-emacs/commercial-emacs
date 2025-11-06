@@ -156,7 +156,6 @@ enum _GL_ATTRIBUTE_PACKED sdata_type
 static void unchain_finalizer (struct Lisp_Finalizer *);
 static void mark_terminals (void);
 static void gc_sweep (void);
-static Lisp_Object make_pure_vector (ptrdiff_t);
 static void mark_buffer (struct buffer *);
 
 static void sweep_sdata (struct thread_state *);
@@ -868,15 +867,6 @@ static ptrdiff_t const STRING_BYTES_MAX =
 	 - FLEXSIZEOF (struct sdata, data, 0))
 	& ~(sizeof (EMACS_INT) - 1)));
 
-static void
-init_strings (void)
-{
-  empty_unibyte_string = make_pure_string ("", 0, 0, 0);
-  staticpro (&empty_unibyte_string);
-  empty_multibyte_string = make_pure_string ("", 0, 0, 1);
-  staticpro (&empty_multibyte_string);
-}
-
 #if GC_ASAN_POISON_OBJECTS
 /* Prepare s for denoting a free sdata struct, i.e, poison all bytes
    in the flexible array member, except the first SDATA_OFFSET bytes.
@@ -1069,6 +1059,25 @@ allocate_sdata (struct Lisp_String *s,
   b->data_slot = (sdata *) (next_slot + GC_STRING_OVERRUN_COOKIE_SIZE);
   eassert ((uintptr_t) b->data_slot % alignof (sdata) == 0);
   bytes_since_gc += sdata_nbytes;
+}
+
+static void
+init_strings (void)
+{
+  /* Replicate make_unibyte_string to bootstrap empty string
+     singletons.  */
+  struct Lisp_String *s = static_string_allocator ();
+  s->u.s.intervals = NULL;
+  allocate_sdata (s, 0, 0, false);
+  s->u.s.size_byte = -1;
+  XSETSTRING (empty_unibyte_string, s);
+  staticpro (&empty_unibyte_string);
+
+  s = static_string_allocator ();
+  s->u.s.intervals = NULL;
+  allocate_sdata (s, 0, 0, false);
+  XSETSTRING (empty_multibyte_string, s);
+  staticpro (&empty_multibyte_string);
 }
 
 /* Reallocate multibyte STRING data when a single character is replaced.
@@ -1968,7 +1977,12 @@ allocate_vector_block (void)
 static void
 init_vectors (void)
 {
-  zero_vector = make_pure_vector (0);
+  /* Replicate initialize_vector to bootstrap empty vector
+     singleton.  */
+  struct Lisp_Vector *p = (struct Lisp_Vector *) allocate_vector_block ()->data;
+  ptrdiff_t restbytes = VBLOCK_NBYTES - header_size;
+  add_vector_free_lists (current_thread, ADVANCE (p, header_size), restbytes);
+  zero_vector = make_lisp_ptr (p, Lisp_Vectorlike);
   staticpro (&zero_vector);
 }
 
@@ -3705,20 +3719,6 @@ make_pure_string (const char *data, ptrdiff_t nchars,
   s->u.s.intervals = NULL;
   XSETSTRING (string, s);
   return string;
-}
-
-/* Return a vector with room for LEN Lisp_Objects allocated from
-   pure space.  */
-
-static Lisp_Object
-make_pure_vector (ptrdiff_t len)
-{
-  Lisp_Object new;
-  size_t size = header_size + len * word_size;
-  struct Lisp_Vector *p = pure_alloc (size, 0);
-  XSETVECTOR (new, p);
-  XVECTOR (new)->header.size = len;
-  return new;
 }
 
 static struct pinned_object
