@@ -3889,13 +3889,10 @@ purecopy (Lisp_Object obj)
       struct Lisp_Vector *objp = XVECTOR (obj);
       ptrdiff_t nbytes = vector_nbytes (objp);
       struct Lisp_Vector *vec = pure_alloc (nbytes, 0);
-      register ptrdiff_t i;
       ptrdiff_t size = ASIZE (obj);
       if (size & PSEUDOVECTOR_FLAG)
 	size &= PSEUDOVECTOR_SIZE_MASK;
       memcpy (vec, objp, nbytes);
-      for (i = 0; i < size; ++i)
-	vec->contents[i] = purecopy (vec->contents[i]);
       /* Byte code strings must be pinned.  */
       if (CLOSUREP (obj) && size >= 2 && STRINGP (vec->contents[1])
 	  && !STRING_MULTIBYTE (vec->contents[1]))

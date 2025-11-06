@@ -886,14 +886,12 @@ syms_of_sqlite (void)
   defsubr (&Ssqlite_available_p);
 
   DEFSYM (Qsqlite_error, "sqlite-error");
-  Fput (Qsqlite_error, Qerror_conditions,
-	Fpurecopy_maybe (list2 (Qsqlite_error, Qerror)));
-  Fput (Qsqlite_error, Qerror_message,
-	build_pure_c_string ("Database error"));
+  Fput (Qsqlite_error, Qerror_conditions, list2 (Qsqlite_error, Qerror));
+  Fput (Qsqlite_error, Qerror_message, build_pure_c_string ("Database error"));
 
   DEFSYM (Qsqlite_locked_error, "sqlite-locked-error");
   Fput (Qsqlite_locked_error, Qerror_conditions,
-	Fpurecopy_maybe (list3 (Qsqlite_locked_error, Qsqlite_error, Qerror)));
+	list3 (Qsqlite_locked_error, Qsqlite_error, Qerror));
   Fput (Qsqlite_locked_error, Qerror_message,
 	build_pure_c_string ("Database locked"));
 

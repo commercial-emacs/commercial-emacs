@@ -1076,9 +1076,6 @@ The return value is undefined.  */)
   (register Lisp_Object symbol, Lisp_Object definition, Lisp_Object docstring)
 {
   CHECK_SYMBOL (symbol);
-  if (!KEYMAPP (definition)) /* else immutable and non-copyable */
-    definition = Fpurecopy_maybe (definition);
-
   defalias (symbol, definition);
 
   if (!NILP (docstring))

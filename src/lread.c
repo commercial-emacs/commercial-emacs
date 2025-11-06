@@ -4440,7 +4440,7 @@ it defaults to the value of `obarray'.  */)
 	  xfree (longhand);
 	}
       else
-	tem = intern_driver (Fpurecopy_maybe (string), obarray, tem);
+	tem = intern_driver (string, obarray, tem);
     }
   return tem;
 }
@@ -4871,7 +4871,7 @@ defsubr (union Aligned_Lisp_Subr *aname)
   SET_SYMBOL_FUNC (XSYMBOL (sym), tem);
 #ifdef HAVE_NATIVE_COMP
   eassert (NILP (Vcomp_native_version_dir));
-  Vcomp_subr_list = Fpurecopy_maybe (Fcons (tem, Vcomp_subr_list));
+  Vcomp_subr_list = Fcons (tem, Vcomp_subr_list);
 #endif
 }
 

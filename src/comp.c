@@ -4683,7 +4683,6 @@ load_comp_unit (struct Lisp_Native_Comp_Unit *xunit)
 	  xunit->optimize_qualities
 	    = load_static_obj (xunit, TEXT_OPTIM_QLY_SYM);
 	  xunit->data_vec = load_static_obj (xunit, TEXT_DATA_RELOC_SYM);
-	  xunit->data_vec = Fpurecopy_maybe (xunit->data_vec);
 	  xunit->data_impure_vec
 	    = load_static_obj (xunit, TEXT_DATA_RELOC_IMPURE_SYM);
 	}
