@@ -67,7 +67,7 @@ corresponding to the mode line clicked."
 	(interactive "e")
 	(with-selected-window (posn-window (event-start e))
 	  (describe-current-input-method))))
-    (purify-if-dumping map)))
+    map))
 
 (defvar mode-line-coding-system-map
   (let ((map (make-sparse-keymap)))
@@ -83,7 +83,7 @@ corresponding to the mode line clicked."
 	(interactive "e")
 	(with-selected-window (posn-window (event-start e))
 	  (call-interactively 'set-buffer-file-coding-system))))
-    (purify-if-dumping map))
+    map)
   "Local keymap for the coding-system part of the mode line.")
 
 (defun mode-line-change-eol (event)
@@ -203,11 +203,11 @@ mouse-3: Set coding system"
     (current-input-method
      (:propertize ("" current-input-method-title)
 		  help-echo (concat
-			     ,(purify-if-dumping "Current input method: ")
+			     "Current input method: "
 			     current-input-method
-			     ,(purify-if-dumping "\n\
+			     "\n\
 mouse-2: Disable input method\n\
-mouse-3: Describe current input method"))
+mouse-3: Describe current input method")
 		  local-map ,mode-line-input-method-map
 		  mouse-face mode-line-highlight))
     ,(propertize
@@ -228,7 +228,7 @@ mnemonics of the following coding systems:
 (defvar mode-line-client
   `(:eval
     (if (frame-parameter nil 'client)
-	,(propertize "@" 'help-echo (purify-if-dumping "emacsclient frame"))))
+	,(propertize "@" 'help-echo "emacsclient frame")))
   "Mode line construct for identifying emacsclient frames.")
 ;; Autoload if this file no longer dumped.
 ;;;###autoload
@@ -250,15 +250,15 @@ mnemonics of the following coding systems:
   (list (propertize
 	 "%1*"
 	 'help-echo 'mode-line-read-only-help-echo
-	 'local-map (purify-if-dumping (make-mode-line-mouse-map
-			       'mouse-1
-			       #'mode-line-toggle-read-only))
+	 'local-map (make-mode-line-mouse-map
+		     'mouse-1
+		     #'mode-line-toggle-read-only)
 	 'mouse-face 'mode-line-highlight)
 	(propertize
 	 "%1+"
 	 'help-echo 'mode-line-modified-help-echo
-	 'local-map (purify-if-dumping (make-mode-line-mouse-map
-			       'mouse-1 #'mode-line-toggle-modified))
+	 'local-map (make-mode-line-mouse-map
+		     'mouse-1 #'mode-line-toggle-modified)
 	 'mouse-face 'mode-line-highlight))
   "Mode line construct for displaying whether current buffer is modified.")
 ;;;###autoload
@@ -266,18 +266,18 @@ mnemonics of the following coding systems:
 
 (defvar-local mode-line-remote
   (list (propertize
-	 "%1@"
-	 'mouse-face 'mode-line-highlight
-	 'help-echo (purify-if-dumping (lambda (window _object _point)
- 				(format "%s"
-					(with-selected-window window
-					  (if (stringp default-directory)
-					      (concat
-					       (if (file-remote-p default-directory)
-						   "Current directory is remote: "
-						 "Current directory is local: ")
-					       default-directory)
-					    "Current directory is nil")))))))
+         "%1@"
+         'mouse-face 'mode-line-highlight
+         'help-echo (lambda (window _object _point)
+                      (format "%s"
+                              (with-selected-window window
+                                (if (stringp default-directory)
+                                    (concat
+                                     (if (file-remote-p default-directory)
+                                         "Current directory is remote: "
+                                       "Current directory is local: ")
+                                     default-directory)
+                                  "Current directory is nil"))))))
   "Mode line construct to indicate a remote buffer.")
 ;;;###autoload
 (put 'mode-line-remote 'risky-local-variable t)
@@ -301,7 +301,7 @@ Value is used for `mode-line-frame-identification', which see."
 (defvar mode-line-window-dedicated-keymap
   (let ((map (make-sparse-keymap)))
     (define-key map [mode-line mouse-1] #'toggle-window-dedicated)
-    (purify-if-dumping map)) "\
+    map) "\
 Keymap for what is displayed by `mode-line-window-dedicated'.")
 
 (defun mode-line-window-control ()

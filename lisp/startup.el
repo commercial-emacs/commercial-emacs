@@ -357,7 +357,7 @@ looked for.
 Setting `init-file-user' does not prevent Emacs from loading
 `site-start.el'.  The only way to do that is to use `--no-site-file'.")
 
-(defcustom site-run-file (purify-if-dumping "site-start")
+(defcustom site-run-file "site-start"
   "File containing site-wide run-time initializations.
 This file is loaded at run-time before `user-init-file'.  It contains
 inits that need to be in place for the entire site, but which, due to
@@ -432,9 +432,9 @@ from being initialized."
 (defvar pure-space-overflow nil
   "Non-nil if building Emacs overflowed pure space.")
 
-(defvar pure-space-overflow-message (purify-if-dumping "\
+(defvar pure-space-overflow-message "\
 Warning Warning!!!  Pure space overflow    !!!Warning Warning
-\(See the node Pure Storage in the Lisp manual for details.)\n"))
+\(See the node Pure Storage in the Lisp manual for details.)\n")
 
 (defcustom tutorial-directory
   (file-name-as-directory (expand-file-name "tutorials" data-directory))
@@ -1539,11 +1539,11 @@ Changed settings will be marked as \"CHANGED outside of Customize\"."
 	   `((changed ((t :background ,color)))))
       (put 'cursor 'face-modified t))))
 
-(defcustom initial-scratch-message (purify-if-dumping "\
+(defcustom initial-scratch-message "\
 ;; This buffer is for text that is not saved, and for Lisp evaluation.
 ;; To create a file, visit it with `\\[find-file]' and enter text in its buffer.
 
-")
+"
   "Initial documentation displayed in *scratch* buffer at startup.
 If this is nil, no message will be displayed."
   :type '(choice (text :tag "Message")

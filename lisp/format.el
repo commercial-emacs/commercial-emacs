@@ -66,26 +66,26 @@
 
 (defvar format-alist
   ;; FIXME: maybe each item can be purecopied instead of just the strings.
-  `((text/enriched ,(purify-if-dumping "Extended MIME text/enriched format.")
-		   ,(purify-if-dumping "Content-[Tt]ype:[ \t]*text/enriched")
+  `((text/enriched "Extended MIME text/enriched format."
+		   "Content-[Tt]ype:[ \t]*text/enriched"
 		   enriched-decode enriched-encode t enriched-mode)
-    (plain ,(purify-if-dumping "ISO 8859-1 standard format, no text properties.")
+    (plain "ISO 8859-1 standard format, no text properties."
 	   ;; Plain only exists so that there is an obvious neutral choice in
 	   ;; the completion list.
 	   nil nil nil nil nil)
-    (TeX   ,(purify-if-dumping "TeX (encoding)")
+    (TeX   "TeX (encoding)"
 	   nil
 	   iso-tex2iso iso-iso2tex t nil)
-    (gtex  ,(purify-if-dumping "German TeX (encoding)")
+    (gtex  "German TeX (encoding)"
 	   nil
 	   iso-gtex2iso iso-iso2gtex t nil)
-    (html  ,(purify-if-dumping "HTML/SGML \"ISO 8879:1986//ENTITIES Added Latin 1//EN\" (encoding)")
+    (html  "HTML/SGML \"ISO 8879:1986//ENTITIES Added Latin 1//EN\" (encoding)"
 	   nil
 	   iso-sgml2iso iso-iso2sgml t nil)
-    (rot13 ,(purify-if-dumping "rot13")
+    (rot13 "rot13"
 	   nil
 	   rot13-region rot13-region t nil)
-    (duden ,(purify-if-dumping "Duden Ersatzdarstellung")
+    (duden "Duden Ersatzdarstellung"
 	   nil
 	   ;; FROM-FN used to call the "diac" command which is not widely
 	   ;; available and apparently not under a free software license:
@@ -93,14 +93,14 @@
 	   ;; Reliable round-trip conversion is not possible anyway and
 	   ;; would be by heuristic method, so make it write-only for now.
 	   iso-cvt-write-only iso-iso2duden t nil)
-    (de646 ,(purify-if-dumping "German ASCII (ISO 646)")
+    (de646 "German ASCII (ISO 646)"
 	   nil
-	   ,(purify-if-dumping "iconv -f iso646-de -t utf-8")
-	   ,(purify-if-dumping "iconv -f utf-8 -t iso646-de") t nil)
-    (denet ,(purify-if-dumping "net German")
+	   "iconv -f iso646-de -t utf-8"
+	   "iconv -f utf-8 -t iso646-de" t nil)
+    (denet "net German"
 	   nil
 	   iso-german iso-cvt-read-only t nil)
-    (esnet ,(purify-if-dumping "net Spanish")
+    (esnet "net Spanish"
 	   nil
 	   iso-spanish iso-cvt-read-only t nil))
   "List of information about understood file formats.

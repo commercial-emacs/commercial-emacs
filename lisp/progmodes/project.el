@@ -1522,7 +1522,12 @@ If FILES-ONLY is non-nil, only show the file-visiting buffers."
 
 (defcustom project-kill-buffer-conditions '(t)
   "List of conditions to kill buffers related to a project.
-This list is used by `project-kill-buffers'.
+
+Alas, since fundamental buffers like *Messages* and *scratch* also
+assert a project association, only file-backed buffers ever
+get killed.  This is a bug (fixed by having those buffers stop
+asserting a project).
+
 Each condition is either:
 - t, immediate match
 - a regular expression, to match a buffer name,

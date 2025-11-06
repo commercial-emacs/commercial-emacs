@@ -73,7 +73,7 @@ If nil, truncated messages will just have \"...\" to indicate truncation."
   :version "28.1")
 
 ;;;###autoload
-(defcustom eldoc-minor-mode-string (purify-if-dumping " ElDoc")
+(defcustom eldoc-minor-mode-string " ElDoc"
   "String to display in mode line when ElDoc Mode is enabled; nil for none."
   :type '(choice string (const :tag "None" nil)))
 
@@ -695,6 +695,7 @@ This is meant to be used as a value for `eldoc-documentation-strategy'."
                         nil)))
   t)
 
+(defvaralias 'eldoc-documentation-function 'eldoc-documentation-strategy)
 (defcustom eldoc-documentation-strategy #'eldoc-documentation-default
   "How to collect and display results of `eldoc-documentation-functions'.
 
@@ -742,8 +743,6 @@ all."
                 (function-item eldoc-documentation-enthusiast)
                 (function :tag "Other function"))
   :version "28.1")
-
-(defvaralias 'eldoc-documentation-function 'eldoc-documentation-strategy)
 
 (defun eldoc--supported-p ()
   "Non-nil if an ElDoc function is set for this buffer."

@@ -162,7 +162,7 @@ not the default value itself.
 DEFAULT is stored as SYMBOL's standard value, in SYMBOL's property
 `standard-value'.  At the same time, SYMBOL's property `force-value' is
 set to nil, as the value is no longer rogue."
-  (put symbol 'standard-value (purify-if-dumping (list default)))
+  (put symbol 'standard-value (list default))
   ;; Maybe this option was rogue in an earlier version.  It no longer is.
   (when (get symbol 'force-value)
     (put symbol 'force-value nil))
@@ -203,7 +203,7 @@ set to nil, as the value is no longer rogue."
                  (when (memq value '(permanent permanent-only))
                    (put symbol 'permanent-local t)))
 		((eq keyword :type)
-		 (put symbol 'custom-type (purify-if-dumping value)))
+		 (put symbol 'custom-type value))
 		((eq keyword :options)
 		 (if (get symbol 'custom-options)
 		     ;; Slow safe code to avoid duplicates.
@@ -482,7 +482,7 @@ information."
     (setq members (cdr members)))
   (when doc
     ;; This text doesn't get into DOC.
-    (put symbol 'group-documentation (purify-if-dumping doc)))
+    (put symbol 'group-documentation doc))
   (while args
     (let ((arg (car args)))
       (setq args (cdr args))
@@ -494,7 +494,7 @@ information."
 	  (error "Keyword %s is missing an argument" keyword))
 	(setq args (cdr args))
 	(cond ((eq keyword :prefix)
-	       (put symbol 'custom-prefix (purify-if-dumping value)))
+	       (put symbol 'custom-prefix value))
 	      (t
 	       (custom-handle-keyword symbol keyword value
 				      'custom-group))))))
@@ -581,7 +581,6 @@ Third argument TYPE is the custom option type."
 (defun custom-handle-keyword (symbol keyword value type)
   "For customization option SYMBOL, handle KEYWORD with VALUE.
 Fourth argument TYPE is the custom option type."
-  (setq value (purify-if-dumping value))
   (cond ((eq keyword :group)
 	 (custom-add-to-group value symbol type))
 	((eq keyword :version)
@@ -634,22 +633,22 @@ For other custom types, this has no effect."
   "To the custom option SYMBOL add the link WIDGET."
   (let ((links (get symbol 'custom-links)))
     (unless (member widget links)
-      (put symbol 'custom-links (cons (purify-if-dumping widget) links)))))
+      (put symbol 'custom-links (cons widget links)))))
 
 (defun custom-add-version (symbol version)
   "To the custom option SYMBOL add the version VERSION."
-  (put symbol 'custom-version (purify-if-dumping version)))
+  (put symbol 'custom-version version))
 
 (defun custom-add-package-version (symbol version)
   "To the custom option SYMBOL add the package version VERSION."
-  (put symbol 'custom-package-version (purify-if-dumping version)))
+  (put symbol 'custom-package-version version))
 
 (defun custom-add-load (symbol load)
   "To the custom option SYMBOL add the dependency LOAD.
 LOAD should be either a library file name, or a feature name."
   (let ((loads (get symbol 'custom-loads)))
     (unless (member load loads)
-      (put symbol 'custom-loads (cons (purify-if-dumping load) loads)))))
+      (put symbol 'custom-loads (cons load loads)))))
 
 (defun custom-autoload (symbol load &optional noset)
   "Mark SYMBOL as autoloaded custom variable and add dependency LOAD.

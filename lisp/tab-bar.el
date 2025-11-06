@@ -539,8 +539,8 @@ at the mouse-down event to the position at mouse-up event."
   "S-<wheel-right>" #'tab-bar-move-tab)
 
 (global-set-key [tab-bar]
-                `(menu-item ,(purify-if-dumping "tab bar") ,(make-sparse-keymap)
-                            :filter tab-bar-make-keymap))
+                `(menu-item "tab bar" ,(make-sparse-keymap)
+                  :filter tab-bar-make-keymap))
 
 (defun tab-bar-make-keymap (&optional _ignore)
   "Generate an actual keymap from `tab-bar-map'.

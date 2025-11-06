@@ -2136,7 +2136,7 @@ performance impact when running `add-hook' and `remove-hook'."
     ;; Do the actual addition if necessary
     (unless (member function hook-value)
       (when (stringp function)          ;FIXME: Why?
-	(setq function (purify-if-dumping function)))
+	(setq function function))
       ;; All those `equal' tests performed between functions can end up being
       ;; costly since those functions may be large recursive and even cyclic
       ;; structures, so we index `hook--depth-alist' with `eq'.  (bug#46326)
@@ -5528,7 +5528,7 @@ See also `with-eval-after-load'."
   ;; evaluating it now).
   (let* ((regexp-or-feature
 	  (if (stringp file)
-              (setq file (purify-if-dumping (load-history-regexp file)))
+              (setq file (load-history-regexp file))
             file))
 	 (elt (assoc regexp-or-feature after-load-alist))
          (func
@@ -6647,7 +6647,7 @@ Also, \"-GIT\", \"-CVS\" and \"-NNN\" are treated as snapshot versions."
 
 (defvar package--builtin-versions
   ;; Mostly populated by loaddefs.el.
-  (purify-if-dumping `((emacs . ,(version-to-list emacs-version))))
+  `((emacs . ,(version-to-list emacs-version)))
   "Alist giving the version of each versioned builtin package.
 I.e. each element of the list is of the form (NAME . VERSION) where
 NAME is the package name as a symbol, and VERSION is its version
@@ -7077,6 +7077,7 @@ and return the value found in PLACE instead."
 
 (make-obsolete 'garbage-collection-messages nil "30.1")
 (make-obsolete 'dump-mode nil "30.1")
-(define-obsolete-function-alias 'purecopy #'purify-if-dumping "30.1")
+(define-obsolete-function-alias 'purecopy #'identity "30.1")
+(define-obsolete-function-alias 'purify-if-dumping #'identity "31.1")
 
 ;;; subr.el ends here

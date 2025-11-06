@@ -84,8 +84,7 @@ buffer-locally and add the items you want to it with
 functions.")
 
 (global-set-key [tool-bar]
-		`(menu-item ,(purify-if-dumping "tool bar") ignore
-			    :filter tool-bar-make-keymap))
+		'(menu-item "tool bar" ignore :filter tool-bar-make-keymap))
 
 (declare-function image-mask-p "image.c" (spec &optional frame))
 

@@ -171,92 +171,92 @@ The format is (FUNCTION ARGS...).")
 (define-button-type 'help-function
   :supertype 'help-xref
   'help-function 'describe-function
-  'help-echo (purify-if-dumping "mouse-2, RET: describe this function"))
+  'help-echo "mouse-2, RET: describe this function")
 
 (define-button-type 'help-variable
   :supertype 'help-xref
   'help-function 'describe-variable
-  'help-echo (purify-if-dumping "mouse-2, RET: describe this variable"))
+  'help-echo "mouse-2, RET: describe this variable")
 
 (define-button-type 'help-type
   :supertype 'help-xref
   'help-function #'cl-describe-type
-  'help-echo (purify-if-dumping "mouse-2, RET: describe this type"))
+  'help-echo "mouse-2, RET: describe this type")
 
 (define-button-type 'help-face
   :supertype 'help-xref
   'help-function 'describe-face
-  'help-echo (purify-if-dumping "mouse-2, RET: describe this face"))
+  'help-echo "mouse-2, RET: describe this face")
 
 (define-button-type 'help-coding-system
   :supertype 'help-xref
   'help-function 'describe-coding-system
-  'help-echo (purify-if-dumping "mouse-2, RET: describe this coding system"))
+  'help-echo "mouse-2, RET: describe this coding system")
 
 (define-button-type 'help-input-method
   :supertype 'help-xref
   'help-function 'describe-input-method
-  'help-echo (purify-if-dumping "mouse-2, RET: describe this input method"))
+  'help-echo "mouse-2, RET: describe this input method")
 
 (define-button-type 'help-character-set
   :supertype 'help-xref
   'help-function 'describe-character-set
-  'help-echo (purify-if-dumping "mouse-2, RET: describe this character set"))
+  'help-echo "mouse-2, RET: describe this character set")
 
 ;; Make some more idiosyncratic button types.
 
 (define-button-type 'help-symbol
   :supertype 'help-xref
   'help-function #'describe-symbol
-  'help-echo (purify-if-dumping "mouse-2, RET: describe this symbol"))
+  'help-echo "mouse-2, RET: describe this symbol")
 
 (define-button-type 'help-back
   :supertype 'help-xref
   'help-function #'help-xref-go-back
-  'help-echo (purify-if-dumping "mouse-2, RET: go back to previous help buffer"))
+  'help-echo "mouse-2, RET: go back to previous help buffer")
 
 (define-button-type 'help-forward
   :supertype 'help-xref
   'help-function #'help-xref-go-forward
-  'help-echo (purify-if-dumping "mouse-2, RET: move forward to next help buffer"))
+  'help-echo "mouse-2, RET: move forward to next help buffer")
 
 (define-button-type 'help-info-variable
   :supertype 'help-xref
   ;; the name of the variable is put before the argument to Info
   'help-function (lambda (_a v) (info v))
-  'help-echo (purify-if-dumping "mouse-2, RET: read this Info node"))
+  'help-echo "mouse-2, RET: read this Info node")
 
 (define-button-type 'help-info
   :supertype 'help-xref
   'help-function #'info
-  'help-echo (purify-if-dumping "mouse-2, RET: read this Info node"))
+  'help-echo "mouse-2, RET: read this Info node")
 
 (define-button-type 'help-man
   :supertype 'help-xref
   'help-function #'man
-  'help-echo (purify-if-dumping "mouse-2, RET: read this man page"))
+  'help-echo "mouse-2, RET: read this man page")
 
 (define-button-type 'help-customization-group
   :supertype 'help-xref
   'help-function #'customize-group
-  'help-echo (purify-if-dumping "mouse-2, RET: display this customization group"))
+  'help-echo "mouse-2, RET: display this customization group")
 
 (define-button-type 'help-url
   :supertype 'help-xref
   'help-function #'browse-url
-  'help-echo (purify-if-dumping "mouse-2, RET: view this URL in a browser"))
+  'help-echo "mouse-2, RET: view this URL in a browser")
 
 (define-button-type 'help-customize-variable
   :supertype 'help-xref
   'help-function (lambda (v)
 		   (customize-variable v))
-  'help-echo (purify-if-dumping "mouse-2, RET: customize variable"))
+  'help-echo "mouse-2, RET: customize variable")
 
 (define-button-type 'help-customize-face
   :supertype 'help-xref
   'help-function (lambda (v)
 		   (customize-face v))
-  'help-echo (purify-if-dumping "mouse-2, RET: customize face"))
+  'help-echo "mouse-2, RET: customize face")
 
 (defun help-function-def--button-function (fun &optional file type)
   (or file
@@ -293,7 +293,7 @@ The format is (FUNCTION ARGS...).")
 (define-button-type 'help-function-def
   :supertype 'help-xref
   'help-function #'help-function-def--button-function
-  'help-echo (purify-if-dumping "mouse-2, RET: find function's definition"))
+  'help-echo "mouse-2, RET: find function's definition")
 
 (define-button-type 'help-function-cmacro ; FIXME: Obsolete since 24.4.
   :supertype 'help-xref
@@ -314,7 +314,7 @@ The format is (FUNCTION ARGS...).")
 			     (forward-line 0)
 			   (message "Unable to find location in file")))
 		     (message "Unable to find file")))
-  'help-echo (purify-if-dumping "mouse-2, RET: find function's compiler macro"))
+  'help-echo "mouse-2, RET: find function's compiler macro")
 
 (define-button-type 'help-variable-def
   :supertype 'help-xref
@@ -335,7 +335,7 @@ The format is (FUNCTION ARGS...).")
                                (widen))
                              (goto-char position))
                        (message "Unable to find location in file"))))
-  'help-echo (purify-if-dumping "mouse-2, RET: find variable's definition"))
+  'help-echo "mouse-2, RET: find variable's definition")
 
 (define-button-type 'help-face-def
   :supertype 'help-xref
@@ -356,27 +356,27 @@ The format is (FUNCTION ARGS...).")
                                (widen))
                              (goto-char position))
                        (message "Unable to find location in file"))))
-  'help-echo (purify-if-dumping "mouse-2, RET: find face's definition"))
+  'help-echo "mouse-2, RET: find face's definition")
 
 (define-button-type 'help-package
   :supertype 'help-xref
   'help-function 'describe-package
-  'help-echo (purify-if-dumping "mouse-2, RET: Describe package"))
+  'help-echo "mouse-2, RET: Describe package")
 
 (define-button-type 'help-package-def
   :supertype 'help-xref
   'help-function (lambda (file) (dired file))
-  'help-echo (purify-if-dumping "mouse-2, RET: visit package directory"))
+  'help-echo "mouse-2, RET: visit package directory")
 
 (define-button-type 'help-theme-def
   :supertype 'help-xref
   'help-function #'find-file
-  'help-echo (purify-if-dumping "mouse-2, RET: visit theme file"))
+  'help-echo "mouse-2, RET: visit theme file")
 
 (define-button-type 'help-theme-edit
   :supertype 'help-xref
   'help-function #'customize-create-theme
-  'help-echo (purify-if-dumping "mouse-2, RET: edit this theme file"))
+  'help-echo "mouse-2, RET: edit this theme file")
 
 (define-button-type 'help-dir-local-var-def
   :supertype 'help-xref
@@ -384,7 +384,7 @@ The format is (FUNCTION ARGS...).")
 		   ;; FIXME: this should go to the point where the
 		   ;; local variable was defined.
 		   (find-file file))
-  'help-echo (purify-if-dumping "mouse-2, RET: open directory-local variables file"))
+  'help-echo "mouse-2, RET: open directory-local variables file")
 (define-button-type 'help-news
   :supertype 'help-xref
   'help-function
@@ -393,7 +393,7 @@ The format is (FUNCTION ARGS...).")
         (view-file file)
       (view-file-other-window file))
     (goto-char pos))
-  'help-echo (purify-if-dumping "mouse-2, RET: show corresponding NEWS announcement"))
+  'help-echo "mouse-2, RET: show corresponding NEWS announcement")
 
 ;;;###autoload
 (defun help-mode--add-function-link (str fun)
@@ -445,21 +445,21 @@ Commands:
 ;; similar should be done for widget doc strings, which currently use
 ;; another mechanism.
 
-(defvar help-back-label (purify-if-dumping "[back]")
+(defvar help-back-label "[back]"
   "Label to use by `help-make-xrefs' for the go-back reference.")
 
-(defvar help-forward-label (purify-if-dumping "[forward]")
+(defvar help-forward-label "[forward]"
   "Label to use by `help-make-xrefs' for the go-forward reference.")
 
 (defconst help-xref-symbol-regexp
-  (purify-if-dumping (concat "\\(\\<\\(\\(variable\\|option\\)\\|"  ; Link to var
- 		    "\\(function\\|command\\|call\\)\\|"   ; Link to function
- 		    "\\(face\\)\\|"			   ; Link to face
- 		    "\\(symbol\\|program\\|property\\)\\|" ; Don't link
-		    "\\(source \\(?:code \\)?\\(?:of\\|for\\)\\)\\)"
-		    "[ \t\n]+\\)?"
-                    "\\(\\\\\\+\\)?"
-                    "['`‘]\\(\\(?:\\sw\\|\\s_\\)+\\|`\\)['’]"))
+  (concat "\\(\\<\\(\\(variable\\|option\\)\\|"  ; Link to var
+          "\\(function\\|command\\|call\\)\\|"   ; Link to function
+          "\\(face\\)\\|"                          ; Link to face
+          "\\(symbol\\|program\\|property\\)\\|" ; Don't link
+          "\\(source \\(?:code \\)?\\(?:of\\|for\\)\\)\\)"
+          "[ \t\n]+\\)?"
+          "\\(\\\\\\+\\)?"
+          "['`‘]\\(\\(?:\\sw\\|\\s_\\)+\\|`\\)['’]")
   "Regexp matching doc string references to symbols.
 
 The words preceding the quoted symbol can be used in doc strings to
@@ -474,21 +474,19 @@ when help commands related to multilingual environment (e.g.,
 
 
 (defconst help-xref-info-regexp
-  (purify-if-dumping
-   "\\<[Ii]nfo[ \t\n]+\\(node\\|anchor\\)[ \t\n]+['`‘]\\([^'’]+\\)['’]")
+  "\\<[Ii]nfo[ \t\n]+\\(node\\|anchor\\)[ \t\n]+['`‘]\\([^'’]+\\)['’]"
   "Regexp matching doc string references to an Info node.")
 
 (defconst help-xref-man-regexp
-  (purify-if-dumping
-   "\\<[Mm]an[ \t\n]+page[ \t\n]+\\(?:for[ \t\n]+\\)?['`‘\"]\\([^'’\"]+\\)['’\"]")
+  "\\<[Mm]an[ \t\n]+page[ \t\n]+\\(?:for[ \t\n]+\\)?['`‘\"]\\([^'’\"]+\\)['’\"]"
   "Regexp matching doc string references to a man page.")
 
 (defconst help-xref-customization-group-regexp
-  (purify-if-dumping "\\<[Cc]ustomization[ \t\n]+[Gg]roup[ \t\n]+['`‘]\\([^'’]+\\)['’]")
+  "\\<[Cc]ustomization[ \t\n]+[Gg]roup[ \t\n]+['`‘]\\([^'’]+\\)['’]"
   "Regexp matching doc string references to a customization group.")
 
 (defconst help-xref-url-regexp
-  (purify-if-dumping "\\<[Uu][Rr][Ll][ \t\n]+['`‘]\\([^'’]+\\)['’]")
+  "\\<[Uu][Rr][Ll][ \t\n]+['`‘]\\([^'’]+\\)['’]"
   "Regexp matching doc string references to a URL.")
 
 ;;;###autoload

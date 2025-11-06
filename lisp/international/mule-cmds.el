@@ -168,14 +168,14 @@
 
 ;;; Mule related hyperlinks.
 (defconst help-xref-mule-regexp-template
-  (purify-if-dumping (concat "\\(\\<\\("
-		    "\\(coding system\\)\\|"
-		    "\\(input method\\)\\|"
-		    "\\(character set\\)\\|"
-		    "\\(charset\\)"
-		    "\\)\\s-+\\)?"
-		    ;; Note starting with word-syntax character:
-		    "['`‘]\\(\\sw\\(\\sw\\|\\s_\\)+\\)['’]")))
+  (concat "\\(\\<\\("
+	  "\\(coding system\\)\\|"
+	  "\\(input method\\)\\|"
+	  "\\(character set\\)\\|"
+	  "\\(charset\\)"
+	  "\\)\\s-+\\)?"
+	  ;; Note starting with word-syntax character:
+	  "['`‘]\\(\\sw\\(\\sw\\|\\s_\\)+\\)['’]"))
 
 (defun coding-system-change-eol-conversion (coding-system eol-type)
   "Return a coding system which differs from CODING-SYSTEM in EOL conversion.
@@ -1200,7 +1200,7 @@ Arguments are the same as `set-language-info'."
 	(progn
 	  (setq key-slot (list key))
 	  (setcdr lang-slot (cons key-slot (cdr lang-slot)))))
-    (setcdr key-slot (purify-if-dumping info))
+    (setcdr key-slot info)
     ;; Update the custom-type of `current-language-environment'.
     (put 'current-language-environment 'custom-type
 	 (cons 'choice (mapcar
@@ -1228,10 +1228,8 @@ where to put this language environment in the
 Describe Language Environment and Set Language Environment menus.
 For example, (\"European\") means to put this language environment
 in the European submenu in each of those two menus."
-  (cond ((symbolp lang-env)
-	 (setq lang-env (symbol-name lang-env)))
-	((stringp lang-env)
-	 (setq lang-env (purify-if-dumping lang-env))))
+  (when (symbolp lang-env)
+    (setq lang-env (symbol-name lang-env)))
   (if parents
       (while parents
 	(let (describe-map setup-map parent-symbol parent prompt)
@@ -1440,11 +1438,10 @@ without loading the relevant Quail packages.
 \n(fn INPUT-METHOD LANG-ENV ACTIVATE-FUNC TITLE DESCRIPTION &rest ARGS)"
   (setq lang-env (if (symbolp lang-env)
                      (symbol-name lang-env)
-                   (purify-if-dumping lang-env)))
+                   lang-env))
   (setq input-method (if (symbolp input-method)
                          (symbol-name input-method)
-                       (purify-if-dumping input-method)))
-  (setq args (mapcar #'purify-if-dumping args))
+                       input-method))
   (let ((info (cons lang-env args))
 	(slot (assoc input-method input-method-alist)))
     (if slot
@@ -2255,29 +2252,28 @@ See `set-language-info-alist' for use in programs."
 ;; purecopied, since they're normally used on startup, and probably
 ;; should reflect the facilities of the base Emacs.
 (defconst locale-language-names
-  (purify-if-dumping
-   '(
-     ;; Locale names of the form LANGUAGE[_TERRITORY][.CODESET][@MODIFIER]
-     ;; as specified in the Single Unix Spec, Version 2.
-     ;; LANGUAGE is a language code taken from ISO 639:1988 (E/F)
-     ;; with additions from ISO 639/RA Newsletter No.1/1989;
-     ;; see Internet RFC 2165 (1997-06) and
-     ;; https://www.evertype.com/standards/iso639/iso639-en.html
-     ;; TERRITORY is a country code taken from ISO 3166
-     ;; http://www.din.de/gremien/nas/nabd/iso3166ma/codlstp1/en_listp1.html.
-     ;; CODESET and MODIFIER are implementation-dependent.
+  '(
+    ;; Locale names of the form LANGUAGE[_TERRITORY][.CODESET][@MODIFIER]
+    ;; as specified in the Single Unix Spec, Version 2.
+    ;; LANGUAGE is a language code taken from ISO 639:1988 (E/F)
+    ;; with additions from ISO 639/RA Newsletter No.1/1989;
+    ;; see Internet RFC 2165 (1997-06) and
+    ;; https://www.evertype.com/standards/iso639/iso639-en.html
+    ;; TERRITORY is a country code taken from ISO 3166
+    ;; http://www.din.de/gremien/nas/nabd/iso3166ma/codlstp1/en_listp1.html.
+    ;; CODESET and MODIFIER are implementation-dependent.
 
-     ;; Language names for which there are no locales (yet) are
-     ;; commented out.
+    ;; Language names for which there are no locales (yet) are
+    ;; commented out.
 
-     ;; jasonr comments: MS Windows uses three letter codes for
-     ;; languages instead of the two letter ISO codes that POSIX
-     ;; uses.  In most cases the first two letters are the same, so
-     ;; most of the regexps in locale-language-names work.  Japanese,
-     ;; Chinese, and some others are exceptions, which are listed in the
-     ;; non-standard section at the bottom of locale-language-names, or
-     ;; in the main section, if otherwise we would pick up the wrong
-     ;; entry (because the first matching entry is used).
+    ;; jasonr comments: MS Windows uses three letter codes for
+    ;; languages instead of the two letter ISO codes that POSIX
+    ;; uses.  In most cases the first two letters are the same, so
+    ;; most of the regexps in locale-language-names work.  Japanese,
+    ;; Chinese, and some others are exceptions, which are listed in the
+    ;; non-standard section at the bottom of locale-language-names, or
+    ;; in the main section, if otherwise we would pick up the wrong
+    ;; entry (because the first matching entry is used).
 
     ("aa_DJ" . "Latin-1") ; Afar
     ("aa" . "UTF-8")
@@ -2288,13 +2284,13 @@ See `set-language-info-alist' for use in programs."
     ("arn" . "UTF-8") ; MS-Windows Mapudungun, Mapuche
     ("ar" . "Arabic")
     ("as" . "UTF-8") ; Assamese
-    ; ay Aymara
+                                        ; ay Aymara
     ("az" . "UTF-8") ; Azerbaijani
     ("ba" . "UTF-8") ; Bashkir, Cyrillic script
     ("be" "Belarusian" cp1251) ; Belarusian [Byelorussian until early 1990s]
     ("bg" "Bulgarian" cp1251) ; Bulgarian
-    ; bh Bihari
-    ; bi Bislama
+                                        ; bh Bihari
+                                        ; bi Bislama
     ("bn" "Bengali" utf-8) ; Bengali, Bangla
     ("bo" . "Tibetan")
     ("br" . "Latin-1") ; Breton
@@ -2307,7 +2303,7 @@ See `set-language-info-alist' for use in programs."
     ("da" . "Latin-1") ; Danish
     ("de" "German" iso-8859-1)
     ("dv" . "UTF-8") ; Divehi
-    ; dz Bhutani
+                                        ; dz Bhutani
     ("ee" . "Latin-4") ; Ewe
     ("el" "Greek" iso-8859-7)
     ;; Users who specify "en" explicitly typically want Latin-1, not ASCII.
@@ -2332,28 +2328,28 @@ See `set-language-info-alist' for use in programs."
     ("gez" "Ethiopic" utf-8) ; Geez
     ("gla" . "Latin-9") ; MS-Windows Scots Gaelic
     ("gl" . "Latin-1") ; Gallegan; Galician
-    ; gn Guarani
+                                        ; gn Guarani
     ("gu" "Gujarati" utf-8) ; Gujarati
     ("gv" . "Latin-1") ; Manx Gaelic
-    ; ha Hausa
+                                        ; ha Hausa
     ("he" "Hebrew" iso-8859-8)
     ("hi" "Devanagari" utf-8) ; Hindi
     ("hni_IN" . "UTF-8") ; Chhattisgarhi
     ("hr" "Croatian" iso-8859-2) ; Croatian
     ("hu" . "Latin-2") ; Hungarian
     ("hy" . "UTF-8") ;  Armenian
-    ; ia Interlingua
+                                        ; ia Interlingua
     ("id" . "Latin-1") ; Indonesian
-    ; ie Interlingue
+                                        ; ie Interlingue
     ("ig" . "UTF-8") ; Igbo (Nigeria)
     ("ibo" . "UTF-8") ; MS-Windows Igbo
-    ; ik Inupiak, Inupiaq
+                                        ; ik Inupiak, Inupiaq
     ("is" . "Latin-1") ; Icelandic
     ("it" "Italian" iso-8859-1) ; Italian
-    ; iu Inuktitut
+                                        ; iu Inuktitut
     ("iw" "Hebrew" iso-8859-8)
     ("ja" "Japanese" euc-jp)
-    ; jw Javanese
+                                        ; jw Javanese
     ("kal" . "Latin-1") ; MS-Windows Greenlandic
     ("ka" "Georgian" georgian-ps) ; Georgian
     ("kk" . "UTF-8") ; Kazakh
@@ -2364,31 +2360,31 @@ See `set-language-info-alist' for use in programs."
     ("kn" "Kannada" utf-8)
     ("ko" "Korean" euc-kr)
     ("ks" . "UTF-8") ; Kashmiri
-    ; ku Kurdish
+                                        ; ku Kurdish
     ("kw" . "Latin-1") ; Cornish
     ("ky" . "UTF-8") ; Kirghiz
     ("lao" "Lao" utf-8) ; MS-Windows Lao
     ("la" . "Latin-1") ; Latin
     ("lb" . "Latin-1") ; Luxemburgish
     ("lg" . "Latin-6") ; Ganda, a.k.a. Luganda
-    ; ln Lingala
+                                        ; ln Lingala
     ("lo" "Lao" utf-8) ; Laothian
     ("lt" "Lithuanian" iso-8859-13)
     ("lv" "Latvian" iso-8859-13) ; Latvian, Lettish
-    ; mg Malagasy
+                                        ; mg Malagasy
     ("mi" . "Latin-7") ; Maori
     ("mk" "Cyrillic-ISO" iso-8859-5) ; Macedonian
     ("mlt" . "Latin-3") ; MS-Windows Maltese
     ("ml" "Malayalam" utf-8)
     ("mn" . "UTF-8") ; Mongolian
-    ; mo Moldavian (retired)
+                                        ; mo Moldavian (retired)
     ("mri" . "Latin-7") ; MS-Windows Maori
     ("mr" "Devanagari" utf-8) ; Marathi
     ("ms" . "Latin-1") ; Malay
     ("mt" . "Latin-3") ; Maltese
     ("mym" "Malayalam" utf-8) ; MS-Windows Malayalam
     ("my" "Burmese" utf-8) ; Burmese
-    ; na Nauru
+                                        ; na Nauru
     ("nb" . "Latin-1") ; Norwegian
     ("ne" "Devanagari" utf-8) ; Nepali
     ("nl" "Dutch" iso-8859-1)
@@ -2407,32 +2403,32 @@ See `set-language-info-alist' for use in programs."
     ("pas" . "UTF-8") ; MS-Windows Pashto
     ("pt_BR" "Brazilian Portuguese" iso-8859-1) ; Brazilian Portuguese
     ("pt" . "Latin-1") ; Portuguese
-    ; qu Quechua
+                                        ; qu Quechua
     ("rm" . "Latin-1") ; Rhaeto-Romanic
-    ; rn Kirundi
+                                        ; rn Kirundi
     ("ro" "Romanian" iso-8859-2)
     ("ru_RU.koi8r" "Cyrillic-KOI8" koi8-r)
     ("ru_RU" "Russian" iso-8859-5)
     ("ru_UA" "Russian" koi8-u)
     ("rw" . "UTF-8") ; Kinyarwanda
     ("sa" . "Devanagari") ; Sanskrit
-    ; sd Sindhi
+                                        ; sd Sindhi
     ("se" . "UTF-8") ; Northern Sami
-    ; sg Sangho
+                                        ; sg Sangho
     ("sh" . "Latin-2") ; Serbo-Croatian
     ("si" "Sinhala" utf-8) ; Sinhalese
     ("sid" . "UTF-8") ; Sidamo
     ("sk" "Slovak" iso-8859-2)
     ("sl" "Slovenian" iso-8859-2)
-    ; sm Samoan
-    ; sn Shona
+                                        ; sm Samoan
+                                        ; sn Shona
     ("so_ET" "UTF-8") ; Somali
     ("so" "Latin-1") ; Somali
     ("sq" . "Latin-2") ; Albanian
     ("sr" . "Latin-2") ; Serbian (Latin alphabet)
-    ; ss Siswati
+                                        ; ss Siswati
     ("st" . "Latin-1") ;  Sesotho
-    ; su Sundanese
+                                        ; su Sundanese
     ("sv" "Swedish" iso-8859-1)		; Swedish
     ("sw" . "Latin-1") ; Swahili
     ("taj" "Tajik" koi8-t) ; MS-Windows Tajik w/Cyrillic script
@@ -2449,12 +2445,12 @@ See `set-language-info-alist' for use in programs."
     ("tuk" . "Latin-5") ; MS-Windows Turkmen
     ("tl" . "Latin-1") ; Tagalog
     ("tn" . "Latin-9") ; Setswana, Tswana
-    ; to Tonga
+                                        ; to Tonga
     ("tr" "Turkish" iso-8859-9)
     ("tsn" . "Latin-9") ; MS-Windows Tswana
     ("ts" . "Latin-1") ; Tsonga
     ("tt" . "UTF-8") ; Tatar
-    ; tw Twi
+                                        ; tw Twi
     ("ug" . "UTF-8") ; Uighur
     ("uk" "Ukrainian" koi8-u)
     ("ur" . "UTF-8") ; Urdu
@@ -2462,15 +2458,15 @@ See `set-language-info-alist' for use in programs."
     ("uz" . "Latin-1") ; Uzbek
     ("ve" . "UTF-8") ; Venda
     ("vi" "Vietnamese" utf-8)
-    ; vo Volapuk
+                                        ; vo Volapuk
     ("wa" . "Latin-1") ; Walloon
     ("wo" . "UTF-8") ; Wolof
     ("xh" . "Latin-1") ; Xhosa
     ("yi" . "Windows-1255") ; Yiddish
     ("yo" . "UTF-8") ; Yoruba
-    ; za Zhuang
+                                        ; za Zhuang
     ("zh_HK" . "Chinese-Big5")
-    ; zh_HK/BIG5-HKSCS \
+                                        ; zh_HK/BIG5-HKSCS \
     ("zh_TW" . "Chinese-Big5")
     ("zh_CN.GB2312" "Chinese-GB")
     ("zh_CN.GBK" "Chinese-GBK")
@@ -2511,10 +2507,10 @@ See `set-language-info-alist' for use in programs."
     ("mar" "Devanagari" utf-8) ; MS-Windows Marathi
     ("khm" "Khmer" utf-8) ; MS-Windows Khmer
     ("iri" . "Latin-1") ; MS-Windows Irish Gaelic
-    ; mwk  MS-Windows Mohawk (Canada)
+                                        ; mwk  MS-Windows Mohawk (Canada)
     ("uig" . "UTF-8") ; MS-Windows Uighur
     ("kin" . "UTF-8") ;  MS-Windows Kinyarwanda
-    ))
+    )
   "Alist of locale regexps vs the corresponding languages and coding systems.
 Each element has this form:
   (LOCALE-REGEXP LANG-ENV CODING-SYSTEM)
@@ -2527,18 +2523,17 @@ In this case, LANG-ENV is one of generic language environments for an
 specific encoding such as \"Latin-1\" and \"UTF-8\".")
 
 (defconst locale-charset-language-names
-  (purify-if-dumping
-   '((".*8859[-_]?1\\>" . "Latin-1")
-     (".*8859[-_]?2\\>" . "Latin-2")
-     (".*8859[-_]?3\\>" . "Latin-3")
-     (".*8859[-_]?4\\>" . "Latin-4")
-     (".*8859[-_]?9\\>" . "Latin-5")
-     (".*8859[-_]?14\\>" . "Latin-8")
-     (".*8859[-_]?15\\>" . "Latin-9")
-     (".*utf\\(?:-?8\\)?\\>" . "UTF-8")
-     ;; utf-8@euro exists, so put this last.  (@euro really specifies
-     ;; the currency, rather than the charset.)
-     (".*@euro\\>" . "Latin-9")))
+  '((".*8859[-_]?1\\>" . "Latin-1")
+    (".*8859[-_]?2\\>" . "Latin-2")
+    (".*8859[-_]?3\\>" . "Latin-3")
+    (".*8859[-_]?4\\>" . "Latin-4")
+    (".*8859[-_]?9\\>" . "Latin-5")
+    (".*8859[-_]?14\\>" . "Latin-8")
+    (".*8859[-_]?15\\>" . "Latin-9")
+    (".*utf\\(?:-?8\\)?\\>" . "UTF-8")
+    ;; utf-8@euro exists, so put this last.  (@euro really specifies
+    ;; the currency, rather than the charset.)
+    (".*@euro\\>" . "Latin-9"))
   "List of pairs of locale regexps and charset language names.
 The first element whose locale regexp matches the start of a downcased locale
 specifies the language name whose charset corresponds to that locale.
@@ -2546,34 +2541,33 @@ This language name is used if the locale is not listed in
 `locale-language-names'.")
 
 (defconst locale-preferred-coding-systems
-  (purify-if-dumping
-   '((".*8859[-_]?1\\>" . iso-8859-1)
-     (".*8859[-_]?2\\>" . iso-8859-2)
-     (".*8859[-_]?3\\>" . iso-8859-3)
-     (".*8859[-_]?4\\>" . iso-8859-4)
-     (".*8859[-_]?9\\>" . iso-8859-9)
-     (".*8859[-_]?14\\>" . iso-8859-14)
-     (".*8859[-_]?15\\>" . iso-8859-15)
-     (".*utf\\(?:-?8\\)?" . utf-8)
-     ;; utf-8@euro exists, so put this after utf-8.  (@euro really
-     ;; specifies the currency, rather than the charset.)
-     (".*@euro" . iso-8859-15)
-     ("koi8-?r" . koi8-r)
-     ("koi8-?u" . koi8-u)
-     ("tcvn" . tcvn)
-     ("big5[-_]?hkscs" . big5-hkscs)
-     ("big5" . big5)
-     ("euc-?tw" . euc-tw)
-     ("euc-?cn" . euc-cn)
-     ("gb2312" . gb2312)
-     ("gbk" . gbk)
-     ("gb18030" . gb18030)
-     ("ja.*[._]euc" . japanese-iso-8bit)
-     ("ja.*[._]jis7" . iso-2022-jp)
-     ("ja.*[._]pck" . japanese-shift-jis)
-     ("ja.*[._]sjis" . japanese-shift-jis)
-     ("jpn" . japanese-shift-jis)   ; MS-Windows uses this.
-     ))
+  '((".*8859[-_]?1\\>" . iso-8859-1)
+    (".*8859[-_]?2\\>" . iso-8859-2)
+    (".*8859[-_]?3\\>" . iso-8859-3)
+    (".*8859[-_]?4\\>" . iso-8859-4)
+    (".*8859[-_]?9\\>" . iso-8859-9)
+    (".*8859[-_]?14\\>" . iso-8859-14)
+    (".*8859[-_]?15\\>" . iso-8859-15)
+    (".*utf\\(?:-?8\\)?" . utf-8)
+    ;; utf-8@euro exists, so put this after utf-8.  (@euro really
+    ;; specifies the currency, rather than the charset.)
+    (".*@euro" . iso-8859-15)
+    ("koi8-?r" . koi8-r)
+    ("koi8-?u" . koi8-u)
+    ("tcvn" . tcvn)
+    ("big5[-_]?hkscs" . big5-hkscs)
+    ("big5" . big5)
+    ("euc-?tw" . euc-tw)
+    ("euc-?cn" . euc-cn)
+    ("gb2312" . gb2312)
+    ("gbk" . gbk)
+    ("gb18030" . gb18030)
+    ("ja.*[._]euc" . japanese-iso-8bit)
+    ("ja.*[._]jis7" . iso-2022-jp)
+    ("ja.*[._]pck" . japanese-shift-jis)
+    ("ja.*[._]sjis" . japanese-shift-jis)
+    ("jpn" . japanese-shift-jis)   ; MS-Windows uses this.
+    )
   "List of pairs of locale regexps and preferred coding systems.
 The first element whose locale regexp matches the start of a downcased locale
 specifies the coding system to prefer when using that locale.
@@ -2964,7 +2958,6 @@ See also the documentation of `get-char-code-property' and
 	  (error "Invalid char-table: %s" table))
     (or (stringp table)
 	(error "Not a char-table nor a file name: %s" table)))
-  (if (stringp table) (setq table (purify-if-dumping table)))
   (if (and (stringp table)
            (char-table-p (alist-get name char-code-property-alist)))
       ;; The table is already setup and we're apparently trying to
@@ -2972,7 +2965,7 @@ See also the documentation of `get-char-code-property' and
       ;; Just skip it, in order to work around a recursive load (bug#52945).
       nil
     (setf (alist-get name char-code-property-alist) table)
-    (put name 'char-code-property-documentation (purify-if-dumping docstring))))
+    (put name 'char-code-property-documentation docstring)))
 
 (defvar char-code-property-table
   (make-char-table 'char-code-property-table)
