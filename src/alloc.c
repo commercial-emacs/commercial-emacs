@@ -902,7 +902,7 @@ PER_THREAD_STATIC int check_string_bytes_count;
 void
 check_string_bytes (struct Lisp_String *s, ptrdiff_t nbytes)
 {
-  eassume (PURE_P (s) || pdumper_address_p (s) || ! s->u.s.data
+  eassume (pdumper_address_p (s) || ! s->u.s.data
 	   || nbytes == SDATA_OF_LISP_STRING (s)->nbytes);
 }
 
@@ -1545,7 +1545,7 @@ pin_string (Lisp_Object string)
   unsigned char *data = s->u.s.data;
 
   if (size <= LARGE_STRING_THRESH
-      && !PURE_P (data) && !pdumper_address_p (data)
+      && !pdumper_address_p (data)
       && s->u.s.size_byte != Sdata_Pinned)
     {
       eassert (s->u.s.size_byte == Sdata_Unibyte);
@@ -3562,9 +3562,6 @@ valid_lisp_object_p (Lisp_Object obj)
     return 1;
 
   void *p = XPNTR (obj);
-  if (PURE_P (p))
-    return 1;
-
   if (SYMBOLP (obj) && builtin_lisp_symbol_p (p))
     return ((char *) p - (char *) lispsym) % sizeof lispsym[0] == 0;
 
@@ -3650,8 +3647,6 @@ hash_table_free_bytes (void *p, ptrdiff_t nbytes)
   hash_table_allocated_bytes -= nbytes;
   xfree (p);
 }
-
-EMACS_INT pure[(PURESIZE + sizeof (EMACS_INT) - 1) / sizeof (EMACS_INT)] = {1,};
 
 static struct pinned_object
 {
@@ -4519,9 +4514,6 @@ process_mark_stack (ptrdiff_t base_sp)
       Lisp_Object *objp = mark_stack_pop ();
 
       void *xpntr = XPNTR (*objp);
-      if (PURE_P (xpntr))
-	continue;
-
       switch (XTYPE (*objp))
 	{
 	case Lisp_String:
@@ -4658,8 +4650,7 @@ process_mark_stack (ptrdiff_t base_sp)
 		break;
 	      }
 
-	    if (!PURE_P (XSTRING (ptr->u.s.name)))
-	      gc_process_string (&ptr->u.s.name);
+	    gc_process_string (&ptr->u.s.name);
 
 	    if (ptr->u.s.next)
 	      {
@@ -4771,7 +4762,7 @@ survives_gc_p (Lisp_Object obj)
       emacs_abort ();
     }
 
-  return survives_p || PURE_P (XPNTR (obj));
+  return survives_p;
 }
 
 /* Formerly two functions sweep_conses() and sweep_floats() which

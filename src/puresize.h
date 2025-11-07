@@ -50,32 +50,6 @@ INLINE_HEADER_BEGIN
 #define PURESIZE  (BASE_PURESIZE * PURESIZE_RATIO)
 #endif
 
-extern AVOID pure_write_error (Lisp_Object);
-
-extern EMACS_INT pure[];
-
-/* The puresize_h_* macros are private to this include file.  */
-
-#define puresize_h_PURE_P(ptr) \
-  ((uintptr_t) (ptr) - (uintptr_t) pure <= PURESIZE)
-
-INLINE bool
-PURE_P (void *ptr)
-{
-  return puresize_h_PURE_P (ptr);
-}
-
-/* Signal an error if OBJ is pure.  PTR is OBJ untagged.  */
-
-#define puresize_h_CHECK_IMPURE(obj, ptr) \
-  (PURE_P (ptr) ? pure_write_error (obj) : (void) 0)
-
-INLINE void
-CHECK_IMPURE (Lisp_Object obj, void *ptr)
-{
-  puresize_h_CHECK_IMPURE (obj, ptr);
-}
-
 INLINE_HEADER_END
 
 #endif /* EMACS_PURESIZE_H */
