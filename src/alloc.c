@@ -181,14 +181,6 @@ Lisp_Object const *staticvec[NSTATICS];
 
 int staticidx;
 
-/* Return PTR rounded up to the next multiple of ALIGNMENT.  */
-
-static void *
-pointer_align (void *ptr, int alignment)
-{
-  return (void *) ROUNDUP ((uintptr_t) ptr, alignment);
-}
-
 /* Extract the lisp struct payload of A.  */
 
 static ATTRIBUTE_NO_SANITIZE_UNDEFINED void *
@@ -3660,66 +3652,6 @@ hash_table_free_bytes (void *p, ptrdiff_t nbytes)
 }
 
 EMACS_INT pure[(PURESIZE + sizeof (EMACS_INT) - 1) / sizeof (EMACS_INT)] = {1,};
-
-static void *
-pure_alloc (size_t size, int alignment)
-{
-  /* Initializing nonzero forces into data space, not bss space. */
-  static ptrdiff_t lisp_bytes, non_lisp_bytes;
-  void *result;
-
-  if (alignment == 0)
-    {
-      /* Allocate Lisp object from PURE beginning.  */
-      result = pointer_align ((char *) pure + lisp_bytes, LISP_ALIGNMENT);
-      lisp_bytes = ((char *) result - (char *) pure) + size;
-    }
-  else
-    {
-      /* Allocate non-Lisp object from PURE end.  */
-      ptrdiff_t new_offs = non_lisp_bytes + size;
-      char *addr = (char *) pure + PURESIZE - new_offs;
-      int shim = (intptr_t) addr & (-1 + alignment);
-      non_lisp_bytes = new_offs + shim;
-      result = addr - shim;
-    }
-
-  if (PURESIZE <= lisp_bytes + non_lisp_bytes)
-    emacs_abort ();
-  return result;
-}
-
-/* Return a string allocated in pure space.  DATA is a buffer holding
-   NCHARS characters, and NBYTES bytes of string data.  MULTIBYTE
-   means make the result string multibyte.
-
-   Must get an error if pure storage is full, since if it cannot hold
-   a large string it may be able to hold conses that point to that
-   string; then the string is not protected from gc.  */
-
-Lisp_Object
-make_pure_string (const char *data, ptrdiff_t nchars,
-		  ptrdiff_t nbytes, bool multibyte)
-{
-  static void *pure_nul = NULL;
-  Lisp_Object string;
-  struct Lisp_String *s = pure_alloc (sizeof *s, 0);
-  if (nbytes == 0 && pure_nul != NULL)
-    s->u.s.data = pure_nul;
-  else
-    {
-      s->u.s.data = pure_alloc (nbytes + 1, 0);
-      memcpy (s->u.s.data, data, nbytes);
-      s->u.s.data[nbytes] = '\0';
-      if (nbytes == 0)
-	pure_nul = s->u.s.data;
-    }
-  s->u.s.size = nchars;
-  s->u.s.size_byte = multibyte ? nbytes : Sdata_Unibyte;
-  s->u.s.intervals = NULL;
-  XSETSTRING (string, s);
-  return string;
-}
 
 static struct pinned_object
 {

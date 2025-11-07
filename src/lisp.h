@@ -4157,7 +4157,6 @@ build_unibyte_string (const char *str)
 
 extern Lisp_Object make_multibyte_string (const char *, ptrdiff_t, ptrdiff_t);
 extern Lisp_Object make_event_array (ptrdiff_t, Lisp_Object *);
-extern Lisp_Object make_pure_string (const char *, ptrdiff_t, ptrdiff_t, bool);
 extern void pin_string (Lisp_Object string);
 
 INLINE Lisp_Object
