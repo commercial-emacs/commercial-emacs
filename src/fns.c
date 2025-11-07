@@ -3205,7 +3205,6 @@ ARRAY is a vector, string, char-table, or bool-vector.  */)
       size = SCHARS (array);
       if (size != 0)
 	{
-	  CHECK_IMPURE (array, XSTRING (array));
 	  unsigned char str[MAX_MULTIBYTE_LENGTH];
 	  int len;
 	  if (STRING_MULTIBYTE (array))
@@ -3242,8 +3241,6 @@ DEFUN ("clear-string", Fclear_string, Sclear_string,
   (Lisp_Object string)
 {
   CHECK_STRING (string);
-  CHECK_IMPURE (string, XSTRING (string));
-
   if (STRING_MULTIBYTE (string))
     {
       STRING_SET_CHARS (string, SBYTES (string));
@@ -5035,7 +5032,6 @@ check_mutable_hash_table (Lisp_Object obj, struct Lisp_Hash_Table *h)
 {
   if (!h->mutable)
     signal_error ("hash table test modifies table", obj);
-  eassert (!PURE_P (h));
 }
 
 /* Put an entry into hash table H that associates KEY with VALUE.
