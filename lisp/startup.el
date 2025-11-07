@@ -429,13 +429,6 @@ from being initialized."
 
 (defvar no-blinking-cursor nil)
 
-(defvar pure-space-overflow nil
-  "Non-nil if building Emacs overflowed pure space.")
-
-(defvar pure-space-overflow-message "\
-Warning Warning!!!  Pure space overflow    !!!Warning Warning
-\(See the node Pure Storage in the Lisp manual for details.)\n")
-
 (defcustom tutorial-directory
   (file-name-as-directory (expand-file-name "tutorials" data-directory))
   "Directory containing the Emacs TUTORIAL files."
@@ -1943,8 +1936,6 @@ splash screen in another window."
 	(erase-buffer)
 	(setq default-directory command-line-default-directory)
 	(make-local-variable 'startup-screen-inhibit-startup-screen)
-	(if pure-space-overflow
-	    (insert pure-space-overflow-message))
 	(unless concise
 	  (fancy-splash-head))
 	(dolist (text fancy-startup-text)
@@ -1982,8 +1973,6 @@ splash screen in another window."
       (setq buffer-undo-list t)
       (let ((inhibit-read-only t))
 	(erase-buffer)
-	(if pure-space-overflow
-	    (insert pure-space-overflow-message))
 	(fancy-splash-head)
 	(dolist (text fancy-about-text)
 	  (apply #'fancy-splash-insert text)
@@ -2048,10 +2037,6 @@ splash screen in another window."
       (erase-buffer)
       (setq default-directory command-line-default-directory)
       (setq-local tab-width 8)
-
-      (if pure-space-overflow
-	  (insert pure-space-overflow-message))
-
       ;; The convention for this piece of code is that
       ;; each piece of output starts with one or two newlines
       ;; and does not end with any newlines.
@@ -2370,18 +2355,6 @@ A fancy display is used on graphic displays, normal otherwise."
 (defun command-line-1 (args-left)
   "A subroutine of `command-line'."
   (display-startup-echo-area-message)
-  (when (and pure-space-overflow
-	     (not noninteractive)
-             ;; If we were dumped with pdumper, we don't care about
-             ;; pure-space overflow.
-             (or (not (fboundp 'pdumper-stats))
-                 (null (pdumper-stats))))
-    (display-warning
-     'initialization
-     "Building Emacs overflowed pure space.\
-  (See the node Pure Storage in the Lisp manual for details.)"
-     :warning))
-
   ;; `displayable-buffers' is a list of buffers that may be displayed,
   ;; which includes files parsed from the command line arguments and
   ;; `initial-buffer-choice'.  All of the display logic happens at the
