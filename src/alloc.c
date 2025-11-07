@@ -3562,6 +3562,8 @@ int
 valid_lisp_object_p (Lisp_Object obj)
 {
 #ifdef ENABLE_CHECKING
+  void *p = XPNTR (obj);
+
   if (FIXNUMP (obj))
     return 1;
 
