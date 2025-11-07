@@ -143,7 +143,6 @@ static ptrdiff_t hash_table_allocated_bytes = 0;
 enum _GL_ATTRIBUTE_PACKED sdata_type
 {
   Sdata_Unibyte = -1,
-  Sdata_Pure = -2,
   Sdata_Pinned = -3,
 };
 

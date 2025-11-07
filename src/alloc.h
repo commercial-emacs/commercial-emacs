@@ -14,7 +14,6 @@
 #include "bignum.h"
 #include "dispextern.h"
 #include "intervals.h"
-#include "puresize.h"
 #include "sheap.h"
 #include "sysstdio.h"
 #include "systime.h"
