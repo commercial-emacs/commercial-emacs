@@ -20,6 +20,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include "lisp.h"
+#include "alloc.h"
 #include "blockinput.h"
 #include "sysstdio.h"
 #include "character.h"

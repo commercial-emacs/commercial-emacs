@@ -661,9 +661,6 @@ struct Lisp_Symbol
       /* Declared by defvar or similar, and thus dynamically scoped.  */
       bool_bf declared_special : 1;
 
-      /* Pointed to from purespace and hence can't be GC'd.  */
-      bool_bf pinned : 1;
-
       /* The symbol's name, as a Lisp string.  */
       Lisp_Object name;
 
@@ -1344,9 +1341,7 @@ struct Lisp_String
     struct
     {
       ptrdiff_t size;           /* MSB is used as the markbit.  */
-      ptrdiff_t size_byte;      /* -1 for unibyte strings,
-				   -2 for data in rodata,
-				   -3 for immovable unibyte strings.  */
+      ptrdiff_t size_byte;      /* Sdata_Unibyte, etc. (alloc.c) */
       INTERVAL intervals;	/* Text properties in this string.  */
       unsigned char *data;
     } s;
@@ -1492,13 +1487,6 @@ CHECK_STRING_NULL_BYTES (Lisp_Object string)
 {
   CHECK_TYPE (memchr (SSDATA (string), '\0', SBYTES (string)) == NULL,
 	      Qfilenamep, string);
-}
-
-/* True if STR is immovable (whose data won't move during GC).  */
-INLINE bool
-string_immovable_p (Lisp_Object str)
-{
-  return XSTRING (str)->u.s.size_byte == -3;
 }
 
 /* A regular vector is just a header plus an array of Lisp_Objects.  */

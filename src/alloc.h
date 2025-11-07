@@ -184,4 +184,6 @@ typedef struct sdata
 
 enum { BLOCK_NOT_FOUND = EMACS_INT_MAX };
 
+bool string_immovable_p (Lisp_Object str);
+
 #endif  /* EMACS_ALLOC_H */

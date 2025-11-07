@@ -1471,12 +1471,8 @@ dump_string (struct dump_context *ctx, const struct Lisp_String *string)
   start_object (ctx, &out, sizeof (out));
   DUMP_FIELD_COPY (&out, string, u.s.size);
   DUMP_FIELD_COPY (&out, string, u.s.size_byte);
-  if (string->u.s.size_byte == -2)
-    /* String literal in Emacs rodata.  */
-    write_field_emacs_ptr (ctx, &out, string, &string->u.s.data);
-  else
-    remember_cold_op (ctx, COLD_OP_STRING,
-		      make_lisp_ptr ((void *) string, Lisp_String));
+  remember_cold_op (ctx, COLD_OP_STRING,
+		    make_lisp_ptr ((void *) string, Lisp_String));
 
   dump_off offset = finish_object (ctx, &out, sizeof (out));
   if (string->u.s.intervals)

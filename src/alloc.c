@@ -143,8 +143,14 @@ static ptrdiff_t hash_table_allocated_bytes = 0;
 enum _GL_ATTRIBUTE_PACKED sdata_type
 {
   Sdata_Unibyte = -1,
-  Sdata_Pinned = -3,
+  Sdata_Pinned = -2,
 };
+
+bool
+string_immovable_p (Lisp_Object str)
+{
+  return XSTRING (str)->u.s.size_byte == Sdata_Pinned;
+}
 
 #define MALLOC_PROBE(size)			\
   do {						\
@@ -2588,7 +2594,6 @@ init_symbol (Lisp_Object val, Lisp_Object name)
   p->u.s.interned = SYMBOL_UNINTERNED;
   p->u.s.trapped_write = SYMBOL_UNTRAPPED_WRITE;
   p->u.s.declared_special = false;
-  p->u.s.pinned = false;
   p->u.s.buffer_local_only = false;
   p->u.s.buffer_local_default = Qunbound;
   p->u.s.c_variable = (lispfwd) { NULL };
@@ -3560,7 +3565,6 @@ valid_lisp_object_p (Lisp_Object obj)
   if (FIXNUMP (obj))
     return 1;
 
-  void *p = XPNTR (obj);
   if (SYMBOLP (obj) && builtin_lisp_symbol_p (p))
     return ((char *) p - (char *) lispsym) % sizeof lispsym[0] == 0;
 
@@ -3646,12 +3650,6 @@ hash_table_free_bytes (void *p, ptrdiff_t nbytes)
   hash_table_allocated_bytes -= nbytes;
   xfree (p);
 }
-
-static struct pinned_object
-{
-  Lisp_Object object;
-  struct pinned_object *next;
-} *pinned_objects;
 
 DEFUN ("purify-if-dumping", Fpurecopy_maybe, Spurecopy_maybe, 1, 1, 0,
        doc: /* Monnier's half-measure to reduce pdump footprint.  */)
@@ -3802,15 +3800,6 @@ compact_undo_list (Lisp_Object list)
 	prev = xcdr_addr (tail);
     }
   return list;
-}
-
-static void
-mark_pinned_objects (void)
-{
-  for (struct pinned_object *pobj = pinned_objects;
-       pobj != NULL;
-       pobj = pobj->next)
-    mark_object (&pobj->object);
 }
 
 static void
@@ -4342,7 +4331,6 @@ garbage_collect (void)
 
   eassert (weak_hash_tables == NULL && mark_stack_empty_p ());
   mark_most_objects ();
-  mark_pinned_objects ();
   mark_lread ();
   mark_terminals ();
   mark_kboards ();
