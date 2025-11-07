@@ -1607,19 +1607,9 @@ form of CONDITIONS."
   "Return list of buffers in project PR to kill.
 What buffers should or should not be killed is described
 in `project-kill-buffer-conditions'."
-  (let ((base-project (when-let ((default-directory
-                                  (file-name-as-directory (getenv "PWD"))))
-                        (project-current)))
-        (normalize (lambda (f) (expand-file-name (file-name-as-directory f)))))
-    (seq-filter (lambda (b)
-                  (project--buffer-check b project-kill-buffer-conditions))
-                ;; heinous hack to avoid killing scratch, messages, etc.
-                (seq-filter (if (equal (funcall normalize (project-root pr))
-                                       (and base-project
-                                            (funcall normalize (project-root base-project))))
-                                #'buffer-file-name
-                              #'identity)
-                            (project-buffers pr)))))
+  (seq-filter (lambda (b)
+                (project--buffer-check b project-kill-buffer-conditions))
+              (project-buffers pr)))
 
 ;;;###autoload
 (defun project-kill-buffers (&optional no-confirm)

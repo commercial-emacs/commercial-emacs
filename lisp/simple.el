@@ -10582,6 +10582,7 @@ If it does not exist, create it and switch it to `messages-buffer-mode'."
   (or (get-buffer "*Messages*")
       (with-current-buffer (get-buffer-create "*Messages*")
         (messages-buffer-mode)
+        (setq-local project-current-directory-override "/")
         (current-buffer))))
 
 
@@ -10810,13 +10811,12 @@ too short to have a dst element.
   "Return the *scratch* buffer, creating a new one if needed."
   (or (get-buffer "*scratch*")
       (let ((scratch (get-buffer-create "*scratch*")))
-        ;; Don't touch the buffer contents or mode unless we know that
-        ;; we just created it.
         (with-current-buffer scratch
           (when initial-scratch-message
             (insert (substitute-command-keys initial-scratch-message))
             (set-buffer-modified-p nil))
-          (funcall initial-major-mode))
+          (funcall initial-major-mode)
+          (setq-local project-current-directory-override "/"))
         scratch)))
 
 (defun scratch-buffer ()
