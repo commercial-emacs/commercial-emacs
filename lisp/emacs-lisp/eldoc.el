@@ -23,26 +23,12 @@
 
 ;;; Commentary:
 
-;; This program was inspired by the behavior of the "mouse documentation
-;; window" on many Lisp Machine systems; as you type a function's symbol
-;; name as part of a sexp, it will print the argument list for that
-;; function.  Behavior is not identical; for example, you need not actually
-;; type the function name, you need only move point around in a sexp that
-;; calls it.  Also, if point is over a documented variable, it will print
-;; the one-line documentation for that variable instead, to remind you of
-;; that variable's meaning.
+;; Show function signature.  Show variable docstring.
 
-;; This mode is now enabled by default in all major modes that provide
-;; support for it, such as `emacs-lisp-mode'.
-;; This is controlled by `global-eldoc-mode'.
-
-;; Major modes for other languages may use ElDoc by adding an
-;; appropriate function to the buffer-local value of
+;; Major modes need to add a backend to buffer-local
 ;; `eldoc-documentation-functions'.
 
 ;;; Code:
-
-(eval-when-compile (require 'cl-lib))
 
 (defgroup eldoc nil
   "Show function arglist or variable docstring in echo area."
@@ -50,69 +36,50 @@
   :group 'extensions)
 
 (defcustom eldoc-idle-delay 0.50
-  "Number of seconds of idle time to wait before displaying documentation.
-If user input arrives before this interval of time has elapsed after the
-last input event, no documentation will be displayed.
-
-If this variable is set to 0, display the documentation without any delay."
+  "Number of idle seconds before displaying.  Can be 0."
   :type 'number)
 
 (defcustom eldoc-print-after-edit nil
-  "If non-nil, eldoc info is only shown after editing commands.
-Changing the value requires toggling `eldoc-mode'."
+  "Only activate for commands with edit-sounding regexp, e.g., insert."
   :type 'boolean
   :version "24.4")
 
 (defcustom eldoc-echo-area-display-truncation-message t
-  "If non-nil, provide verbose help when a message has been truncated.
-When this is non-nil, and the documentation string was truncated to
-fit in the echo-area, the documentation will be followed by an
-explanation of how to display the full documentation text.
-If nil, truncated messages will just have \"...\" to indicate truncation."
+  "Instruct how to unhide truncated help (in lieu of trailing ellipsis)."
   :type 'boolean
   :version "28.1")
 
 ;;;###autoload
 (defcustom eldoc-minor-mode-string " ElDoc"
-  "String to display in mode line when ElDoc Mode is enabled; nil for none."
+  "Minor mode's so-called lighter; nil for none."
   :type '(choice string (const :tag "None" nil)))
 
 (defcustom eldoc-argument-case #'identity
-  "Case to display argument names of functions, as a symbol.
-This has two preferred values: `upcase' or `downcase'.
-Actually, any name of a function which takes a string as an argument and
-returns another string is acceptable.
+  "Function accepts argument name string and returns a string.
 
-Note that this variable has no effect, unless
-`eldoc-documentation-strategy' handles it explicitly."
+A suitable value would be `upcase` or `downcase`.
+Used by default `eldoc-documentation-function'."
   :type '(radio (function-item upcase)
 		(function-item downcase)
                 function))
 (make-obsolete-variable 'eldoc-argument-case nil "25.1")
 
 (defcustom eldoc-echo-area-use-multiline-p 'truncate-sym-name-if-fit
-  "Allow long ElDoc doc strings to resize echo area display.
-If the value is t, never attempt to truncate messages, even if the
-echo area must be resized to fit.  In that case, Emacs will resize
-the mini-window up to the limit set by `max-mini-window-height'.
+  "How display should accommodate long docstrings.
 
-If the value is a positive number, it is used to calculate a
-number of screen lines of documentation that ElDoc is allowed to
-put in the echo area.  A positive integer specifies the maximum
-number of lines directly, while a floating-point number specifies
-the number of screen lines as a fraction of the echo area frame's
-height.
+If nil, merely truncate to fit on a single line.
 
-If the value is the symbol `truncate-sym-name-if-fit', the part of
-the doc string that represents a symbol's name may be truncated
-if it will enable the rest of the doc string to fit on a single
-line, without resizing the echo area.
+If t, do not truncate.  Resize the echo area up to
+`max-mini-window-height'.
 
-If the value is nil, a doc string is always truncated to fit in a
-single screen line of echo-area display.
+If a positive integer, specifies the maximum number of lines the
+echo area can expand.
 
-Any resizing of the echo area additionally respects
-`max-mini-window-height'."
+If a positive float, specifies the maximum height of the expanded echo
+area as a fraction of frame height.
+
+If the symbol \\='truncate-sym-name-if-fit, the documented symbol is
+truncated if the resulting docstring fits on a single line."
   :type '(radio (const   :tag "Always" t)
                 (float   :tag "Fraction of frame height" 0.25)
                 (integer :tag "Number of lines" 5)
@@ -122,12 +89,12 @@ Any resizing of the echo area additionally respects
  line" truncate-sym-name-if-fit)))
 
 (defcustom eldoc-echo-area-prefer-doc-buffer nil
-  "Prefer ElDoc's documentation buffer if it is displayed in some window.
-If this variable's value is t, ElDoc will skip showing
-documentation in the echo area if the dedicated documentation
-buffer (displayed by `eldoc-doc-buffer') is already displayed in
-some window.  If the value is the symbol `maybe', then the echo area
-is only skipped if the documentation needs to be truncated there."
+  "Prefer ElDoc's dedicated buffer over the echo area.
+
+If t, shunt display to an extant `eldoc-doc-buffer' (but don't create
+it).
+
+If \\=`maybe, behave as t only if truncation is required."
   :type '(choice (const :tag "Prefer ElDoc's documentation buffer" t)
                  (const :tag "Prefer echo area" nil)
                  (const :tag "Skip echo area if truncating" maybe))
@@ -135,9 +102,9 @@ is only skipped if the documentation needs to be truncated there."
 
 (defface eldoc-highlight-function-argument
   '((t (:inherit bold)))
-  "Face used for the argument at point in a function's argument list.
-Note that this face has no effect unless the `eldoc-documentation-strategy'
-handles it explicitly.")
+  "Face for the function argument at point.
+
+Used by the default `eldoc-documentation-function'.")
 
 ;;; No user options below here.
 
@@ -695,8 +662,8 @@ This is meant to be used as a value for `eldoc-documentation-strategy'."
                         nil)))
   t)
 
-(defvaralias 'eldoc-documentation-function 'eldoc-documentation-strategy)
-(defcustom eldoc-documentation-strategy #'eldoc-documentation-default
+(defvaralias 'eldoc-documentation-strategy 'eldoc-documentation-function)
+(defcustom eldoc-documentation-function #'eldoc-documentation-default
   "How to collect and display results of `eldoc-documentation-functions'.
 
 This variable controls how to call the functions in the special hook
