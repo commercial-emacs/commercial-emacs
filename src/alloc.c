@@ -1990,6 +1990,7 @@ init_vectors (void)
   ptrdiff_t restbytes = VBLOCK_NBYTES - header_size;
   add_vector_free_lists (current_thread, ADVANCE (p, header_size), restbytes);
   zero_vector = make_lisp_ptr (p, Lisp_Vectorlike);
+  XVECTOR (zero_vector)->header.size = 0;
   staticpro (&zero_vector);
 }
 
