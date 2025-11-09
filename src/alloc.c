@@ -186,16 +186,6 @@ Lisp_Object const *staticvec[NSTATICS];
 
 int staticidx;
 
-/* Return PTR rounded up to the next multiple of ALIGNMENT.  */
-
-#ifndef USE_ALIGNED_ALLOC
-static void *
-pointer_align (void *ptr, int alignment)
-{
-  return (void *) ROUNDUP ((uintptr_t) ptr, alignment);
-}
-#endif
-
 /* Extract the lisp struct payload of A.  */
 
 static ATTRIBUTE_NO_SANITIZE_UNDEFINED void *
@@ -241,6 +231,13 @@ static_assert (BLOCK_ALIGN % sizeof (void *) == 0
 static_assert (malloc_laligned ()
 	|| (LISP_ALIGNMENT % sizeof (void *) == 0
 	    && POWER_OF_2 (LISP_ALIGNMENT / sizeof (void *))));
+#else /* !defined USE_ALIGNED_ALLOC */
+/* Return PTR rounded up to the next multiple of ALIGNMENT.  */
+static void *
+pointer_align (void *ptr, int alignment)
+{
+  return (void *) ROUNDUP ((uintptr_t) ptr, alignment);
+}
 #endif
 
 static inline bool
