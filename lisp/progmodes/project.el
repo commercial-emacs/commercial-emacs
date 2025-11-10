@@ -2164,7 +2164,8 @@ is part of the default mode line beginning with Emacs 30."
 (dolist (name (split-string "*scratch* *Messages*"))
   (when-let ((b (get-buffer name)))
     (with-current-buffer b
-      (setq-local project-current-directory-override "/"))))
+      (setq-local project-current-directory-override "/")
+      (put 'project-current-directory-override 'permanent-local t))))
 
 (provide 'project)
 ;;; project.el ends here

@@ -10583,7 +10583,8 @@ If it does not exist, create it and switch it to `messages-buffer-mode'."
       (with-current-buffer (get-buffer-create "*Messages*")
         (messages-buffer-mode)
         (when (boundp 'project-current-directory-override)
-          (setq-local project-current-directory-override "/"))
+          (setq-local project-current-directory-override "/")
+          (put 'project-current-directory-override 'permanent-local t))
         (current-buffer))))
 
 
@@ -10818,7 +10819,8 @@ too short to have a dst element.
             (set-buffer-modified-p nil))
           (funcall initial-major-mode)
           (when (boundp 'project-current-directory-override)
-            (setq-local project-current-directory-override "/")))
+            (setq-local project-current-directory-override "/")
+            (put 'project-current-directory-override 'permanent-local t)))
         scratch)))
 
 (defun scratch-buffer ()
