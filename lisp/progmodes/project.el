@@ -2161,5 +2161,10 @@ is part of the default mode line beginning with Emacs 30."
         'help-echo "mouse-1: Project menu"
         'local-map project-mode-line-map)))))
 
+(dolist (name (split-string "*scratch* *Messages*"))
+  (when-let ((b (get-buffer name)))
+    (with-current-buffer b
+      (setq-local project-current-directory-override "/"))))
+
 (provide 'project)
 ;;; project.el ends here
