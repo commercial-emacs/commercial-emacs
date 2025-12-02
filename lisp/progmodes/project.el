@@ -2162,7 +2162,8 @@ is part of the default mode line beginning with Emacs 30."
         'local-map project-mode-line-map)))))
 
 (dolist (name (split-string "*scratch* *Messages*"))
-  (when-let ((b (get-buffer name)))
+  (when-let ((b (get-buffer name))
+             (interactive-p (not noninteractive)))
     (with-current-buffer b
       (setq-local project-current-directory-override "/")
       (put 'project-current-directory-override 'permanent-local t))))
