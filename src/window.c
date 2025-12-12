@@ -6513,8 +6513,6 @@ scroll_command (Lisp_Object window, Lisp_Object n, int direction)
     {
       SET_PT_BOTH (marker_position (w->pointm),
                    marker_byte_position (w->pointm));
-      SET_PT_BOTH (marker_position (w->old_pointm),
-                   marker_byte_position (w->old_pointm));
     }
 
   if (NILP (n))
