@@ -16944,6 +16944,7 @@ window_start_acceptable_p (Lisp_Object window, ptrdiff_t startp)
   return true;
 }
 
+
 static void
 restore_point (const struct text_pos pt, const modiff_count modiff)
 {
@@ -16956,6 +16957,7 @@ restore_point (const struct text_pos pt, const modiff_count modiff)
   else
     TEMP_SET_PT_BOTH (CHARPOS (pt), CHAR_TO_BYTE (CHARPOS (pt)));
 }
+
 
 /* Redisplay leaf window WINDOW.
 
@@ -16992,7 +16994,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
   struct buffer *wbuffer = XBUFFER (w->contents);
   struct text_pos opoint, wpoint, wstart;
 
-  int tem, rc, frame_line_height, margin, centering_position = -1;
+  int tem, centering_position = -1;
   bool used_current_matrix_p = false;
   bool temp_scroll_step = false;
   bool last_line_misfit = false;
@@ -17012,8 +17014,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
   eassert (XMARKER (w->pointm)->buffer == wbuffer);
 
   reconsider_clip_changes (w);
-  frame_line_height = default_line_height (w);
-  margin = window_scroll_margin (w, MARGIN_IN_LINES);
+  int frame_line_height = default_line_height (w);
+  int margin = window_scroll_margin (w, MARGIN_IN_LINES);
 
   bool update_mode_line = (w->update_mode_line
 			   || update_mode_lines
@@ -17378,20 +17380,21 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
      not moved off the frame, and we are not retrying after hscroll.
      (current_matrix_up_to_date_p is true when retrying.)  */
   if (current_matrix_up_to_date_p
-      && (rc = try_cursor_movement (window, wstart, &temp_scroll_step),
-	  rc != CURSOR_MOVEMENT_CANNOT_BE_USED))
+      && (tem = try_cursor_movement (window, wstart, &temp_scroll_step),
+	  tem != CURSOR_MOVEMENT_CANNOT_BE_USED))
     {
-      switch (rc)
+      switch (tem)
 	{
 	case CURSOR_MOVEMENT_SUCCESS:
 	  used_current_matrix_p = true;
 	  goto done;
-
+	  break;
 	case CURSOR_MOVEMENT_MUST_SCROLL:
 	  goto try_to_scroll;
-
+	  break;
 	default:
 	  emacs_abort ();
+	  break;
 	}
     }
   /* If current starting point was originally the beginning of a line
