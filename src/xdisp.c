@@ -11761,17 +11761,17 @@ gui_consider_frame_title (Lisp_Object frame)
        || update_mode_lines == REDISPLAY_SOME))
 
 static bool
-needs_no_redisplay (struct window *w)
+needs_redisplay (struct window *w)
 {
   struct buffer *buffer = XBUFFER (w->contents);
   struct frame *f = XFRAME (w->frame);
-  return (REDISPLAY_SOME_P ()
-          && !w->redisplay
-          && !w->update_mode_line
-          && !f->face_change
-          && !f->redisplay
-          && !buffer->text->redisplay
-          && window_point (w) == w->last_point);
+  return (!REDISPLAY_SOME_P ()
+          || w->redisplay
+          || w->update_mode_line
+          || f->face_change
+          || f->redisplay
+          || buffer->text->redisplay
+          || window_point (w) != w->last_point);
 }
 
 /* Prepare for redisplay by updating menu-bar item lists when
@@ -11795,7 +11795,7 @@ prepare_menu_bars (void)
 	      struct window *w = XWINDOW (this);
 	      /* Cf. conditions for redisplaying a window at the
 		 beginning of redisplay_window.  */
-	      if (!needs_no_redisplay (w))
+	      if (needs_redisplay (w))
 		windows = Fcons (this, windows);
 	    }
 	}
@@ -16994,7 +16994,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
   void *itdata = NULL;
   modiff_count lchars_modiff = CHARS_MODIFF, ochars_modiff = lchars_modiff;
 
-  if (NILP (all) && needs_no_redisplay (w))
+  if (NILP (all) && !needs_redisplay (w))
     return Qnil;
 
   SET_TEXT_POS (lpoint, PT, PT_BYTE);
