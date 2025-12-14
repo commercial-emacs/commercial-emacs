@@ -217,9 +217,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #define DISP_INFINITY 10000000
 
-/* Holds the list (error).  */
-static Lisp_Object list_of_error;
-
 #ifdef HAVE_WINDOW_SYSTEM
 
 /* Test if overflow newline into fringe.  Called with iterator IT
@@ -572,8 +569,8 @@ void
 wset_update_mode_line (struct window *w)
 {
   w->update_mode_line = true;
-  /* Ensure `redisplay_window' gets called so that
-     `gui_consider_frame_title' can update the frame title bar.  */
+  /* Ensure redisplay_window gets called so that
+     gui_consider_frame_title can update the frame title bar.  */
   wset_redisplay (w);
 }
 
@@ -740,10 +737,8 @@ static void echo_area_display (bool);
 static void block_buffer_flips (void);
 static void unblock_buffer_flips (void);
 static void redisplay_windows (Lisp_Object);
-static void redisplay_window (Lisp_Object, bool);
+static Lisp_Object redisplay_window (Lisp_Object, Lisp_Object);
 static Lisp_Object redisplay_window_error (Lisp_Object);
-static Lisp_Object redisplay_window_0 (Lisp_Object);
-static Lisp_Object redisplay_window_1 (Lisp_Object);
 static bool move_cursor (struct window *, struct glyph_row *,
 			 struct glyph_matrix *, ptrdiff_t, ptrdiff_t,
 			 int, int);
@@ -10968,7 +10963,7 @@ resize_mini_window (struct window *w, bool exact_p)
 	      int last_line_y = bottom_y - unit_y;
 	      init_iterator (&it, w, ZV, ZV_BYTE, NULL, DEFAULT_FACE_ID);
 	      move_it_dy (&it, -1 * last_line_y);
-              /* Prevent `redisplay_window' overriding window-start.  */
+              /* Prevent redisplay_window overriding window-start.  */
               w->start_at_line_beg = false;
               SET_MARKER_FROM_TEXT_POS (w->start, it.position);
             }
@@ -15033,20 +15028,20 @@ redisplay_internal (void)
     {
       sf->inhibit_clear_image_cache = true;
       displayed_buffer = XBUFFER (XWINDOW (selected_window)->contents);
-      /* Use list_of_error, not Qerror, so that
-	 we catch only errors and don't run the debugger.  */
-      internal_condition_case_1 (redisplay_window_1, selected_window,
-				 list_of_error,
-				 redisplay_window_error);
-      if (update_miniwindow_p)
-	internal_condition_case_1 (redisplay_window_1,
-				   FRAME_MINIBUF_WINDOW (sf), list_of_error,
-				   redisplay_window_error);
+      if (displayed_buffer->display_error_modiff < BUF_MODIFF (displayed_buffer))
+	{
+	  internal_condition_case_2 (redisplay_window, selected_window, Qnil,
+				     Qt, redisplay_window_error);
+	  if (update_miniwindow_p)
+	    internal_condition_case_2 (redisplay_window,
+				       FRAME_MINIBUF_WINDOW (sf), Qnil,
+				       Qt, redisplay_window_error);
+	}
 
       /* Compare desired and current matrices, perform output.  */
 
     update:
-      /* If fonts changed, display again.  Likewise if redisplay_window_1
+      /* If fonts changed, display again.  Likewise if redisplay_window
 	 above caused some change (e.g., a change in faces) that requires
 	 considering the entire frame again.  */
       if (sf->fonts_changed || sf->redisplay)
@@ -15426,11 +15421,9 @@ redisplay_windows (Lisp_Object window)
       else if (BUFFERP (w->contents))
 	{
 	  displayed_buffer = XBUFFER (w->contents);
-	  /* Use list_of_error, not Qerror, so that
-	     we catch only errors and don't run the debugger.  */
-	  internal_condition_case_1 (redisplay_window_0, window,
-				     list_of_error,
-				     redisplay_window_error);
+	  if (displayed_buffer->display_error_modiff < BUF_MODIFF (displayed_buffer))
+	    internal_condition_case_2 (redisplay_window, window, Qt,
+				       Qt, redisplay_window_error);
 	}
 
       window = w->next;
@@ -15438,28 +15431,11 @@ redisplay_windows (Lisp_Object window)
 }
 
 static Lisp_Object
-redisplay_window_error (Lisp_Object ignore)
+redisplay_window_error (Lisp_Object /* ignore */)
 {
   displayed_buffer->display_error_modiff = BUF_MODIFF (displayed_buffer);
   return Qnil;
 }
-
-static Lisp_Object
-redisplay_window_0 (Lisp_Object window)
-{
-  if (displayed_buffer->display_error_modiff < BUF_MODIFF (displayed_buffer))
-    redisplay_window (window, false);
-  return Qnil;
-}
-
-static Lisp_Object
-redisplay_window_1 (Lisp_Object window)
-{
-  if (displayed_buffer->display_error_modiff < BUF_MODIFF (displayed_buffer))
-    redisplay_window (window, true);
-  return Qnil;
-}
-
 
 /* Set cursor position of W.  Point is assumed to be within ROW.
    Adding DELTA takes position from rowspace to bufferspace.
@@ -16411,9 +16387,6 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
   else
     {
       /* Maybe forget recorded base line for line number display.  */
-      /* FIXME: Why do we need this?  `try_scrolling` can only be called from
-         `redisplay_window` which should have flushed this cache already when
-         needed.  */
       if (!BASE_LINE_NUMBER_VALID_P (w))
 	w->base_line_number = 0;
 
@@ -16971,8 +16944,7 @@ window_start_acceptable_p (Lisp_Object window, ptrdiff_t startp)
   return true;
 }
 
-/* Redisplay leaf window WINDOW.  JUST_THIS_ONE_P means only
-   selected_window is redisplayed.
+/* Redisplay leaf window WINDOW.
 
    Updating window-start (stored in w->start marker) needs to
    consider:
@@ -16997,8 +16969,8 @@ window_start_acceptable_p (Lisp_Object window, ptrdiff_t startp)
 
  */
 
-static void
-redisplay_window (Lisp_Object window, bool just_this_one_p)
+static Lisp_Object
+redisplay_window (Lisp_Object window, Lisp_Object all)
 {
   struct window *w = XWINDOW (window);
   struct frame *f = XFRAME (w->frame);
@@ -17022,11 +16994,11 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   void *itdata = NULL;
   modiff_count lchars_modiff = CHARS_MODIFF, ochars_modiff = lchars_modiff;
 
+  if (NILP (all) && needs_no_redisplay (w))
+    return Qnil;
+
   SET_TEXT_POS (lpoint, PT, PT_BYTE);
   opoint = lpoint;
-
-  if (!just_this_one_p && needs_no_redisplay (w))
-    return;
 
   /* Make sure that both W's markers are valid.  */
   eassert (XMARKER (w->start)->buffer == buffer);
@@ -17036,15 +17008,13 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   frame_line_height = default_line_height (w);
   margin = window_scroll_margin (w, MARGIN_IN_LINES);
 
-  /* Has the mode line to be updated?  */
   update_mode_line = (w->update_mode_line
 		      || update_mode_lines
 		      || buffer->clip_changed
 		      || buffer->prevent_redisplay_optimizations_p);
 
-  if (!just_this_one_p)
-    /* If `just_this_one_p' is set, we apparently set must_be_updated_p more
-       cleverly elsewhere.  */
+  if (!NILP (all))
+    /* Else this is set true more cleverly elsewhere.  */
     w->must_be_updated_p = true;
 
   if (MINI_WINDOW_P (w))
@@ -17068,15 +17038,10 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 		  In that case, redisplay the window normally.  */
 	       && !NILP (Fmemq (w->contents, Vminibuffer_list)))
 	{
-	  /* W is a mini-buffer window, but it's not active, so clear
-	     it.  */
+	  /* Inactive minibuffer, so clear it.  */
 	  int yb = window_text_bottom_y (w);
-	  struct glyph_row *row;
-	  int y;
-
-	  for (y = 0, row = w->desired_matrix->rows;
-	       y < yb;
-	       y += row->height, ++row)
+	  struct glyph_row *row = w->desired_matrix->rows;
+	  for (int y = 0; y < yb; y += row->height, ++row)
 	    blank_row (w, row, y);
 	  goto finish_scroll_bars;
 	}
@@ -17091,12 +17056,11 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       clear_glyph_matrix (w->desired_matrix);
     }
 
-  /* Otherwise set up data on this window; select its buffer and point
-     value.  */
-  /* Really select the buffer, for the sake of buffer-local
-     variables.  */
   set_buffer_internal (XBUFFER (w->contents));
-
+  SET_TEXT_POS (opoint, PT, PT_BYTE);
+  ochars_modiff = CHARS_MODIFF;
+  beg_unchanged = BEG_UNCHANGED;
+  end_unchanged = END_UNCHANGED;
   current_matrix_up_to_date_p
     = (w->window_end_valid
        && !current_buffer->clip_changed
@@ -17104,12 +17068,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
        && !window_outdated (w)
        && !composition_break_at_point
        && !hscrolling_current_line_p (w));
-
-  beg_unchanged = BEG_UNCHANGED;
-  end_unchanged = END_UNCHANGED;
-
-  SET_TEXT_POS (opoint, PT, PT_BYTE);
-  ochars_modiff = CHARS_MODIFF;
 
   specbind (Qinhibit_point_motion_hooks, Qt);
 
@@ -17552,7 +17510,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
     {
       /* The function returns -1 if new fonts were loaded, 1 if
 	 successful, 0 if not successful.  */
-      int ss = try_scrolling (window, just_this_one_p,
+      int ss = try_scrolling (window, !NILP (all),
 			      ((scroll_minibuffer_conservatively
 			        && MINI_WINDOW_P (w))
 			       ? SCROLL_LIMIT + 1
@@ -17690,7 +17648,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       /* Don't use try_window_reusing_current_matrix in this case
 	 because it can have changed the buffer.  */
       || !NILP (Vwindow_scroll_functions)
-      || !just_this_one_p
+      || !NILP (all)
       || MINI_WINDOW_P (w)
       || !(used_current_matrix_p
 	   = try_window_reusing_current_matrix (w)))
@@ -17858,7 +17816,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  if (a) the window to its side is being redone and
 	  (b) we do a frame-based redisplay.  This is a consequence
 	  of how inverted lines are drawn in frame-based redisplay.  */
-       || (!just_this_one_p
+       || (!NILP (all)
 	   && !FRAME_WINDOW_P (f)
 	   && !WINDOW_FULL_WIDTH_P (w))
        /* Line number to display.  */
@@ -17981,7 +17939,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   gui_update_window_border (w);
 
   if (FRAME_WINDOW_P (f)
-      && update_window_fringes (w, (just_this_one_p
+      && update_window_fringes (w, (!NILP (all)
 				    || (!used_current_matrix_p && !overlay_arrow_seen)
 				    || w->pseudo_window_p)))
     {
@@ -18035,9 +17993,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
     TEMP_SET_PT_BOTH (Z, Z_BYTE);
   else if (ochars_modiff == CHARS_MODIFF)
     TEMP_SET_PT_BOTH (CHARPOS (opoint), BYTEPOS (opoint));
-  else
-    /* For fear character and byte pos mis-corresponds for redisplay
-       race conditions (display_mode_lines).  */
+  else /* EZ hack to reassert char-byte correspondence. */
     TEMP_SET_PT_BOTH (CHARPOS (opoint), CHAR_TO_BYTE (CHARPOS (opoint)));
   set_buffer_internal (old);
 
@@ -18051,7 +18007,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	TEMP_SET_PT_BOTH (CHARPOS (lpoint), CHAR_TO_BYTE (CHARPOS (lpoint)));
     }
 
-  unbind_to (count, Qnil);
+  return unbind_to (count, Qnil);
 }
 
 
@@ -33319,9 +33275,6 @@ be let-bound around code that needs to disable messages temporarily. */);
   DEFSYM (Qdrag_with_tab_line, "drag-with-tab-line");
 
   DEFSYM (Qinhibit_free_realized_faces, "inhibit-free-realized-faces");
-
-  list_of_error = list1 (list2 (Qerror, Qvoid_variable));
-  staticpro (&list_of_error);
 
   /* Values of those variables at last redisplay are stored as
      properties on 'overlay-arrow-position' symbol.  However, if
