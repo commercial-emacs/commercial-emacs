@@ -1187,6 +1187,9 @@ command_loop (void)
       Vreal_this_command = cmd;
       safe_run_hooks (Qpre_command_hook);
 
+      /* Restore scroll point to window point.  */
+      XWINDOW (selected_window)->scroll_pointm = XWINDOW (selected_window)->pointm;
+
       /* Conclude undo amalgamation, if any.  */
       if (!EQ (Vthis_command, KVAR (current_kboard, Vlast_command)))
 	Fundo_boundary ();
