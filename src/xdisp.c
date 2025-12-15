@@ -14681,8 +14681,7 @@ redisplay_internal (void)
       /* Ensure recorded data applies.  */
       && static_sline_buffer == current_buffer
       && match_p
-      && !w->force_start
-      && !w->optional_new_start
+      && w->start_instruct == WINDOW_START_NONE
       /* Point must be on line with recorded data.  */
       && PT >= CHARPOS (tlbufpos)
       && PT <= Z - CHARPOS (tlendpos)
@@ -15310,7 +15309,6 @@ mark_window_display_accurate_1 (struct window *w, bool accurate_p)
 	       || MATRIX_ROW_VPOS (row, w->current_matrix) == 0)))
 	w->window_end_valid = true;
       w->update_mode_line = false;
-      w->preserve_vscroll_p = false;
     }
 
   w->redisplay = !accurate_p;
@@ -16972,16 +16970,6 @@ restore_point (const struct text_pos pt, const modiff_count modiff)
       previous window-start position.  In that case, we try to salvage
       what we can from the current glyph matrix by calling
       try_scrolling.
-
-    . Some Emacs command could force us to use a specific window-start
-      position by setting the force_start flag or optional_new_start
-      flag.  If the specified start does not allow point to be
-      displayed, or if new fonts need to be loaded, we abort and defer
-      to the next redisplay cycle.  Note that the force_start flag can
-      be set by redisplay itself, e.g., when it decides that the
-      previous window start point is fine and should be kept.  Search
-      for "goto force_start" below to see the details.
-
  */
 
 static Lisp_Object
@@ -17065,7 +17053,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       clear_glyph_matrix (w->desired_matrix);
     }
 
-  set_buffer_internal (XBUFFER (w->contents));
+  set_buffer_internal (XBUFFER (w->contents)); /* !!! */
   SET_TEXT_POS (wpoint, PT, PT_BYTE);
   wchars_modiff = CHARS_MODIFF;
   const ptrdiff_t beg_unchanged = BEG_UNCHANGED;
@@ -17101,46 +17089,38 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
   if (mode_line_update_needed (w))
     update_mode_line = true;
 
-  /* Point refers normally to the selected window.  For any other
-     window, set up appropriate value.  */
   if (!EQ (window, selected_window))
     {
-      ptrdiff_t new_pt = marker_position (w->pointm);
-      ptrdiff_t new_pt_byte = marker_byte_position (w->pointm);
+      /* Pretend global PT is WINDOW's for the duration.  */
+      ptrdiff_t pt = marker_position (w->pointm);
+      ptrdiff_t pt_byte = marker_byte_position (w->pointm);
 
-      if (new_pt < BEGV)
+      if (pt < BEGV)
 	{
-	  new_pt = BEGV;
-	  new_pt_byte = BEGV_BYTE;
+	  pt = BEGV;
+	  pt_byte = BEGV_BYTE;
 	  set_marker_both (w->pointm, Qnil, BEGV, BEGV_BYTE);
 	}
-      else if (new_pt > (ZV - 1))
+      else if (pt >= ZV)
 	{
-	  new_pt = ZV;
-	  new_pt_byte = ZV_BYTE;
+	  pt = ZV;
+	  pt_byte = ZV_BYTE;
 	  set_marker_both (w->pointm, Qnil, ZV, ZV_BYTE);
 	}
 
-      /* We don't use SET_PT so that the point-motion hooks don't run.  */
-      TEMP_SET_PT_BOTH (new_pt, new_pt_byte);
+      TEMP_SET_PT_BOTH (pt, pt_byte);
     }
 
-  /* If any of the character widths specified in the display table
-     have changed, invalidate the width run cache.  It's true that
-     this may be a bit late to catch such changes, but the rest of
-     redisplay goes (non-fatally) haywire when the display table is
-     changed, so why should we worry about doing any better?  */
+  /* 1991 Blandy complained redisplay went "haywire" without this.  */
   if (current_buffer->width_run_cache
       || (current_buffer->base_buffer
 	  && current_buffer->base_buffer->width_run_cache))
     {
       struct Lisp_Char_Table *disptab = buffer_display_table ();
-
-      if (!disptab_matches_widthtab
-	  (disptab, XVECTOR (BVAR (current_buffer, width_table))))
+      if (!disptab_matches_widthtab (disptab, XVECTOR (BVAR (current_buffer,
+							     width_table))))
         {
 	  struct buffer *buf = current_buffer;
-
 	  if (buf->base_buffer)
 	    buf = buf->base_buffer;
           invalidate_region_cache (buf, buf->width_run_cache, BEG, Z);
@@ -17148,37 +17128,32 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
         }
     }
 
-  /* If window-start is screwed up, choose a new one.  */
-  if (XMARKER (w->start)->buffer != current_buffer)
-    goto recenter;
+  /* Remove this Blandyism.  */
+  eassert (XMARKER (w->start)->buffer == current_buffer);
 
   SET_TEXT_POS_FROM_MARKER (wstart, w->start);
 
   /* If someone specified a new starting point but did not insist,
      check whether it can be used.  */
-  if ((w->optional_new_start || window_frozen_p (w))
+  if ((w->start_instruct == WINDOW_START_CONSIDER_BESPOKE || window_frozen_p (w))
       && CHARPOS (wstart) >= BEGV
       && CHARPOS (wstart) <= ZV)
     {
-      ptrdiff_t it_charpos;
-
-      w->optional_new_start = false;
+      w->start_instruct = WINDOW_START_NONE;
       start_move_it (&it, w, wstart);
       move_it_forward (&it, PT, it.last_visible_y, MOVE_TO_POS | MOVE_TO_Y, NULL);
-      it_charpos = IT_CHARPOS (it);
-      /* Make sure we set the force_start flag only if the cursor row
-	 will be fully visible.  Otherwise, the code under force_start
-	 label below will try to move point back into view, which is
-	 not what the code which sets optional_new_start wants.  */
-      if ((it.current_y == 0
-	   || line_bottom_y (it, last_height) < it.last_visible_y)
-	  && !w->force_start)
+      ptrdiff_t it_charpos = IT_CHARPOS (it);
+      /* Set start_instruct only if the cursor row is wholly visible.
+	 Otherwise, we'll move point back into view, which contravenes
+	 optional_new_start's intent.  */
+      if (it.current_y == 0
+	  || line_bottom_y (it, last_height) < it.last_visible_y)
 	{
 	  if (it_charpos == PT)
-	    w->force_start = true;
+	    w->start_instruct = WINDOW_START_BESPOKE;
 	  /* IT may overshoot PT if text at PT is invisible.  */
 	  else if (it_charpos > PT && CHARPOS (wstart) <= PT)
-	    w->force_start = true;
+	    w->start_instruct = WINDOW_START_BESPOKE;
 	}
     }
 
@@ -17186,33 +17161,28 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
     /* Forget any recorded base line for line number display.  */
     w->base_line_number = 0;
 
- force_start:
+ bespoke_start:
 
   /* Handle case where place to start displaying has been specified,
      unless the specified location is outside the accessible range.  */
-  if (w->force_start)
+  if (w->start_instruct == WINDOW_START_BESPOKE)
     {
+      w->start_instruct = WINDOW_START_NONE;
+
       /* We set this later on if we have to adjust point.  */
       int new_y = -1;
 
-      w->force_start = false;
-
-      /* The vscroll should be preserved in this case, since
-	 `pixel-scroll-precision-mode' must continue working normally
-	 when a mini-window is resized.  (bug#55312) */
-      if (!w->preserve_vscroll_p && !window_frozen_p (w))
+      if (!window_frozen_p (w))
 	w->vscroll = 0;
 
-      w->preserve_vscroll_p = false;
       w->window_end_valid = false;
 
       /* Redisplay the mode line.  Select the buffer properly for that.
-	 Also, run the hook window-scroll-functions
-	 because we have scrolled.  */
-      /* Note, we do this after clearing force_start because
-	 if there's an error, it is better to forget about force_start
-	 than to get into an infinite loop calling the hook functions
-	 and having them get more errors.  */
+	 Also, run the hook window-scroll-functions because we have
+	 scrolled. Note, we do this after clearing start_instruct
+	 because if there's an error, it is better to forget about
+	 start_instruct than to get into an infinite loop calling the
+	 hook functions and having them get more errors.  */
       if (!update_mode_line || !NILP (Vwindow_scroll_functions))
 	{
 	  update_mode_line = true;
@@ -17231,14 +17201,15 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	goto ignore_start;
 
       /* Redisplay, then check if cursor has been set during the
-	 redisplay.  Give up if new fonts were loaded.  */
-      /* We used to issue a CHECK_MARGINS argument to try_window here,
-	 but this causes scrolling to fail when point begins inside
-	 the scroll margin (bug#148) -- cyd  */
+	 redisplay.  Give up if new fonts were loaded.  We used to issue
+	 a CHECK_MARGINS argument to try_window here, but this causes
+	 scrolling to fail when point begins inside the scroll margin
+	 (bug#148) -- cyd
+      */
       clear_glyph_matrix (w->desired_matrix);
       if (!try_window (window, wstart, 0))
 	{
-	  w->force_start = true;
+	  w->start_instruct = WINDOW_START_BESPOKE;
 	  clear_glyph_matrix (w->desired_matrix);
 	  goto need_larger_matrices;
 	}
@@ -17341,11 +17312,11 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  move_cursor (w, row, w->desired_matrix, 0, 0, 0, 0);
 
 	  /* Re-run pre-redisplay-function so it can update the region
-	     according to the new position of point.  */
-	  /* Other than the cursor, w's redisplay is done so we can set its
-	     redisplay to false.  Also the buffer's redisplay can be set to
-	     false, since propagate_buffer_redisplay should have already
-	     propagated its info to `w' anyway.  */
+	     according to the new position of point. Other than the
+	     cursor, W's redisplay is done so we can set its redisplay
+	     to false.  Also the buffer's redisplay can be set to false,
+	     since propagate_buffer_redisplay should have already
+	     propagated its info to W anyway.  */
 	  w->redisplay = false;
 	  XBUFFER (w->contents)->text->redisplay = false;
 	  dsafe_calln (true, Vpre_redisplay_function, Fcons (window, Qnil));
@@ -17447,9 +17418,9 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
              in which case we accept that it is partially visible.  */
           && (rtop != 0) == (rbot != 0))
 	{
-	  w->force_start = true;
+	  w->start_instruct = WINDOW_START_BESPOKE;
 	  SET_TEXT_POS_FROM_MARKER (wstart, w->start);
-	  goto force_start;
+	  goto bespoke_start;
       	}
 
       /* Try to redisplay starting at same place as before.

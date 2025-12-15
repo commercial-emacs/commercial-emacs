@@ -394,7 +394,7 @@ define pwinx
     printf "invalid"
   end
   printf " vscroll=%d", $w->vscroll
-  if ($w->force_start != 0)
+  if ($w->start_instruct != 0)
     printf " FORCE_START"
   end
   if ($w->must_be_updated_p)

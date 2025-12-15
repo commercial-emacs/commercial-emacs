@@ -1265,7 +1265,7 @@ should be a member of WINDOWS, starts at position START."
 
 ;;; Avoid tail recenter
 
-;; This sets the window internal flag `force_start'. The effect is
+;; This sets the window internal flag `start_instruct'. The effect is
 ;; that windows only displaying the tail aren't recentered.
 ;;
 ;; A window displaying only the tail, is a window whose window-start

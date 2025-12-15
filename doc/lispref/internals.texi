@@ -2436,17 +2436,13 @@ selected; when it is not selected, it retains its previous value.
 @item old_pointm
 The value of @code{pointm} at the last redisplay time.
 
-@item force_start
+@item start_instruct
 If this flag is non-@code{nil}, it says that the window has been
 scrolled explicitly by the Lisp program, and the value of the
 window's @code{start} was set for redisplay to honor.  This affects
 what the next redisplay does if point is off the screen: instead of
 scrolling the window to show the text around point, it moves point to
 a location that is on the screen.
-
-@item optional_new_start
-This is similar to @code{force_start}, but the next redisplay will
-only obey it if point stays visible.
 
 @item start_at_line_beg
 Non-@code{nil} means current value of @code{start} was the beginning of a line

@@ -97,6 +97,13 @@ struct cursor_pos
   int hpos, vpos;
 };
 
+enum window_start_on_redisplay
+  {
+    WINDOW_START_NONE,
+    WINDOW_START_BESPOKE,
+    WINDOW_START_CONSIDER_BESPOKE
+  };
+
 struct window
   {
     /* This is for Lisp; the terminal code does not refer to it.  */
@@ -384,19 +391,13 @@ struct window
        was last updated.  */
     bool_bf last_had_star : 1;
 
-    /* True means current value of `start'
+    /* True means current value of window start
        was the beginning of a line when it was chosen.  */
     bool_bf start_at_line_beg : 1;
 
-    /* True means next redisplay must use the value of start
-       set up for it in advance.  Set by scrolling commands.  */
-    bool_bf force_start : 1;
-
-    /* True means we have explicitly changed the value of start,
-       but that the next redisplay is not obliged to use the new value.
-       This is used in Fdelete_other_windows to force a call to
-       Vwindow_scroll_functions; also by Frecenter with argument.  */
-    bool_bf optional_new_start : 1;
+    /* Indicate to redisplay if start was calculated beforehand.  Set by
+       scrolling commands.  */
+    enum window_start_on_redisplay start_instruct;
 
     /* True means the cursor is currently displayed.  This can be
        set to zero by functions overpainting the cursor image.  */
@@ -441,10 +442,6 @@ struct window
     /* True if auto hscrolling is currently suspended in this
        window.  */
     bool_bf suspend_auto_hscroll : 1;
-
-    /* True if vscroll should be preserved while forcing the start due
-       to a frozen window.  */
-    bool_bf preserve_vscroll_p : 1;
 
     /* Amount by which lines of this window are scrolled in
        y-direction (smooth scrolling).  */

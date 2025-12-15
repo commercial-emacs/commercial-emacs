@@ -1154,9 +1154,9 @@ command_loop (void)
 
       /* By clearing UNCHANGED, redisplay updates entire window
          in case previous command forced a specific window-start.  */
-      if (XWINDOW (selected_window)->force_start) {
+      if (XWINDOW (selected_window)->start_instruct == WINDOW_START_BESPOKE) {
         struct buffer *b;
-        XWINDOW (selected_window)->force_start = 0;
+        XWINDOW (selected_window)->start_instruct = WINDOW_START_NONE;
         b = XBUFFER (XWINDOW (selected_window)->contents);
         BUF_BEG_UNCHANGED (b) = BUF_END_UNCHANGED (b) = 0;
       }

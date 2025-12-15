@@ -1953,7 +1953,7 @@ set by `set-window-vscroll' and by scrolling functions.  */)
   /* This is not right, but much easier than doing what is right.  */
   w->start_at_line_beg = false;
   if (NILP (noforce))
-    w->force_start = true;
+    w->start_instruct = WINDOW_START_BESPOKE;
   wset_update_mode_line (w);
   /* Bug#15957.  */
   w->window_end_valid = false;
@@ -3617,11 +3617,11 @@ window-start value is reasonable when this function is called.  */)
 				    || FETCH_BYTE (pos.bytepos - 1) == '\n');
 	  /* We need to do this, so that the window-scroll-functions
 	     get called.  */
-	  w->optional_new_start = true;
+	  if (w->start_instruct == WINDOW_START_NONE)
+	    w->start_instruct = WINDOW_START_CONSIDER_BESPOKE;
 
 	  /* Reset the vscroll, as redisplay will not.  */
 	  w->vscroll = 0;
-	  w->preserve_vscroll_p = false;
 
 	  set_buffer_internal (obuf);
 	}
@@ -4268,7 +4268,7 @@ set_window_buffer (Lisp_Object window, Lisp_Object buffer,
 			     make_fixnum (b->last_window_start),
 			     buffer);
       w->start_at_line_beg = false;
-      w->force_start = false;
+      w->start_instruct = WINDOW_START_NONE;
       /* Flush the base_line cache since it applied to another buffer.  */
       w->base_line_number = 0;
     }
@@ -5762,9 +5762,7 @@ static void
 window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-
   n = clip_to_bounds (INT_MIN, n, INT_MAX);
-
   wset_redisplay (XWINDOW (window));
 
   if (whole && fast_but_imprecise_scrolling)
@@ -5778,9 +5776,7 @@ window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
     window_scroll_line_based (window, n, whole, noerror);
 
   unbind_to (count, Qnil);
-
-  /* Bug#15957.  */
-  XWINDOW (window)->window_end_valid = false;
+  XWINDOW (window)->window_end_valid = false; /* Bug#15957.  */
 }
 
 /* Compute scroll margin for WINDOW.
@@ -5827,13 +5823,13 @@ static void
 window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 {
   struct it it;
+  void *itdata = NULL;
   struct window *w = XWINDOW (window);
   struct text_pos start;
   int this_scroll_margin;
   /* True if we fiddled the window vscroll field without really scrolling.  */
   bool vscrolled = false;
   int x, y, rtop, rbot, rowh, vpos;
-  void *itdata = NULL;
   int frame_line_height = default_line_height (w);
   bool adjust_old_pointm = !NILP (Fequal (Fwindow_point (window),
 					  Fwindow_old_point (window)));
@@ -5934,9 +5930,9 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 					 w->contents);
 		  w->start_at_line_beg = true;
 		  wset_update_mode_line (w);
-		  /* Set force_start so that redisplay_window will run the
+		  /* Set start_instruct so that redisplay_window will run the
 		     window-scroll-functions.  */
-		  w->force_start = true;
+		  w->start_instruct = WINDOW_START_BESPOKE;
 		  return;
 		}
 	    }
@@ -6093,7 +6089,6 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	}
 
       /* If control gets here, then we vscrolled.  */
-
       XBUFFER (w->contents)->prevent_redisplay_optimizations_p = true;
 
       /* Don't try to change the window start below.  */
@@ -6119,9 +6114,9 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       bytepos = marker_byte_position (w->start);
       w->start_at_line_beg = (pos == BEGV || FETCH_BYTE (bytepos - 1) == '\n');
       wset_update_mode_line (w);
-      /* Set force_start so that redisplay_window will run the
+      /* Set start_instruct so that redisplay_window will run the
 	 window-scroll-functions.  */
-      w->force_start = true;
+      w->start_instruct = WINDOW_START_BESPOKE;
     }
 
   /* The rest of this function uses current_y in a nonstandard way,
@@ -6287,7 +6282,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 
   if (adjust_old_pointm)
     Fset_marker (w->old_pointm,
-		 ((w == XWINDOW (selected_window))
+		 (w == XWINDOW (selected_window)
 		  ? make_fixnum (BUF_PT (XBUFFER (w->contents)))
 		  : Fmarker_position (w->pointm)),
 		 w->contents);
@@ -6373,9 +6368,9 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
       set_marker_restricted_both (w->start, w->contents, pos, pos_byte);
       w->start_at_line_beg = !NILP (bolp);
       wset_update_mode_line (w);
-      /* Set force_start so that redisplay_window will run
+      /* Set start_instruct so that redisplay_window will run
 	 the window-scroll-functions.  */
-      w->force_start = true;
+      w->start_instruct = WINDOW_START_BESPOKE;
 
       if (!NILP (Vscroll_preserve_screen_position)
 	  && this_scroll_margin == 0
@@ -6481,48 +6476,34 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
 static void
 scroll_command (Lisp_Object window, Lisp_Object n, int direction)
 {
-  struct window *w;
-  bool other_window;
-  specpdl_ref count = SPECPDL_INDEX ();
-
   eassert (eabs (direction) == 1);
+  specpdl_ref count = SPECPDL_INDEX ();
+  // bool mwheel_scroll = EQ (Vthis_command, Qmwheel_scroll);
 
-  w = XWINDOW (window);
-  other_window = !EQ (window, selected_window);
-
-  /* If given window's buffer isn't current, make it current for the
-     moment.  If the window's buffer is the same, but it is not the
-     selected window, we need to save-excursion to avoid affecting
-     point in the selected window (which would cause the selected
-     window to scroll).  Don't screw up if window_scroll gets an
-     error.  */
-  if (other_window || XBUFFER (w->contents) != current_buffer)
+  if (!EQ (window, selected_window))
     {
       record_unwind_protect_excursion ();
-      if (XBUFFER (w->contents) != current_buffer)
-	Fset_buffer (w->contents);
+      set_buffer_internal (XBUFFER (XWINDOW (window)->contents));
+      /* mirror local pointm to global PT.  */
+      SET_PT_BOTH (marker_position (XWINDOW (window)->pointm),
+		   marker_byte_position (XWINDOW (window)->pointm));
     }
-
-  if (other_window)
-    {
-      SET_PT_BOTH (marker_position (w->pointm),
-                   marker_byte_position (w->pointm));
-    }
+  else
+    eassert (XBUFFER (XWINDOW (window)->contents) == current_buffer);
 
   if (NILP (n))
     window_scroll (window, direction, true, false);
   else if (EQ (n, Qminus))
     window_scroll (window, -direction, true, false);
   else
-    {
-      n = Fprefix_numeric_value (n);
-      window_scroll (window, XFIXNUM (n) * direction, false, false);
-    }
+    window_scroll (window, XFIXNUM (Fprefix_numeric_value (n)) * direction,
+		   false, false);
 
-  if (other_window)
+  if (!EQ (window, selected_window))
     {
-      set_marker_both (w->pointm, Qnil, PT, PT_BYTE);
-      set_marker_both (w->old_pointm, Qnil, PT, PT_BYTE);
+      /* mirror back global PT to local pointm (then unbind_to PT).  */
+      set_marker_both (XWINDOW (window)->pointm, Qnil, PT, PT_BYTE);
+      set_marker_both (XWINDOW (window)->old_pointm, Qnil, PT, PT_BYTE);
     }
 
   unbind_to (count, Qnil);
@@ -6930,14 +6911,10 @@ and redisplay normally--don't erase and redraw the frame.  */)
   /* Set the new window start.  */
   set_marker_both (w->start, w->contents, charpos, bytepos);
 
-  /* The window start was calculated with an iterator already adjusted
-     by the existing vscroll, so w->start must not be combined with
-     retaining the existing vscroll, which redisplay will not reset if
-     w->preserve_vscroll_p is enabled.  (bug#70386) */
   w->vscroll = 0;
-  w->preserve_vscroll_p = false;
   w->window_end_valid = false;
-  w->optional_new_start = true;
+  if (w->start_instruct == WINDOW_START_NONE)
+    w->start_instruct = WINDOW_START_CONSIDER_BESPOKE;
 
   w->start_at_line_beg = (bytepos == BEGV_BYTE
 			  || FETCH_BYTE (bytepos - 1) == '\n');
@@ -7023,12 +7000,7 @@ from the top of the window.  */)
       Fvertical_motion (make_fixnum (- (height / 2)), window, Qnil);
       set_marker_both (w->start, w->contents, PT, PT_BYTE);
       w->start_at_line_beg = !NILP (Fbolp ());
-      w->force_start = true;
-
-      /* Since `Fvertical_motion' computes coordinates after vscroll is
-         applied, it is taken into account in POS, and vscroll must be
-         reset by `force_start' in `redisplay_internal'.  */
-      w->preserve_vscroll_p = false;
+      w->start_instruct = WINDOW_START_BESPOKE;
     }
   else
     Fgoto_char (w->start);
@@ -8370,10 +8342,9 @@ corresponds to an integral number of pixels.  The return value is the
 result of this rounding.
 If PIXELS-P is non-nil, the return value is VSCROLL.
 
-PRESERVE-VSCROLL-P makes setting the start of WINDOW preserve the
-vscroll if its start is "frozen" due to a resized mini-window.  */)
+PRESERVE-VSCROLL-P is unused.  */)
   (Lisp_Object window, Lisp_Object vscroll, Lisp_Object pixels_p,
-   Lisp_Object preserve_vscroll_p)
+   Lisp_Object /* preserve_vscroll_p */)
 {
   struct window *w = decode_live_window (window);
   struct frame *f = XFRAME (w->frame);
@@ -8402,8 +8373,6 @@ vscroll if its start is "frozen" due to a resized mini-window.  */)
 	  /* Mark W for redisplay.  (bug#55299) */
 	  wset_redisplay (w);
 	}
-
-      w->preserve_vscroll_p = !NILP (preserve_vscroll_p);
     }
 
   return Fwindow_vscroll (window, pixels_p);
@@ -8602,6 +8571,7 @@ syms_of_window (void)
   DEFSYM (Qscroll_up, "scroll-up");
   DEFSYM (Qscroll_down, "scroll-down");
   DEFSYM (Qscroll_command, "scroll-command");
+  DEFSYM (Qmwheel_scroll, "mwheel-scroll");
 
   Fput (Qscroll_up, Qscroll_command, Qt);
   Fput (Qscroll_down, Qscroll_command, Qt);
@@ -8976,6 +8946,11 @@ This table is maintained by code in window.c and is made visible in
 Elisp for testing purposes only.  */);
   window_dead_windows_table
     = CALLN (Fmake_hash_table, QCweakness, Qt);
+
+  DEFVAR_BOOL ("rational-window-point", rational_window_point,
+	       doc: /*  Non-nil means mwheel-scroll leaves point alone.
+How does this react with `cursor-in-non-selected-windows'.  */);
+  rational_window_point = false;
 
   defsubr (&Sselected_window);
   defsubr (&Sold_selected_window);
