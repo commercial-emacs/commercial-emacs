@@ -17033,14 +17033,17 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       clear_glyph_matrix (w->desired_matrix);
     }
 
-  eassert (current_buffer == XBUFFER (w->contents)
-	   || !EQ (window, selected_window));
+  if (current_buffer != XBUFFER (w->contents)
+      || !EQ (window, selected_window))
+    {
+      /* Even if WINDOW contains same buffer as SELECTED_WINDOW, we
+	 still restore that buffer's original PT.  */
+      record_unwind_protect_excursion ();
+      set_buffer_internal (XBUFFER (w->contents)); /* !!! */
+    }
 
   if (!EQ (window, selected_window))
     {
-      record_unwind_protect_excursion ();
-      set_buffer_internal (XBUFFER (w->contents)); /* !!! */
-
       /* Pretend global PT is WINDOW's for the duration.  */
       ptrdiff_t pt = marker_position (w->pointm);
       ptrdiff_t pt_byte = marker_byte_position (w->pointm);
