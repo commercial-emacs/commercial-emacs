@@ -170,11 +170,6 @@ struct window
        selected window too.  */
     Lisp_Object old_pointm;
 
-    /* Special marker for mwheel-scroll. For such scrolls we do not
-       require point to remain visible.  Redisplay keys off this
-       auxiliary marker.  */
-    Lisp_Object scroll_pointm;
-
     /* No permanent meaning; used by save-window-excursion's
        bookkeeping.  */
     Lisp_Object temslot;

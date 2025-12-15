@@ -186,12 +186,6 @@ wset_old_pointm (struct window *w, Lisp_Object val)
 }
 
 static void
-wset_scroll_pointm (struct window *w, Lisp_Object val)
-{
-  w->scroll_pointm = val;
-}
-
-static void
 wset_start (struct window *w, Lisp_Object val)
 {
   w->start = val;
@@ -4519,7 +4513,6 @@ make_parent_window (Lisp_Object window, bool horflag)
   wset_start (p, Qnil);
   wset_pointm (p, Qnil);
   wset_old_pointm (p, Qnil);
-  wset_scroll_pointm (p, Qnil);
   wset_buffer (p, Qnil);
   wset_combination (p, horflag, window);
   wset_combination_limit (p, Qnil);
@@ -4548,7 +4541,6 @@ make_window (void)
   wset_start (w, Fmake_marker ());
   wset_pointm (w, Fmake_marker ());
   wset_old_pointm (w, Fmake_marker ());
-  wset_scroll_pointm (w, Fmake_marker ());
   wset_vertical_scroll_bar_type (w, Qt);
   wset_horizontal_scroll_bar_type (w, Qt);
   wset_cursor_type (w, Qt);
@@ -5831,12 +5823,6 @@ sanitize_next_screen_context_lines (void)
    heights.  See the comment of window_scroll for parameter
    descriptions.  */
 
-static bool
-is_mwheel_scroll (void)
-{
-  return !NILP (Vthis_command) && EQ (Vthis_command, Qmwheel_scroll);
-}
-
 static void
 window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 {
@@ -6191,9 +6177,6 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 		break;
 	    }
 	  SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
-	  if (is_mwheel_scroll ())
-	    set_marker_both (w->scroll_pointm, w->contents,
-			     IT_CHARPOS (it), IT_BYTEPOS (it));
 	  /* Fix up the Y position to preserve, if it is inside the
 	     scroll margin at the window top.  */
 	  if (window_scroll_pixel_based_preserve_y >= 0
@@ -6285,9 +6268,6 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	     alter it.current_y this time.  */
 	  move_it_forward (&it, -1, goal_y, MOVE_TO_Y, NULL);
 	  SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
-	  if (is_mwheel_scroll ())
-	    set_marker_both (w->scroll_pointm, w->contents,
-			     IT_CHARPOS (it), IT_BYTEPOS (it));
 	}
       else
 	{
@@ -6297,18 +6277,10 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	    {
 	      move_it_dvpos (&it, -2);
 	      SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
-	      if (is_mwheel_scroll ())
-		set_marker_both (w->scroll_pointm, w->contents,
-				 IT_CHARPOS (it), IT_BYTEPOS (it));
 	    }
 	  else
 	    /* No, the position we saved is OK, so use it.  */
-	    {
-	      SET_PT_BOTH (charpos, bytepos);
-	      if (is_mwheel_scroll ())
-		set_marker_both (w->scroll_pointm, w->contents,
-				 charpos, bytepos);
-	    }
+	    SET_PT_BOTH (charpos, bytepos);
 	}
     }
   bidi_unshelve_cache (itdata, false);
@@ -8630,7 +8602,6 @@ syms_of_window (void)
   DEFSYM (Qscroll_up, "scroll-up");
   DEFSYM (Qscroll_down, "scroll-down");
   DEFSYM (Qscroll_command, "scroll-command");
-  DEFSYM (Qmwheel_scroll, "mwheel-scroll");
 
   Fput (Qscroll_up, Qscroll_command, Qt);
   Fput (Qscroll_down, Qscroll_command, Qt);

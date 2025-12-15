@@ -17706,6 +17706,10 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  } while (IT_CHARPOS (it) == pos0);
 	  try_window (window, it.current.pos, 0);
 	}
+      else
+	{
+	  /* Not much we can do about it.  */
+	}
     }
 
   /* Consider the following case: Window starts at BEGV, there is
@@ -17872,7 +17876,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	goto need_larger_matrices;
     }
 
-  if (!line_number_displayed && w->base_line_pos != -1)
+  if ( !line_number_displayed && w->base_line_pos != -1)
     {
       w->base_line_pos = 0;
       w->base_line_number = 0;
