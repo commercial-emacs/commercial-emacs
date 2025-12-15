@@ -16943,20 +16943,6 @@ window_start_acceptable_p (Lisp_Object window, ptrdiff_t startp)
 }
 
 
-static void
-restore_point (const struct text_pos pt, const modiff_count modiff)
-{
-  if (CHARPOS (pt) < BEGV)
-    TEMP_SET_PT_BOTH (BEGV, BEGV_BYTE);
-  else if (CHARPOS (pt) > ZV)
-    TEMP_SET_PT_BOTH (ZV, ZV_BYTE);
-  else if (modiff == CHARS_MODIFF)
-    TEMP_SET_PT_BOTH (CHARPOS (pt), BYTEPOS (pt));
-  else
-    TEMP_SET_PT_BOTH (CHARPOS (pt), CHAR_TO_BYTE (CHARPOS (pt)));
-}
-
-
 /* Redisplay leaf window WINDOW.
 
    Updating window-start (stored in w->start marker) needs to
@@ -16978,37 +16964,31 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
   struct it it;
   struct window *w = XWINDOW (window);
   struct frame *f = XFRAME (w->frame);
-  struct buffer *obuffer = current_buffer;
-  struct buffer *wbuffer = XBUFFER (w->contents);
-  struct text_pos opoint, wpoint, wstart;
+  struct text_pos wstart;
 
   int tem, centering_position = -1;
   bool used_current_matrix_p = false;
   bool temp_scroll_step = false;
   bool last_line_misfit = false;
-  const modiff_count ochars_modiff = CHARS_MODIFF;
-  modiff_count wchars_modiff = ochars_modiff;
 
   specpdl_ref count = SPECPDL_INDEX ();
 
   if (NILP (all) && !needs_redisplay (w))
     return unbind_to (count, Qnil);
 
-  SET_TEXT_POS (opoint, PT, PT_BYTE);
-  wpoint = opoint;
-
   /* Make sure that both W's markers are valid.  */
-  eassert (XMARKER (w->start)->buffer == wbuffer);
-  eassert (XMARKER (w->pointm)->buffer == wbuffer);
+  eassert (XMARKER (w->start)->buffer == XBUFFER (w->contents));
+  eassert (XMARKER (w->pointm)->buffer == XBUFFER (w->contents));
 
   reconsider_clip_changes (w);
   int frame_line_height = default_line_height (w);
   int margin = window_scroll_margin (w, MARGIN_IN_LINES);
 
-  bool update_mode_line = (w->update_mode_line
-			   || update_mode_lines
-			   || wbuffer->clip_changed
-			   || wbuffer->prevent_redisplay_optimizations_p);
+  bool update_mode_line
+    = (w->update_mode_line
+       || update_mode_lines
+       || XBUFFER (w->contents)->clip_changed
+       || XBUFFER (w->contents)->prevent_redisplay_optimizations_p);
 
   if (!NILP (all))
     /* Else this is set true more cleverly elsewhere.  */
@@ -17053,9 +17033,34 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       clear_glyph_matrix (w->desired_matrix);
     }
 
-  set_buffer_internal (XBUFFER (w->contents)); /* !!! */
-  SET_TEXT_POS (wpoint, PT, PT_BYTE);
-  wchars_modiff = CHARS_MODIFF;
+  eassert (current_buffer == XBUFFER (w->contents)
+	   || !EQ (window, selected_window));
+
+  if (!EQ (window, selected_window))
+    {
+      record_unwind_protect_excursion ();
+      set_buffer_internal (XBUFFER (w->contents)); /* !!! */
+
+      /* Pretend global PT is WINDOW's for the duration.  */
+      ptrdiff_t pt = marker_position (w->pointm);
+      ptrdiff_t pt_byte = marker_byte_position (w->pointm);
+
+      if (pt < BEGV)
+	{
+	  pt = BEGV;
+	  pt_byte = BEGV_BYTE;
+	  set_marker_both (w->pointm, Qnil, BEGV, BEGV_BYTE);
+	}
+      else if (pt >= ZV)
+	{
+	  pt = ZV;
+	  pt_byte = ZV_BYTE;
+	  set_marker_both (w->pointm, Qnil, ZV, ZV_BYTE);
+	}
+
+      TEMP_SET_PT_BOTH (pt, pt_byte);
+    }
+
   const ptrdiff_t beg_unchanged = BEG_UNCHANGED;
   const ptrdiff_t end_unchanged = END_UNCHANGED;
   bool current_matrix_up_to_date_p
@@ -17083,33 +17088,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       current_matrix_up_to_date_p = false;
     }
 
-  eassert (Z != Z_BYTE || CHARPOS (wpoint) == BYTEPOS (wpoint));
-  eassert (BYTEPOS (wpoint) >= CHARPOS (wpoint));
-
   if (mode_line_update_needed (w))
     update_mode_line = true;
-
-  if (!EQ (window, selected_window))
-    {
-      /* Pretend global PT is WINDOW's for the duration.  */
-      ptrdiff_t pt = marker_position (w->pointm);
-      ptrdiff_t pt_byte = marker_byte_position (w->pointm);
-
-      if (pt < BEGV)
-	{
-	  pt = BEGV;
-	  pt_byte = BEGV_BYTE;
-	  set_marker_both (w->pointm, Qnil, BEGV, BEGV_BYTE);
-	}
-      else if (pt >= ZV)
-	{
-	  pt = ZV;
-	  pt_byte = ZV_BYTE;
-	  set_marker_both (w->pointm, Qnil, ZV, ZV_BYTE);
-	}
-
-      TEMP_SET_PT_BOTH (pt, pt_byte);
-    }
 
   /* 1991 Blandy complained redisplay went "haywire" without this.  */
   if (current_buffer->width_run_cache
@@ -17128,13 +17108,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
         }
     }
 
-  /* Remove this Blandyism.  */
-  eassert (XMARKER (w->start)->buffer == current_buffer);
-
   SET_TEXT_POS_FROM_MARKER (wstart, w->start);
 
-  /* If someone specified a new starting point but did not insist,
-     check whether it can be used.  */
   if ((w->start_instruct == WINDOW_START_CONSIDER_BESPOKE || window_frozen_p (w))
       && CHARPOS (wstart) >= BEGV
       && CHARPOS (wstart) <= ZV)
@@ -17143,9 +17118,9 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       start_move_it (&it, w, wstart);
       move_it_forward (&it, PT, it.last_visible_y, MOVE_TO_POS | MOVE_TO_Y, NULL);
       ptrdiff_t it_charpos = IT_CHARPOS (it);
-      /* Set start_instruct only if the cursor row is wholly visible.
-	 Otherwise, we'll move point back into view, which contravenes
-	 optional_new_start's intent.  */
+      /* Set WINDOW_START_BESPOKE only if the cursor row is wholly
+	 visible.  Otherwise, we'll move point back into view, which
+	 contravenes WINDOW_START_CONSIDER_BESPOKE's intent.  */
       if (it.current_y == 0
 	  || line_bottom_y (it, last_height) < it.last_visible_y)
 	{
@@ -17177,12 +17152,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
       w->window_end_valid = false;
 
-      /* Redisplay the mode line.  Select the buffer properly for that.
-	 Also, run the hook window-scroll-functions because we have
-	 scrolled. Note, we do this after clearing start_instruct
-	 because if there's an error, it is better to forget about
-	 start_instruct than to get into an infinite loop calling the
-	 hook functions and having them get more errors.  */
       if (!update_mode_line || !NILP (Vwindow_scroll_functions))
 	{
 	  update_mode_line = true;
@@ -17200,15 +17169,10 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       if (!window_start_acceptable_p (window, CHARPOS (wstart)))
 	goto ignore_start;
 
-      /* Redisplay, then check if cursor has been set during the
-	 redisplay.  Give up if new fonts were loaded.  We used to issue
-	 a CHECK_MARGINS argument to try_window here, but this causes
-	 scrolling to fail when point begins inside the scroll margin
-	 (bug#148) -- cyd
-      */
       clear_glyph_matrix (w->desired_matrix);
-      if (!try_window (window, wstart, 0))
+      if (0 == try_window (window, wstart, 0))
 	{
+	  /* Give up if new fonts were loaded. */
 	  w->start_instruct = WINDOW_START_BESPOKE;
 	  clear_glyph_matrix (w->desired_matrix);
 	  goto need_larger_matrices;
@@ -17216,11 +17180,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
       if (w->cursor.vpos < 0)
 	{
-	  /* If point does not appear, try to move point so it does
-	     appear.  The desired matrix has been built above, so we
-	     can use it here.  First see if point is in invisible
-	     text, and if so, move it to the first visible buffer
-	     position past that.  */
+	  /* Point did not appear. First see if point is in invisible
+	     text, and if so, move it one past.  */
 	  struct glyph_row *r = NULL;
 	  Lisp_Object invprop =
 	    get_char_property_and_overlay (make_fixnum (PT), Qinvisible,
@@ -17248,23 +17209,14 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
       if (!cursor_row_fully_visible_p (w, false, false, false))
 	{
-	  /* Point does appear, but on a line partly visible at end of window.
-	     Move it back to a fully-visible line.  */
+	  /* Move it back to a fully-visible line.  */
 	  new_y = WINDOW_Y_BOTTOM_BORDER (w);
 	}
       else if (w->cursor.vpos >= 0)
 	{
-	  /* Some people insist on not letting point enter the scroll
-	     margin, even though this part handles windows that didn't
-	     scroll at all.  */
-          int pixel_margin = margin * frame_line_height;
 	  bool tab_line = window_wants_tab_line (w);
 	  bool header_line = window_wants_header_line (w);
 
-	  /* Note: We add an extra FRAME_LINE_HEIGHT, because the loop
-	     below, which finds the row to move point to, advances by
-	     the Y coordinate of the *next* row, see the definition of
-	     MATRIX_ROW_BOTTOM_Y.  */
 	  if (w->cursor.vpos < margin + tab_line + header_line)
 	    {
 	      w->cursor.vpos = -1;
@@ -17274,12 +17226,13 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  else
 	    {
 	      int window_height = window_box_height (w);
+	      int margin_height = margin * frame_line_height;
 
 	      if (tab_line)
 		window_height += CURRENT_TAB_LINE_HEIGHT (w);
 	      if (header_line)
 		window_height += CURRENT_HEADER_LINE_HEIGHT (w);
-	      if (w->cursor.y >= window_height - pixel_margin)
+	      if (w->cursor.y >= window_height - margin_height)
 		{
 		  w->cursor.vpos = -1;
 		  clear_glyph_matrix (w->desired_matrix);
@@ -17304,10 +17257,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  TEMP_SET_PT_BOTH (MATRIX_ROW_START_CHARPOS (row),
 			    MATRIX_ROW_START_BYTEPOS (row));
 
-	  if (w != XWINDOW (selected_window))
-	    set_marker_both (w->pointm, Qnil, PT, PT_BYTE);
-	  else if (current_buffer == obuffer)
-	    SET_TEXT_POS (wpoint, PT, PT_BYTE);
+	  set_marker_both (w->pointm, Qnil, PT, PT_BYTE);
 
 	  move_cursor (w, row, w->desired_matrix, 0, 0, 0, 0);
 
@@ -17335,6 +17285,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 		goto need_larger_matrices;
 	    }
 	}
+
       if (w->cursor.vpos < 0
 	  || !cursor_row_fully_visible_p (w, false, false, false))
 	{
@@ -17496,20 +17447,19 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	{
 	case SCROLLING_SUCCESS:
 	  goto done;
-
+	  break;
 	case SCROLLING_NEED_LARGER_MATRICES:
 	  goto need_larger_matrices;
-
+	  break;
 	case SCROLLING_FAILED:
 	  break;
-
 	default:
 	  emacs_abort ();
+	  break;
 	}
     }
 
-  /* Finally, just choose a place to start which positions point
-     according to user preferences.  */
+  /* Finally, just choose a place to start which centers position.  */
 
  recenter:
 
@@ -17627,7 +17577,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       || MINI_WINDOW_P (w)
       || !(used_current_matrix_p
 	   = try_window_reusing_current_matrix (w)))
-    use_desired_matrix = (try_window (window, wstart, 0) == 1);
+    use_desired_matrix = (1 == try_window (window, wstart, 0));
 
   bidi_unshelve_cache (itdata, false);
 
@@ -17677,10 +17627,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  } while (IT_CHARPOS (it) == pos0);
 	  try_window (window, it.current.pos, 0);
 	}
-      else
-	{
-	  /* Not much we can do about it.  */
-	}
+      /* else not much we can do */
     }
 
   /* Consider the following case: Window starts at BEGV, there is
@@ -17847,7 +17794,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	goto need_larger_matrices;
     }
 
-  if ( !line_number_displayed && w->base_line_pos != -1)
+  if (!line_number_displayed && w->base_line_pos != -1)
     {
       w->base_line_pos = 0;
       w->base_line_number = 0;
@@ -17861,7 +17808,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       && EQ (FRAME_SELECTED_WINDOW (f), window))
     {
       bool redisplay_menu_p;
-
       if (FRAME_WINDOW_P (f))
 	{
 #ifdef HAVE_EXT_MENU_BAR
@@ -17959,12 +17905,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	(*FRAME_TERMINAL (f)->redeem_scroll_bar_hook) (w);
     }
 
-  restore_point (wpoint, wchars_modiff);
-  if (obuffer != wbuffer)
-    {
-      set_buffer_internal (obuffer);
-      restore_point (opoint, ochars_modiff);
-    }
   return unbind_to (count, Qnil);
 }
 
