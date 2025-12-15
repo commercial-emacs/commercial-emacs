@@ -17192,7 +17192,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	      r = row_containing_pos (w, alt_pt, w->desired_matrix->rows,
 				      NULL, 0);
 	    }
-	  new_y = r ? MATRIX_ROW_BOTTOM_Y (r) : window_box_height (w) / 2
+	  new_y = r ? MATRIX_ROW_BOTTOM_Y (r) : window_box_height (w) / 2;
 	}
 
       if (!cursor_row_fully_visible_p (w, false, false, false))
