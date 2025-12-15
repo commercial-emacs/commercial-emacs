@@ -1807,15 +1807,9 @@ window_point (struct window *w)
 
 DEFUN ("window-point", Fwindow_point, Swindow_point, 0, 1, 0,
        doc: /* Return current value of point in WINDOW.
-WINDOW must be a live window and defaults to the selected one.
-
-For a nonselected window, this is the value point would have if that
-window were selected.
-
-Note that, when WINDOW is selected, the value returned is the same as
-that returned by `point' for WINDOW's buffer.  It would be more strictly
-correct to return the top-level value of `point', outside of any
-`save-excursion' forms.  But that is hard to define.  */)
+WINDOW defaults to the selected window.  IF WINDOW is the selected
+window, the value is identical to its buffer's point.  Otherwise, the
+value becomes buffer's point once WINDOW is selected. */)
   (Lisp_Object window)
 {
   return make_fixnum (window_point (decode_live_window (window)));
