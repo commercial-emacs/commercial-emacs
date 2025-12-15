@@ -1129,7 +1129,13 @@ command_loop (void)
       /* A filter may have run while we were reading the input.  */
       if (!FRAME_LIVE_P (XFRAME (selected_frame)))
 	Fkill_emacs (Qnil, Qnil);
+
+      /* Reestablish baseline for selected window.  */
       set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
+      set_marker_both (XWINDOW (selected_window)->pointm,
+		       XWINDOW (selected_window)->contents,
+		       BUF_PT (current_buffer),
+		       BUF_PT_BYTE (current_buffer));
 
       ++num_input_keys;
 
@@ -1186,9 +1192,6 @@ command_loop (void)
       Vthis_command = cmd;
       Vreal_this_command = cmd;
       safe_run_hooks (Qpre_command_hook);
-
-      /* Restore scroll point to window point.  */
-      XWINDOW (selected_window)->scroll_pointm = XWINDOW (selected_window)->pointm;
 
       /* Conclude undo amalgamation, if any.  */
       if (!EQ (Vthis_command, KVAR (current_kboard, Vlast_command)))
