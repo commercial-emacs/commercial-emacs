@@ -7240,7 +7240,7 @@ the return value is nil.  Otherwise the value is t.  */)
 	 into the window itself.  (Normally the pointm of the selected
 	 window holds garbage.)  We do this now, before
 	 restoring the window contents, and prevent it from
-	 being done later on when we select a new window.  */
+	 being done later when we select a new window.  */
       if (!NILP (XWINDOW (selected_window)->contents))
 	{
 	  w = XWINDOW (selected_window);
@@ -8947,10 +8947,10 @@ Elisp for testing purposes only.  */);
   window_dead_windows_table
     = CALLN (Fmake_hash_table, QCweakness, Qt);
 
-  DEFVAR_BOOL ("rational-window-point", rational_window_point,
+  DEFVAR_BOOL ("mwheel-scroll-keeps-point", mwheel_scroll_keeps_point,
 	       doc: /*  Non-nil means mwheel-scroll leaves point alone.
 How does this react with `cursor-in-non-selected-windows'.  */);
-  rational_window_point = false;
+  mwheel_scroll_keeps_point = false;
 
   defsubr (&Sselected_window);
   defsubr (&Sold_selected_window);

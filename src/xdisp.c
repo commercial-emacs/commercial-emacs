@@ -14448,8 +14448,7 @@ reconsider_clip_changes (struct window *w)
      b->clip_changed has already been set, skip this check.  */
   if (!b->clip_changed && w->window_end_valid)
     {
-      ptrdiff_t pt = (w == XWINDOW (selected_window)
-		      ? PT : marker_position (w->pointm));
+      ptrdiff_t pt = window_point (w);
 
       if ((w->current_matrix->buffer != b || pt != w->last_point)
 	  && check_point_in_composition (w->current_matrix->buffer,
@@ -16991,7 +16990,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
        || XBUFFER (w->contents)->prevent_redisplay_optimizations_p);
 
   if (!NILP (all))
-    /* Else this is set true more cleverly elsewhere.  */
     w->must_be_updated_p = true;
 
   if (MINI_WINDOW_P (w))
@@ -17042,6 +17040,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       set_buffer_internal (XBUFFER (w->contents)); /* !!! */
     }
 
+  specbind (Qinhibit_point_motion_hooks, Qt);
+
   if (!EQ (window, selected_window))
     {
       /* Pretend global PT is WINDOW's for the duration.  */
@@ -17073,8 +17073,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
        && !window_outdated (w)
        && !composition_break_at_point
        && !hscrolling_current_line_p (w));
-
-  specbind (Qinhibit_point_motion_hooks, Qt);
 
   /* When windows_or_buffers_changed is non-zero, we can't rely
      on the window end being valid, so set it to zero there.  */
@@ -17141,14 +17139,9 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
  bespoke_start:
 
-  /* Handle case where place to start displaying has been specified,
-     unless the specified location is outside the accessible range.  */
   if (w->start_instruct == WINDOW_START_BESPOKE)
     {
       w->start_instruct = WINDOW_START_NONE;
-
-      /* We set this later on if we have to adjust point.  */
-      int new_y = -1;
 
       if (!window_frozen_p (w))
 	w->vscroll = 0;
@@ -17167,8 +17160,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       else if (CHARPOS (wstart) > ZV)
 	SET_TEXT_POS (wstart, ZV, ZV_BYTE);
 
-      /* Reject the specified start location if it is invisible, and
-	 the buffer wants it always visible.  */
+      /* Reject for visibility requirement.  */
       if (!window_start_acceptable_p (window, CHARPOS (wstart)))
 	goto ignore_start;
 
@@ -17181,10 +17173,11 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  goto need_larger_matrices;
 	}
 
+      int new_y = -1;
       if (w->cursor.vpos < 0)
 	{
-	  /* Point did not appear. First see if point is in invisible
-	     text, and if so, move it one past.  */
+	  /* Point did not appear. If point is in invisible text, move
+	     it one past.  */
 	  struct glyph_row *r = NULL;
 	  Lisp_Object invprop =
 	    get_char_property_and_overlay (make_fixnum (PT), Qinvisible,
@@ -17192,22 +17185,14 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
 	  if (TEXT_PROP_MEANS_INVISIBLE (invprop) != 0)
 	    {
-	      ptrdiff_t alt_pt;
 	      Lisp_Object invprop_end =
 		Fnext_single_char_property_change (make_fixnum (PT), Qinvisible,
 						   Qnil, Qnil);
-
-	      if (FIXNATP (invprop_end))
-		alt_pt = XFIXNAT (invprop_end);
-	      else
-		alt_pt = ZV;
+	      ptrdiff_t alt_pt = FIXNATP (invprop_end) ? XFIXNAT (invprop_end) : ZV;
 	      r = row_containing_pos (w, alt_pt, w->desired_matrix->rows,
 				      NULL, 0);
 	    }
-	  if (r)
-	    new_y = MATRIX_ROW_BOTTOM_Y (r);
-	  else	/* Give up and just move to the middle of the window.  */
-	    new_y = window_box_height (w) / 2;
+	  new_y = r ? MATRIX_ROW_BOTTOM_Y (r) : window_box_height (w) / 2
 	}
 
       if (!cursor_row_fully_visible_p (w, false, false, false))
@@ -17244,7 +17229,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	    }
 	}
 
-      if (new_y >= 0) /* need to move point */
+      if (new_y >= 0) /* need to move point for visibility */
 	{
 	  struct glyph_row *row;
 	  for (row = MATRIX_FIRST_TEXT_ROW (w->desired_matrix);
