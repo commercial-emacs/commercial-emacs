@@ -1193,6 +1193,15 @@ command_loop (void)
       Vreal_this_command = cmd;
       safe_run_hooks (Qpre_command_hook);
 
+      /* Restore scroll point to window point.  */
+      if (!EQ (Vreal_this_command, Qmwheel_scroll)
+	  && EQ (KVAR (current_kboard, Vreal_last_command), Qmwheel_scroll))
+	{
+	  fprintf (stderr, "wtf ");
+	  debug_print (Vreal_this_command);
+	  XWINDOW (selected_window)->scroll_pointm = Fmake_marker ();
+	}
+
       /* Conclude undo amalgamation, if any.  */
       if (!EQ (Vthis_command, KVAR (current_kboard, Vlast_command)))
 	Fundo_boundary ();

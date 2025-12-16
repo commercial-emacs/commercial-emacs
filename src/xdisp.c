@@ -1286,8 +1286,7 @@ window_start_coordinates (struct window *w, ptrdiff_t charpos, int *x, int *y,
        call a scroll function.  */
     SET_TEXT_POS (top, BEGV, BEGV_BYTE);
 
-  /* If the top of the window is after CHARPOS, the latter is surely
-     not visible.  */
+  /* Not visible if window's top follows CHARPOS.  */
   if (move_to_pos_p && CHARPOS (top) > charpos)
     return visible_p;
 

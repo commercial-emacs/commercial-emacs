@@ -4519,7 +4519,7 @@ make_parent_window (Lisp_Object window, bool horflag)
   wset_start (p, Qnil);
   wset_pointm (p, Qnil);
   wset_old_pointm (p, Qnil);
-  wset_scroll_pointm (p, Qnil);
+  wset_scroll_pointm (p, Fmake_marker ());
   wset_buffer (p, Qnil);
   wset_combination (p, horflag, window);
   wset_combination_limit (p, Qnil);
@@ -5827,63 +5827,40 @@ sanitize_next_screen_context_lines (void)
    heights.  See the comment of window_scroll for parameter
    descriptions.  */
 
-static bool
-is_mwheel_scroll (void)
-{
-  return !NILP (Vthis_command) && EQ (Vthis_command, Qmwheel_scroll);
-}
-
 static void
 window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 {
-  struct it it;
-  void *itdata = NULL;
   struct window *w = XWINDOW (window);
-  struct text_pos start;
-  int this_scroll_margin;
-  /* True if we fiddled the window vscroll field without really scrolling.  */
-  bool vscrolled = false;
+  const int frame_line_height = default_line_height (w);
+  const bool mwheel_p = mwheel_scroll_keeps_point &&
+    EQ (Vthis_command, Qmwheel_scroll);
+
+  struct text_pos wstart;
+  SET_TEXT_POS_FROM_MARKER (wstart, w->start);
+  if (CHARPOS (wstart) > ZV || CHARPOS (wstart) < BEGV)
+    SET_TEXT_POS (wstart, BEGV, BEGV_BYTE);
+
   int x, y, rtop, rbot, rowh, vpos;
-  int frame_line_height = default_line_height (w);
-  bool adjust_old_pointm = !NILP (Fequal (Fwindow_point (window),
-					  Fwindow_old_point (window)));
+  bool pt_visible = window_start_coordinates (w, PT, &x, &y,
+					      &rtop, &rbot, &rowh, &vpos);
 
-  SET_TEXT_POS_FROM_MARKER (start, w->start);
-  /* Scrolling a minibuffer window via scroll bar when the echo area
-     shows long text sometimes resets the minibuffer contents behind
-     our backs.  Also, someone might narrow-to-region and immediately
-     call a scroll function.  */
-  if (CHARPOS (start) > ZV || CHARPOS (start) < BEGV)
-    SET_TEXT_POS (start, BEGV, BEGV_BYTE);
-
-  /* If PT is not visible in WINDOW, move back one half of
-     the screen.  Allow PT to be partially visible, otherwise
-     something like (scroll-down 1) with PT in the line before
-     the partially visible one would recenter.  */
-
-  if (!window_start_coordinates (w, PT, &x, &y, &rtop, &rbot, &rowh, &vpos))
+  if (!pt_visible && !mwheel_p)
     {
-      itdata = bidi_shelve_cache ();
-      /* Move backward half the height of the window.  Performance note:
-	 vmotion used here is about 10% faster, but would give wrong
-	 results for variable height lines.  */
+      /* Move back a half-screen to make PT visible.  Otherwise, a
+	 scroll of a single line would produce a jarring recenter.  */
+      struct it it;
+      void *itdata = bidi_shelve_cache ();
       init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
       it.current_y = it.last_visible_y;
       move_it_dy (&it, window_box_height (w) / -2);
-
-      /* The function move_iterator_vertically may move over more than
-	 the specified y-distance.  If it->w is small, e.g. a
-	 mini-buffer window, we may end up in front of the window's
-	 display area.  Start displaying at the start of the line
-	 containing PT in this case.  */
+      /* Snap to bol of PT if move_it_dy steps outside minibuffer.  */
       if (it.current_y <= 0)
 	{
 	  init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
 	  move_it_dy (&it, 0);
 	  it.current_y = 0;
 	}
-
-      start = it.current.pos;
+      wstart = it.current.pos;
       bidi_unshelve_cache (itdata, false);
     }
   else if (auto_window_vscroll_p)
@@ -5913,10 +5890,10 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 		  px = max (0, -w->vscroll - min (rtop, -dy));
 		  Fset_window_vscroll (window, make_fixnum (px), Qt,
 				       Qnil);
-		  return;
+		  return; /* !!! */
 		}
 	    }
-	  if (n > 0)
+	  else if (n > 0)
 	    {
 	      /* Do vscroll if already vscrolled or only display line.  */
 	      if (rbot > 0 && (w->vscroll < 0 || vpos == 0))
@@ -5924,16 +5901,14 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 		  px = max (0, -w->vscroll + min (rbot, dy));
 		  Fset_window_vscroll (window, make_fixnum (px), Qt,
 				       Qnil);
-		  return;
+		  return; /* !!! */
 		}
 
 	      /* Maybe modify window start instead of scrolling.  */
 	      if (rbot > 0 || w->vscroll < 0)
 		{
 		  ptrdiff_t spos;
-
-		  Fset_window_vscroll (window, make_fixnum (0), Qt,
-				       Qnil);
+		  Fset_window_vscroll (window, make_fixnum (0), Qt, Qnil);
 		  /* If there are other text lines above the current row,
 		     move window start to current row.  Else to next row. */
 		  if (rbot > 0)
@@ -5947,7 +5922,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 		  /* Set start_instruct so that redisplay_window will run the
 		     window-scroll-functions.  */
 		  w->start_instruct = WINDOW_START_BESPOKE;
-		  return;
+		  return; /* !!! */
 		}
 	    }
 	}
@@ -5955,10 +5930,8 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       Fset_window_vscroll (window, make_fixnum (0), Qt, Qnil);
     }
 
-  itdata = bidi_shelve_cache ();
-  /* If scroll_preserve_screen_position is non-nil, we try to set
-     point in the same window line as it is now, so get that line.  */
-  if (!NILP (Vscroll_preserve_screen_position))
+  void *itdata = bidi_shelve_cache ();
+  if (!mwheel_p && !NILP (Vscroll_preserve_screen_position))
     {
       /* We preserve the goal pixel coordinate across consecutive
 	 calls to scroll-up, scroll-down and other commands that
@@ -5969,7 +5942,8 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	  || !SYMBOLP (KVAR (current_kboard, Vlast_command))
 	  || NILP (Fget (KVAR (current_kboard, Vlast_command), Qscroll_command)))
 	{
-	  start_move_it (&it, w, start);
+	  struct it it;
+	  start_move_it (&it, w, wstart);
 	  move_it_forward (&it, PT, -1, MOVE_TO_POS, NULL);
 	  window_scroll_pixel_based_preserve_y = it.current_y;
 	  window_scroll_pixel_based_preserve_x = it.current_x;
@@ -5979,9 +5953,8 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
     window_scroll_pixel_based_preserve_y
       = window_scroll_pixel_based_preserve_x = -1;
 
-  /* Move iterator it from start the specified distance forward or
-     backward.  The result is the new window start.  */
-  start_move_it (&it, w, start);
+  struct it it;
+  start_move_it (&it, w, wstart);
   if (whole)
     {
       ptrdiff_t start_pos = IT_CHARPOS (it);
@@ -6057,22 +6030,19 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
   else
     move_it_dvpos (&it, n);
 
-  /* We failed if we find ZV is already on the screen (scrolling up,
-     means there's nothing past the end), or if we can't start any
-     earlier (scrolling down, means there's nothing past the top).  */
   if ((n > 0 && IT_CHARPOS (it) == ZV)
-      || (n < 0 && IT_CHARPOS (it) == CHARPOS (start)))
+      || (n < 0 && IT_CHARPOS (it) == CHARPOS (wstart)))
     {
+      /* scrolled within line */
       if (IT_CHARPOS (it) == ZV)
 	{
 	  if (it.current_y < it.last_visible_y
 	      && (it.current_y + it.max_ascent + it.max_descent
 		  > it.last_visible_y))
 	    {
-	      /* The last line was only partially visible, make it fully
-		 visible.  */
-	      w->vscroll = (it.last_visible_y
-			    - it.current_y + it.max_ascent + it.max_descent);
+	      /* Scroll further to bring last line fully into view.  */
+	      w->vscroll = (it.last_visible_y - it.current_y
+			    + it.max_ascent + it.max_descent);
 	      adjust_frame_glyphs (it.f);
 	    }
 	  else
@@ -6086,71 +6056,45 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 		xsignal0 (Qend_of_buffer);
 	    }
 	}
+      /* bring first line into view.  */
+      else if (w->vscroll != 0)
+	w->vscroll = 0;
       else
 	{
-	  if (w->vscroll != 0)
-	    /* The first line was only partially visible, make it fully
-	       visible. */
-	    w->vscroll = 0;
+	  bidi_unshelve_cache (itdata, false);
+	  if (noerror)
+	    return;
 	  else
-	    {
-	      bidi_unshelve_cache (itdata, false);
-	      if (noerror)
-		return;
-	      else
-		xsignal0 (Qbeginning_of_buffer);
-	    }
+	    xsignal0 (Qbeginning_of_buffer);
 	}
-
-      /* If control gets here, then we vscrolled.  */
       XBUFFER (w->contents)->prevent_redisplay_optimizations_p = true;
-
-      /* Don't try to change the window start below.  */
-      vscrolled = true;
     }
-
-  if (!vscrolled)
+  else
     {
       ptrdiff_t pos = IT_CHARPOS (it);
-      ptrdiff_t bytepos;
 
-      /* If in the middle of a multi-glyph character move forward to
-	 the next character.  */
+      /* Move past multi-glyph.  */
       if (in_display_vector_p (&it))
-	{
-	  ++pos;
-	  move_it_forward (&it, pos, -1, MOVE_TO_POS, NULL);
-	}
+	move_it_forward (&it, ++pos, -1, MOVE_TO_POS, NULL);
 
-      /* Set the window start, and set up the window for redisplay.  */
-      set_marker_restricted_both (w->start, w->contents, IT_CHARPOS (it),
-				  IT_BYTEPOS (it));
-      bytepos = marker_byte_position (w->start);
-      w->start_at_line_beg = (pos == BEGV || FETCH_BYTE (bytepos - 1) == '\n');
+      set_marker_restricted_both (w->start, w->contents,
+				  IT_CHARPOS (it), IT_BYTEPOS (it));
+      w->start_at_line_beg =
+	(pos == BEGV || FETCH_BYTE (marker_byte_position (w->start) - 1) == '\n');
       wset_update_mode_line (w);
-      /* Set start_instruct so that redisplay_window will run the
-	 window-scroll-functions.  */
+      /* Instruct redisplay_window to run window-scroll-functions.  */
       w->start_instruct = WINDOW_START_BESPOKE;
     }
 
-  /* The rest of this function uses current_y in a nonstandard way,
-     not including the height of the header line if any.  */
+  /* We desire current_y = 0 at the window start.  */
   it.current_y = it.vpos = 0;
-
-  /* Move PT out of scroll margins.
-     This code wants current_y to be zero at the window start position
-     even if there is a header line.  */
-  this_scroll_margin = window_scroll_margin (w, MARGIN_IN_PIXELS);
-
-  if (n > 0)
+  const int margin = window_scroll_margin (w, MARGIN_IN_PIXELS);
+  if (!mwheel_p && n > 0)
     {
-      int last_y = it.last_visible_y - this_scroll_margin - 1;
-
-      /* We moved the window start towards ZV, so PT may be now
-	 in the scroll margin at the top.  */
+      int last_y = it.last_visible_y - margin - 1;
       move_it_forward (&it, PT, -1, MOVE_TO_POS, NULL);
       if (IT_CHARPOS (it) == PT
-	  && it.current_y >= this_scroll_margin
+	  && it.current_y >= margin
 	  && it.current_y <= (last_y
 			      - WINDOW_BORDER_WIDTH (w)
 			      - WINDOW_TAB_LINE_HEIGHT (w)
@@ -6178,25 +6122,24 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	    }
 
 	  /* Get out of the scroll margin at the top of the window.  */
-	  while (it.current_y < this_scroll_margin)
+	  while (it.current_y < margin)
 	    {
 	      int prev = it.current_y;
 	      move_it_dvpos (&it, 1);
 	      if (prev == it.current_y)
 		break;
 	    }
+
 	  SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
-	  if (is_mwheel_scroll ())
-	    set_marker_both (w->scroll_pointm, w->contents,
-			     IT_CHARPOS (it), IT_BYTEPOS (it));
+
 	  /* Fix up the Y position to preserve, if it is inside the
 	     scroll margin at the window top.  */
 	  if (window_scroll_pixel_based_preserve_y >= 0
-	      && window_scroll_pixel_based_preserve_y < this_scroll_margin)
-	    window_scroll_pixel_based_preserve_y = this_scroll_margin;
+	      && window_scroll_pixel_based_preserve_y < margin)
+	    window_scroll_pixel_based_preserve_y = margin;
 	}
     }
-  else if (n < 0)
+  else if (!mwheel_p && n < 0)
     {
       ptrdiff_t charpos, bytepos;
       bool partial_p;
@@ -6211,7 +6154,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 			- WINDOW_BORDER_WIDTH (w)
 			- WINDOW_TAB_LINE_HEIGHT (w)
 			- WINDOW_HEADER_LINE_HEIGHT (w)
-			- partial_line_height (&it) - this_scroll_margin - 1),
+			- partial_line_height (&it) - margin - 1),
 		       MOVE_TO_POS | MOVE_TO_Y,
 		       NULL);
 
@@ -6226,11 +6169,8 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	 reached PT before the scroll margin.  */
       if (charpos != PT)
 	{
-	  struct it it2;
-	  void *it_data;
-
-	  it2 = it;
-	  it_data = bidi_shelve_cache ();
+	  struct it it2 = it;
+	  void *it_data = bidi_shelve_cache ();
 	  move_it_forward (&it, PT, -1, MOVE_TO_POS, NULL);
 	  if (IT_CHARPOS (it) == PT && it.current_y == it2.current_y)
 	    {
@@ -6248,14 +6188,14 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       /* See if point is on a partially visible line at the end.  */
       if (it.what == IT_EOB)
 	partial_p = (it.current_y + it.ascent + it.descent) >
-	  (it.last_visible_y - this_scroll_margin - WINDOW_BORDER_WIDTH (w)
+	  (it.last_visible_y - margin - WINDOW_BORDER_WIDTH (w)
 	   - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w));
       else
 	{
 	  move_it_dvpos (&it, 1);
 	  partial_p =
 	    (it.current_y >
-	     (it.last_visible_y - this_scroll_margin - WINDOW_BORDER_WIDTH (w)
+	     (it.last_visible_y - margin - WINDOW_BORDER_WIDTH (w)
 	      - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w)));
 	}
 
@@ -6266,23 +6206,19 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	;
       else if (window_scroll_pixel_based_preserve_y >= 0)
 	{
-	  int goal_y = min (it.last_visible_y - this_scroll_margin - 1,
+	  int goal_y = min (it.last_visible_y - margin - 1,
 			    window_scroll_pixel_based_preserve_y);
-
 	  /* Don't let the preserved screen Y coordinate put us inside
 	     any of the two margins.  */
-	  if (goal_y < this_scroll_margin)
-	    goal_y = this_scroll_margin;
-	  SET_TEXT_POS_FROM_MARKER (start, w->start);
-	  start_move_it (&it, w, start);
+	  if (goal_y < margin)
+	    goal_y = margin;
+	  SET_TEXT_POS_FROM_MARKER (wstart, w->start);
+	  start_move_it (&it, w, wstart);
 	  /* It would be wrong to subtract WINDOW_HEADER_LINE_HEIGHT
 	     here because we called start_move_it again and did not
 	     alter it.current_y this time.  */
 	  move_it_forward (&it, -1, goal_y, MOVE_TO_Y, NULL);
 	  SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
-	  if (is_mwheel_scroll ())
-	    set_marker_both (w->scroll_pointm, w->contents,
-			     IT_CHARPOS (it), IT_BYTEPOS (it));
 	}
       else
 	{
@@ -6292,28 +6228,20 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	    {
 	      move_it_dvpos (&it, -2);
 	      SET_PT_BOTH (IT_CHARPOS (it), IT_BYTEPOS (it));
-	      if (is_mwheel_scroll ())
-		set_marker_both (w->scroll_pointm, w->contents,
-				 IT_CHARPOS (it), IT_BYTEPOS (it));
 	    }
 	  else
 	    /* No, the position we saved is OK, so use it.  */
-	    {
-	      SET_PT_BOTH (charpos, bytepos);
-	      if (is_mwheel_scroll ())
-		set_marker_both (w->scroll_pointm, w->contents,
-				 charpos, bytepos);
-	    }
+	    SET_PT_BOTH (charpos, bytepos);
 	}
     }
-  bidi_unshelve_cache (itdata, false);
-
-  if (adjust_old_pointm)
+  if (!NILP (Fequal (Fwindow_point (window),
+		     Fwindow_old_point (window))))
     Fset_marker (w->old_pointm,
 		 (w == XWINDOW (selected_window)
 		  ? make_fixnum (BUF_PT (XBUFFER (w->contents)))
 		  : Fmarker_position (w->pointm)),
 		 w->contents);
+  bidi_unshelve_cache (itdata, false);
 }
 
 
@@ -6391,7 +6319,7 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
 
   if (pos < ZV)
     {
-      int this_scroll_margin = window_scroll_margin (w, MARGIN_IN_LINES);
+      int margin = window_scroll_margin (w, MARGIN_IN_LINES);
 
       set_marker_restricted_both (w->start, w->contents, pos, pos_byte);
       w->start_at_line_beg = !NILP (bolp);
@@ -6401,7 +6329,7 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
       w->start_instruct = WINDOW_START_BESPOKE;
 
       if (!NILP (Vscroll_preserve_screen_position)
-	  && this_scroll_margin == 0
+	  && margin == 0
 	  && (whole || !EQ (Vscroll_preserve_screen_position, Qt)))
 	{
 	  SET_PT_BOTH (pos, pos_byte);
@@ -6413,10 +6341,10 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
 	{
 	  int top_margin;
 
-	  if (this_scroll_margin > 0)
+	  if (margin > 0)
 	    {
 	      SET_PT_BOTH (pos, pos_byte);
-	      Fvertical_motion (make_fixnum (this_scroll_margin), window, Qnil);
+	      Fvertical_motion (make_fixnum (margin), window, Qnil);
 	      top_margin = PT;
 	    }
 	  else
@@ -6430,11 +6358,11 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
 	      int nlines = window_scroll_preserve_vpos;
 
 	      SET_PT_BOTH (pos, pos_byte);
-	      if (window_scroll_preserve_vpos < this_scroll_margin)
-		nlines = this_scroll_margin;
+	      if (window_scroll_preserve_vpos < margin)
+		nlines = margin;
 	      else if (window_scroll_preserve_vpos
-		       >= w->total_lines - this_scroll_margin)
-		nlines = w->total_lines - this_scroll_margin - 1;
+		       >= w->total_lines - margin)
+		nlines = w->total_lines - margin - 1;
 	      Fvertical_motion (Fcons (make_fixnum (window_scroll_preserve_hpos),
 				       make_fixnum (nlines)), window, Qnil);
 	    }
@@ -6448,9 +6376,9 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
 	  /* If we scrolled backward, put point near the end of the window
 	     but not within the scroll margin.  */
 	  SET_PT_BOTH (pos, pos_byte);
-	  tem = Fvertical_motion (make_fixnum (ht - this_scroll_margin), window,
+	  tem = Fvertical_motion (make_fixnum (ht - margin), window,
 				  Qnil);
-	  if (XFIXNAT (tem) == ht - this_scroll_margin)
+	  if (XFIXNAT (tem) == ht - margin)
 	    bottom_margin = PT;
 	  else
 	    bottom_margin = PT + 1;
@@ -6465,11 +6393,11 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
 		  int nlines = window_scroll_preserve_vpos;
 
 		  SET_PT_BOTH (pos, pos_byte);
-		  if (window_scroll_preserve_vpos < this_scroll_margin)
-		    nlines = this_scroll_margin;
+		  if (window_scroll_preserve_vpos < margin)
+		    nlines = margin;
 		  else if (window_scroll_preserve_vpos
-			   >= ht - this_scroll_margin)
-		    nlines = ht - this_scroll_margin - 1;
+			   >= ht - margin)
+		    nlines = ht - margin - 1;
 		  Fvertical_motion (Fcons (make_fixnum (window_scroll_preserve_hpos),
 					   make_fixnum (nlines)), window, Qnil);
 		}
@@ -6506,7 +6434,6 @@ scroll_command (Lisp_Object window, Lisp_Object n, int direction)
 {
   eassert (eabs (direction) == 1);
   specpdl_ref count = SPECPDL_INDEX ();
-  // bool mwheel_scroll = EQ (Vthis_command, Qmwheel_scroll);
 
   if (!EQ (window, selected_window))
     {
