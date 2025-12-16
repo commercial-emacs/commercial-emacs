@@ -16963,6 +16963,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
   struct window *w = XWINDOW (window);
   struct frame *f = XFRAME (w->frame);
   struct text_pos wstart;
+  const bool mwheel_p = mwheel_scroll_keeps_point &&
+    EQ (Vthis_command, Qmwheel_scroll);
 
   int tem, centering_position = -1;
   bool used_current_matrix_p = false;
@@ -17228,7 +17230,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	    }
 	}
 
-      if (new_y >= 0) /* need to move point for visibility */
+      if (!mwheel_p && new_y >= 0) /* need to move point for visibility */
 	{
 	  struct glyph_row *row;
 	  for (row = MATRIX_FIRST_TEXT_ROW (w->desired_matrix);

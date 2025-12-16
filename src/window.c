@@ -5826,6 +5826,9 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
   const int frame_line_height = default_line_height (w);
   const bool mwheel_p = mwheel_scroll_keeps_point &&
     EQ (Vthis_command, Qmwheel_scroll);
+  const bool adjust_old_pointm = !NILP (Fequal (Fwindow_point (window),
+						Fwindow_old_point (window)));
+  const ptrdiff_t opoint = PT;
 
   struct text_pos wstart;
   SET_TEXT_POS_FROM_MARKER (wstart, w->start);
@@ -6225,13 +6228,15 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	    SET_PT_BOTH (charpos, bytepos);
 	}
     }
-  if (!NILP (Fequal (Fwindow_point (window),
-		     Fwindow_old_point (window))))
+
+  if (adjust_old_pointm)
     Fset_marker (w->old_pointm,
-		 (w == XWINDOW (selected_window)
+		 ((w == XWINDOW (selected_window))
 		  ? make_fixnum (BUF_PT (XBUFFER (w->contents)))
 		  : Fmarker_position (w->pointm)),
 		 w->contents);
+
+  eassert (!mwheel_p || PT == opoint);
   bidi_unshelve_cache (itdata, false);
 }
 
