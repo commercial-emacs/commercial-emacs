@@ -159,7 +159,6 @@ Leaving \"Default\" unchecked is equivalent with specifying a default of
 	      :set (lambda (symbol value)
 		     (set-default symbol value)
 		     (force-mode-line-update t)))
-             (mwheel-scroll-keeps-point windows boolean)
 	     (transient-mark-mode editing-basics boolean nil
 				  :standard (not noninteractive)
 				  :initialize custom-initialize-delay

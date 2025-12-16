@@ -5824,11 +5824,8 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 {
   struct window *w = XWINDOW (window);
   const int frame_line_height = default_line_height (w);
-  const bool mwheel_p = mwheel_scroll_keeps_point &&
-    EQ (Vthis_command, Qmwheel_scroll);
   const bool adjust_old_pointm = !NILP (Fequal (Fwindow_point (window),
 						Fwindow_old_point (window)));
-  const ptrdiff_t opoint = PT;
 
   struct text_pos wstart;
   SET_TEXT_POS_FROM_MARKER (wstart, w->start);
@@ -5839,7 +5836,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
   bool pt_visible = window_start_coordinates (w, PT, &x, &y,
 					      &rtop, &rbot, &rowh, &vpos);
 
-  if (!pt_visible && !mwheel_p)
+  if (!pt_visible)
     {
       /* Move back a half-screen to make PT visible.  Otherwise, a
 	 scroll of a single line would produce a jarring recenter.  */
@@ -5926,7 +5923,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
     }
 
   void *itdata = bidi_shelve_cache ();
-  if (!mwheel_p && !NILP (Vscroll_preserve_screen_position))
+  if (!NILP (Vscroll_preserve_screen_position))
     {
       /* We preserve the goal pixel coordinate across consecutive
 	 calls to scroll-up, scroll-down and other commands that
@@ -6084,7 +6081,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
   /* We desire current_y = 0 at the window start.  */
   it.current_y = it.vpos = 0;
   const int margin = window_scroll_margin (w, MARGIN_IN_PIXELS);
-  if (!mwheel_p && n > 0)
+  if (n > 0)
     {
       int last_y = it.last_visible_y - margin - 1;
       move_it_forward (&it, PT, -1, MOVE_TO_POS, NULL);
@@ -6133,7 +6130,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	    window_scroll_pixel_based_preserve_y = margin;
 	}
     }
-  else if (!mwheel_p && n < 0)
+  else if (n < 0)
     {
       ptrdiff_t charpos, bytepos;
       bool partial_p;
@@ -6231,12 +6228,11 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 
   if (adjust_old_pointm)
     Fset_marker (w->old_pointm,
-		 ((w == XWINDOW (selected_window))
+		 (w == XWINDOW (selected_window)
 		  ? make_fixnum (BUF_PT (XBUFFER (w->contents)))
 		  : Fmarker_position (w->pointm)),
 		 w->contents);
 
-  eassert (!mwheel_p || PT == opoint);
   bidi_unshelve_cache (itdata, false);
 }
 
@@ -8522,7 +8518,6 @@ syms_of_window (void)
   DEFSYM (Qscroll_up, "scroll-up");
   DEFSYM (Qscroll_down, "scroll-down");
   DEFSYM (Qscroll_command, "scroll-command");
-  DEFSYM (Qmwheel_scroll, "mwheel-scroll");
 
   Fput (Qscroll_up, Qscroll_command, Qt);
   Fput (Qscroll_down, Qscroll_command, Qt);
@@ -8897,11 +8892,6 @@ This table is maintained by code in window.c and is made visible in
 Elisp for testing purposes only.  */);
   window_dead_windows_table
     = CALLN (Fmake_hash_table, QCweakness, Qt);
-
-  DEFVAR_BOOL ("mwheel-scroll-keeps-point", mwheel_scroll_keeps_point,
-	       doc: /*  Non-nil means mwheel-scroll leaves point alone.
-How does this react with `cursor-in-non-selected-windows'.  */);
-  mwheel_scroll_keeps_point = false;
 
   defsubr (&Sselected_window);
   defsubr (&Sold_selected_window);
