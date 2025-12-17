@@ -381,25 +381,7 @@ value of ARG, and the command uses it in subsequent scrolls."
         (add-hook 'pre-command-hook 'mwheel-filter-click-events))
       (setq mwheel-inhibit-click-event-timer
             (run-with-timer mouse-wheel-inhibit-click-time nil
-                            'mwheel-inhibit-click-timeout)))
-
-    (let ((point (window-point scroll-window))
-          (cursor-type (window-cursor-type scroll-window)))
-      (when (and cursor-type
-                 (or (< point (window-start scroll-window))
-                     (>= point (window-end scroll-window))))
-        (add-hook 'pre-command-hook
-                  (apply-partially #'restore-cursor-type scroll-window cursor-type))
-        (set-window-cursor-type scroll-window nil)))))
-
-(defun restore-cursor-type (window type)
-  (let ((self (apply-partially #'restore-cursor-type window type)))
-    (if (not (window-live-p window))
-        (remove-hook 'pre-command-hook self)
-      (when (and (not (eq this-command 'mwheel-scroll))
-                 (eq (selected-window) window))
-        (set-window-cursor-type window type)
-        (remove-hook 'pre-command-hook self)))))
+                            'mwheel-inhibit-click-timeout)))))
 
 (put 'mwheel-scroll 'scroll-command t)
 
