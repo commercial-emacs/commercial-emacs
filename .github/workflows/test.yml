@@ -20,15 +20,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-22.04, macos-14, windows-2022]
+        os: [macos-large]
         gearing: [standard]
-        include:
-          - os: ubuntu-22.04
-            gearing: alt-x
-          - os: ubuntu-22.04
-            gearing: native-comp
-          - os: ubuntu-22.04
-            gearing: multithread
     steps:
     - run: |
         git config --global core.autocrlf false
