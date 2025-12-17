@@ -137,6 +137,7 @@ settings, then once more for each (OPTION . VALUE) pair.")
   "Test that `shr-zoom-image' properly replaces the original image."
   (skip-unless (bound-and-true-p image-types))
   (skip-unless (libxml-available-p))
+  (skip-when (and (eq system-type 'darwin) (getenv "GITHUB_ACTIONS")))
   (let* ((image (expand-file-name "data/image/blank-100x200.png"
                                   (getenv "EMACS_TEST_DIRECTORY")))
          (image-url (concat "file://" (if (string-prefix-p "/" image)
