@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [macos-large]
+        os: [macos-15-intel]
         gearing: [standard]
     steps:
     - run: |
