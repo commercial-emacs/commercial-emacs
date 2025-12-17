@@ -1130,12 +1130,7 @@ command_loop (void)
       if (!FRAME_LIVE_P (XFRAME (selected_frame)))
 	Fkill_emacs (Qnil, Qnil);
 
-      /* Reestablish baseline for selected window.  */
       set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
-      set_marker_both (XWINDOW (selected_window)->pointm,
-		       XWINDOW (selected_window)->contents,
-		       BUF_PT (current_buffer),
-		       BUF_PT_BYTE (current_buffer));
 
       ++num_input_keys;
 

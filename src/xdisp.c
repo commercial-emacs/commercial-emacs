@@ -17035,8 +17035,9 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
     {
       /* Even if WINDOW contains same buffer as SELECTED_WINDOW, we
 	 still restore that buffer's original PT.  */
-      record_unwind_protect_excursion ();
-      set_buffer_internal (XBUFFER (w->contents)); /* !!! */
+      record_unwind_protect_excursion (); /* preserve original point */
+      set_buffer_internal (XBUFFER (w->contents));
+      record_unwind_protect_excursion (); /* preserve W's point */
     }
 
   specbind (Qinhibit_point_motion_hooks, Qt);
