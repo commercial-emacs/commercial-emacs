@@ -3409,6 +3409,7 @@ extern void gui_update_cursor (struct frame *, bool);
 extern void gui_clear_cursor (struct window *);
 extern void gui_draw_vertical_border (struct window *w);
 extern void gui_draw_right_divider (struct window *w);
+extern void gui_update_window_border (struct window *w);
 
 extern int get_glyph_string_clip_rects (struct glyph_string *,
                                         NativeRectangle *, int);
@@ -3431,7 +3432,6 @@ extern void gui_consider_frame_title (Lisp_Object);
 #endif	/* HAVE_WINDOW_SYSTEM */
 
 extern void note_mouse_highlight (struct frame *, int, int);
-extern void gui_update_window_border (struct window *w);
 extern void gui_clear_window_mouse_face (struct window *);
 extern void cancel_mouse_face (struct frame *);
 extern bool clear_mouse_face (Mouse_HLInfo *);
