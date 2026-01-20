@@ -21,8 +21,7 @@
   :global t
   :group 'windows
   (unless (eq window-system 'x)
-    (setq window-border-mode nil)
-    (user-error "window-border-mode only implemented for X"))
+    (setq window-border-mode nil))
   (if window-border-mode
       (if (or (not (integerp window-border-width))
               (<= window-border-width 0))
