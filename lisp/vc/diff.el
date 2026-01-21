@@ -188,7 +188,9 @@ returns the buffer used."
                                   (list (or old-alt old)
                                         (or new-alt new)))))
 		     " "))
-	 (thisdir default-directory))
+	 (thisdir (if (file-exists-p default-directory)
+                      default-directory
+                    (expand-file-name "~"))))
     (with-current-buffer buf
       (setq buffer-read-only t)
       (buffer-disable-undo (current-buffer))
