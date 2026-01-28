@@ -2801,6 +2801,10 @@ init_iterator (struct it *it, struct window *w,
 	    : it->continuation_pixel_width;
 	}
 
+      /* round down to integral multiple of column widths */
+      it->last_visible_x = (it->last_visible_x / FRAME_COLUMN_WIDTH (it->f))
+	* FRAME_COLUMN_WIDTH (it->f);
+
       it->tab_line_p = window_wants_tab_line (w);
       it->header_line_p = window_wants_header_line (w);
       body_height = WINDOW_BORDER_WIDTH (w) + WINDOW_TAB_LINE_HEIGHT (w) +
