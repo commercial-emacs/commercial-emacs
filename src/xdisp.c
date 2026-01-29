@@ -16976,7 +16976,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
   specpdl_ref count = SPECPDL_INDEX ();
 
-  if (NILP (all) && !needs_redisplay (w))
+  if (!NILP (all) && !needs_redisplay (w))
     return unbind_to (count, Qnil);
 
   /* Make sure that both W's markers are valid.  */
@@ -17429,7 +17429,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
     {
       /* The function returns -1 if new fonts were loaded, 1 if
 	 successful, 0 if not successful.  */
-      int ss = try_scrolling (window, !NILP (all),
+      int ss = try_scrolling (window, NILP (all),
 			      ((scroll_minibuffer_conservatively
 			        && MINI_WINDOW_P (w))
 			       ? SCROLL_LIMIT + 1
@@ -17853,7 +17853,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
   gui_update_window_border (w);
 
   if (FRAME_WINDOW_P (f)
-      && update_window_fringes (w, (!NILP (all)
+      && update_window_fringes (w, (NILP (all)
 				    || (!used_current_matrix_p && !overlay_arrow_seen)
 				    || w->pseudo_window_p)))
     {
