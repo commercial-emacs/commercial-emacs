@@ -839,7 +839,6 @@ window_text_bottom_y (struct window *w)
   int bottom_y = WINDOW_PIXEL_HEIGHT (w);
 
   bottom_y -= WINDOW_BOTTOM_DIVIDER_WIDTH (w);
-  bottom_y -= WINDOW_BORDER_WIDTH (w);
 
   if (window_wants_mode_line (w))
     bottom_y -= CURRENT_MODE_LINE_HEIGHT (w);
