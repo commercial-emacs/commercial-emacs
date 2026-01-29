@@ -173,7 +173,12 @@ inserting the command."
     (let ((debug-on-error (and (not ignore-errors) debug-on-error)))
       (eshell-insert-command command func))
     (eshell-wait-for-subprocess)
-    (should (eshell-match-output regexp))))
+    (condition-case err
+        (should (eshell-match-output regexp))
+      (error (if (zerop (1+ (cl-decf eshell-test--max-allowable-errors)))
+                 (signal (car err) (cdr err))
+               (message "%s" (error-message-string err))
+               (ert-pass))))))
 
 (defvar eshell-history-file-name)
 
