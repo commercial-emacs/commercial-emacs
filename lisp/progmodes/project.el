@@ -1719,7 +1719,8 @@ has changed, and NO-WRITE is nil."
                              project--list)))
     (when (eq (current-buffer) (window-buffer))
       (setq project--list (delq extant project--list))
-      (push (list dir) project--list))
+      (when (or (not (listp pr)) (not (eq 'transient (car pr))))
+        (push (list dir) project--list)))
     ;; Decided against writing to disk to update most recent project.
     (unless extant
       (project--write-project-list))))
@@ -2165,7 +2166,7 @@ is part of the default mode line beginning with Emacs 30."
   (when-let ((b (get-buffer name))
              (interactive-p (not noninteractive)))
     (with-current-buffer b
-      (setq-local project-current-directory-override "/")
+      (setq-local project-current-directory-override temporary-file-directory)
       (put 'project-current-directory-override 'permanent-local t))))
 
 (provide 'project)
