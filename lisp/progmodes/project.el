@@ -1734,13 +1734,12 @@ passed to `message' as its first argument."
           ;; without with-temp-buffer, arbitrary current buffer would
           ;; yield default-directory as project-root
           (null (with-temp-buffer
-                  (let ((default-directory project-root)
-                        (to-delete (project-current)))
+                  (when-let ((default-directory project-root)
+                             (to-delete (project-current)))
                     (project-kill-buffers (not confirm))
-                    (or (not to-delete) ;pathological project-root like "/"
-                        (cl-some (lambda (b)
-                                   (and (buffer-live-p b) (buffer-file-name b)))
-                                 (project-buffers to-delete)))))))
+                    (cl-some (lambda (b)
+                               (and (buffer-live-p b) (buffer-file-name b)))
+                             (project-buffers to-delete))))))
       (progn (setq project--list
                    (delq (assoc (abbreviate-file-name project-root) project--list)
                          project--list))
