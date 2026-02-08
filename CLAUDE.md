@@ -48,7 +48,7 @@ This is a fork of GNU Emacs called "Commercial Emacs" with several performance a
 
 ### Tree-sitter Support
 To build with tree-sitter highlighting:
-1. Install tree-sitter library v0.20.10beta3
+1. Install tree-sitter library v0.20.10beta4
 2. Configure with `--with-tree-sitter` flag
 3. Test with `make test/src/tree-sitter-tests`
 
