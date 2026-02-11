@@ -2080,7 +2080,8 @@ If INITIAL is non-nil, it specifies the initial input string."
 
        (t
 	(setq ido-selected
-	      (if (or (eq ido-exit 'takeprompt)
+	      (if (or (equal prompt "Write file: ")
+                      (eq ido-exit 'takeprompt)
 		      (null ido-matches))
 		  ido-final-text
 		;; else take head of list
