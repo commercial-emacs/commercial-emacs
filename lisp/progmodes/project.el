@@ -1741,11 +1741,10 @@ passed to `message' as its first argument."
                     (cl-some (lambda (b)
                                (and (buffer-live-p b) (buffer-file-name b)))
                              (project-buffers to-delete))))))
-      (progn (setq project--list
-                   (delq (assoc (abbreviate-file-name project-root) project--list)
-                         project--list))
-             (message "Removed project %s" project-root)
-             (project--write-project-list))
+      (when-let ((entry (assoc (abbreviate-file-name project-root) project--list)))
+        (setq project--list (delq entry project--list))
+        (message "Removed project %s" project-root)
+        (project--write-project-list))
     (message "Could not remove project %s, project buffers persist"
              project-root)))
 
