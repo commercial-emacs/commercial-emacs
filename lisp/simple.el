@@ -10584,7 +10584,7 @@ If it does not exist, create it and switch it to `messages-buffer-mode'."
         (messages-buffer-mode)
         (when (and (boundp 'project-current-directory-override)
                    (not noninteractive))
-          (setq-local project-current-directory-override temporary-file-directory)
+          (setq-local project-current-directory-override user-emacs-directory)
           (put 'project-current-directory-override 'permanent-local t))
         (current-buffer))))
 
@@ -10821,7 +10821,7 @@ too short to have a dst element.
           (funcall initial-major-mode)
           (when (and (boundp 'project-current-directory-override)
                      (not noninteractive))
-            (setq-local project-current-directory-override temporary-file-directory)
+            (setq-local project-current-directory-override user-emacs-directory)
             (put 'project-current-directory-override 'permanent-local t)))
         scratch)))
 

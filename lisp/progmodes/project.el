@@ -2166,7 +2166,7 @@ is part of the default mode line beginning with Emacs 30."
   (when-let ((b (get-buffer name))
              (interactive-p (not noninteractive)))
     (with-current-buffer b
-      (setq-local project-current-directory-override temporary-file-directory)
+      (setq-local project-current-directory-override user-emacs-directory)
       (put 'project-current-directory-override 'permanent-local t))))
 
 (provide 'project)
