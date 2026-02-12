@@ -19,7 +19,7 @@ git clone https://github.com/commercial-emacs/commercial-emacs.git
 cd commercial-emacs
 ./autogen.sh
 ./configure --prefix=$HOME/.local
-make -j4
+make -j$(nproc)
 src/emacs
 ```
 
