@@ -390,13 +390,9 @@ to find the list of ignores for each directory."
 
 The default implementation matches each buffer to PROJECT root using
 the buffer's value of `default-directory'."
-  (let ((root (expand-file-name (file-name-as-directory (project-root project))))
-        bufs)
-    (dolist (buf (buffer-list))
-      (when (string-prefix-p root (expand-file-name
-                                   (buffer-local-value 'default-directory buf)))
-        (push buf bufs)))
-    (nreverse bufs)))
+  (when project
+    (seq-filter (lambda (b) (equal project (with-current-buffer b (project-current))))
+                (buffer-list))))
 
 (defgroup project-vc nil
   "VC-aware project implementation."
@@ -734,18 +730,19 @@ DIRS must contain directory names."
                              (not (project--submodule-p root)))
                     (mapcar (lambda (m) (format "%s%s/" root m))
                             (let ((default-directory root))
-                              (project--git-submodules)))))
-         bufs)
-    (dolist (buf (buffer-list))
-      (when-let ((dir (expand-file-name (buffer-local-value 'default-directory buf)))
-                 (not-tramp-p (or (not (fboundp 'tramp-tramp-file-p))
-                                  (not (funcall #'tramp-tramp-file-p dir))))
-                 (project-p (equal project (project-current nil dir)))
-                 (not-submod-p (cl-every (lambda (module)
-                                           (not (string-prefix-p module dir)))
-                                         modules)))
-        (push buf bufs)))
-    (nreverse bufs)))
+                              (project--git-submodules))))))
+    (seq-filter
+     (lambda (b)
+       (let ((dir (with-current-buffer b
+                    (or project-current-directory-override
+                        default-directory))))
+         (and (equal project (with-current-buffer b (project-current)))
+              (or (not (fboundp #'tramp-tramp-file-p))
+                  (not (funcall #'tramp-tramp-file-p dir)))
+              (cl-every (lambda (module)
+                          (not (string-prefix-p module dir)))
+                        modules))))
+     (buffer-list))))
 
 (cl-defmethod project-name ((project (head vc)))
   (or (project--value-in-dir 'project-vc-name (project-root project))
