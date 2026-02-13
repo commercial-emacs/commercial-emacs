@@ -1685,13 +1685,15 @@ With some possible metadata (to be decided).")
     (let ((filename project-list-file))
       (with-temp-buffer
         (insert ";;; -*- lisp-data -*-\n")
-        (let ((print-length nil)
-              (print-level nil))
-          (pp (mapcar (lambda (elem)
-                        (let ((name (car elem)))
-                          (list (if (file-remote-p name) name
-                                  (expand-file-name name)))))
-                      project--list)
+        (let (print-length print-level)
+          (pp (seq-keep
+               (lambda (elem)
+                 (when-let ((name (car elem))
+                            (full-name (if (file-remote-p name) name
+                                         (when (file-exists-p name)
+                                           (expand-file-name name)))))
+                   (list full-name)))
+               project--list)
               (current-buffer)))
         (write-region nil nil filename nil 'silent)))))
 
@@ -1911,13 +1913,6 @@ projects."
       (message "%d project%s were found"
                count (if (= count 1) "" "s")))
     count))
-
-(defun project-forget-zombie-projects ()
-  "Forget all known projects that don't exist any more."
-  (interactive)
-  (dolist (proj (project-known-project-roots))
-    (unless (file-exists-p proj)
-      (project-forget-project proj))))
 
 (defun project-forget-projects-under (dir &optional recursive)
   "Forget all known projects below a directory DIR.
@@ -2164,6 +2159,8 @@ is part of the default mode line beginning with Emacs 30."
     (with-current-buffer b
       (setq-local project-current-directory-override user-emacs-directory)
       (put 'project-current-directory-override 'permanent-local t))))
+
+(add-hook 'kill-emacs-hook #'project--write-project-list)
 
 (provide 'project)
 ;;; project.el ends here
