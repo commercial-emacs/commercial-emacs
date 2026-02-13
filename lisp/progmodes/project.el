@@ -730,8 +730,11 @@ DIRS must contain directory names."
 (defvar project-prefix-map
   (let ((map (make-sparse-keymap
               (lambda ()
-                (when-let ((pr (seq-some #'project--find-in-directory
-                                         (mapcar #'car project--list))))
+                (when-let ((pr (or (project--find-in-directory
+                                    (or project-current-directory-override
+                                        default-directory))
+                                   (seq-some #'project--find-in-directory
+                                             (mapcar #'car project--list)))))
                   (format "[%s]" (project-name pr)))))))
     (define-key map "!" 'project-shell-command)
     (define-key map "&" 'project-async-shell-command)
@@ -1741,8 +1744,11 @@ For an as-yet registered project, type \"...\" This unorthodox,
 surprising, and probably broken behavior needs removal with extreme
 prejudice."
   (let* (dir
-         (from (seq-some #'project--find-in-directory
-                         (mapcar #'car project--list)))
+         (from (or (project--find-in-directory
+                    (or project-current-directory-override
+                        default-directory))
+                   (seq-some #'project--find-in-directory
+                             (mapcar #'car project--list))))
          (dir-choice "... (choose a dir)")
          (choices (project--file-completion-table
                    (append project--list `(,dir-choice))))
