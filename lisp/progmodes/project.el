@@ -55,7 +55,7 @@
 ;;
 ;; Transient project:
 ;;
-;; An instance of this type can be returned by `project-get-project' if no
+;; An instance of this type can be returned by `project-most-recent-project' if no
 ;; project was detected automatically, and the user had to pick a
 ;; directory manually.  The fileset it describes is the whole
 ;; directory, with the exception of some standard ignored files and
@@ -205,41 +205,11 @@ Called with no arguments and should return a project root dir."
   :version "30.1")
 
 ;;;###autoload
-(defun project-get-project (&optional directory)
-  "Return the project for DIRECTORY, and mark as most recently used.
-DIRECTORY defaults to `default-directory'.  If no project obtains
-from DIRECTORY, prompt the user for an alternate directory.  If
-no project obtains from the alternate, return the \"transient\"
-project instance and do not adjust recently used projects."
-  (let* ((directory (or directory
-                        project-current-directory-override
-                        default-directory))
-         (pr (project--find-in-directory directory)))
-    (when (and (not pr)
-               (not project-current-directory-override))
-      (setq directory (project-prompt-project-dir)
-            pr (project--find-in-directory directory)))
-    (if pr
-        (prog1 pr
-          (project-remember-project pr))
-      (prog1 (cons 'transient directory)
-        (project--remove-from-project-list directory nil)))))
-
-;;;###autoload
-(defun project-current (&optional maybe-prompt directory)
-  "Return the project for DIRECTORY.
-DIRECTORY defaults to `default-directory'.
-Under MAYBE-PROMPT, calls `project-get-project'."
-  ;; Gradually replace occurrences of (project-current t)
-  ;; with (project-most-recent-project), and replace (project-current nil dir)
-  ;; with (let ((default-directory dir)) (project-current))
-  (if maybe-prompt
-      (project-get-project directory)
-    (let ((pr (project--find-in-directory
-               (or directory
-                   project-current-directory-override
-                   default-directory))))
-      (prog1 pr (when pr (project-remember-project pr))))))
+(defun project-current (&rest _args)
+  "We hate this function."
+  (project-remember-project (project--find-in-directory
+                             (or project-current-directory-override
+                                 default-directory))))
 
 (defsubst project--find-in-directory (dir)
   (run-hook-with-args-until-success 'project-find-functions (file-name-as-directory dir)))
@@ -391,7 +361,12 @@ to find the list of ignores for each directory."
 The default implementation matches each buffer to PROJECT root using
 the buffer's value of `default-directory'."
   (when project
-    (seq-filter (lambda (b) (equal project (with-current-buffer b (project-current))))
+    (seq-filter (lambda (b)
+                  (equal project
+                         (with-current-buffer b
+                           (project--find-in-directory
+                            (or project-current-directory-override
+                                default-directory)))))
                 (buffer-list))))
 
 (defgroup project-vc nil
@@ -736,7 +711,7 @@ DIRS must contain directory names."
        (let ((dir (with-current-buffer b
                     (or project-current-directory-override
                         default-directory))))
-         (and (equal project (with-current-buffer b (project-current)))
+         (and (equal project (project--find-in-directory dir))
               (or (not (fboundp #'tramp-tramp-file-p))
                   (not (funcall #'tramp-tramp-file-p dir)))
               (cl-every (lambda (module)
@@ -755,7 +730,8 @@ DIRS must contain directory names."
 (defvar project-prefix-map
   (let ((map (make-sparse-keymap
               (lambda ()
-                (when-let ((pr (project--most-recent-project)))
+                (when-let ((pr (seq-some #'project--find-in-directory
+                                         (mapcar #'car project--list))))
                   (format "[%s]" (project-name pr)))))))
     (define-key map "!" 'project-shell-command)
     (define-key map "&" 'project-async-shell-command)
@@ -953,9 +929,8 @@ relative to PROJECT instead.
 This supports using a relative file name from the current buffer
 when switching projects with `project-switch-project' and then
 using a command like `project-find-file'."
-  (if-let (filename-proj (and project-current-directory-override
-                            (project-current nil default-directory)))
-      ;; file-name-concat requires Emacs 28+
+  (if-let (filename-proj (when project-current-directory-override
+                           (project--find-in-directory default-directory)))
       (concat (file-name-as-directory (project-root project))
               (file-relative-name filename (project-root filename-proj)))
     filename))
@@ -968,7 +943,7 @@ Interactively, prompt for FILENAME, defaulting to the root directory of
 the current project."
   (declare (interactive-only find-file))
   (interactive (list (read-file-name "Find file in root: "
-                                     (project-root (project-current t)) nil
+                                     (project-root (project-most-recent-project)) nil
                                      (confirm-nonexistent-file-or-buffer))))
   (find-file filename t))
 
@@ -1309,7 +1284,9 @@ If you exit the `query-replace', you can later continue the
 
 (defun project-prefixed-buffer-name (mode)
   (concat "*"
-          (if-let ((proj (project-current nil)))
+          (if-let ((proj (project--find-in-directory
+                          (or project-current-directory-override
+                              default-directory))))
               (project-name proj)
             (file-name-nondirectory
              (directory-file-name default-directory)))
@@ -1621,7 +1598,8 @@ interactively.
 
 Also see the `project-kill-buffers-display-buffer-list' variable."
   (interactive)
-  (let* ((pr (project-most-recent-project))
+  (let* ((pr (project--find-in-directory (or project-current-directory-override
+                                             default-directory)))
          (bufs (project--buffers-to-kill pr))
          (query-user (lambda ()
                        (yes-or-no-p
@@ -1697,65 +1675,53 @@ With some possible metadata (to be decided).")
               (current-buffer)))
         (write-region nil nil filename nil 'silent)))))
 
-(defsubst project--most-recent-project ()
-  (or (project-current)
-      (when-let ((mru (caar project--list)))
-        (project--find-in-directory mru))))
-
 ;;;###autoload
 (defun project-most-recent-project ()
-  (let ((pr (or (project--most-recent-project)
-                (project-get-project))))
-    (prog1 pr (project-remember-project pr))))
+  (let ((dir (or project-current-directory-override
+                 default-directory)))
+    (project-remember-project (or (project--find-in-directory dir)
+                                  (seq-some #'project--find-in-directory
+                                            (mapcar #'car project--list))
+                                  (unless project-current-directory-override
+                                    (project--find-in-directory
+                                     (setq dir (project-prompt-project-dir))))
+                                  (cons 'transient dir)))))
 
 ;;;###autoload
 (defun project-remember-project (pr &optional _no-write)
-  "Add project PR to the front of the project list.
-Save the result in `project-list-file' if the list of projects
-has changed, and NO-WRITE is nil."
-  (let* ((dir (abbreviate-file-name (project-root pr)))
-         (extant (cl-find-if (lambda (entry) (equal dir (car entry)))
-                             project--list)))
-    (when (eq (current-buffer) (window-buffer))
-      (setq project--list (delq extant project--list))
-      (when (or (not (listp pr)) (not (eq 'transient (car pr))))
-        (push (list dir) project--list)))
-    ;; Decided against writing to disk to update most recent project.
-    (unless extant
-      (project--write-project-list))))
-
-(defun project--remove-from-project-list (project-root confirm)
-  "Remove directory PROJECT-ROOT of a missing project from the project list.
-If the directory was in the list before the removal, save the
-result in `project-list-file'.  Announce the project's removal
-from the list using REPORT-MESSAGE, which is a format string
-passed to `message' as its first argument."
-  (if (or (not (file-exists-p project-root))
-          ;; without with-temp-buffer, arbitrary current buffer would
-          ;; yield default-directory as project-root
-          (null (with-temp-buffer
-                  (when-let ((default-directory project-root)
-                             (to-delete (project-current)))
-                    (project-kill-buffers (not confirm))
-                    (cl-some (lambda (b)
-                               (and (buffer-live-p b) (buffer-file-name b)))
-                             (project-buffers to-delete))))))
-      (when-let ((entry (assoc (abbreviate-file-name project-root) project--list)))
-        (setq project--list (delq entry project--list))
-        (message "Removed project %s" project-root)
-        (project--write-project-list))
-    (message "Could not remove project %s, project buffers persist"
-             project-root)))
+  "Add project PR to the front of the project list."
+  (prog1 pr
+    (when (and pr (or (not (listp pr)) (not (eq 'transient (car pr)))))
+      (let* ((dir (abbreviate-file-name (project-root pr)))
+             (extant (cl-find-if (lambda (entry) (equal dir (car entry)))
+                                 project--list)))
+        (when (eq (current-buffer) (window-buffer))
+          (setq project--list (delq extant project--list))
+          (push (list dir) project--list))
+        (unless extant
+          ;; don't wait for kill-emacs-hook
+          (project--write-project-list))))))
 
 ;;;###autoload
-(defun project-forget-project (project-root &optional confirm)
+(defun project-forget-project (project-root &optional _confirm)
   "Remove directory PROJECT-ROOT from the project list.
 PROJECT-ROOT is the root directory of a known project listed in
 the project list.  To prevent `project-buffers' from immediately
 reinserting the project, kill open buffers associated
 with PROJECT-ROOT unless CONFIRM directs otherwise."
-  (interactive (list (funcall project-prompter) t))
-  (project--remove-from-project-list project-root confirm))
+  (interactive (list (funcall project-prompter) nil))
+  (if (or (not (file-exists-p project-root))
+          (null (when-let ((pr (project--find-in-directory project-root)))
+                  ;; project-kill-buffers stupidly does not take directory
+                  (mapc #'kill-buffer (project--buffers-to-kill pr))
+                  (project--buffers-to-kill pr))))
+      (when-let ((entry (assoc (abbreviate-file-name project-root) project--list)))
+        (setq project--list (delq entry project--list))
+        (message "Removed project %s" project-root)
+        ;; don't wait for kill-emacs-hook
+        (project--write-project-list))
+    (message "Could not remove project %s, project buffers persist"
+             project-root)))
 
 (defun project--prev-buffer (predicate)
   "Return previous buffer satisfying PREDICATE which takes buffer."
@@ -1775,19 +1741,23 @@ For an as-yet registered project, type \"...\" This unorthodox,
 surprising, and probably broken behavior needs removal with extreme
 prejudice."
   (let* (dir
-         (from (project--most-recent-project))
+         (from (seq-some #'project--find-in-directory
+                         (mapcar #'car project--list)))
          (dir-choice "... (choose a dir)")
          (choices (project--file-completion-table
                    (append project--list `(,dir-choice))))
-         (default (when-let ((prev-buffer
-                              (project--prev-buffer
-                               (lambda (buffer)
-                                 (when (buffer-live-p buffer)
-                                   (with-current-buffer buffer
-                                     (when-let ((project (project-current)))
-                                       (not (equal from project)))))))))
-                    (with-current-buffer prev-buffer
-                      (project-root (project-current))))))
+         (default
+          (catch 'done
+            (prog1 nil
+              (project--prev-buffer
+               (lambda (buffer)
+                 (when (buffer-live-p buffer)
+                   (with-current-buffer buffer
+                     (when-let ((cand (project--find-in-directory
+                                       (or project-current-directory-override
+                                           default-directory))))
+                       (unless (equal from cand)
+                         (throw 'done (project-root cand))))))))))))
     (while (string-empty-p
             ;; Even under require-match, `completing-read' allows RET
             ;; to yield an empty string.
@@ -1859,7 +1829,7 @@ If OVERRIDING-MAP is non-nil, it will be used as
 `overriding-terminal-local-map' to provide shorter bindings
 from that map which will take priority over the global ones."
   (interactive)
-  (let* ((pr (project-current t))
+  (let* ((pr (project-most-recent-project))
          (prompt-format (or prompt-format "[execute in %s]:"))
          (command (let ((overriding-terminal-local-map overriding-map))
                     (key-binding (read-key-sequence
@@ -1903,12 +1873,13 @@ projects."
                  (project (project--find-in-directory subdir))
                  (project-root (project-root project))
                  ((not (gethash project-root known))))
-        (project-remember-project project t)
+        (project-remember-project project)
         (puthash project-root t known)
         (message "Found %s..." project-root)
         (setq count (1+ count))))
     (if (zerop count)
         (message "No projects were found")
+      ;; don't wait for kill-emacs-hook
       (project--write-project-list)
       (message "%d project%s were found"
                count (if (= count 1) "" "s")))
@@ -1933,6 +1904,7 @@ forgotten projects."
           (setq count (1+ count)))))
     (if (zerop count)
         (message "No projects were forgotten")
+      ;; don't wait for kill-emacs-hook
       (project--write-project-list)
       (message "%d project%s were forgotten"
                count (if (= count 1) "" "s")))
@@ -2081,8 +2053,7 @@ made from `project-switch-commands'.
 When called in a program, it will use the project corresponding
 to directory DIR."
   (interactive (list (project-prompt-project-dir)))
-  (if-let ((pr (let ((default-directory dir))
-                 (project-current)))
+  (if-let ((pr (project--find-in-directory dir))
            (mru (cl-find-if #'buffer-file-name (project-buffers pr))))
       (project-switch-to-buffer mru)
     (let ((command (if (symbolp project-switch-commands)
@@ -2099,7 +2070,7 @@ If you set `uniquify-dirname-transform' to this function,
 slash-separated components from `project-name' will be appended to
 the buffer's directory name when buffers from two different projects
 would otherwise have the same name."
-  (if-let (proj (project-current nil dirname))
+  (if-let (proj (project--find-in-directory dirname))
       (let ((root (project-root proj)))
         (expand-file-name
          (file-name-concat
@@ -2136,7 +2107,9 @@ is part of the default mode line beginning with Emacs 30."
 
 (defun project-mode-line-format ()
   "Compose the project mode-line."
-  (when-let ((project (project-current)))
+  (when-let ((project (project--find-in-directory
+                       (or project-current-directory-override
+                           default-directory))))
     ;; Preserve the global value of 'last-coding-system-used'
     ;; that 'write-region' needs to set for 'basic-save-buffer',
     ;; but updating the mode line might occur at the same time
@@ -2160,7 +2133,8 @@ is part of the default mode line beginning with Emacs 30."
       (setq-local project-current-directory-override user-emacs-directory)
       (put 'project-current-directory-override 'permanent-local t))))
 
-(add-hook 'kill-emacs-hook #'project--write-project-list)
+(unless noninteractive
+  (add-hook 'kill-emacs-hook #'project--write-project-list))
 
 (provide 'project)
 ;;; project.el ends here
