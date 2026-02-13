@@ -277,7 +277,7 @@ current project's main and external roots."
      (message "Searching %s..." dir)
      (redisplay)
      (message "Searching %s... done" dir))
-   (let ((pr (project-get-project)))
+   (let ((pr (project-most-recent-project)))
      (project-combine-directories
       (cons
        (xref--project-root pr)

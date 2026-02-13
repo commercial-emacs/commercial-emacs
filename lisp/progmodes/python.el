@@ -3265,7 +3265,7 @@ process buffer for a list of commands.)"
            t)))
   (let* ((project (and (eq 'project dedicated)
                        (featurep 'project)
-                       (project-get-project)))
+                       (project-most-recent-project)))
          (default-directory (if project
                                 (project-root project)
                               default-directory))
