@@ -743,7 +743,7 @@ static bool move_cursor (struct window *, struct glyph_row *,
 			 struct glyph_matrix *, ptrdiff_t, ptrdiff_t,
 			 int, int);
 static bool insist_fully_visible_cursor (struct window *);
-static bool try_scrolling_cursor_row (struct window *, bool);
+static bool try_scrolling_cursor_row (struct window *, struct glyph_matrix *);
 static bool update_menu_bar (struct frame *, bool, bool);
 static bool try_window_reusing_current_matrix (struct window *);
 static int try_window_insdel (struct window *);
@@ -14831,7 +14831,7 @@ redisplay_internal (void)
 	      eassert (static_sline_y == it.current_y);
 	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
 	      if (insist_fully_visible_cursor (w) &&
-		  try_scrolling_cursor_row (w, true))
+		  try_scrolling_cursor_row (w, w->current_matrix))
 		goto cancel;
 	      else
 		goto update;
@@ -16008,19 +16008,14 @@ insist_fully_visible_cursor (struct window *w)
 }
 
 
-/* If CURRENT_MATRIX_P, use the information from the
-   window's current glyph matrix; otherwise use the desired glyph
-   matrix.
-
-   True means the caller should scroll to recover point.  */
+/* True means the caller should scroll to recover point.  */
 
 static bool
-try_scrolling_cursor_row (struct window *w, bool current_matrix_p)
+try_scrolling_cursor_row (struct window *w, struct glyph_matrix *matrix)
 {
   if (w->cursor.vpos < 0)
     return false;
 
-  struct glyph_matrix *matrix = current_matrix_p ? w->current_matrix : w->desired_matrix;
   struct glyph_row *row = MATRIX_ROW (matrix, w->cursor.vpos);
 
   return (MATRIX_ROW_PARTIALLY_VISIBLE_P (w, row)
@@ -16357,7 +16352,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
       /* If cursor ends up on a partially visible line,
 	 treat that as being off the bottom of the screen.  */
       if (insist_fully_visible_cursor (w) &&
-	  try_scrolling_cursor_row (w, false)
+	  try_scrolling_cursor_row (w, w->desired_matrix)
 	  /* It's possible that the cursor is on the first line of the
 	     buffer, which is partially obscured due to a vscroll
 	     (Bug#7537).  In that case, avoid looping forever. */
@@ -16686,7 +16681,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	    {
 	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
 	      if (insist_fully_visible_cursor (w) &&
-		  try_scrolling_cursor_row (w, true))
+		  try_scrolling_cursor_row (w, w->current_matrix))
 		rc = CURSOR_MOVEMENT_MUST_SCROLL;
 	      else
 		rc = CURSOR_MOVEMENT_SUCCESS;
@@ -17145,7 +17140,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	}
 
       if (insist_fully_visible_cursor (w) &&
-	  try_scrolling_cursor_row (w, false))
+	  try_scrolling_cursor_row (w, w->desired_matrix))
 	{
 	  /* Bump new_y back to the last visible line.  */
 	  new_y = WINDOW_Y_BOTTOM_BORDER (w);
@@ -17229,7 +17224,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
       if (w->cursor.vpos < 0
 	  || (insist_fully_visible_cursor (w) &&
-	      try_scrolling_cursor_row (w, false)))
+	      try_scrolling_cursor_row (w, w->desired_matrix)))
 	{
 	  clear_glyph_matrix (w->desired_matrix);
 	  goto try_to_scroll;
@@ -17341,7 +17336,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       if (w->cursor.vpos >= 0)
 	{
 	  if (insist_fully_visible_cursor (w) &&
-	      try_scrolling_cursor_row (w, false))
+	      try_scrolling_cursor_row (w, w->desired_matrix))
 	    {
 	      clear_glyph_matrix (w->desired_matrix);
 	      last_line_misfit = true;
@@ -17631,7 +17626,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       move_cursor (w, row, matrix, 0, 0, 0, 0);
     }
 
-  if (insist_fully_visible_cursor (w) && try_scrolling_cursor_row (w, false))
+  if (insist_fully_visible_cursor (w) && try_scrolling_cursor_row (w, w->desired_matrix))
     {
       /* If vscroll is enabled, disable it and try again.  */
       if (w->vscroll)
