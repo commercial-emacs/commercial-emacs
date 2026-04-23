@@ -14683,7 +14683,7 @@ redisplay_internal (void)
       /* Ensure recorded data applies.  */
       && static_sline_buffer == current_buffer
       && match_p
-      && w->start_instruct == WINDOW_START_NONE
+      && !w->start_dirty
       /* Point must be on line with recorded data.  */
       && PT >= CHARPOS (tlbufpos)
       && PT <= Z - CHARPOS (tlendpos)
@@ -17113,37 +17113,15 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
   SET_TEXT_POS_FROM_MARKER (wstart, w->start);
 
-  if ((w->start_instruct == WINDOW_START_CONSIDER_BESPOKE || window_frozen_p (w))
-      && CHARPOS (wstart) >= BEGV
-      && CHARPOS (wstart) <= ZV)
-    {
-      w->start_instruct = WINDOW_START_NONE;
-      start_move_it (&it, w, wstart);
-      move_it_forward (&it, PT, it.last_visible_y, MOVE_TO_POS | MOVE_TO_Y, NULL);
-      ptrdiff_t it_charpos = IT_CHARPOS (it);
-      /* Set WINDOW_START_BESPOKE only if the cursor row is wholly
-	 visible.  Otherwise, we'll move point back into view, which
-	 contravenes WINDOW_START_CONSIDER_BESPOKE's intent.  */
-      if (it.current_y == 0
-	  || line_bottom_y (it, last_height) < it.last_visible_y)
-	{
-	  if (it_charpos == PT)
-	    w->start_instruct = WINDOW_START_BESPOKE;
-	  /* IT may overshoot PT if text at PT is invisible.  */
-	  else if (it_charpos > PT && CHARPOS (wstart) <= PT)
-	    w->start_instruct = WINDOW_START_BESPOKE;
-	}
-    }
-
   if (!BASE_LINE_NUMBER_VALID_P (w))
     /* Forget any recorded base line for line number display.  */
     w->base_line_number = 0;
 
  bespoke_start:
 
-  if (w->start_instruct == WINDOW_START_BESPOKE)
+  if (w->start_dirty)
     {
-      w->start_instruct = WINDOW_START_NONE;
+      w->start_dirty = false;
 
       if (!window_frozen_p (w))
 	w->vscroll = 0;
@@ -17162,7 +17140,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       else if (CHARPOS (wstart) > ZV)
 	SET_TEXT_POS (wstart, ZV, ZV_BYTE);
 
-      /* Reject for visibility requirement.  */
+      /* Whether WSTART falls in a display string */
       if (!window_start_acceptable_p (window, CHARPOS (wstart)))
 	goto ignore_start;
 
@@ -17170,7 +17148,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       if (0 == try_window (window, wstart, 0))
 	{
 	  /* Give up if new fonts were loaded. */
-	  w->start_instruct = WINDOW_START_BESPOKE;
+	  w->start_dirty = true;
 	  clear_glyph_matrix (w->desired_matrix);
 	  goto need_larger_matrices;
 	}
@@ -17359,7 +17337,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
              in which case we accept that it is partially visible.  */
           && (rtop != 0) == (rbot != 0))
 	{
-	  w->start_instruct = WINDOW_START_BESPOKE;
+	  w->start_dirty = true;
 	  SET_TEXT_POS_FROM_MARKER (wstart, w->start);
 	  goto bespoke_start;
       	}

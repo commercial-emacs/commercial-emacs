@@ -97,13 +97,6 @@ struct cursor_pos
   int hpos, vpos;
 };
 
-enum window_start_on_redisplay
-  {
-    WINDOW_START_NONE,
-    WINDOW_START_BESPOKE,
-    WINDOW_START_CONSIDER_BESPOKE
-  };
-
 struct window
   {
     /* This is for Lisp; the terminal code does not refer to it.  */
@@ -395,9 +388,8 @@ struct window
        was the beginning of a line when it was chosen.  */
     bool_bf start_at_line_beg : 1;
 
-    /* Indicate to redisplay if start was calculated beforehand.  Set by
-       scrolling commands.  */
-    enum window_start_on_redisplay start_instruct;
+    /* Dirty bit: w->start was externally set; redisplay must align to it.  */
+    bool_bf start_dirty : 1;
 
     /* True means the cursor is currently displayed.  This can be
        set to zero by functions overpainting the cursor image.  */
@@ -431,9 +423,9 @@ struct window
        i.e., always survive Fset_window_buffer.  */
     bool_bf scroll_bars_persistent : 1;
 
-    /* True if window_end_pos and window_end_vpos are truly valid.
-       This is false if nontrivial redisplay is preempted since in that case
-       the frame image that window_end_pos did not get onto the frame.  */
+    /* A false value means redisplay was preempted such that the cached
+       window_end_pos and window_end_vpos were never realized to screen,
+       and so the next redisplay cycle cannot take shortcuts.  */
     bool_bf window_end_valid : 1;
 
     /* True if it needs to be redisplayed.  */

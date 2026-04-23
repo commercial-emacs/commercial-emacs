@@ -11011,15 +11011,15 @@ displaying that processes's buffer."
   "Update process window sizes to match the current window configuration."
   (when (fboundp 'process-list)
     (dolist (procwin (window--process-window-list))
-      (let ((process (car procwin)))
+      (let* ((process (car procwin))
+             (process-adjust (process-get process 'adjust-window-size-function)))
         (with-demoted-errors "Error adjusting window size: %S"
           (with-current-buffer (process-buffer process)
-            (let ((size (funcall
-                         (or (process-get process 'adjust-window-size-function)
-                             window-adjust-process-window-size-function)
-                         process (cdr procwin))))
-              (when size
-                (set-process-window-size process (cdr size) (car size))))))))))
+            (when-let ((size (funcall
+                              (or process-adjust
+                                  window-adjust-process-window-size-function)
+                              process (cdr procwin))))
+              (set-process-window-size process (cdr size) (car size)))))))))
 
 (add-hook 'window-configuration-change-hook 'window--adjust-process-windows)
 

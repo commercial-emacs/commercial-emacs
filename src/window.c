@@ -1925,40 +1925,23 @@ Return POS.  */)
 }
 
 DEFUN ("set-window-start", Fset_window_start, Sset_window_start, 2, 3, 0,
-       doc: /* Make display in WINDOW start at position POS in WINDOW's buffer.
-WINDOW must be a live window and defaults to the selected one.  Return
-POS.
+       doc: /* Start WINDOW's display of buffer at POS.
 
-Optional third arg NOFORCE non-nil prevents next redisplay from
-moving point if displaying the window at POS makes point invisible;
-redisplay will then choose the WINDOW's start position by itself in
-that case, i.e. it will disregard POS if adhering to it will make
-point not visible in the window.
+If this renders point non-visible, a non-nil NOFORCE moves point back
+into view.  Any vertical scroll set by `set-window-vscroll' is
+cancelled.
 
-For reliable setting of WINDOW start position, make sure point is
-at a position that will be visible when that start is in effect,
-otherwise there's a chance POS will be disregarded, e.g., if point
-winds up in a partially-visible line.
-
-The setting of the WINDOW's start position takes effect during the
-next redisplay cycle, not immediately.  If NOFORCE is nil or
-omitted, forcing the display of WINDOW to start at POS cancels
-any setting of WINDOW's vertical scroll (\"vscroll\") amount
-set by `set-window-vscroll' and by scrolling functions.  */)
+Returns POS.  */)
   (Lisp_Object window, Lisp_Object pos, Lisp_Object noforce)
 {
-  register struct window *w = decode_live_window (window);
-
+  struct window *w = decode_live_window (window);
   set_marker_restricted (w->start, pos, w->contents);
-  /* This is not right, but much easier than doing what is right.  */
-  w->start_at_line_beg = false;
+  w->start_at_line_beg = false; /* 1991 Blandy won't presume clean linebreak */
   if (NILP (noforce))
-    w->start_instruct = WINDOW_START_BESPOKE;
+    w->start_dirty = true;
   wset_update_mode_line (w);
-  /* Bug#15957.  */
-  w->window_end_valid = false;
+  w->window_end_valid = false; /* Bug#15957 */
   wset_redisplay (w);
-
   return pos;
 }
 
@@ -3617,8 +3600,8 @@ window-start value is reasonable when this function is called.  */)
 				    || FETCH_BYTE (pos.bytepos - 1) == '\n');
 	  /* We need to do this, so that the window-scroll-functions
 	     get called.  */
-	  if (w->start_instruct == WINDOW_START_NONE)
-	    w->start_instruct = WINDOW_START_CONSIDER_BESPOKE;
+	  if (!w->start_dirty)
+	    w->start_dirty = true;
 
 	  /* Reset the vscroll, as redisplay will not.  */
 	  w->vscroll = 0;
@@ -4268,7 +4251,7 @@ set_window_buffer (Lisp_Object window, Lisp_Object buffer,
 			     make_fixnum (b->last_window_start),
 			     buffer);
       w->start_at_line_beg = false;
-      w->start_instruct = WINDOW_START_NONE;
+      w->start_dirty = false;
       /* Flush the base_line cache since it applied to another buffer.  */
       w->base_line_number = 0;
     }
@@ -5913,9 +5896,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 					 w->contents);
 		  w->start_at_line_beg = true;
 		  wset_update_mode_line (w);
-		  /* Set start_instruct so that redisplay_window will run the
-		     window-scroll-functions.  */
-		  w->start_instruct = WINDOW_START_BESPOKE;
+		  w->start_dirty = true;
 		  return; /* !!! */
 		}
 	    }
@@ -6077,7 +6058,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	(pos == BEGV || FETCH_BYTE (marker_byte_position (w->start) - 1) == '\n');
       wset_update_mode_line (w);
       /* Instruct redisplay_window to run window-scroll-functions.  */
-      w->start_instruct = WINDOW_START_BESPOKE;
+      w->start_dirty = true;
     }
 
   /* We desire current_y = 0 at the window start.  */
@@ -6318,9 +6299,7 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
       set_marker_restricted_both (w->start, w->contents, pos, pos_byte);
       w->start_at_line_beg = !NILP (bolp);
       wset_update_mode_line (w);
-      /* Set start_instruct so that redisplay_window will run
-	 the window-scroll-functions.  */
-      w->start_instruct = WINDOW_START_BESPOKE;
+      w->start_dirty = true;
 
       if (!NILP (Vscroll_preserve_screen_position)
 	  && margin == 0
@@ -6862,8 +6841,8 @@ and redisplay normally--don't erase and redraw the frame.  */)
 
   w->vscroll = 0;
   w->window_end_valid = false;
-  if (w->start_instruct == WINDOW_START_NONE)
-    w->start_instruct = WINDOW_START_CONSIDER_BESPOKE;
+  if (!w->start_dirty)
+    w->start_dirty = true;
 
   w->start_at_line_beg = (bytepos == BEGV_BYTE
 			  || FETCH_BYTE (bytepos - 1) == '\n');
@@ -6949,7 +6928,7 @@ from the top of the window.  */)
       Fvertical_motion (make_fixnum (- (height / 2)), window, Qnil);
       set_marker_both (w->start, w->contents, PT, PT_BYTE);
       w->start_at_line_beg = !NILP (Fbolp ());
-      w->start_instruct = WINDOW_START_BESPOKE;
+      w->start_dirty = true;
     }
   else
     Fgoto_char (w->start);

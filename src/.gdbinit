@@ -394,8 +394,8 @@ define pwinx
     printf "invalid"
   end
   printf " vscroll=%d", $w->vscroll
-  if ($w->start_instruct != 0)
-    printf " FORCE_START"
+  if ($w->start_dirty)
+    printf " START_DIRTY"
   end
   if ($w->must_be_updated_p)
     printf " MUST_UPD"
