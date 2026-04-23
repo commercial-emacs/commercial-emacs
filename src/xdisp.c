@@ -742,8 +742,8 @@ static Lisp_Object redisplay_window_error (Lisp_Object);
 static bool move_cursor (struct window *, struct glyph_row *,
 			 struct glyph_matrix *, ptrdiff_t, ptrdiff_t,
 			 int, int);
-static bool enforce_cursor_visible_p (struct window *);
-static bool try_scroll_cursor_row_p (struct window *, bool, bool);
+static bool insist_fully_visible_cursor (struct window *);
+static bool try_scrolling_cursor_row (struct window *, bool);
 static bool update_menu_bar (struct frame *, bool, bool);
 static bool try_window_reusing_current_matrix (struct window *);
 static int try_window_insdel (struct window *);
@@ -14830,8 +14830,8 @@ redisplay_internal (void)
 	      eassert (static_sline_vpos == it.vpos);
 	      eassert (static_sline_y == it.current_y);
 	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
-	      if (enforce_cursor_visible_p (w) &&
-		  try_scroll_cursor_row_p (w, false, true))
+	      if (insist_fully_visible_cursor (w) &&
+		  try_scrolling_cursor_row (w, true))
 		goto cancel;
 	      else
 		goto update;
@@ -15990,7 +15990,7 @@ run_window_scroll_functions (Lisp_Object window, struct text_pos startp)
 /* True if make-cursor-line-fully-visible demands enforcement for W.  */
 
 static bool
-enforce_cursor_visible_p (struct window *w)
+insist_fully_visible_cursor (struct window *w)
 {
   Lisp_Object mclfv_p = WINDOW_BUFFER_LOCAL_VALUE (Qmake_cursor_line_fully_visible, w);
   if (EQ (mclfv_p, Qunbound))
@@ -16008,39 +16008,23 @@ enforce_cursor_visible_p (struct window *w)
 }
 
 
-/* Make sure the line containing the cursor is fully visible.
-   A value of true means there is nothing to be done.
-   (Either the line is fully visible, or it cannot be made so,
-   or we cannot tell.)
-
-   If FORCE_P, try to scroll the degenerate case.
-
-   If CURRENT_MATRIX_P, use the information from the
+/* If CURRENT_MATRIX_P, use the information from the
    window's current glyph matrix; otherwise use the desired glyph
    matrix.
 
-   A value of false means the caller should do scrolling
-   as if point had gone off the screen.  */
+   True means the caller should scroll to recover point.  */
 
 static bool
-try_scroll_cursor_row_p (struct window *w, bool force_p,
-			 bool current_matrix_p)
+try_scrolling_cursor_row (struct window *w, bool current_matrix_p)
 {
-  /* It's not always possible to find the cursor, e.g, when a window
-     is full of overlay strings.  Don't do anything in that case.  */
   if (w->cursor.vpos < 0)
     return false;
 
   struct glyph_matrix *matrix = current_matrix_p ? w->current_matrix : w->desired_matrix;
   struct glyph_row *row = MATRIX_ROW (matrix, w->cursor.vpos);
 
-  if (!MATRIX_ROW_PARTIALLY_VISIBLE_P (w, row))
-    return false;
-
-  /* Degenerate: cursor row taller than window. */
-  int window_height = window_box_height (w);
-  bool forceable = force_p && !MINI_WINDOW_P (w) && !w->vscroll && w->cursor.vpos;
-  return row->height < window_height || forceable;
+  return (MATRIX_ROW_PARTIALLY_VISIBLE_P (w, row)
+	  && row->height < window_box_height (w));
 }
 
 
@@ -16372,8 +16356,8 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
       /* If cursor ends up on a partially visible line,
 	 treat that as being off the bottom of the screen.  */
-      if (enforce_cursor_visible_p (w) &&
-	  try_scroll_cursor_row_p (w, extra_scroll_margin_lines <= 1, false)
+      if (insist_fully_visible_cursor (w) &&
+	  try_scrolling_cursor_row (w, false)
 	  /* It's possible that the cursor is on the first line of the
 	     buffer, which is partially obscured due to a vscroll
 	     (Bug#7537).  In that case, avoid looping forever. */
@@ -16683,7 +16667,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 		  any chance, since then MATRIX_ROW_PARTIALLY_VISIBLE_P
 		  might yield true.  */
 	       && !row->mode_line_p
-	       && enforce_cursor_visible_p (w))
+	       && insist_fully_visible_cursor (w))
 	{
 	  if (PT == MATRIX_ROW_END_CHARPOS (row)
 	      && !row->ends_at_zv_p
@@ -16701,8 +16685,8 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	  else
 	    {
 	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
-	      if (enforce_cursor_visible_p (w) &&
-		  try_scroll_cursor_row_p (w, false, true))
+	      if (insist_fully_visible_cursor (w) &&
+		  try_scrolling_cursor_row (w, true))
 		rc = CURSOR_MOVEMENT_MUST_SCROLL;
 	      else
 		rc = CURSOR_MOVEMENT_SUCCESS;
@@ -17160,8 +17144,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  new_y = r ? MATRIX_ROW_BOTTOM_Y (r) : window_box_height (w) / 2;
 	}
 
-      if (enforce_cursor_visible_p (w) &&
-	  try_scroll_cursor_row_p (w, false, false))
+      if (insist_fully_visible_cursor (w) &&
+	  try_scrolling_cursor_row (w, false))
 	{
 	  /* Bump new_y back to the last visible line.  */
 	  new_y = WINDOW_Y_BOTTOM_BORDER (w);
@@ -17244,8 +17228,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	}
 
       if (w->cursor.vpos < 0
-	  || (enforce_cursor_visible_p (w) &&
-	      try_scroll_cursor_row_p (w, false, false)))
+	  || (insist_fully_visible_cursor (w) &&
+	      try_scrolling_cursor_row (w, false)))
 	{
 	  clear_glyph_matrix (w->desired_matrix);
 	  goto try_to_scroll;
@@ -17356,8 +17340,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
       if (w->cursor.vpos >= 0)
 	{
-	  if (enforce_cursor_visible_p (w) &&
-	      try_scroll_cursor_row_p (w, true, false))
+	  if (insist_fully_visible_cursor (w) &&
+	      try_scrolling_cursor_row (w, false))
 	    {
 	      clear_glyph_matrix (w->desired_matrix);
 	      last_line_misfit = true;
@@ -17647,7 +17631,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       move_cursor (w, row, matrix, 0, 0, 0, 0);
     }
 
-  if (enforce_cursor_visible_p (w) && try_scroll_cursor_row_p (w, false, false))
+  if (insist_fully_visible_cursor (w) && try_scrolling_cursor_row (w, false))
     {
       /* If vscroll is enabled, disable it and try again.  */
       if (w->vscroll)
@@ -19167,7 +19151,7 @@ try_window_insdel (struct window *w)
 	/* Old redisplay didn't take scroll margin into account at the bottom,
 	   but then global-hl-line-mode doesn't scroll.  KFS 2004-06-14 */
 	|| (w->cursor.y
-	    + (enforce_cursor_visible_p (w)
+	    + (insist_fully_visible_cursor (w)
 	       ? cursor_height + bot_scroll_margin
 	       : 1)) > it.last_visible_y)
       {
