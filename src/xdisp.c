@@ -743,7 +743,7 @@ static bool move_cursor (struct window *, struct glyph_row *,
 			 struct glyph_matrix *, ptrdiff_t, ptrdiff_t,
 			 int, int);
 static bool insist_fully_visible_cursor (struct window *);
-static bool try_scrolling_cursor_row (struct window *, struct glyph_matrix *);
+static bool partially_visible_cursor_row (struct window *, struct glyph_matrix *);
 static bool update_menu_bar (struct frame *, bool, bool);
 static bool try_window_reusing_current_matrix (struct window *);
 static int try_window_insdel (struct window *);
@@ -14831,7 +14831,7 @@ redisplay_internal (void)
 	      eassert (static_sline_y == it.current_y);
 	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
 	      if (insist_fully_visible_cursor (w) &&
-		  try_scrolling_cursor_row (w, w->current_matrix))
+		  partially_visible_cursor_row (w, w->current_matrix))
 		goto cancel;
 	      else
 		goto update;
@@ -15987,37 +15987,32 @@ run_window_scroll_functions (Lisp_Object window, struct text_pos startp)
 }
 
 
-/* True if make-cursor-line-fully-visible demands enforcement for W.  */
+/* True if make-cursor-line-fully-visible.  */
 
 static bool
 insist_fully_visible_cursor (struct window *w)
 {
-  Lisp_Object mclfv_p = WINDOW_BUFFER_LOCAL_VALUE (Qmake_cursor_line_fully_visible, w);
-  if (EQ (mclfv_p, Qunbound))
-    mclfv_p = Vmake_cursor_line_fully_visible;
-  if (NILP (mclfv_p))
-    return false;
-  if (FUNCTIONP (mclfv_p))
+  Lisp_Object blv = WINDOW_BUFFER_LOCAL_VALUE (Qmake_cursor_line_fully_visible, w);
+  Lisp_Object var = EQ (blv, Qunbound) ? Vmake_cursor_line_fully_visible : blv;
+  if (FUNCTIONP (var))
     {
       Lisp_Object window;
       XSETWINDOW (window, w);
-      /* If the function signals an error, we will NOT scroll.  */
-      return !NILP (dsafe_call1 (mclfv_p, window));
+      return !NILP (dsafe_call1 (var, window));
     }
-  return true;
+  return !NILP (var);
 }
 
 
 /* True means the caller should scroll to recover point.  */
 
 static bool
-try_scrolling_cursor_row (struct window *w, struct glyph_matrix *matrix)
+partially_visible_cursor_row (struct window *w, struct glyph_matrix *matrix)
 {
   if (w->cursor.vpos < 0)
     return false;
 
   struct glyph_row *row = MATRIX_ROW (matrix, w->cursor.vpos);
-
   return (MATRIX_ROW_PARTIALLY_VISIBLE_P (w, row)
 	  && row->height < window_box_height (w));
 }
@@ -16025,9 +16020,6 @@ try_scrolling_cursor_row (struct window *w, struct glyph_matrix *matrix)
 
 /* Try scrolling PT into view in window WINDOW.  JUST_THIS_ONE_P
    means only WINDOW is redisplayed in redisplay_internal.
-   TEMP_SCROLL_STEP has the same meaning as emacs_scroll_step, and is used
-   in redisplay_window to bring a partially visible line into view in
-   the case that only the cursor has moved.
 
    LAST_LINE_MISFIT should be true if we're scrolling because the
    last screen line's vertical height extends past the end of the screen.
@@ -16065,7 +16057,7 @@ enum
 static int
 try_scrolling (Lisp_Object window, bool just_this_one_p,
 	       intmax_t arg_scroll_conservatively, intmax_t scroll_step,
-	       bool temp_scroll_step, bool last_line_misfit)
+	       bool last_line_misfit)
 {
   struct window *w = XWINDOW (window);
   struct text_pos pos, startp;
@@ -16092,12 +16084,12 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
       arg_scroll_conservatively = scroll_limit + 1;
       scroll_max = scroll_limit * frame_line_height;
     }
-  else if (0 < scroll_step || 0 < arg_scroll_conservatively || temp_scroll_step)
+  else if (0 < scroll_step || 0 < arg_scroll_conservatively)
     /* Compute how much we should try to scroll maximally to bring
        point into view.  */
     {
       intmax_t scroll_lines_max
-	= max (scroll_step, max (arg_scroll_conservatively, temp_scroll_step));
+	= max (scroll_step, arg_scroll_conservatively);
       int scroll_lines = clip_to_bounds (0, scroll_lines_max, 1000000);
       scroll_max = scroll_lines * frame_line_height;
     }
@@ -16194,7 +16186,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	amount_to_scroll
 	  = min (max (dy, frame_line_height),
 		 frame_line_height * arg_scroll_conservatively);
-      else if (scroll_step || temp_scroll_step)
+      else if (scroll_step)
 	amount_to_scroll = scroll_max;
       else
 	{
@@ -16301,7 +16293,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	    amount_to_scroll
 	      = min (max (dy, frame_line_height),
 		     frame_line_height * arg_scroll_conservatively);
-	  else if (scroll_step || temp_scroll_step)
+	  else if (scroll_step)
 	    amount_to_scroll = scroll_max;
 	  else
 	    {
@@ -16352,7 +16344,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
       /* If cursor ends up on a partially visible line,
 	 treat that as being off the bottom of the screen.  */
       if (insist_fully_visible_cursor (w) &&
-	  try_scrolling_cursor_row (w, w->desired_matrix)
+	  partially_visible_cursor_row (w, w->desired_matrix)
 	  /* It's possible that the cursor is on the first line of the
 	     buffer, which is partially obscured due to a vscroll
 	     (Bug#7537).  In that case, avoid looping forever. */
@@ -16456,16 +16448,13 @@ enum
 
    CURSOR_MOVEMENT_SUCCESS if successful
 
-   CURSOR_MOVEMENT_MUST_SCROLL if scrolling required.  *SCROLL_STEP is
-   assigned true if `scroll-step' (emacs_scroll_step) needs to be
-   assigned 1 for scrolling.
+   CURSOR_MOVEMENT_MUST_SCROLL if scrolling required.
 
    CURSOR_MOVEMENT_NEED_LARGER_MATRICES, in which case abort this
    redisplay, and expand matrices first.  */
 
 static int
-try_cursor_movement (Lisp_Object window, struct text_pos startp,
-		     bool *scroll_step)
+try_cursor_movement (Lisp_Object window, struct text_pos startp)
 {
   struct window *w = XWINDOW (window);
   struct frame *f = XFRAME (w->frame);
@@ -16657,34 +16646,21 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
       if (must_scroll)
 	;
       else if (rc != CURSOR_MOVEMENT_SUCCESS
-	       && MATRIX_ROW_PARTIALLY_VISIBLE_P (w, row)
 	       /* Make sure this isn't a header line nor a tab-line by
 		  any chance, since then MATRIX_ROW_PARTIALLY_VISIBLE_P
 		  might yield true.  */
 	       && !row->mode_line_p
-	       && insist_fully_visible_cursor (w))
+	       && insist_fully_visible_cursor (w)
+	       && partially_visible_cursor_row (w, w->current_matrix))
 	{
 	  if (PT == MATRIX_ROW_END_CHARPOS (row)
 	      && !row->ends_at_zv_p
 	      && !MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (row))
 	    rc = CURSOR_MOVEMENT_MUST_SCROLL;
-	  else if (row->height > window_box_height (w))
-	    {
-	      /* If we end up in a partially visible line, let's
-		 make it fully visible, except when it's taller
-		 than the window, in which case we can't do much
-		 about it.  */
-	      *scroll_step = true;
-	      rc = CURSOR_MOVEMENT_MUST_SCROLL;
-	    }
 	  else
 	    {
 	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
-	      if (insist_fully_visible_cursor (w) &&
-		  try_scrolling_cursor_row (w, w->current_matrix))
-		rc = CURSOR_MOVEMENT_MUST_SCROLL;
-	      else
-		rc = CURSOR_MOVEMENT_SUCCESS;
+	      rc = CURSOR_MOVEMENT_MUST_SCROLL;
 	    }
 	}
       else if (scroll_p)
@@ -16929,7 +16905,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
   int tem, centering_position = -1;
   bool used_current_matrix_p = false;
-  bool temp_scroll_step = false;
   bool last_line_misfit = false;
 
   specpdl_ref count = SPECPDL_INDEX ();
@@ -17140,7 +17115,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	}
 
       if (insist_fully_visible_cursor (w) &&
-	  try_scrolling_cursor_row (w, w->desired_matrix))
+	  partially_visible_cursor_row (w, w->desired_matrix))
 	{
 	  /* Bump new_y back to the last visible line.  */
 	  new_y = WINDOW_Y_BOTTOM_BORDER (w);
@@ -17224,7 +17199,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
       if (w->cursor.vpos < 0
 	  || (insist_fully_visible_cursor (w) &&
-	      try_scrolling_cursor_row (w, w->desired_matrix)))
+	      partially_visible_cursor_row (w, w->desired_matrix)))
 	{
 	  clear_glyph_matrix (w->desired_matrix);
 	  goto try_to_scroll;
@@ -17239,7 +17214,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
      not moved off the frame, and we are not retrying after hscroll.
      (current_matrix_up_to_date_p is true when retrying.)  */
   if (current_matrix_up_to_date_p
-      && (tem = try_cursor_movement (window, wstart, &temp_scroll_step),
+      && (tem = try_cursor_movement (window, wstart),
 	  tem != CURSOR_MOVEMENT_CANNOT_BE_USED))
     {
       switch (tem)
@@ -17336,7 +17311,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       if (w->cursor.vpos >= 0)
 	{
 	  if (insist_fully_visible_cursor (w) &&
-	      try_scrolling_cursor_row (w, w->desired_matrix))
+	      partially_visible_cursor_row (w, w->desired_matrix))
 	    {
 	      clear_glyph_matrix (w->desired_matrix);
 	      last_line_misfit = true;
@@ -17366,7 +17341,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  distinguish these two use cases?  */
        || (scroll_minibuffer_conservatively && MINI_WINDOW_P (w))
        || 0 < emacs_scroll_step
-       || temp_scroll_step
        || NUMBERP (BVAR (current_buffer, scroll_up_aggressively))
        || NUMBERP (BVAR (current_buffer, scroll_down_aggressively)))
       && CHARPOS (wstart) >= BEGV
@@ -17380,7 +17354,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 			       ? SCROLL_LIMIT + 1
 			       : scroll_conservatively),
 			      emacs_scroll_step,
-			      temp_scroll_step, last_line_misfit);
+			      last_line_misfit);
       switch (ss)
 	{
 	case SCROLLING_SUCCESS:
@@ -17626,7 +17600,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       move_cursor (w, row, matrix, 0, 0, 0, 0);
     }
 
-  if (insist_fully_visible_cursor (w) && try_scrolling_cursor_row (w, w->desired_matrix))
+  if (insist_fully_visible_cursor (w) && partially_visible_cursor_row (w, w->desired_matrix))
     {
       /* If vscroll is enabled, disable it and try again.  */
       if (w->vscroll)
