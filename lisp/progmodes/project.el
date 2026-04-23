@@ -2139,7 +2139,7 @@ is part of the default mode line beginning with Emacs 30."
       (setq-local project-current-directory-override user-emacs-directory)
       (put 'project-current-directory-override 'permanent-local t))))
 
-(unless noninteractive
+(unless (or noninteractive (getenv "TEST_INTERACTIVE"))
   (add-hook 'kill-emacs-hook #'project--write-project-list))
 
 (provide 'project)
