@@ -742,7 +742,8 @@ static Lisp_Object redisplay_window_error (Lisp_Object);
 static bool move_cursor (struct window *, struct glyph_row *,
 			 struct glyph_matrix *, ptrdiff_t, ptrdiff_t,
 			 int, int);
-static bool cursor_row_fully_visible_p (struct window *, bool, bool, bool);
+static bool enforce_cursor_visible_p (struct window *);
+static bool try_scroll_cursor_row_p (struct window *, bool, bool);
 static bool update_menu_bar (struct frame *, bool, bool);
 static bool try_window_reusing_current_matrix (struct window *);
 static int try_window_insdel (struct window *);
@@ -14829,10 +14830,11 @@ redisplay_internal (void)
 	      eassert (static_sline_vpos == it.vpos);
 	      eassert (static_sline_y == it.current_y);
 	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
-	      if (cursor_row_fully_visible_p (w, false, true, false))
-		goto update;
-	      else
+	      if (enforce_cursor_visible_p (w) &&
+		  try_scroll_cursor_row_p (w, false, true))
 		goto cancel;
+	      else
+		goto update;
 	    }
 	  else
 	    goto cancel;
@@ -15985,80 +15987,60 @@ run_window_scroll_functions (Lisp_Object window, struct text_pos startp)
 }
 
 
+/* True if make-cursor-line-fully-visible demands enforcement for W.  */
+
+static bool
+enforce_cursor_visible_p (struct window *w)
+{
+  Lisp_Object mclfv_p = WINDOW_BUFFER_LOCAL_VALUE (Qmake_cursor_line_fully_visible, w);
+  if (EQ (mclfv_p, Qunbound))
+    mclfv_p = Vmake_cursor_line_fully_visible;
+  if (NILP (mclfv_p))
+    return false;
+  if (FUNCTIONP (mclfv_p))
+    {
+      Lisp_Object window;
+      XSETWINDOW (window, w);
+      /* If the function signals an error, we will NOT scroll.  */
+      return !NILP (dsafe_call1 (mclfv_p, window));
+    }
+  return true;
+}
+
+
 /* Make sure the line containing the cursor is fully visible.
    A value of true means there is nothing to be done.
    (Either the line is fully visible, or it cannot be made so,
    or we cannot tell.)
 
-   If FORCE_P, return false even if partial visible cursor row
-   is higher than window.
+   If FORCE_P, try to scroll the degenerate case.
 
    If CURRENT_MATRIX_P, use the information from the
    window's current glyph matrix; otherwise use the desired glyph
    matrix.
 
-   If JUST_TEST_USER_PREFERENCE_P, just test what the value of
-   make-cursor-row-fully-visible requires, don't test the actual
-   cursor position.  The assumption is that in that case the caller
-   performs the necessary testing of the cursor position.
-
    A value of false means the caller should do scrolling
    as if point had gone off the screen.  */
 
 static bool
-cursor_row_fully_visible_p (struct window *w, bool force_p,
-			    bool current_matrix_p,
-			    bool just_test_user_preference_p)
+try_scroll_cursor_row_p (struct window *w, bool force_p,
+			 bool current_matrix_p)
 {
-  struct glyph_matrix *matrix;
-  struct glyph_row *row;
-  int window_height;
-  Lisp_Object mclfv_p = WINDOW_BUFFER_LOCAL_VALUE (Qmake_cursor_line_fully_visible, w);
-
-  /* If no local binding, use the global value.  */
-  if (EQ (mclfv_p, Qunbound))
-    mclfv_p = Vmake_cursor_line_fully_visible;
-  /* Follow mode sets the variable to a Lisp function in buffers that
-     are under Follow mode.  */
-  if (FUNCTIONP (mclfv_p))
-    {
-      Lisp_Object window;
-      XSETWINDOW (window, w);
-      /* If the function we call here signals an error, we will NOT
-	 scroll when the cursor is partially-visible.  */
-      Lisp_Object val = dsafe_call1 (mclfv_p, window);
-      if (NILP (val))
-	return true;
-      else if (just_test_user_preference_p)
-	return false;
-    }
-  else if (NILP (mclfv_p))
-    return true;
-  else if (just_test_user_preference_p)
-    return false;
-
   /* It's not always possible to find the cursor, e.g, when a window
      is full of overlay strings.  Don't do anything in that case.  */
   if (w->cursor.vpos < 0)
-    return true;
+    return false;
 
-  matrix = current_matrix_p ? w->current_matrix : w->desired_matrix;
-  row = MATRIX_ROW (matrix, w->cursor.vpos);
+  struct glyph_matrix *matrix = current_matrix_p ? w->current_matrix : w->desired_matrix;
+  struct glyph_row *row = MATRIX_ROW (matrix, w->cursor.vpos);
 
-  /* If the cursor row is not partially visible, there's nothing to do.  */
   if (!MATRIX_ROW_PARTIALLY_VISIBLE_P (w, row))
-    return true;
+    return false;
 
-  /* If the row the cursor is in is taller than the window's height,
-     it's not clear what to do, so do nothing.  */
-  window_height = window_box_height (w);
-  if (row->height >= window_height)
-    {
-      if (!force_p || MINI_WINDOW_P (w)
-	  || w->vscroll || w->cursor.vpos == 0)
-	return true;
-    }
-  return false;
+  /* Degenerate: cursor row taller than window. */
+  int window_height = window_box_height (w);
+  bool forceable = force_p && !MINI_WINDOW_P (w) && !w->vscroll && w->cursor.vpos;
+  return row->height < window_height || forceable;
 }
 
 
@@ -16390,8 +16372,8 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
       /* If cursor ends up on a partially visible line,
 	 treat that as being off the bottom of the screen.  */
-      if (!cursor_row_fully_visible_p (w, extra_scroll_margin_lines <= 1,
-					false, false)
+      if (enforce_cursor_visible_p (w) &&
+	  try_scroll_cursor_row_p (w, extra_scroll_margin_lines <= 1, false)
 	  /* It's possible that the cursor is on the first line of the
 	     buffer, which is partially obscured due to a vscroll
 	     (Bug#7537).  In that case, avoid looping forever. */
@@ -16701,7 +16683,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 		  any chance, since then MATRIX_ROW_PARTIALLY_VISIBLE_P
 		  might yield true.  */
 	       && !row->mode_line_p
-	       && !cursor_row_fully_visible_p (w, true, true, true))
+	       && enforce_cursor_visible_p (w))
 	{
 	  if (PT == MATRIX_ROW_END_CHARPOS (row)
 	      && !row->ends_at_zv_p
@@ -16719,7 +16701,8 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp,
 	  else
 	    {
 	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
-	      if (!cursor_row_fully_visible_p (w, false, true, false))
+	      if (enforce_cursor_visible_p (w) &&
+		  try_scroll_cursor_row_p (w, false, true))
 		rc = CURSOR_MOVEMENT_MUST_SCROLL;
 	      else
 		rc = CURSOR_MOVEMENT_SUCCESS;
@@ -16964,7 +16947,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
   struct it it;
   struct window *w = XWINDOW (window);
   struct frame *f = XFRAME (w->frame);
-  struct text_pos wstart;
 
   int tem, centering_position = -1;
   bool used_current_matrix_p = false;
@@ -17111,13 +17093,14 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
         }
     }
 
+  struct text_pos wstart;
   SET_TEXT_POS_FROM_MARKER (wstart, w->start);
 
   if (!BASE_LINE_NUMBER_VALID_P (w))
     /* Forget any recorded base line for line number display.  */
     w->base_line_number = 0;
 
- bespoke_start:
+ dirty_start:
 
   if (w->start_dirty)
     {
@@ -17153,16 +17136,18 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  goto need_larger_matrices;
 	}
 
+      /*
+	Assign new_y.
+	try_window assigned cursor.vpos if point within glyph matrix.
+      */
       int new_y = -1;
       if (w->cursor.vpos < 0)
 	{
-	  /* Point did not appear. If point is in invisible text, move
-	     it one past.  */
+	  /* try_window did not assign.  If not invisible text, then
+	     set new_y to median row.  */
 	  struct glyph_row *r = NULL;
-	  Lisp_Object invprop =
-	    get_char_property_and_overlay (make_fixnum (PT), Qinvisible,
-					   Qnil, NULL);
-
+	  Lisp_Object invprop = get_char_property_and_overlay
+	    (make_fixnum (PT), Qinvisible, Qnil, NULL);
 	  if (TEXT_PROP_MEANS_INVISIBLE (invprop) != 0)
 	    {
 	      Lisp_Object invprop_end =
@@ -17175,13 +17160,15 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  new_y = r ? MATRIX_ROW_BOTTOM_Y (r) : window_box_height (w) / 2;
 	}
 
-      if (!cursor_row_fully_visible_p (w, false, false, false))
+      if (enforce_cursor_visible_p (w) &&
+	  try_scroll_cursor_row_p (w, false, false))
 	{
-	  /* Move it back to a fully-visible line.  */
+	  /* Bump new_y back to the last visible line.  */
 	  new_y = WINDOW_Y_BOTTOM_BORDER (w);
 	}
       else if (w->cursor.vpos >= 0)
 	{
+	  /* Bump past margin, tab, and header lines.  */
 	  bool tab_line = window_wants_tab_line (w);
 	  bool header_line = window_wants_header_line (w);
 
@@ -17209,8 +17196,9 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	    }
 	}
 
-      if (new_y >= 0) /* need to move point for visibility */
+      if (new_y >= 0)
 	{
+	  /* End run to set window point and cursor.  */
 	  struct glyph_row *row;
 	  for (row = MATRIX_FIRST_TEXT_ROW (w->desired_matrix);
 	       row < MATRIX_BOTTOM_TEXT_ROW (w->desired_matrix, w);
@@ -17239,7 +17227,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  XBUFFER (w->contents)->text->redisplay = false;
 	  dsafe_calln (true, Vpre_redisplay_function, Fcons (window, Qnil));
 
-	  if (w->redisplay || XBUFFER (w->contents)->text->redisplay
+	  if (w->redisplay
+	      || XBUFFER (w->contents)->text->redisplay
 	      || ((EQ (Vdisplay_line_numbers, Qrelative)
 		   || EQ (Vdisplay_line_numbers, Qvisual))
 		  && row != MATRIX_FIRST_TEXT_ROW (w->desired_matrix)))
@@ -17249,13 +17238,14 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 		 under display-line-numbers = relative mode.  We need
 		 another round of redisplay.  */
 	      clear_glyph_matrix (w->desired_matrix);
-	      if (!try_window (window, wstart, 0))
+	      if (0 == try_window (window, wstart, 0))
 		goto need_larger_matrices;
 	    }
 	}
 
       if (w->cursor.vpos < 0
-	  || !cursor_row_fully_visible_p (w, false, false, false))
+	  || (enforce_cursor_visible_p (w) &&
+	      try_scroll_cursor_row_p (w, false, false)))
 	{
 	  clear_glyph_matrix (w->desired_matrix);
 	  goto try_to_scroll;
@@ -17339,7 +17329,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	{
 	  w->start_dirty = true;
 	  SET_TEXT_POS_FROM_MARKER (wstart, w->start);
-	  goto bespoke_start;
+	  goto dirty_start;
       	}
 
       /* Try to redisplay starting at same place as before.
@@ -17366,7 +17356,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
       if (w->cursor.vpos >= 0)
 	{
-	  if (!cursor_row_fully_visible_p (w, true, false, false))
+	  if (enforce_cursor_visible_p (w) &&
+	      try_scroll_cursor_row_p (w, true, false))
 	    {
 	      clear_glyph_matrix (w->desired_matrix);
 	      last_line_misfit = true;
@@ -17656,7 +17647,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       move_cursor (w, row, matrix, 0, 0, 0, 0);
     }
 
-  if (!cursor_row_fully_visible_p (w, false, false, false))
+  if (enforce_cursor_visible_p (w) && try_scroll_cursor_row_p (w, false, false))
     {
       /* If vscroll is enabled, disable it and try again.  */
       if (w->vscroll)
@@ -17892,16 +17883,14 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
   struct it it;
   struct glyph_row *last_text_row = NULL;
   struct frame *f = XFRAME (w->frame);
-  int cursor_vpos = w->cursor.vpos;
 
-  /* Make POS the new window start.  */
-  set_marker_both (w->start, Qnil, CHARPOS (pos), BYTEPOS (pos));
-
-  /* Mark cursor position as unknown.  No overlay arrow seen.  */
+  /* Stash previous display cycle's cursor, now rediscover it. */
+  const int former_cursor_vpos = w->cursor.vpos;
   w->cursor.vpos = -1;
   overlay_arrow_seen = false;
 
-  /* Initialize iterator and info to start at POS.  */
+  /* Make POS the new window start.  */
+  set_marker_both (w->start, Qnil, CHARPOS (pos), BYTEPOS (pos));
   start_move_it (&it, w, pos);
   it.glyph_row->reversed_p = false;
 
@@ -17910,7 +17899,7 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
     {
       int last_row_scale = it.w->nrows_scale_factor,
 	last_col_scale = it.w->ncols_scale_factor;
-      if (display_sline (&it, cursor_vpos))
+      if (display_sline (&it, former_cursor_vpos))
 	last_text_row = it.glyph_row - 1;
       if (f->fonts_changed
 	  && (!(flags & TRY_WINDOW_IGNORE_FONTS_CHANGE)
@@ -17920,9 +17909,8 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
 	return 0;
     }
 
-  /* Save the character position of 'it' before we call
-     'start_move_it' again.  */
-  ptrdiff_t it_charpos = IT_CHARPOS (it);
+  /* Stash charpos before start_move_it.  */
+  const ptrdiff_t it_charpos = IT_CHARPOS (it);
 
   /* Don't let the cursor end in the scroll margins.  However, when
      the window is vscrolled, we leave it to vscroll to handle the
@@ -17940,12 +17928,10 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
       if ((w->cursor.y >= 0
 	   && w->cursor.y < top_scroll_margin
 	   && CHARPOS (pos) > BEGV)
-	  /* rms: considering make_cursor_line_fully_visible_p here
-	     seems to give wrong results.  We don't want to recenter
-	     when the last line is partly visible, we want to allow
-	     that case to be handled in the usual way.  */
-	  || w->cursor.y > (it.last_visible_y - partial_line_height (&it)
-			    - bot_scroll_margin - 1))
+	  || w->cursor.y > (it.last_visible_y
+			    - partial_line_height (&it)
+			    - bot_scroll_margin
+			    - 1))
 	{
 	  w->cursor.vpos = -1;
 	  clear_glyph_matrix (w->desired_matrix);
@@ -17964,9 +17950,8 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
     {
       eassert (MATRIX_ROW_DISPLAYS_TEXT_P (last_text_row));
       adjust_window_ends (w, last_text_row, false);
-      eassert
-	(MATRIX_ROW_DISPLAYS_TEXT_P (MATRIX_ROW (w->desired_matrix,
-						 w->window_end_vpos)));
+      eassert (MATRIX_ROW_DISPLAYS_TEXT_P (MATRIX_ROW (w->desired_matrix,
+						       w->window_end_vpos)));
     }
   else
     {
@@ -17975,7 +17960,7 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
       w->window_end_vpos = 0;
     }
 
-  /* But that is not valid info until redisplay finishes.  */
+  /* Not valid until redisplay finishes.  */
   w->window_end_valid = false;
   return 1;
 }
@@ -19182,9 +19167,9 @@ try_window_insdel (struct window *w)
 	/* Old redisplay didn't take scroll margin into account at the bottom,
 	   but then global-hl-line-mode doesn't scroll.  KFS 2004-06-14 */
 	|| (w->cursor.y
-	    + (cursor_row_fully_visible_p (w, false, true, true)
-	       ? 1
-	       : cursor_height + bot_scroll_margin)) > it.last_visible_y)
+	    + (enforce_cursor_visible_p (w)
+	       ? cursor_height + bot_scroll_margin
+	       : 1)) > it.last_visible_y)
       {
 	w->cursor.vpos = -1;
 	clear_glyph_matrix (w->desired_matrix);
