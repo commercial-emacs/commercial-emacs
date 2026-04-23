@@ -10922,6 +10922,8 @@ that text."
     (remove-function filter-buffer-substring-function
                      #'kill-ring-deindent-buffer-substring-function)))
 
+(make-obsolete-variable 'make-cursor-line-fully-visible nil "31.0")
+
 (provide 'simple)
 
 ;;; simple.el ends here

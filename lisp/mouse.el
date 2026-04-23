@@ -1760,7 +1760,6 @@ The region will be defined with mark and point."
          (_ (mouse-set-point start-event))
          (echo-keystrokes 0)
 	 (bounds (window-edges start-window))
-	 (make-cursor-line-fully-visible nil)
 	 (top (nth 1 bounds))
 	 (bottom (if (or (window-minibuffer-p start-window)
                          ;; Do not account for the mode line if there

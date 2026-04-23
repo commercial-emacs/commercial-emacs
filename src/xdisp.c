@@ -742,8 +742,7 @@ static Lisp_Object redisplay_window_error (Lisp_Object);
 static bool move_cursor (struct window *, struct glyph_row *,
 			 struct glyph_matrix *, ptrdiff_t, ptrdiff_t,
 			 int, int);
-static bool insist_fully_visible_cursor (struct window *);
-static bool partially_visible_cursor_row (struct window *, struct glyph_matrix *);
+static bool partially_visible_cursor (struct window *, struct glyph_matrix *);
 static bool update_menu_bar (struct frame *, bool, bool);
 static bool try_window_reusing_current_matrix (struct window *);
 static int try_window_insdel (struct window *);
@@ -14830,8 +14829,7 @@ redisplay_internal (void)
 	      eassert (static_sline_vpos == it.vpos);
 	      eassert (static_sline_y == it.current_y);
 	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
-	      if (insist_fully_visible_cursor (w) &&
-		  partially_visible_cursor_row (w, w->current_matrix))
+	      if (partially_visible_cursor (w, w->current_matrix))
 		goto cancel;
 	      else
 		goto update;
@@ -15986,28 +15984,10 @@ run_window_scroll_functions (Lisp_Object window, struct text_pos startp)
   return startp;
 }
 
-
-/* True if make-cursor-line-fully-visible.  */
-
-static bool
-insist_fully_visible_cursor (struct window *w)
-{
-  Lisp_Object blv = WINDOW_BUFFER_LOCAL_VALUE (Qmake_cursor_line_fully_visible, w);
-  Lisp_Object var = EQ (blv, Qunbound) ? Vmake_cursor_line_fully_visible : blv;
-  if (FUNCTIONP (var))
-    {
-      Lisp_Object window;
-      XSETWINDOW (window, w);
-      return !NILP (dsafe_call1 (var, window));
-    }
-  return !NILP (var);
-}
-
-
 /* True means the caller should scroll to recover point.  */
 
 static bool
-partially_visible_cursor_row (struct window *w, struct glyph_matrix *matrix)
+partially_visible_cursor (struct window *w, struct glyph_matrix *matrix)
 {
   if (w->cursor.vpos < 0)
     return false;
@@ -16343,8 +16323,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
       /* If cursor ends up on a partially visible line,
 	 treat that as being off the bottom of the screen.  */
-      if (insist_fully_visible_cursor (w) &&
-	  partially_visible_cursor_row (w, w->desired_matrix)
+      if (partially_visible_cursor (w, w->desired_matrix)
 	  /* It's possible that the cursor is on the first line of the
 	     buffer, which is partially obscured due to a vscroll
 	     (Bug#7537).  In that case, avoid looping forever. */
@@ -16650,8 +16629,7 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp)
 		  any chance, since then MATRIX_ROW_PARTIALLY_VISIBLE_P
 		  might yield true.  */
 	       && !row->mode_line_p
-	       && insist_fully_visible_cursor (w)
-	       && partially_visible_cursor_row (w, w->current_matrix))
+	       && partially_visible_cursor (w, w->current_matrix))
 	{
 	  if (PT == MATRIX_ROW_END_CHARPOS (row)
 	      && !row->ends_at_zv_p
@@ -17113,9 +17091,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	    }
 	  new_y = r ? MATRIX_ROW_BOTTOM_Y (r) : window_box_height (w) / 2;
 	}
-
-      if (insist_fully_visible_cursor (w) &&
-	  partially_visible_cursor_row (w, w->desired_matrix))
+      else if (partially_visible_cursor (w, w->desired_matrix))
 	{
 	  /* Bump new_y back to the last visible line.  */
 	  new_y = WINDOW_Y_BOTTOM_BORDER (w);
@@ -17171,26 +17147,18 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
 	  move_cursor (w, row, w->desired_matrix, 0, 0, 0, 0);
 
-	  /* Re-run pre-redisplay-function so it can update the region
-	     according to the new position of point. Other than the
-	     cursor, W's redisplay is done so we can set its redisplay
-	     to false.  Also the buffer's redisplay can be set to false,
-	     since propagate_buffer_redisplay should have already
-	     propagated its info to W anyway.  */
+	  /* Rerun pre-redisplay-function for the new position,
+	     possibly necessitating redisplay.  */
 	  w->redisplay = false;
 	  XBUFFER (w->contents)->text->redisplay = false;
 	  dsafe_calln (true, Vpre_redisplay_function, Fcons (window, Qnil));
 
 	  if (w->redisplay
 	      || XBUFFER (w->contents)->text->redisplay
-	      || ((EQ (Vdisplay_line_numbers, Qrelative)
+	      || ((EQ (Vdisplay_line_numbers, Qrelative) /* hack */
 		   || EQ (Vdisplay_line_numbers, Qvisual))
 		  && row != MATRIX_FIRST_TEXT_ROW (w->desired_matrix)))
 	    {
-	      /* Either pre-redisplay-function made changes (e.g. move
-		 the region), or we moved point in a window that is
-		 under display-line-numbers = relative mode.  We need
-		 another round of redisplay.  */
 	      clear_glyph_matrix (w->desired_matrix);
 	      if (0 == try_window (window, wstart, 0))
 		goto need_larger_matrices;
@@ -17198,8 +17166,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	}
 
       if (w->cursor.vpos < 0
-	  || (insist_fully_visible_cursor (w) &&
-	      partially_visible_cursor_row (w, w->desired_matrix)))
+	  || (partially_visible_cursor (w, w->desired_matrix)))
 	{
 	  clear_glyph_matrix (w->desired_matrix);
 	  goto try_to_scroll;
@@ -17310,8 +17277,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
       if (w->cursor.vpos >= 0)
 	{
-	  if (insist_fully_visible_cursor (w) &&
-	      partially_visible_cursor_row (w, w->desired_matrix))
+	  if (partially_visible_cursor (w, w->desired_matrix))
 	    {
 	      clear_glyph_matrix (w->desired_matrix);
 	      last_line_misfit = true;
@@ -17600,7 +17566,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       move_cursor (w, row, matrix, 0, 0, 0, 0);
     }
 
-  if (insist_fully_visible_cursor (w) && partially_visible_cursor_row (w, w->desired_matrix))
+  if (partially_visible_cursor (w, w->desired_matrix))
     {
       /* If vscroll is enabled, disable it and try again.  */
       if (w->vscroll)
@@ -19119,10 +19085,7 @@ try_window_insdel (struct window *w)
 	 && CHARPOS (start) > BEGV)
 	/* Old redisplay didn't take scroll margin into account at the bottom,
 	   but then global-hl-line-mode doesn't scroll.  KFS 2004-06-14 */
-	|| (w->cursor.y
-	    + (insist_fully_visible_cursor (w)
-	       ? cursor_height + bot_scroll_margin
-	       : 1)) > it.last_visible_y)
+	|| (w->cursor.y + cursor_height + bot_scroll_margin) > it.last_visible_y)
       {
 	w->cursor.vpos = -1;
 	clear_glyph_matrix (w->desired_matrix);
@@ -33436,16 +33399,6 @@ after setting `recenter-redisplay' to the value of t.  */);
   DEFVAR_BOOL ("auto-raise-tool-bar-buttons", auto_raise_tool_bar_buttons_p,
     doc: /* Non-nil means raise tool-bar buttons when the mouse moves over them.  */);
   auto_raise_tool_bar_buttons_p = true;
-
-  DEFVAR_LISP ("make-cursor-line-fully-visible", Vmake_cursor_line_fully_visible,
-    doc: /* Whether to scroll the window if the cursor line is not fully visible.
-If the value is non-nil, Emacs scrolls or recenters the window to make
-the cursor line fully visible.  The value could also be a function, which
-is called with a single argument, the window to be scrolled, and should
-return non-nil if the partially-visible cursor requires scrolling the
-window, nil if it's okay to leave the cursor partially-visible.  */);
-  Vmake_cursor_line_fully_visible = Qt;
-  DEFSYM (Qmake_cursor_line_fully_visible, "make-cursor-line-fully-visible");
 
   DEFVAR_BOOL ("make-window-start-visible", make_window_start_visible,
     doc: /* Whether to ensure `window-start' position is never invisible.  */);
