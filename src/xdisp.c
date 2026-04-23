@@ -16830,33 +16830,6 @@ set_horizontal_scroll_bar (struct window *w)
       (w, portion, whole, start);
 }
 
-/* Subroutine of redisplay_window, to determine whether a window-start
-   point STARTP of WINDOW should be rejected.  */
-static bool
-window_start_acceptable_p (Lisp_Object window, ptrdiff_t startp)
-{
-  if (!make_window_start_visible)
-    return true;
-
-  struct window *w = XWINDOW (window);
-  struct frame *f = XFRAME (w->frame);
-  Lisp_Object startpos = make_fixnum (startp);
-  Lisp_Object invprop, disp_spec;
-  struct text_pos ignored;
-
-  /* Is STARTP in invisible text?  */
-  if ((invprop = Fget_char_property (startpos, Qinvisible, window)),
-      TEXT_PROP_MEANS_INVISIBLE (invprop) != 0)
-    return false;
-
-  /* Is STARTP covered by a replacing 'display' property?  */
-  if (!NILP (disp_spec = Fget_char_property (startpos, Qdisplay, window))
-      && handle_display_spec (NULL, disp_spec, Qnil, Qnil, &ignored, startp,
-			      FRAME_WINDOW_P (f)) > 0)
-    return false;
-
-  return true;
-}
 
 
 /* Redisplay leaf window WINDOW.
@@ -17055,10 +17028,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       else if (CHARPOS (wstart) > ZV)
 	SET_TEXT_POS (wstart, ZV, ZV_BYTE);
 
-      /* Whether WSTART falls in a display string */
-      if (!window_start_acceptable_p (window, CHARPOS (wstart)))
-	goto ignore_start;
-
       clear_glyph_matrix (w->desired_matrix);
       if (0 == try_window (window, wstart, 0))
 	{
@@ -17074,29 +17043,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       */
       int new_y = -1;
       if (w->cursor.vpos < 0)
-	{
-	  /* try_window did not assign.  If not invisible text, then
-	     set new_y to median row.  */
-	  struct glyph_row *r = NULL;
-	  Lisp_Object invprop = get_char_property_and_overlay
-	    (make_fixnum (PT), Qinvisible, Qnil, NULL);
-	  if (TEXT_PROP_MEANS_INVISIBLE (invprop) != 0)
-	    {
-	      Lisp_Object invprop_end =
-		Fnext_single_char_property_change (make_fixnum (PT), Qinvisible,
-						   Qnil, Qnil);
-	      ptrdiff_t alt_pt = FIXNATP (invprop_end) ? XFIXNAT (invprop_end) : ZV;
-	      r = row_containing_pos (w, alt_pt, w->desired_matrix->rows,
-				      NULL, 0);
-	    }
-	  new_y = r ? MATRIX_ROW_BOTTOM_Y (r) : window_box_height (w) / 2;
-	}
-      else if (partially_visible_cursor (w, w->desired_matrix))
-	{
-	  /* Bump new_y back to the last visible line.  */
-	  new_y = WINDOW_Y_BOTTOM_BORDER (w);
-	}
-      else if (w->cursor.vpos >= 0)
+	new_y = window_box_height (w) / 2;
+      else
 	{
 	  /* Bump past margin, tab, and header lines.  */
 	  bool tab_line = window_wants_tab_line (w);
@@ -17124,6 +17072,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 		  goto try_to_scroll;
 		}
 	    }
+	  if (partially_visible_cursor (w, w->desired_matrix))
+	    new_y = WINDOW_Y_BOTTOM_BORDER (w);
 	}
 
       if (new_y >= 0)
@@ -17174,8 +17124,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 
       goto done;
     }
-
- ignore_start:
 
   /* Handle case where text has not changed, only point, and it has
      not moved off the frame, and we are not retrying after hscroll.
@@ -33399,12 +33347,6 @@ after setting `recenter-redisplay' to the value of t.  */);
   DEFVAR_BOOL ("auto-raise-tool-bar-buttons", auto_raise_tool_bar_buttons_p,
     doc: /* Non-nil means raise tool-bar buttons when the mouse moves over them.  */);
   auto_raise_tool_bar_buttons_p = true;
-
-  DEFVAR_BOOL ("make-window-start-visible", make_window_start_visible,
-    doc: /* Whether to ensure `window-start' position is never invisible.  */);
-  make_window_start_visible = false;
-  DEFSYM (Qmake_window_start_visible, "make-window-start-visible");
-  Fmake_variable_buffer_local (Qmake_window_start_visible);
 
   DEFSYM (Qclose_tab, "close-tab");
   DEFVAR_LISP ("tab-bar-border", Vtab_bar_border,
