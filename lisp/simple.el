@@ -10923,6 +10923,7 @@ that text."
                      #'kill-ring-deindent-buffer-substring-function)))
 
 (make-obsolete-variable 'make-cursor-line-fully-visible nil "31.0")
+(make-obsolete-variable 'make-window-start-visible nil "31.0")
 
 (provide 'simple)
 

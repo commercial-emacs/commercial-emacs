@@ -16624,24 +16624,10 @@ try_cursor_movement (Lisp_Object window, struct text_pos startp)
 	}
       if (must_scroll)
 	;
-      else if (rc != CURSOR_MOVEMENT_SUCCESS
-	       /* Make sure this isn't a header line nor a tab-line by
-		  any chance, since then MATRIX_ROW_PARTIALLY_VISIBLE_P
-		  might yield true.  */
-	       && !row->mode_line_p
-	       && partially_visible_cursor (w, w->current_matrix))
-	{
-	  if (PT == MATRIX_ROW_END_CHARPOS (row)
-	      && !row->ends_at_zv_p
-	      && !MATRIX_ROW_ENDS_IN_MIDDLE_OF_CHAR_P (row))
-	    rc = CURSOR_MOVEMENT_MUST_SCROLL;
-	  else
-	    {
-	      move_cursor (w, row, w->current_matrix, 0, 0, 0, 0);
-	      rc = CURSOR_MOVEMENT_MUST_SCROLL;
-	    }
-	}
       else if (scroll_p)
+	rc = CURSOR_MOVEMENT_MUST_SCROLL;
+      else if (rc != CURSOR_MOVEMENT_SUCCESS
+	       && partially_visible_cursor (w, w->current_matrix))
 	rc = CURSOR_MOVEMENT_MUST_SCROLL;
       else if (rc != CURSOR_MOVEMENT_SUCCESS
 	       && !NILP (BVAR (XBUFFER (w->contents), bidi_display_reordering)))
@@ -17037,16 +17023,9 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	  goto need_larger_matrices;
 	}
 
-      /*
-	Assign new_y.
-	try_window assigned cursor.vpos if point within glyph matrix.
-      */
-      int new_y = -1;
-      if (w->cursor.vpos < 0)
-	new_y = window_box_height (w) / 2;
-      else
+      /* Try again if margin, tab, header lines cover cursor.  */
+      if (w->cursor.vpos >= 0)
 	{
-	  /* Bump past margin, tab, and header lines.  */
 	  bool tab_line = window_wants_tab_line (w);
 	  bool header_line = window_wants_header_line (w);
 
@@ -17072,13 +17051,17 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 		  goto try_to_scroll;
 		}
 	    }
-	  if (partially_visible_cursor (w, w->desired_matrix))
-	    new_y = WINDOW_Y_BOTTOM_BORDER (w);
 	}
+
+      /* Figure out viewport (window start).  */
+      int new_y = (w->cursor.vpos < 0)
+	? window_box_height (w) / 2
+	: (partially_visible_cursor (w, w->desired_matrix))
+	? WINDOW_Y_BOTTOM_BORDER (w)
+	: -1;
 
       if (new_y >= 0)
 	{
-	  /* End run to set window point and cursor.  */
 	  struct glyph_row *row;
 	  for (row = MATRIX_FIRST_TEXT_ROW (w->desired_matrix);
 	       row < MATRIX_BOTTOM_TEXT_ROW (w->desired_matrix, w);
@@ -17113,13 +17096,6 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	      if (0 == try_window (window, wstart, 0))
 		goto need_larger_matrices;
 	    }
-	}
-
-      if (w->cursor.vpos < 0
-	  || (partially_visible_cursor (w, w->desired_matrix)))
-	{
-	  clear_glyph_matrix (w->desired_matrix);
-	  goto try_to_scroll;
 	}
 
       goto done;
