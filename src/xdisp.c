@@ -16036,7 +16036,7 @@ enum
 
 static int
 try_scrolling (Lisp_Object window, bool just_this_one_p,
-	       intmax_t arg_scroll_conservatively, intmax_t scroll_step,
+	       intmax_t conservatively, intmax_t scroll_step,
 	       bool last_line_misfit)
 {
   struct window *w = XWINDOW (window);
@@ -16055,21 +16055,20 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
   this_scroll_margin = window_scroll_margin (w, MARGIN_IN_PIXELS);
 
-  /* Force arg_scroll_conservatively to have a reasonable value, to
+  /* Force CONSERVATIVELY to have a reasonable value, to
      avoid scrolling too far away with slow move_it_* functions.  Note
      that the user can supply scroll-conservatively equal to
-     `most-positive-fixnum', which can be larger than INT_MAX.  */
-  if (arg_scroll_conservatively > scroll_limit)
+     most-positive-fixnum, which can be larger than INT_MAX.  */
+  if (conservatively > scroll_limit)
     {
-      arg_scroll_conservatively = scroll_limit + 1;
+      conservatively = scroll_limit + 1;
       scroll_max = scroll_limit * frame_line_height;
     }
-  else if (0 < scroll_step || 0 < arg_scroll_conservatively)
+  else if (0 < scroll_step || 0 < conservatively)
     /* Compute how much we should try to scroll maximally to bring
        point into view.  */
     {
-      intmax_t scroll_lines_max
-	= max (scroll_step, arg_scroll_conservatively);
+      intmax_t scroll_lines_max	= max (scroll_step, conservatively);
       int scroll_lines = clip_to_bounds (0, scroll_lines_max, 1000000);
       scroll_max = scroll_lines * frame_line_height;
     }
@@ -16084,7 +16083,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
  too_near_end:
 
   /* Decide whether to scroll down.  */
-  if (PT > CHARPOS (startp))
+  if (CHARPOS (startp) < PT)
     {
       int scroll_margin_y;
 
@@ -16096,7 +16095,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	- frame_line_height * extra_scroll_margin_lines;
       move_it_forward (&it, PT, scroll_margin_y - 1, MOVE_TO_POS | MOVE_TO_Y, NULL);
 
-      if (PT > CHARPOS (it.current.pos))
+      if (CHARPOS (it.current.pos) < PT)
 	{
 	  int y0 = line_bottom_y (it, frame_line_height);
 	  /* Compute how many pixels below window bottom to stop searching
@@ -16123,7 +16122,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
       else if (PT == IT_CHARPOS (it)
 	       && IT_CHARPOS (it) < ZV
 	       && it.method == GET_FROM_STRING
-	       && arg_scroll_conservatively > scroll_limit
+	       && conservatively > scroll_limit
 	       && it.current_x == 0)
 	{
 	  enum move_it_result skip;
@@ -16162,10 +16161,9 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	 window start down.  If scrolling conservatively, move it just
 	 enough down to make point visible.  If scroll_step is set,
 	 move it down by scroll_step.  */
-      if (arg_scroll_conservatively)
-	amount_to_scroll
-	  = min (max (dy, frame_line_height),
-		 frame_line_height * arg_scroll_conservatively);
+      if (conservatively)
+	amount_to_scroll = min (max (dy, frame_line_height),
+				frame_line_height * conservatively);
       else if (scroll_step)
 	amount_to_scroll = scroll_max;
       else
@@ -16194,7 +16192,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	return SCROLLING_FAILED;
 
       start_move_it (&it, w, startp);
-      if (arg_scroll_conservatively <= scroll_limit)
+      if (conservatively <= scroll_limit)
 	move_it_dy (&it, -amount_to_scroll);
       else
 	{
@@ -16207,9 +16205,8 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	  int start_y = line_bottom_y (it, last_height);
 	  do {
 	    move_it_dvpos (&it, 1);
-	  } while (IT_CHARPOS (it) < ZV
-		   && ((line_bottom_y (it, last_height) - start_y) <
-		       amount_to_scroll));
+	  } while (IT_CHARPOS (it) < ZV &&
+		   ((line_bottom_y (it, last_height) - start_y) < amount_to_scroll));
 	}
 
       /* If STARTP is unchanged, move it down another screen line.  */
@@ -16222,8 +16219,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
       struct text_pos scroll_margin_pos = startp;
       int y_offset = 0;
 
-      /* See if point is inside the scroll margin at the top of the
-         window.  */
+      /* See if point is inside the scroll margin at the top of the window.  */
       if (this_scroll_margin)
 	{
 	  int y_start;
@@ -16269,10 +16265,9 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	  /* Compute new window start.  */
 	  start_move_it (&it, w, startp);
 
-	  if (arg_scroll_conservatively)
-	    amount_to_scroll
-	      = min (max (dy, frame_line_height),
-		     frame_line_height * arg_scroll_conservatively);
+	  if (conservatively)
+	    amount_to_scroll = min (max (dy, frame_line_height),
+				    frame_line_height * conservatively);
 	  else if (scroll_step)
 	    amount_to_scroll = scroll_max;
 	  else
@@ -16308,7 +16303,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 
   /* Display the window.  Give up if new fonts are loaded, or if point
      doesn't appear.  */
-  if (!try_window (window, startp, 0))
+  if (0 == try_window (window, startp, 0))
     rc = SCROLLING_NEED_LARGER_MATRICES;
   else if (w->cursor.vpos < 0)
     {
@@ -17143,9 +17138,8 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       /* Otherwise try_window_insdel has returned -1 which means that we
 	 don't want the alternative below this comment to execute.  */
     }
-  else if (CHARPOS (wstart) >= BEGV
-	   && CHARPOS (wstart) <= ZV
-	   && PT >= CHARPOS (wstart)
+  else if (BEGV <= CHARPOS (wstart)
+	   && CHARPOS (wstart) <= PT
 	   && (CHARPOS (wstart) < ZV
 	       /* Avoid starting at end of buffer.  */
 	       || CHARPOS (wstart) == BEGV
@@ -17233,19 +17227,14 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
        || 0 < emacs_scroll_step
        || NUMBERP (BVAR (current_buffer, scroll_up_aggressively))
        || NUMBERP (BVAR (current_buffer, scroll_down_aggressively)))
-      && CHARPOS (wstart) >= BEGV
-      && CHARPOS (wstart) <= ZV)
+      && BEGV <= CHARPOS (wstart) && CHARPOS (wstart) <= ZV)
     {
-      /* The function returns -1 if new fonts were loaded, 1 if
-	 successful, 0 if not successful.  */
-      int ss = try_scrolling (window, NILP (all),
-			      ((scroll_minibuffer_conservatively
-			        && MINI_WINDOW_P (w))
+      const intmax_t conservatively =
+	scroll_minibuffer_conservatively && MINI_WINDOW_P (w)
 			       ? SCROLL_LIMIT + 1
-			       : scroll_conservatively),
-			      emacs_scroll_step,
-			      last_line_misfit);
-      switch (ss)
+	: scroll_conservatively;
+      switch (try_scrolling (window, NILP (all), conservatively,
+			     emacs_scroll_step, last_line_misfit))
 	{
 	case SCROLLING_SUCCESS:
 	  goto done;
@@ -17377,8 +17366,7 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       || !NILP (Vwindow_scroll_functions)
       || !NILP (all)
       || MINI_WINDOW_P (w)
-      || !(used_current_matrix_p
-	   = try_window_reusing_current_matrix (w)))
+      || !(used_current_matrix_p = try_window_reusing_current_matrix (w)))
     use_desired_matrix = (1 == try_window (window, wstart, 0));
 
   bidi_unshelve_cache (itdata, false);
