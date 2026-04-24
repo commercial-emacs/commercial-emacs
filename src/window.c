@@ -5736,12 +5736,10 @@ window_internal_height (struct window *w)
 			   Window Scrolling
  ***********************************************************************/
 
-/* Scroll contents of window WINDOW up.  If WHOLE, scroll
-   N screen-fulls, which is defined as the height of the window minus
-   next_screen_context_lines.  If WHOLE is zero, scroll up N lines
-   instead.  Negative values of N mean scroll down.  NOERROR
-   means don't signal an error if we try to move over BEGV or ZV,
-   respectively.  */
+/* Scroll WINDOW forward by N lines (negative N scrolls backward).
+   If WHOLE, N is a screenful count where one screenful is the window
+   height minus next_screen_context_lines; otherwise N is a line count.
+   NOERROR suppresses errors at BEGV/ZV boundaries.  */
 
 static void
 window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
@@ -5823,14 +5821,14 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 
   if (!pt_visible)
     {
-      /* Move back a half-screen to make PT visible.  Otherwise, a
-	 scroll of a single line would produce a jarring recenter.  */
+      /* Set wstart so PT is half a screen from the bottom (roughly centered).
+	 A single-line scroll would otherwise produce a jarring recenter.  */
       struct it it;
       void *itdata = bidi_shelve_cache ();
       init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
       it.current_y = it.last_visible_y;
       move_it_dy (&it, window_box_height (w) / -2);
-      /* Snap to bol of PT if move_it_dy steps outside minibuffer.  */
+      /* Snap to bol of PT if move_it_dy steps outside (often minibuffer).  */
       if (it.current_y <= 0)
 	{
 	  init_iterator (&it, w, PT, PT_BYTE, NULL, DEFAULT_FACE_ID);
@@ -5840,17 +5838,15 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
       wstart = it.current.pos;
       bidi_unshelve_cache (itdata, false);
     }
+  /* auto-window-vscroll (true by default) adds a pixel offset so the
+     iterator starts further down a tall row, keeping its bottom in view.  */
   else if (auto_window_vscroll_p)
     {
       if (rtop || rbot)		/* Partially visible.  */
 	{
-	  int px;
-	  int dy = frame_line_height;
-	  /* In the below we divide the window box height by the
-	     frame's line height to make the result predictable when
-	     the window box is not an integral multiple of the line
-	     height.  This is important to ensure we get back to the
-	     same position when scrolling up, then down.  */
+	  int px, dy = frame_line_height;
+	  /* Snap dy to a multiple of line height so up-then-down scroll
+	     is reversible.  */
 	  if (whole)
 	    {
 	      int ht = window_box_height (w);
@@ -5865,8 +5861,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	      if (w->vscroll < 0 && rtop > 0)
 		{
 		  px = max (0, -w->vscroll - min (rtop, -dy));
-		  Fset_window_vscroll (window, make_fixnum (px), Qt,
-				       Qnil);
+		  Fset_window_vscroll (window, make_fixnum (px), Qt, Qnil);
 		  return; /* !!! */
 		}
 	    }
@@ -5876,8 +5871,7 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	      if (rbot > 0 && (w->vscroll < 0 || vpos == 0))
 		{
 		  px = max (0, -w->vscroll + min (rbot, dy));
-		  Fset_window_vscroll (window, make_fixnum (px), Qt,
-				       Qnil);
+		  Fset_window_vscroll (window, make_fixnum (px), Qt, Qnil);
 		  return; /* !!! */
 		}
 
@@ -5930,33 +5924,27 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 
   struct it it;
   start_move_it (&it, w, wstart);
-  if (whole)
+  if (!whole)
+    move_it_dvpos (&it, n);
+  else
     {
       ptrdiff_t start_pos = IT_CHARPOS (it);
       int flh = frame_line_height;
       int ht = window_box_height (w);
       int nscls = sanitize_next_screen_context_lines ();
-      /* In the below we divide the window box height by the frame's
-	 line height to make the result predictable when the window
-	 box is not an integral multiple of the line height.  This is
-	 important to ensure we get back to the same position when
-	 scrolling up, then down.  */
+      /* Snap dy to a multiple of line height so up-then-down scroll
+	 is reversible.  */
       int dy = n * max (flh, (ht / flh - nscls) * flh);
       int goal_y;
       void *it_data;
 
-      /* Note that move_it_dy always moves the iterator to the
-         start of a line.  So, if the last line doesn't have a newline,
-	 we would end up at the start of the line ending at ZV.  */
       if (dy <= 0)
 	{
 	  goal_y = it.current_y + dy;
 	  move_it_dy (&it, dy);
-	  /* move_it_dy (backward) above always overshoots if DY
-	     cannot be reached exactly, i.e. if it falls in the middle
-	     of a screen line.  But if that screen line is large
-	     (e.g., a tall image), it might make more sense to
-	     undershoot instead.  */
+	  /* move_it_dy snaps backward to the previous line start,
+	     overshooting goal_y.  For a tall row (e.g. an image),
+	     the next line start may be closer; undershoot instead.  */
 	  if (goal_y - it.current_y > 0.5 * flh)
 	    {
 	      it_data = bidi_shelve_cache ();
@@ -5975,11 +5963,9 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	{
 	  goal_y = it.current_y + dy;
 	  move_it_forward (&it, ZV, goal_y, MOVE_TO_POS | MOVE_TO_Y, NULL);
-	  /* Extra precision for people who want us to preserve the
-	     screen position of the cursor: effectively round DY to the
-	     nearest screen line, instead of rounding to zero; the latter
-	     causes point to move by one line after C-v followed by M-v,
-	     if the buffer has lines of different height.  */
+	  /* With scroll-preserve-screen-position, round dy to the
+	     nearest line rather than toward zero; rounding toward zero
+	     shifts point by one line on C-v M-v in variable-height buffers.  */
 	  if (!NILP (Vscroll_preserve_screen_position)
 	      && goal_y - it.current_y  > 0.5 * flh)
 	    {
@@ -6002,8 +5988,6 @@ window_scroll_pixel_based (Lisp_Object window, int n, bool whole, bool noerror)
 	    move_it_dvpos (&it, 1);
 	}
     }
-  else
-    move_it_dvpos (&it, n);
 
   if ((n > 0 && IT_CHARPOS (it) == ZV)
       || (n < 0 && IT_CHARPOS (it) == CHARPOS (wstart)))
@@ -6231,13 +6215,12 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
   register ptrdiff_t pos, pos_byte;
   register int ht = window_internal_height (w);
   register Lisp_Object tem;
-  bool lose;
   Lisp_Object bolp;
   ptrdiff_t startpos = marker_position (w->start);
   ptrdiff_t startbyte = marker_byte_position (w->start);
   Lisp_Object original_pos = Qnil;
-  bool adjust_old_pointm = !NILP (Fequal (Fwindow_point (window),
-					  Fwindow_old_point (window)));
+  const bool adjust_old_pointm = !NILP (Fequal (Fwindow_point (window),
+						Fwindow_old_point (window)));
 
   /* If scrolling screen-fulls, compute the number of lines to
      scroll from the window's height.  */
@@ -6276,7 +6259,7 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
     }
 
   SET_PT_BOTH (startpos, startbyte);
-  lose = n < 0 && PT == BEGV;
+  bool lose = n < 0 && PT == BEGV;
   Fvertical_motion (make_fixnum (n), window, Qnil);
   pos = PT;
   pos_byte = PT_BYTE;

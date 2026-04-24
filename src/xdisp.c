@@ -17048,14 +17048,13 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
 	    }
 	}
 
-      /* Figure out viewport (window start).  */
-      int new_y = (w->cursor.vpos < 0)
-	? window_box_height (w) / 2
-	: (partially_visible_cursor (w, w->desired_matrix))
-	? WINDOW_Y_BOTTOM_BORDER (w)
-	: -1;
-
-      if (new_y >= 0)
+      /* Figure out viewport (window start) if point off screen.  */
+      int new_y;
+      if (new_y = (w->cursor.vpos < 0)
+	  ? window_box_height (w) / 2
+	  : (partially_visible_cursor (w, w->desired_matrix))
+	  ? WINDOW_Y_BOTTOM_BORDER (w)
+	  : -1, new_y >= 0)
 	{
 	  struct glyph_row *row;
 	  for (row = MATRIX_FIRST_TEXT_ROW (w->desired_matrix);
@@ -17230,9 +17229,9 @@ redisplay_window (Lisp_Object window, Lisp_Object all)
       && BEGV <= CHARPOS (wstart) && CHARPOS (wstart) <= ZV)
     {
       const intmax_t conservatively =
-	scroll_minibuffer_conservatively && MINI_WINDOW_P (w)
-			       ? SCROLL_LIMIT + 1
-	: scroll_conservatively;
+	(scroll_minibuffer_conservatively && MINI_WINDOW_P (w)
+	 ? SCROLL_LIMIT + 1
+	 : scroll_conservatively);
       switch (try_scrolling (window, NILP (all), conservatively,
 			     emacs_scroll_step, last_line_misfit))
 	{
