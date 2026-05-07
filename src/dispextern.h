@@ -793,14 +793,25 @@ void check_matrix_pointer_lossage (struct glyph_matrix *);
 /* A glyph row is comprised of three contiguous arrays held in
    glyph_row.glyphs.  Adjust mark_glyph_matrix if adding areas.
 
-   +--------------------+-------------+---------------------+
-   |  left margin area  |  text area  |  right margin area  |
-   +--------------------+-------------+---------------------+
-   |                    |             |                     |
+   +--------------------+-------------+---------------------+-+
+   |  left margin area  |  text area  |  right margin area  | |
+   +--------------------+-------------+---------------------+-+
+   |                    |             |                     | |
    glyphs[LEFT_MARGIN_AREA]           glyphs[RIGHT_MARGIN_AREA]
-			|                                   |
-			glyphs[TEXT_AREA]                   |
-			                      glyphs[LAST_AREA]
+			|                                   | |
+			glyphs[TEXT_AREA]                   | |
+			                                    glyphs[RIGHT_BORDER_AREA]
+                                                              glyphs[LAST_AREA]
+
+   Under X, window borders are not rendered as glyphs, thus
+   glyphs[RIGHT_BORDER_AREA] == glyphs[LAST_AREA].
+
+   Under TTY, when WINDOW_RIGHTMOST_P, there is no right border, thus
+   glyphs[RIGHT_BORDER_AREA] == glyphs[LAST_AREA].
+
+   Under TTY, when !WINDOW_RIGHTMOST_P, the right window border is
+   rendered as "|", thus glyphs[RIGHT_BORDER_AREA] == glyphs[LAST_AREA] - 1.
+
 */
 enum glyph_row_area
 {
@@ -808,6 +819,7 @@ enum glyph_row_area
   LEFT_MARGIN_AREA,
   TEXT_AREA,
   RIGHT_MARGIN_AREA,
+  RIGHT_BORDER_AREA,
   LAST_AREA
 };
 

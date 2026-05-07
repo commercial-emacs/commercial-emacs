@@ -337,6 +337,43 @@ verify_row_hash (struct glyph_row *row)
   return row->hash == row_hash (row);
 }
 
+static bool
+text_row_p (struct glyph_row *row, struct glyph_matrix *matrix,
+	      int height, struct window *w)
+{
+  if (!w)
+    return false;
+  bool bespoke_p =
+    ((row == matrix->rows + height - 1 && window_wants_mode_line (w))
+     || (row == matrix->rows && matrix->tab_line_p)
+     || (row == matrix->rows && !matrix->tab_line_p && matrix->header_line_p)
+     || (row == matrix->rows + 1 && matrix->tab_line_p && matrix->header_line_p));
+  return !bespoke_p;
+}
+
+static void
+assign_glyph_areas (struct glyph_row *row, struct glyph_matrix *matrix,
+		    int height, struct window *w, int left, int right, int width)
+{
+  if (text_row_p (row, matrix, height, w))
+    {
+      row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA] + left;
+      row->glyphs[LAST_AREA] = row->glyphs[LEFT_MARGIN_AREA] + width;
+      int border = (!FRAME_WINDOW_P (XFRAME (w->frame)) &&
+		    !WINDOW_RIGHTMOST_P (w)) ? 1 : 0;
+      row->glyphs[RIGHT_BORDER_AREA] = row->glyphs[LAST_AREA] - border;
+      row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA] - right;
+    }
+  else
+    {
+      row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA];
+      row->glyphs[RIGHT_MARGIN_AREA]
+	= row->glyphs[RIGHT_BORDER_AREA]
+	= row->glyphs[LAST_AREA]
+	= row->glyphs[TEXT_AREA] + width;
+    }
+}
+
 /* Adjust glyph matrix MATRIX on window W or on a frame to changed
    window sizes.
 
@@ -451,36 +488,7 @@ adjust_glyph_matrix (struct window *w, struct glyph_matrix *matrix, int x, int y
 	       + (y + i) * matrix->pool->ncolumns
 	       + x);
 
-	  if (w == NULL
-	      || (row == matrix->rows + dim.height - 1
-		  && window_wants_mode_line (w))
-	      || (row == matrix->rows && matrix->tab_line_p)
-	      || (row == matrix->rows
-		  && !matrix->tab_line_p && matrix->header_line_p)
-	      || (row == (matrix->rows + 1)
-		  && matrix->tab_line_p && matrix->header_line_p))
-	    {
-	      row->glyphs[TEXT_AREA]
-		= row->glyphs[LEFT_MARGIN_AREA];
-	      row->glyphs[RIGHT_MARGIN_AREA]
-		= row->glyphs[TEXT_AREA] + dim.width;
-	      row->glyphs[LAST_AREA]
-		= row->glyphs[RIGHT_MARGIN_AREA];
-	    }
-	  else
-	    {
-	      row->glyphs[TEXT_AREA]
-		= row->glyphs[LEFT_MARGIN_AREA] + left;
-	      row->glyphs[RIGHT_MARGIN_AREA]
-		= row->glyphs[TEXT_AREA] + dim.width - left - right;
-	      /* Leave room for a border glyph.  */
-	      if (!FRAME_WINDOW_P (XFRAME (w->frame))
-		  && !WINDOW_RIGHTMOST_P (w)
-		  && right > 0)
-		row->glyphs[RIGHT_MARGIN_AREA] -= 1;
-	      row->glyphs[LAST_AREA]
-		= row->glyphs[LEFT_MARGIN_AREA] + dim.width;
-	    }
+	  assign_glyph_areas (row, matrix, dim.height, w, left, right, dim.width);
 	}
 
       matrix->left_margin_glyphs = left;
@@ -506,31 +514,7 @@ adjust_glyph_matrix (struct window *w, struct glyph_matrix *matrix, int x, int y
 		= xnrealloc (row->glyphs[LEFT_MARGIN_AREA],
 			     dim.width, sizeof (struct glyph));
 
-	      /* The mode line, if displayed, never has marginal areas.  */
-	      if ((row == matrix->rows + dim.height - 1
-		   && !(w && window_wants_mode_line (w)))
-		  || (row == matrix->rows && matrix->tab_line_p)
-		  || (row == matrix->rows
-		      && !matrix->tab_line_p && matrix->header_line_p)
-		  || (row == (matrix->rows + 1)
-		      && matrix->tab_line_p && matrix->header_line_p))
-		{
-		  row->glyphs[TEXT_AREA]
-		    = row->glyphs[LEFT_MARGIN_AREA];
-		  row->glyphs[RIGHT_MARGIN_AREA]
-		    = row->glyphs[TEXT_AREA] + dim.width;
-		  row->glyphs[LAST_AREA]
-		    = row->glyphs[RIGHT_MARGIN_AREA];
-		}
-	      else
-		{
-		  row->glyphs[TEXT_AREA]
-		    = row->glyphs[LEFT_MARGIN_AREA] + left;
-		  row->glyphs[RIGHT_MARGIN_AREA]
-		    = row->glyphs[TEXT_AREA] + dim.width - left - right;
-		  row->glyphs[LAST_AREA]
-		    = row->glyphs[LEFT_MARGIN_AREA] + dim.width;
-		}
+	      assign_glyph_areas (row, matrix, dim.height, w, left, right, dim.width);
 	      ++row;
 	    }
 	}
@@ -1124,7 +1108,7 @@ sync_glyph_row_margins (struct window *w, struct glyph_row *row)
       if (w->left_margin_cols > 0)
 	row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA];
       if (w->right_margin_cols > 0)
-	row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[LAST_AREA];
+	row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA];
     }
   else
     {
@@ -1142,15 +1126,8 @@ sync_glyph_row_margins (struct window *w, struct glyph_row *row)
 	  && (left != row->glyphs[TEXT_AREA] - row->glyphs[LEFT_MARGIN_AREA]))
 	row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA] + left;
       if (w->right_margin_cols > 0
-	  && (right != row->glyphs[LAST_AREA] - row->glyphs[RIGHT_MARGIN_AREA]))
-	{
-	  row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[LAST_AREA] - right;
-	  /* Leave room for a border glyph.  */
-	  if (!FRAME_WINDOW_P (XFRAME (w->frame))
-	      && !WINDOW_RIGHTMOST_P (w)
-	      && right > 0)
-	    row->glyphs[RIGHT_MARGIN_AREA] -= 1;
-	}
+	  && (right != row->glyphs[RIGHT_BORDER_AREA] - row->glyphs[RIGHT_MARGIN_AREA]))
+	row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA] - right;
     }
 }
 
