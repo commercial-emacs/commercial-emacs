@@ -2427,8 +2427,8 @@ remember_mouse_glyph (struct frame *f, int gx, int gy, NativeRectangle *rect)
 	  && !WINDOW_HAS_VERTICAL_SCROLL_BAR (w)
 	  && !WINDOW_RIGHTMOST_P (w))
 	if (gx < WINDOW_PIXEL_WIDTH (w) - width)
-	  /* Make sure the vertical border can get her own glyph to the
-	     right of the one we build here.  */
+	  /* Make sure the vertical border can get its own glyph to the
+	     right of the one built here.  */
 	  width = WINDOW_RIGHT_FRINGE_WIDTH (w) - width;
 	else
 	  width = WINDOW_PIXEL_WIDTH (w) - gx;
@@ -18404,6 +18404,7 @@ sync_frame_with_window_matrix_rows (struct window *w)
       frame_row->glyphs[LEFT_MARGIN_AREA] = start;
       frame_row->glyphs[TEXT_AREA] = start;
       frame_row->glyphs[RIGHT_MARGIN_AREA] = end;
+      frame_row->glyphs[RIGHT_BORDER_AREA] = end;
       frame_row->glyphs[LAST_AREA] = end;
 
       /* Disable frame rows whose corresponding window rows have
@@ -20157,7 +20158,7 @@ extend_face_to_end_of_line (struct it *it)
 	  it->face_id = default_face->id;
 	  while (it->glyph_row->used[RIGHT_MARGIN_AREA]
 		 < WINDOW_RIGHT_MARGIN_WIDTH (it->w)
-		 && g < it->glyph_row->glyphs[LAST_AREA])
+		 && g < it->glyph_row->glyphs[RIGHT_BORDER_AREA])
 	    {
 	      PRODUCE_GLYPHS (it);
 	      it->current_x += it->pixel_width;

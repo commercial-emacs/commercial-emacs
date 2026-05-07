@@ -351,6 +351,8 @@ text_row_p (struct glyph_row *row, struct glyph_matrix *matrix,
   return !bespoke_p;
 }
 
+/* Assign other areas after LEFT_MARGIN_AREA is fixed. */
+
 static void
 assign_glyph_areas (struct glyph_row *row, struct glyph_matrix *matrix,
 		    int height, struct window *w, int left, int right, int width)
@@ -359,8 +361,8 @@ assign_glyph_areas (struct glyph_row *row, struct glyph_matrix *matrix,
     {
       row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA] + left;
       row->glyphs[LAST_AREA] = row->glyphs[LEFT_MARGIN_AREA] + width;
-      int border = (!FRAME_WINDOW_P (XFRAME (w->frame)) &&
-		    !WINDOW_RIGHTMOST_P (w)) ? 1 : 0;
+      int border = (FRAME_WINDOW_P (XFRAME (w->frame)) ||
+		    WINDOW_RIGHTMOST_P (w)) ? 0 : 1;
       row->glyphs[RIGHT_BORDER_AREA] = row->glyphs[LAST_AREA] - border;
       row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA] - right;
     }
@@ -1034,52 +1036,6 @@ assign_row (struct glyph_row *to, struct glyph_row *from)
   copy_row_except_pointers (to, from);
 }
 
-
-/* Test whether the glyph memory of the glyph row WINDOW_ROW, which is
-   a row in a window matrix, is a slice of the glyph memory of the
-   glyph row FRAME_ROW which is a row in a frame glyph matrix.  Value
-   is true if the glyph memory of WINDOW_ROW is part of the glyph
-   memory of FRAME_ROW.  */
-
-#ifdef GLYPH_DEBUG
-
-static bool
-glyph_row_slice_p (struct glyph_row *window_row, struct glyph_row *frame_row)
-{
-  struct glyph *window_glyph_start = window_row->glyphs[0];
-  struct glyph *frame_glyph_start = frame_row->glyphs[0];
-  struct glyph *frame_glyph_end = frame_row->glyphs[LAST_AREA];
-
-  return (frame_glyph_start <= window_glyph_start
-	  && window_glyph_start < frame_glyph_end);
-}
-
-#endif /* GLYPH_DEBUG */
-
-#if 0
-
-/* Find the row in the window glyph matrix WINDOW_MATRIX being a slice
-   of ROW in the frame matrix FRAME_MATRIX.  Value is null if no row
-   in WINDOW_MATRIX is found satisfying the condition.  */
-
-static struct glyph_row *
-find_glyph_row_slice (struct glyph_matrix *window_matrix,
-		      struct glyph_matrix *frame_matrix, int row)
-{
-  int i;
-
-  eassert (row >= 0 && row < frame_matrix->nrows);
-
-  for (i = 0; i < window_matrix->nrows; ++i)
-    if (glyph_row_slice_p (window_matrix->rows + i,
-			   frame_matrix->rows + row))
-      break;
-
-  return i < window_matrix->nrows ? window_matrix->rows + i : 0;
-}
-
-#endif /* 0 */
-
 void
 reenable_glyph_row (struct glyph_row *row)
 {
@@ -1097,38 +1053,14 @@ reenable_glyph_row (struct glyph_row *row)
 void
 sync_glyph_row_margins (struct window *w, struct glyph_row *row)
 {
-  if (row->mode_line_p)
+  int left = 0, right = 0;
+  if (!row->mode_line_p)
     {
-      /* Mode and header/tab lines, if displayed, never have marginal
-	 areas.  If we are called with MODE_LINE_P non-zero, we are
-	 displaying the mode/header/tab line in this window, and so the
-	 marginal areas of this glyph row should be eliminated.  This
-	 is needed when the mode/header/tab line is switched on in a
-	 window that has display margins.  */
-      if (w->left_margin_cols > 0)
-	row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA];
-      if (w->right_margin_cols > 0)
-	row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA];
+      left = w->desired_matrix->left_margin_glyphs;
+      right = w->desired_matrix->right_margin_glyphs;
     }
-  else
-    {
-      /* The real number of glyphs reserved for the margins is
-	 recorded in the glyph matrix, and can be different from
-	 window's left_margin_cols and right_margin_cols; see
-	 margin_glyphs_to_reserve for when that happens.  */
-      int left = w->desired_matrix->left_margin_glyphs;
-      int right = w->desired_matrix->right_margin_glyphs;
-
-      /* Make sure the marginal areas of this row are in sync with
-	 what the window wants, when the row actually displays text
-	 and not tab/header/mode line.  */
-      if (w->left_margin_cols > 0
-	  && (left != row->glyphs[TEXT_AREA] - row->glyphs[LEFT_MARGIN_AREA]))
-	row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA] + left;
-      if (w->right_margin_cols > 0
-	  && (right != row->glyphs[RIGHT_BORDER_AREA] - row->glyphs[RIGHT_MARGIN_AREA]))
-	row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA] - right;
-    }
+  row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA] + left;
+  row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA] - right;
 }
 
 
@@ -2600,9 +2532,10 @@ build_frame_matrix_from_leaf_window (struct glyph_matrix *frame_matrix, struct w
 
 	  /* Maybe insert a vertical border between horizontally adjacent
 	     windows.  */
-	  if (GLYPH_CHAR (right_border_glyph) != 0)
+	  if (window_row->glyphs[RIGHT_BORDER_AREA] < window_row->glyphs[LAST_AREA])
 	    {
-	      struct glyph *border = window_row->glyphs[LAST_AREA] - 1;
+	      eassume (GLYPH_CHAR (right_border_glyph) != 0);
+	      struct glyph *border = window_row->glyphs[RIGHT_BORDER_AREA];
 	      /* It's a subtle bug if we are overwriting some non-char
 		 glyph with the vertical border glyph.  */
 	      eassert (border->type == CHAR_GLYPH);
@@ -2876,12 +2809,8 @@ sync_window_with_frame_matrix_rows (struct window *w)
     {
       window_row->glyphs[LEFT_MARGIN_AREA]
 	= frame_row->glyphs[0] + x;
-      window_row->glyphs[TEXT_AREA]
-	= window_row->glyphs[LEFT_MARGIN_AREA] + left;
-      window_row->glyphs[LAST_AREA]
-	= window_row->glyphs[LEFT_MARGIN_AREA] + width;
-      window_row->glyphs[RIGHT_MARGIN_AREA]
-	= window_row->glyphs[LAST_AREA] - right;
+      assign_glyph_areas (window_row, w->current_matrix,
+			  w->current_matrix->nrows, w, left, right, width);
     }
 }
 
