@@ -442,7 +442,7 @@ This is a reduced example from GNU nano's initial screen."
         (term-send-string proc "\020")) ;C-p
       (term-send-string proc "a\177cookie") ;DEL triggers a redisplay
       (with-timeout (5)
-        (while (not (string-match-p "-|-" (buffer-string))) ;mode line
+        (while (not (string-match-p tmpfile (buffer-string))) ;mode line
           (accept-process-output)))
       (let ((lines (string-split (buffer-string) "\n")))
         (while (length> lines 55)
