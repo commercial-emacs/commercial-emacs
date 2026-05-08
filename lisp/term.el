@@ -3979,7 +3979,6 @@ all pending output has been dealt with."))
 	  (wrapped (and (zerop (term-horizontal-column))
 			(not (zerop (term-current-column))))))
       (term-vertical-motion 1)
-      (delete-region saved-point (point))
       ;; wrapped is true if we're at the beginning of screen line,
       ;; but not a buffer line.  If we delete the current screen line
       ;; that will make the previous line no longer wrap, and (because
@@ -3989,9 +3988,11 @@ all pending output has been dealt with."))
       ;; contain a space, to force the previous line to continue to wrap.
       ;; We could do this always, but it seems preferable to not add the
       ;; extra space when wrapped is false.
-      (when wrapped
-	(insert ? ))
-      (insert ?\n)
+      (let ((deletion-point (point)))
+	(when wrapped
+	  (insert ? ))
+	(insert ?\n)
+	(delete-region saved-point deletion-point))
       (put-text-property saved-point (point) 'font-lock-face 'default)
       (goto-char saved-point))))
 

@@ -22,7 +22,9 @@
 
 ;;; Code:
 (require 'ert)
+(require 'ert-x)
 (require 'term)
+(require 'cl-macs)
 (eval-when-compile (require 'cl-lib))
 
 (defvar term-height)                    ; Number of lines in window.
@@ -393,6 +395,68 @@ This is a reduced example from GNU nano's initial screen."
     (should (equal string
                    (term-test-screen-from-input
                     40 1 bytes)))))
+
+(ert-deftest test-dispnew-erases-border ()
+  (with-temp-buffer
+    (ert-with-temp-file tmpfile
+      (with-temp-buffer
+        (insert "r\n")
+        (insert (make-string 4096 ?\n))
+        (write-file tmpfile))
+      (let ((process-environment process-environment)
+            proc
+            (buf (current-buffer)))
+        (cl-letf (((symbol-function 'window-screen-lines)
+                   (lambda (&rest _) 55))
+                  ((symbol-function 'window-max-chars-per-line)
+                   (lambda (&rest _) 159))
+                  ((symbol-function 'pos-visible-in-window-p)
+                   (lambda (&rest _) t)))
+          (push "TERM=vt100" process-environment)
+          (push "LINES=55" process-environment)
+          (push "COLUMNS=159" process-environment)
+          (setq proc (make-process :name "emacs"
+                                   :buffer (current-buffer)
+                                   :command (list (expand-file-name invocation-name invocation-directory)
+                                                  "--eval" "(setq user-emacs-directory-warning nil)"
+                                                  "-Q" "-q" "-nw")
+                                   :connection-type 'pty
+                                   :coding 'binary
+                                   :filter (lambda (&rest args)
+                                             (when (buffer-live-p buf)
+                                               (with-current-buffer buf
+                                                 (cl-letf (((symbol-function 'window-screen-lines)
+                                                            (lambda (&rest _) 55))
+                                                           ((symbol-function 'window-max-chars-per-line)
+                                                            (lambda (&rest _) 159))
+                                                           ((symbol-function 'pos-visible-in-window-p)
+                                                            (lambda (&rest _) t)))
+                                                   (apply #'term-emulate-terminal args)))))))
+          (term-mode)
+          (term-char-mode)
+          (term-send-string proc "\e:(setq split-width-threshold 0)\r")
+          (accept-process-output proc 1)
+          (term-send-string proc "\e:(set-window-margins nil 1 1)\r")
+          (accept-process-output proc 1)
+          (term-send-string proc (format "\0304\006%s\n" tmpfile))
+          (accept-process-output proc 1)
+          (term-send-string proc "\e>")
+          (accept-process-output proc 1)
+          (dotimes (_ 4)
+            (term-send-string proc "\020"))
+          (accept-process-output proc 1)
+          (term-send-string proc "a\177cookie")
+          (accept-process-output proc 1)
+          (while (not (string-match "cookie" (buffer-string)))
+            (accept-process-output))
+          (message "buffer %S" (buffer-string))
+          (let ((lines (string-split (buffer-string) "\n")))
+            (while (length> lines 55)
+              (pop lines))
+            (pop lines)
+            (setq lines (ntake 52 lines))
+            (dolist (line lines)
+              (should (eq (aref line 79) ?|)))))))))
 
 (provide 'term-tests)
 

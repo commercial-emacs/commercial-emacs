@@ -368,11 +368,12 @@ assign_glyph_areas (struct glyph_row *row, struct glyph_matrix *matrix,
     }
   else
     {
+      int border = (w && !FRAME_WINDOW_P (XFRAME (w->frame))
+		    && !WINDOW_RIGHTMOST_P (w)) ? 1 : 0;
       row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA];
-      row->glyphs[RIGHT_MARGIN_AREA]
-	= row->glyphs[RIGHT_BORDER_AREA]
-	= row->glyphs[LAST_AREA]
-	= row->glyphs[TEXT_AREA] + width;
+      row->glyphs[LAST_AREA] = row->glyphs[TEXT_AREA] + width;
+      row->glyphs[RIGHT_BORDER_AREA] = row->glyphs[LAST_AREA] - border;
+      row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA];
     }
 }
 
@@ -2541,6 +2542,7 @@ build_frame_matrix_from_leaf_window (struct glyph_matrix *frame_matrix, struct w
 	      eassert (border->type == CHAR_GLYPH);
 	      border->type = CHAR_GLYPH;
 	      SET_CHAR_GLYPH_FROM_GLYPH (*border, right_border_glyph);
+	      window_row->used[RIGHT_BORDER_AREA]++;
 	    }
 
 #ifdef GLYPH_DEBUG
