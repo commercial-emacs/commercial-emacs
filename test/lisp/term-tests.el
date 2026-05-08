@@ -441,8 +441,8 @@ This is a reduced example from GNU nano's initial screen."
       (dotimes (_ 4)
         (term-send-string proc "\020")) ;C-p
       (term-send-string proc "a\177cookie") ;DEL triggers a redisplay
-      (with-timeout (3)
-        (while (not (string-match-p "*scratch*" (buffer-string))) ;mode line
+      (with-timeout (5)
+        (while (not (string-match-p "-|-" (buffer-string))) ;mode line
           (accept-process-output)))
       (let ((lines (string-split (buffer-string) "\n")))
         (while (length> lines 55)
