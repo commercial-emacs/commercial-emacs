@@ -357,24 +357,15 @@ static void
 assign_glyph_areas (struct glyph_row *row, struct glyph_matrix *matrix,
 		    int height, struct window *w, int left, int right, int width)
 {
-  if (text_row_p (row, matrix, height, w))
-    {
-      row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA] + left;
-      row->glyphs[LAST_AREA] = row->glyphs[LEFT_MARGIN_AREA] + width;
-      int border = (FRAME_WINDOW_P (XFRAME (w->frame)) ||
-		    WINDOW_RIGHTMOST_P (w)) ? 0 : 1;
-      row->glyphs[RIGHT_BORDER_AREA] = row->glyphs[LAST_AREA] - border;
-      row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA] - right;
-    }
-  else
-    {
-      int border = (w && !FRAME_WINDOW_P (XFRAME (w->frame))
-		    && !WINDOW_RIGHTMOST_P (w)) ? 1 : 0;
-      row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA];
-      row->glyphs[LAST_AREA] = row->glyphs[TEXT_AREA] + width;
-      row->glyphs[RIGHT_BORDER_AREA] = row->glyphs[LAST_AREA] - border;
-      row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA];
-    }
+  if (!text_row_p (row, matrix, height, w))
+    left = right = 0;
+  const int border =
+    (w && !FRAME_WINDOW_P (XFRAME (w->frame)) && !WINDOW_RIGHTMOST_P (w))
+    ? 1 : 0;
+  row->glyphs[TEXT_AREA] = row->glyphs[LEFT_MARGIN_AREA] + left;
+  row->glyphs[LAST_AREA] = row->glyphs[LEFT_MARGIN_AREA] + width;
+  row->glyphs[RIGHT_BORDER_AREA] = row->glyphs[LAST_AREA] - border;
+  row->glyphs[RIGHT_MARGIN_AREA] = row->glyphs[RIGHT_BORDER_AREA] - right;
 }
 
 /* Adjust glyph matrix MATRIX on window W or on a frame to changed
