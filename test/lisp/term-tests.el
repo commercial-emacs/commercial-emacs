@@ -449,7 +449,6 @@ This is a reduced example from GNU nano's initial screen."
           (accept-process-output proc 1)
           (while (not (string-match "cookie" (buffer-string)))
             (accept-process-output))
-          (message "buffer %S" (buffer-string))
           (let ((lines (string-split (buffer-string) "\n")))
             (while (length> lines 55)
               (pop lines))
@@ -457,6 +456,60 @@ This is a reduced example from GNU nano's initial screen."
             (setq lines (ntake 52 lines))
             (dolist (line lines)
               (should (eq (aref line 79) ?|)))))))))
+
+(ert-deftest test-dispnew-truncation-consistency ()
+  "Test truncation indicator appears in both halves of a split window."
+  (with-temp-buffer
+    (let ((process-environment process-environment)
+          proc
+          (buf (current-buffer)))
+      (cl-letf (((symbol-function 'window-screen-lines)
+                 (lambda (&rest _) 24))
+                ((symbol-function 'window-max-chars-per-line)
+                 (lambda (&rest _) 80))
+                ((symbol-function 'pos-visible-in-window-p)
+                 (lambda (&rest _) t)))
+        (push "TERM=vt100" process-environment)
+        (push "LINES=24" process-environment)
+        (push "COLUMNS=80" process-environment)
+        (setq proc (make-process :name "emacs"
+                                 :buffer (current-buffer)
+                                 :command (list (expand-file-name invocation-name invocation-directory)
+                                                "--eval" "(setq user-emacs-directory-warning nil)"
+                                                "-Q" "-q" "-nw")
+                                 :connection-type 'pty
+                                 :coding 'binary
+                                 :filter (lambda (&rest args)
+                                           (when (buffer-live-p buf)
+                                             (with-current-buffer buf
+                                               (cl-letf (((symbol-function 'window-screen-lines)
+                                                          (lambda (&rest _) 24))
+                                                         ((symbol-function 'window-max-chars-per-line)
+                                                          (lambda (&rest _) 80))
+                                                         ((symbol-function 'pos-visible-in-window-p)
+                                                          (lambda (&rest _) t)))
+                                                 (apply #'term-emulate-terminal args)))))))
+        (term-mode)
+        (term-char-mode)
+        (term-send-string proc "\e:(setq truncate-lines t tab-width 80)\r")
+        (accept-process-output proc 1)
+        (term-send-string proc "\e:(setq split-width-threshold 0)\r")
+        (accept-process-output proc 1)
+        (term-send-string proc "\e:(insert \"s\\tx\")\r")
+        (accept-process-output proc 1)
+        (term-send-string proc (kbd "C-a"))
+        (accept-process-output proc 1)
+        (term-send-string proc (kbd "C-x 3"))
+        (with-timeout (3)
+          (while (not (string-match "\ns" (buffer-string)))
+            (accept-process-output)))
+        (let* ((lines (string-split (buffer-string) "\n"))
+               (line (cl-find-if (lambda (l) (and (> (length l) 39)
+                                                   (eq (aref l 0) ?s)))
+                                 lines)))
+          (should line)
+          (should (eq (aref line 38) ?$))
+          (should (eq (aref line 39) ?|)))))))
 
 (provide 'term-tests)
 
