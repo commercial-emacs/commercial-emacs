@@ -441,7 +441,7 @@ This is a reduced example from GNU nano's initial screen."
       (dotimes (_ 4)
         (term-send-string proc "\020")) ;C-p
       (term-send-string proc "a\177cookie") ;DEL triggers a redisplay
-      (with-timeout (10)
+      (with-timeout (3)
         (while (not (string-match-p "cookie" (buffer-string)))
           (accept-process-output)))
       (let ((lines (string-split (buffer-string) "\n")))
@@ -460,7 +460,7 @@ This is a reduced example from GNU nano's initial screen."
     (term-send-string proc "\e:(insert \"s\\tx\")\r")
     (term-send-string proc (kbd "C-a"))
     (term-send-string proc (kbd "C-x 3"))
-    (with-timeout (10)
+    (with-timeout (3)
       (while (not (string-match-p "\ns" (buffer-string)))
         (accept-process-output)))
     (let* ((lines (string-split (buffer-string) "\n"))
@@ -476,13 +476,10 @@ This is a reduced example from GNU nano's initial screen."
   (with-tty-subprocess 55 159 proc
     (term-send-string proc "\e:(setq split-width-threshold 0)\r")
     (term-send-string proc
-                      (concat "\e:(dotimes (i 20) "
-                              "(insert (make-string i ?.) "
-                              "(apply #'concat (make-list 50 (string ?\s #x5B57)))"
-                              " \"\\n\"))\r"))
+      "\e:(dotimes (i 20) (insert (make-string i ?.) (apply #'concat (make-list 50 (string ?\s #x5B57))) \"\\n\"))\r")
     (term-send-string proc "\e<")
     (term-send-string proc (kbd "C-x 3"))
-    (with-timeout (10)
+    (with-timeout (3)
       (while (not (string-match-p "\n\\." (buffer-string)))
         (accept-process-output)))
     (let* ((lines (string-split (buffer-string) "\n"))
@@ -506,7 +503,7 @@ This is a reduced example from GNU nano's initial screen."
                               "(insert (propertize \" \" 'display '((margin right-margin) \"1234\") 'default t)) "
                               "(split-window-right)))\r"))
     (term-send-string proc "\e:(insert \"here\")\r")
-    (with-timeout (10)
+    (with-timeout (3)
       (while (not (string-match-p "here" (buffer-string)))
         (accept-process-output)))
     (let* ((lines (string-split (buffer-string) "\n"))
