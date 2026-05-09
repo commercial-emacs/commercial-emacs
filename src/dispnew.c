@@ -2524,9 +2524,8 @@ build_frame_matrix_from_leaf_window (struct glyph_matrix *frame_matrix, struct w
 
 	  /* Maybe insert a vertical border between horizontally adjacent
 	     windows.  */
-	  if (window_row->glyphs[RIGHT_BORDER_AREA] < window_row->glyphs[LAST_AREA])
+	  if (GLYPH_CHAR (right_border_glyph) != 0)
 	    {
-	      eassume (GLYPH_CHAR (right_border_glyph) != 0);
 	      struct glyph *border = window_row->glyphs[RIGHT_BORDER_AREA];
 	      /* It's a subtle bug if we are overwriting some non-char
 		 glyph with the vertical border glyph.  */
