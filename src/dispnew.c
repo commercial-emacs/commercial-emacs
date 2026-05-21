@@ -339,7 +339,7 @@ verify_row_hash (struct glyph_row *row)
 
 static bool
 text_row_p (struct glyph_row *row, struct glyph_matrix *matrix,
-	      int height, struct window *w)
+	    int height, struct window *w)
 {
   if (!w)
     return false;
