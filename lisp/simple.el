@@ -8624,88 +8624,93 @@ treated as delimiting words.  See this command's namesake in Info node
 		 regexp)
   :group 'fill)
 
+(defsubst string-empty-p (string)
+  "Check whether STRING is empty."
+  (declare (pure t) (side-effect-free t))
+  (string= string ""))
+
 (defun do-auto-fill ()
   "The default value for `normal-auto-fill-function'.
 This is the default auto-fill function, some major modes use a different one.
 Returns t if it really did any work."
-  (let (fc justify give-up
-	   (fill-prefix fill-prefix))
-    (if (or (not (setq justify (current-justification)))
-	    (null (setq fc (current-fill-column)))
-	    (and (eq justify 'left)
-		 (<= (current-column) fc))
-	    (and auto-fill-inhibit-regexp
-		 (save-excursion (beginning-of-line)
-				 (looking-at auto-fill-inhibit-regexp))))
-	nil ;; Auto-filling not required
-      (if (memq justify '(full center right))
-	  (save-excursion (unjustify-current-line)))
+  (let ((fill-prefix fill-prefix)
+        (justify (current-justification))
+        (fc (current-fill-column)))
+    (when (and justify fc
+               (or (not (eq justify 'left))
+                   (> (current-column) fc))
+               (or (null auto-fill-inhibit-regexp)
+                   (not (save-excursion
+                          (beginning-of-line)
+			  (looking-at auto-fill-inhibit-regexp)))))
+      (when (memq justify '(full center right))
+        (save-excursion (unjustify-current-line)))
 
-      ;; Choose a fill-prefix automatically.
-      (when (and adaptive-fill-mode
-		 (or (null fill-prefix) (string= fill-prefix "")))
-	(let ((prefix
-	       (fill-context-prefix
-		(save-excursion (fill-forward-paragraph -1) (point))
-		(save-excursion (fill-forward-paragraph 1) (point)))))
-	  (and prefix (not (equal prefix ""))
-	       ;; Use auto-indentation rather than a guessed empty prefix.
-	       (not (and fill-indent-according-to-mode
-			 (string-match "\\`[ \t]*\\'" prefix)))
-	       (setq fill-prefix prefix))))
+      ;; Choose a fill-prefix
+      (when (and adaptive-fill-mode (zerop (length fill-prefix)))
+        (let* ((prefix (fill-context-prefix
+	                (save-excursion (fill-forward-paragraph -1) (point))
+	                (save-excursion (fill-forward-paragraph 1) (point))))
+               ;; Only obey fill-indent-according-to-mode if PREFIX is degenerate
+               (use-mode-indent (and fill-indent-according-to-mode
+                                     (string-match-p "\\`[ \t]*\\'" prefix))))
+          (when (and (not (zerop (length prefix))) (not use-mode-indent))
+            (setq fill-prefix prefix))))
 
-      (while (and (not give-up) (> (current-column) fc))
-        ;; Determine where to split the line.
-        (let ((fill-point
-               (save-excursion
-                 (beginning-of-line)
-                 ;; Don't split earlier in the line than the length of the
-                 ;; fill prefix, since the resulting line would be longer.
-                 (when fill-prefix
-                   (move-to-column (string-width fill-prefix)))
-                 (let ((after-prefix (point)))
+      (catch 'give-up
+        (while (> (current-column) fc)
+         ;; Determine where to split the line.
+         (let ((fill-point
+                (save-excursion
+                  (beginning-of-line)
+                  ;; Don't split earlier in the line than the length of the
+                  ;; fill prefix, since the resulting line would be longer.
+                  (when fill-prefix
+                    (move-to-column (string-width fill-prefix)))
+                  (let ((after-prefix (point)))
                     (move-to-column (1+ fc))
                     (fill-move-to-break-point after-prefix)
                     (point)))))
 
-	  ;; See whether the place we found is any good.
-	  (if (save-excursion
-		(goto-char fill-point)
-		(or (bolp)
-		    ;; There is no use breaking at end of line.
-		    (save-excursion (skip-chars-forward " ") (eolp))
-		    ;; Don't split right after a comment starter
-		    ;; since we would just make another comment starter.
-		    (and comment-start-skip
-			 (let ((limit (point)))
-			   (beginning-of-line)
-			   (and (re-search-forward comment-start-skip
-						   limit t)
-				(eq (point) limit))))))
-	      ;; No good place to break => stop trying.
-	      (setq give-up t)
-	    ;; Ok, we have a useful place to break the line.  Do it.
-	    (let ((prev-column (current-column)))
-	      ;; If point is at the fill-point, do not `save-excursion'.
-	      ;; Otherwise, if a comment prefix or fill-prefix is inserted,
-	      ;; point will end up before it rather than after it.
-	      (if (save-excursion
-		    (skip-chars-backward " \t")
-		    (= (point) fill-point))
-		  (default-indent-new-line t)
-		(save-excursion
-		  (goto-char fill-point)
-		  (default-indent-new-line t)))
-	      ;; Now do justification, if required
-	      (if (not (eq justify 'left))
-		  (save-excursion
-		    (end-of-line 0)
-		    (justify-current-line justify nil t)))
-	      ;; If making the new line didn't reduce the hpos of
-	      ;; the end of the line, then give up now;
-	      ;; trying again will not help.
-	      (if (>= (current-column) prev-column)
-		  (setq give-up t))))))
+	   ;; See whether the place we found is any good.
+	   (if (save-excursion
+	         (goto-char fill-point)
+	         (or (bolp)
+		     ;; There is no use breaking at end of line.
+		     (save-excursion (skip-chars-forward " ") (eolp))
+		     ;; Don't split right after a comment starter
+		     ;; since we would just make another comment starter.
+		     (and comment-start-skip
+		          (let ((limit (point)))
+			    (beginning-of-line)
+			    (and (re-search-forward comment-start-skip
+						    limit t)
+			         (eq (point) limit))))))
+	       ;; No good place to break => stop trying.
+	       (throw 'give-up t)
+	     ;; Ok, we have a useful place to break the line.  Do it.
+	     (let ((prev-column (current-column)))
+	       ;; If point is at the fill-point, do not `save-excursion'.
+	       ;; Otherwise, if a comment prefix or fill-prefix is inserted,
+	       ;; point will end up before it rather than after it.
+	       (if (save-excursion
+		     (skip-chars-backward " \t")
+		     (= (point) fill-point))
+		   (default-indent-new-line t)
+	         (save-excursion
+		   (goto-char fill-point)
+		   (default-indent-new-line t)))
+	       ;; Now do justification, if required
+	       (unless (eq justify 'left)
+		 (save-excursion
+		   (end-of-line 0)
+		   (justify-current-line justify nil t)))
+	       ;; If making the new line didn't reduce the hpos of
+	       ;; the end of the line, then give up now;
+	       ;; trying again will not help.
+	       (when (>= (current-column) prev-column)
+		 (throw 'give-up t)))))))
+
       ;; Justify last line.
       (justify-current-line justify t t)
       t)))
@@ -10852,11 +10857,6 @@ killed."
         (with-current-buffer buffer
           (save-buffer)))
       t)))
-
-(defsubst string-empty-p (string)
-  "Check whether STRING is empty."
-  (declare (pure t) (side-effect-free t))
-  (string= string ""))
 
 (defun read-signal-name ()
   "Read a signal number or name."
