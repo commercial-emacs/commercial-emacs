@@ -252,6 +252,36 @@ width of display property."
                        (end-of-line)
                        (- (point) (beginning-of-visual-line))))))))
 
+(ert-deftest xdisp-tests--visual-line-nav ()
+  "C-n/C-p preserve column across wrapped visual lines."
+  (skip-unless (not noninteractive))
+  (xdisp-tests--visible-buffer
+   (visual-line-mode)
+   ;; Fill three visual rows with 5-char words.
+   ;; wprow = words that fit per row; 3*wprow+1 words guarantees 3 rows.
+   (let* ((w (window-width))
+          (word "aaaaa")
+          (wprow (/ w 6))           ; each word+space = 6 cols
+          (nwords (1+ (* 3 wprow)))
+          (vcol (lambda ()
+                  (- (point)
+                     (save-excursion (beginning-of-visual-line) (point))))))
+     (save-excursion
+       (insert (mapconcat #'identity (make-list nwords word) " ") "\n"))
+     (save-excursion
+       (dotimes (_i 2)
+         (should (= (let (temporary-goal-column)
+                      (call-interactively #'forward-word) (funcall vcol))
+                    (let (temporary-goal-column)
+                      (call-interactively #'next-line) (funcall vcol))))))
+     (save-excursion
+       (call-interactively #'end-of-buffer)
+       (dotimes (_i 2)
+         (should (= (let (temporary-goal-column)
+                      (call-interactively #'backward-word 1) (funcall vcol))
+                    (let (temporary-goal-column)
+                      (call-interactively #'previous-line) (funcall vcol)))))))))
+
 (ert-deftest xdisp-tests--vertical-motion-display-string ()
   "Test line-up and line-down in presence of display string."
   (skip-unless (not noninteractive))

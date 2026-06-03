@@ -217,6 +217,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #define DISP_INFINITY 10000000
 
+#define FRINGE_P(IT)						\
+  (FRAME_WINDOW_P ((IT)->f) &&					\
+   (((IT)->bidi_p && (IT)->bidi_it.paragraph_dir == R2L)	\
+    ? (WINDOW_LEFT_FRINGE_WIDTH ((IT)->w) > 0)			\
+    : (WINDOW_RIGHT_FRINGE_WIDTH ((IT)->w) > 0)))
+
 #ifdef HAVE_WINDOW_SYSTEM
 
 /* Test if overflow newline into fringe.  Called with iterator IT
@@ -224,10 +230,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #define IT_OVERFLOW_NEWLINE_INTO_FRINGE(IT)		\
   (!NILP (Voverflow_newline_into_fringe)		\
-   && FRAME_WINDOW_P ((IT)->f)				\
-   && ((IT)->bidi_it.paragraph_dir == R2L		\
-       ? (WINDOW_LEFT_FRINGE_WIDTH ((IT)->w) > 0)	\
-       : (WINDOW_RIGHT_FRINGE_WIDTH ((IT)->w) > 0))	\
+   && FRINGE_P (it)					\
    && (IT)->current_x == (IT)->last_visible_x)
 
 #else /* !HAVE_WINDOW_SYSTEM */
@@ -8456,9 +8459,6 @@ get_element_from_composition (struct it *it)
   return true;
 }
 
-/* Check if iterator is at a position corresponding to a valid buffer
-   position after some move_it_* call.  */
-
 #define BUFFER_POS_REACHED_P()					\
   ((op & MOVE_TO_POS)						\
    && BUFFERP (it->object)					\
@@ -8494,6 +8494,9 @@ get_element_from_composition (struct it *it)
     SET_CLOSEST_PAST_CHARPOS ((IT));				\
   }								\
   while (false)
+
+#define COULD_WRAP_P(IT) \
+  ((IT)->line_wrap == WORD_WRAP && wrap_it.sp >= 0)
 
 /* Move iterator IT forward one screen line without producing glyphs.
 
@@ -8660,44 +8663,43 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 		{
 		  if (BUFFER_POS_REACHED_P ())
 		    {
-		      if (it->line_wrap != WORD_WRAP || wrap_it.sp < 0)
-			goto buffer_pos_reached;
-		      if (atpos_it.sp < 0)
+		      if (COULD_WRAP_P (it))
 			{
-			  SAVE_IT (atpos_it, *it, atpos_data);
-			  it->current_x = old_x;
-			  it->max_descent = it_prev.max_descent;
-			  it->max_ascent = it_prev.max_ascent;
+			  if (atpos_it.sp < 0)
+			    {
+			      SAVE_IT (atpos_it, *it, atpos_data);
+			      atpos_it.current_x = old_x;
+			      atpos_it.max_descent = it_prev.max_descent;
+			      atpos_it.max_ascent = it_prev.max_ascent;
+			    }
 			}
+		      else
+			goto buffer_pos_reached;
 		    }
 		  else
 		    {
-		      if (it->line_wrap != WORD_WRAP || wrap_it.sp < 0)
+		      if (COULD_WRAP_P (it))
+			{
+			  if (atx_it.sp < 0)
+			    {
+			      SAVE_IT (atx_it, *it, atx_data);
+			      atx_it.current_x = old_x;
+			      atx_it.max_descent = it_prev.max_descent;
+			      atx_it.max_ascent = it_prev.max_ascent;
+			    }
+			}
+		      else
 			{
 			  it->current_x = old_x;
 			  result = MOVE_X_REACHED;
 			  break;
 			}
-		      if (atx_it.sp < 0)
-			{
-			  SAVE_IT (atx_it, *it, atx_data);
-			  it->current_x = old_x;
-			  it->max_descent = it_prev.max_descent;
-			  it->max_ascent = it_prev.max_ascent;
-			}
 		    }
 		}
 
-	      if (/* Lines are continued.  */
-		  it->line_wrap != TRUNCATE
-		  && (/* ... and glyph doesn't fit on the line.  */
-		      new_x > it->last_visible_x
-		      /* ... or fringe would collide.  */
-		      || (new_x == it->last_visible_x
-			  && FRAME_WINDOW_P (it->f)
-			  && ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
-			      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-			      : WINDOW_RIGHT_FRINGE_WIDTH (it->w)))))
+	      if ((it->line_wrap == WORD_WRAP || it->line_wrap == WINDOW_WRAP)
+		  && (new_x > it->last_visible_x
+		      || (new_x == it->last_visible_x && FRINGE_P (it))))
 		{
 		  bool moved_forward = false;
 
@@ -8724,8 +8726,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 			      */
 			      bool can_wrap = true;
 
-			      if (it->line_wrap == WORD_WRAP
-				  && wrap_it.sp >= 0
+			      if (COULD_WRAP_P (it)
 				  && may_wrap
 				  && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
 				{
@@ -8739,8 +8740,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 				    can_wrap = false;
 				  RESTORE_IT (it, &tem_it, tem_data);
 				}
-			      if (it->line_wrap != WORD_WRAP
-				  || wrap_it.sp < 0
+			      if (!COULD_WRAP_P (it)
 				  /* Under overflow-newline-into-fringe,
 				     ignore previous wrap point, and break.  */
 				  || (may_wrap && can_wrap
@@ -8751,15 +8751,14 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 				  result = MOVE_POS_MATCH_OR_ZV;
 				  break;
 				}
-			      if (it->line_wrap == WORD_WRAP
-				  && atpos_it.sp < 0)
+			      if (COULD_WRAP_P (it) && atpos_it.sp < 0)
 				{
 				  SAVE_IT (atpos_it, *it, atpos_data);
 				  atpos_it.current_x = it_prev.current_x;
-				  atpos_it.hpos = old_hpos;
 				}
 			    }
 
+			  old_hpos = it->hpos;
 			  set_iterator_to_next (it, true);
 			  if (IT_CHARPOS (*it) < CHARPOS (static_sline_min_pos))
 			    SET_TEXT_POS (static_sline_min_pos,
@@ -8769,11 +8768,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 			     display line when (i) tty (ii) graphical displays
 			     with no fringe, or (iii) overflow-newline-into-fringe
 			     is set.  */
-			  if (!FRAME_WINDOW_P (it->f)
-			      || ((it->bidi_p
-				   && it->bidi_it.paragraph_dir == R2L)
-				  ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-				  : WINDOW_RIGHT_FRINGE_WIDTH (it->w)) == 0
+			  if (!FRINGE_P (it)
 			      || IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
 			    {
 			      if (!get_display_element (it))
@@ -8790,8 +8785,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 				  break;
 				}
 			      if (ITERATOR_AT_END_OF_LINE_P (it)
-				  && (it->line_wrap != WORD_WRAP
-				      || wrap_it.sp < 0
+				  && (!COULD_WRAP_P (it)
 				      || IT_OVERFLOW_NEWLINE_INTO_FRINGE (it)))
 				{
 				  result = MOVE_NEWLINE_OR_CR;
@@ -8800,11 +8794,12 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 			    }
 			}
 		    }
-		  else {
-		    it->current_x = old_x;
-		    it->max_descent = it_prev.max_descent;
-		    it->max_ascent = it_prev.max_ascent;
-		  }
+		  else
+		    {
+		      it->current_x = old_x;
+		      it->max_descent = it_prev.max_descent;
+		      it->max_ascent = it_prev.max_ascent;
+		    }
 
 		  /* may_wrap meant previous character affirmed
 		     char_can_wrap_after(), but current character
@@ -8815,7 +8810,8 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 		    {
 		      /* If we've found TO_X, go back there, as we now
 			 know the last word fits on this screen line.  */
-		      if ((op & MOVE_TO_X) && new_x == it->last_visible_x
+		      if ((op & MOVE_TO_X)
+			  && new_x == it->last_visible_x
 			  && atx_it.sp >= 0)
 			{
 			  RESTORE_IT (it, &atx_it, atx_data);
@@ -8840,16 +8836,18 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 
 	      if (BUFFER_POS_REACHED_P ())
 		{
-		  if (it->line_wrap != WORD_WRAP || wrap_it.sp < 0)
-		    goto buffer_pos_reached;
-		  else if (atpos_it.sp < 0)
+		  if (COULD_WRAP_P (it))
 		    {
-		      eassert (it->line_wrap == WORD_WRAP);
-		      SAVE_IT (atpos_it, *it, atpos_data);
-		      it->current_x = old_x;
-		      it->max_descent = it_prev.max_descent;
-		      it->max_ascent = it_prev.max_ascent;
+		      if (atpos_it.sp < 0)
+			{
+			  SAVE_IT (atpos_it, *it, atpos_data);
+			  atpos_it.current_x = old_x;
+			  atpos_it.max_descent = it_prev.max_descent;
+			  atpos_it.max_ascent = it_prev.max_ascent;
+			}
 		    }
+		  else
+		    goto buffer_pos_reached;
 		}
 
 	      if (new_x > it->first_visible_x)
@@ -8916,70 +8914,41 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 	  goto done;
 	}
 
-      /* Awkward:
+      /* Blink-and-you-miss-it advance step.  */
+      ADVANCE_IT (it);
 
-	 When i == 0, if past edge, goto done, else advance iterator
-	 When i == 1, if past edge, goto done
-
-	 Look in git history for OVERWIDE_PREFIX how this was
-	 previously done.  */
-      for (int i=0; i<2; ++i)
+      if (it->line_wrap == TRUNCATE
+	  && it->current_x >= it->last_visible_x)
 	{
-	  if (it->line_wrap == TRUNCATE)
+	  result = MOVE_LINE_TRUNCATED;
+	  if (!FRINGE_P (it) || IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
 	    {
-	      if (it->current_x >= it->last_visible_x)
-		{
-		  bool fringeless =
-		    !FRAME_WINDOW_P (it->f)
-		    || 0 == ((it->bidi_p && it->bidi_it.paragraph_dir == R2L)
-			     ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-			     : WINDOW_RIGHT_FRINGE_WIDTH (it->w))
-		    || IT_OVERFLOW_NEWLINE_INTO_FRINGE (it);
-
-		  if (fringeless &&
-		      (!get_display_element (it) || BUFFER_POS_REACHED_P ()))
-		    result = MOVE_POS_MATCH_OR_ZV;
-		  else if (fringeless && ITERATOR_AT_END_OF_LINE_P (it))
-		    result = MOVE_NEWLINE_OR_CR;
-		  else if (ppos_p
-			   && !saw_smaller_pos
-			   && IT_CHARPOS (*it) > to_charpos)
-		    {
-		      if (closest_pos < ZV)
-			{
-			  RESTORE_IT (it, &ppos_it, ppos_data);
-			  emulate_display_sline (it, closest_pos, -1, MOVE_TO_POS);
-			}
-		      result = MOVE_POS_MATCH_OR_ZV;
-		    }
-		  else
-		    result = MOVE_LINE_TRUNCATED;
-		  goto done;
-		}
+	      if (!get_display_element (it) || BUFFER_POS_REACHED_P ())
+		result = MOVE_POS_MATCH_OR_ZV;
+	      else if (ITERATOR_AT_END_OF_LINE_P (it))
+		result = MOVE_NEWLINE_OR_CR;
 	    }
-	  else /* it->line_wrap != TRUNCATE */
+	  if (result == MOVE_LINE_TRUNCATED
+	      && ppos_p
+	      && !saw_smaller_pos
+	      && IT_CHARPOS (*it) > to_charpos)
 	    {
-	      /* Test this before outer loop's get_display_element()
-		 changes method (Bug#67201).  */
-	      if (BUFFER_POS_REACHED_P ())
+	      if (closest_pos < ZV)
 		{
-		  result = MOVE_POS_MATCH_OR_ZV;
-		  goto done;
+		  RESTORE_IT (it, &ppos_it, ppos_data);
+		  emulate_display_sline (it, closest_pos, -1, MOVE_TO_POS);
 		}
+	      result = MOVE_POS_MATCH_OR_ZV;
 	    }
-
-	  /* Blink-and-you-miss-it advance step.  */
-	  if (i == 0)
-	    ADVANCE_IT (it);
+	  goto done;
 	}
     }
  done:
 
-  /* Restore to wrap point when atpos/atx position would be displayed
+  /* Restore to wrap point when atpos position would be displayed
      on the next screen line due to line-wrap. (Bug#23570)  */
-  if (it->line_wrap == WORD_WRAP
-      && result == MOVE_LINE_CONTINUED
-      && wrap_it.sp >= 0
+  if (result == MOVE_LINE_CONTINUED
+      && COULD_WRAP_P (it)
       && ((atpos_it.sp >= 0 && wrap_it.current_x < atpos_it.current_x)
 	  || (atx_it.sp >= 0 && wrap_it.current_x < atx_it.current_x)))
     RESTORE_IT (it, &wrap_it, wrap_data);
@@ -21315,7 +21284,7 @@ display_sline (struct it *it, int cursor_vpos)
 
       /* Remember the line height so far in case the next element doesn't
 	 fit on the line.  */
-      if (it->line_wrap != TRUNCATE)
+      if (it->line_wrap == WORD_WRAP || it->line_wrap == WINDOW_WRAP)
 	{
 	  ascent = it->max_ascent;
 	  descent = it->max_descent;
@@ -21438,8 +21407,7 @@ display_sline (struct it *it, int cursor_vpos)
 		glyph = row->glyphs[TEXT_AREA] + nglyphs - 1 - i;
 	      new_x = x + glyph->pixel_width;
 
-	      if (/* Lines are continued.  */
-		  it->line_wrap != TRUNCATE
+	      if ((it->line_wrap == WORD_WRAP || it->line_wrap == WINDOW_WRAP)
 		  && (/* Glyph doesn't fit on the line.  */
 		      new_x > it->last_visible_x
 		      /* Or it fits exactly on a window system frame.  */
@@ -21736,116 +21704,104 @@ display_sline (struct it *it, int cursor_vpos)
 	  goto done;
 	}
 
-      /* Awkward:
-
-	 (i == 0) Goto done if past edge
-	 (i == 0) Advance iterator
-	 (i == 1) Goto done if past edge
-
-	 Look in git history for OVERWIDE_PREFIX how this was
-	 previously done.  */
-      for (int k=0; k<2; ++k)
+      set_iterator_to_next (it, true);
+      int fringe_width = (row->reversed_p
+			  ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
+			  : WINDOW_RIGHT_FRINGE_WIDTH (it->w));
+      if (it->line_wrap == TRUNCATE
+	  && ((FRAME_WINDOW_P (it->f)
+	       /* EZ hack: truncate sooner for images. Commit
+		  d34f67d.  */
+	       && (fringe_width || it->what == IT_IMAGE))
+	      ? (it->current_x >= it->last_visible_x)
+	      : (it->current_x > it->last_visible_x)))
 	{
-	  int fringe_width = (row->reversed_p
-			      ? WINDOW_LEFT_FRINGE_WIDTH (it->w)
-			      : WINDOW_RIGHT_FRINGE_WIDTH (it->w));
-	  if (it->line_wrap == TRUNCATE
-	      && ((FRAME_WINDOW_P (it->f)
-		   /* EZ hack: truncate sooner for images. Commit
-		      d34f67d.  */
-		   && (fringe_width || it->what == IT_IMAGE))
-		  ? (it->current_x >= it->last_visible_x)
-		  : (it->current_x > it->last_visible_x)))
+	  if (!FRAME_WINDOW_P (it->f) || !fringe_width)
 	    {
-	      if (!FRAME_WINDOW_P (it->f) || !fringe_width)
+	      /* Add truncation glyphs.  */
+	      int i;
+	      if (!row->reversed_p)
 		{
-		  /* Add truncation glyphs.  */
-		  int i;
-		  if (!row->reversed_p)
-		    {
-		      for (i = row->used[TEXT_AREA] - 1; i > 0; --i)
-			if (!CHAR_GLYPH_PADDING_P (row->glyphs[TEXT_AREA][i]))
-			  break;
-		    }
-		  else
-		    {
-		      for (i = 0; i < row->used[TEXT_AREA]; i++)
-			if (!CHAR_GLYPH_PADDING_P (row->glyphs[TEXT_AREA][i]))
-			  break;
-		      /* Remove any padding glyphs at the front of ROW, to
-			 make room for the truncation glyphs we will be
-			 adding below.  The loop below always inserts at
-			 least one truncation glyph, so also remove the
-			 last glyph added to ROW.  */
-		      unproduce_glyphs (it, i + 1);
-		      /* Adjust i for the loop below.  */
-		      i = row->used[TEXT_AREA] - (i + 1);
-		    }
+		  for (i = row->used[TEXT_AREA] - 1; i > 0; --i)
+		    if (!CHAR_GLYPH_PADDING_P (row->glyphs[TEXT_AREA][i]))
+		      break;
+		}
+	      else
+		{
+		  for (i = 0; i < row->used[TEXT_AREA]; i++)
+		    if (!CHAR_GLYPH_PADDING_P (row->glyphs[TEXT_AREA][i]))
+		      break;
+		  /* Remove any padding glyphs at the front of ROW, to
+		     make room for the truncation glyphs we will be
+		     adding below.  The loop below always inserts at
+		     least one truncation glyph, so also remove the
+		     last glyph added to ROW.  */
+		  unproduce_glyphs (it, i + 1);
+		  /* Adjust i for the loop below.  */
+		  i = row->used[TEXT_AREA] - (i + 1);
+		}
 
-		  /* produce_special_glyphs overwrites the last glyph, so
-		     we don't want that if we want to keep that last
-		     glyph, which means it's an image.  */
-		  if (it->current_x > it->last_visible_x)
+	      /* produce_special_glyphs overwrites the last glyph, so
+		 we don't want that if we want to keep that last
+		 glyph, which means it's an image.  */
+	      if (it->current_x > it->last_visible_x)
+		{
+		  it->current_x = x_before;
+		  if (!FRAME_WINDOW_P (it->f))
 		    {
-		      it->current_x = x_before;
-		      if (!FRAME_WINDOW_P (it->f))
-			{
-			  for (int n = row->used[TEXT_AREA]; i < n; ++i)
-			    {
-			      row->used[TEXT_AREA] = i;
-			      produce_special_glyphs (it, IT_TRUNCATION);
-			    }
-			}
-		      else
+		      for (int n = row->used[TEXT_AREA]; i < n; ++i)
 			{
 			  row->used[TEXT_AREA] = i;
 			  produce_special_glyphs (it, IT_TRUNCATION);
 			}
-		      it->hpos = hpos_before;
 		    }
-		  /* Add a space glyph to the margin to evince
-		     background of a remapped default face.  */
-		  if (lookup_basic_face (it->w, it->f, DEFAULT_FACE_ID)
-		      != DEFAULT_FACE_ID /* default face is remapped */
-		      && ((WINDOW_LEFT_MARGIN_WIDTH (it->w) > 0
-			   && it->glyph_row->used[LEFT_MARGIN_AREA] == 0)
-			  || (WINDOW_RIGHT_MARGIN_WIDTH (it->w) > 0
-			      && it->glyph_row->used[RIGHT_MARGIN_AREA] == 0)))
-		    extend_face_to_end_of_line (it);
-		}
-	      else if (IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
-		{
-		  /* Don't truncate if we can overflow newline into fringe.  */
-		  if (!get_display_element (it))
+		  else
 		    {
-		      it->continuation_lines_width = 0;
-		      it->font_height = Qnil;
-		      it->voffset = 0;
-		      row->ends_at_zv_p = true;
-		      row->exact_window_width_line_p = true;
-		      goto done;
+		      row->used[TEXT_AREA] = i;
+		      produce_special_glyphs (it, IT_TRUNCATION);
 		    }
-		  if (ITERATOR_AT_END_OF_LINE_P (it))
-		    {
-		      row->exact_window_width_line_p = true;
-		      goto at_end_of_line;
-		    }
-		  it->current_x = x_before;
 		  it->hpos = hpos_before;
 		}
-
-	      row->truncated_on_right_p = true;
-	      it->continuation_lines_width = 0;
-	      reseat_following_line_start (it, false);
-	      row->ends_at_zv_p =
-		IT_BYTEPOS (*it) >= ZV_BYTE
-		/* dubious concession to R2L:
-		   EZ considers a newline penultimate byte as ambiguous.  */
-		&& (ZV_BYTE <= 1 || FETCH_BYTE (ZV_BYTE - 1) != '\n');
-	      goto done;
+	      /* Add a space glyph to the margin to evince
+		 background of a remapped default face.  */
+	      if (lookup_basic_face (it->w, it->f, DEFAULT_FACE_ID)
+		  != DEFAULT_FACE_ID /* default face is remapped */
+		  && ((WINDOW_LEFT_MARGIN_WIDTH (it->w) > 0
+		       && it->glyph_row->used[LEFT_MARGIN_AREA] == 0)
+		      || (WINDOW_RIGHT_MARGIN_WIDTH (it->w) > 0
+			  && it->glyph_row->used[RIGHT_MARGIN_AREA] == 0)))
+		extend_face_to_end_of_line (it);
 	    }
-	  if (k == 0)
-	    set_iterator_to_next (it, true);
+	  else if (IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
+	    {
+	      /* Don't truncate if we can overflow newline into fringe.  */
+	      if (!get_display_element (it))
+		{
+		  it->continuation_lines_width = 0;
+		  it->font_height = Qnil;
+		  it->voffset = 0;
+		  row->ends_at_zv_p = true;
+		  row->exact_window_width_line_p = true;
+		  goto done;
+		}
+	      if (ITERATOR_AT_END_OF_LINE_P (it))
+		{
+		  row->exact_window_width_line_p = true;
+		  goto at_end_of_line;
+		}
+	      it->current_x = x_before;
+	      it->hpos = hpos_before;
+	    }
+
+	  row->truncated_on_right_p = true;
+	  it->continuation_lines_width = 0;
+	  reseat_following_line_start (it, false);
+	  row->ends_at_zv_p =
+	    IT_BYTEPOS (*it) >= ZV_BYTE
+	    /* dubious concession to R2L:
+	       EZ considers a newline penultimate byte as ambiguous.  */
+	    && (ZV_BYTE <= 1 || FETCH_BYTE (ZV_BYTE - 1) != '\n');
+	  break;
 	}
     }
 done:
@@ -22602,8 +22558,7 @@ Value is the new character position of point.  */)
       else
 	{
 	  if (at_eol_p
-	      || (target_x >= it.last_visible_x
-		  && it.line_wrap != TRUNCATE))
+	      || (target_x >= it.last_visible_x && it.line_wrap != TRUNCATE))
 	    {
 	      if (pt_x > 0)
 		move_it_dvpos (&it, 0);
