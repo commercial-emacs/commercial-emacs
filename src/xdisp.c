@@ -8973,6 +8973,7 @@ emulate_display_sline (struct it *it, ptrdiff_t to_charpos, int to_x,
 
 #undef BUFFER_POS_REACHED_P
 #undef SET_CLOSEST_PAST_CHARPOS
+#undef COULD_WRAP_P
 
 /* Move IT forward until it satisfies OP, which can be one of
    MOVE_TO_POS
@@ -21951,9 +21952,10 @@ done:
     it->glyph_row->reversed_p = row->reversed_p;
   it->start = row->end;
   return MATRIX_ROW_DISPLAYS_TEXT_P (row);
-
-#undef RECORD_MAX_MIN_POS
 }
+#undef RECORD_MAX_MIN_POS
+#undef FRINGE_P
+
 
 DEFUN ("current-bidi-paragraph-direction", Fcurrent_bidi_paragraph_direction,
        Scurrent_bidi_paragraph_direction, 0, 1, 0,
