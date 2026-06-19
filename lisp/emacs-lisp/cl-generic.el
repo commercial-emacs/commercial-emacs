@@ -390,7 +390,7 @@ the specializer used will be the one returned by BODY."
                   (cl--generic-split-args args))
                  (fun `(cl-function (lambda ,plain-args ,@body)))
                  (macroenv (cons `(cl-generic-current-method-specializers
-                                   . ,(lambda () spec-args))
+                                   . ,(lambda () (list 'quote spec-args)))
                                  macroexpand-all-environment)))
       (require 'cl-lib)        ;Needed to expand `cl-flet' and `cl-function'.
       (when (assq 'interactive body)
