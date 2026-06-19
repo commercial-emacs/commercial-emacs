@@ -551,13 +551,20 @@ Returns the process associated with the connection."
 	       (and (string-match "\\bSTLS\\b" capabilities)
 		    "STLS\r\n"))))
       (when result
-	(let ((response (plist-get (cdr result) :greeting)))
+	(let* ((process (car result))
+               (properties (cdr result))
+               (response (plist-get properties :greeting))
+               (capabilities (plist-get properties :capabilities)))
 	  (setq pop3-timestamp
 		(substring response (or (string-search "<" response) 0)
-			   (+ 1 (or (string-search ">" response) -1)))))
-	(set-process-query-on-exit-flag (car result) nil)
-	(erase-buffer)
-	(car result)))))
+			   (+ 1 (or (string-search ">" response) -1))))
+	  (set-process-query-on-exit-flag process nil)
+	  (erase-buffer)
+          ;; Support RFC 6856.
+          (when (string-match "\\bUTF8\\b" capabilities)
+            (pop3-send-command process "UTF8")
+            (ignore-errors (pop3-read-response process)))
+	  process)))))
 
 ;; Support functions
 
