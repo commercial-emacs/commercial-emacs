@@ -390,56 +390,57 @@ report."
 
 (defun nntp-wait-for (process wait-for buffer &optional decode discard)
   "Wait for WAIT-FOR to arrive from PROCESS."
-
   (with-current-buffer (process-buffer process)
-    (goto-char (point-min))
-
-    (while (and (or (not (memq (char-after (point)) '(?2 ?3 ?4 ?5)))
-		    (looking-at "48[02]"))
-		(memq (process-status process) '(open run)))
-      (cond ((looking-at "480")
-	     (nntp-handle-authinfo process))
-	    ((looking-at "482")
-	     (nnheader-report 'nntp "%s"
-			      (get 'nntp-authinfo-rejected 'error-message))
-	     (signal 'nntp-authinfo-rejected nil))
-	    ((looking-at "^.*\n")
-	     (delete-region (point) (progn (forward-line 1) (point)))))
-      (nntp-accept-process-output process)
-      (goto-char (point-min)))
-    (prog1
-	(cond
-	 ((looking-at "[45]")
-	  (progn
-	    (nntp-snarf-error-message)
-	    nil))
-	 ((not (memq (process-status process) '(open run)))
-	  (nntp-report "NNTP server %S closed connection" nntp-address))
-	 (t
-	  (goto-char (point-max))
-	  (let ((limit (point-min))
-		response)
-	    (while (not (re-search-backward wait-for limit t))
-	      (nntp-accept-process-output process)
-	      ;; We assume that whatever we wait for is less than 1000
-	      ;; characters long.
-	      (setq limit (max (- (point-max) 1000) (point-min)))
-	      (goto-char (point-max)))
-	    (setq response (match-string 0))
-	    (with-current-buffer nntp-server-buffer
-	      (setq nntp-process-response response)))
-	  (nntp-decode-text (not decode))
-	  (unless discard
-	    (with-current-buffer buffer
-	      (goto-char (point-max))
-	      (nnheader-insert-buffer-substring (process-buffer process))
-	      ;; Nix out "nntp reading...." message.
-	      (when nntp-have-messaged
-		(setq nntp-have-messaged nil)
-		(nnheader-message 5 ""))))
-	  t))
-      (unless discard
-	(erase-buffer)))))
+    (with-timeout (10
+                   (nntp-close-server)
+                   (nntp-report "NNTP server %S closed connection" nntp-address))
+      (goto-char (point-min))
+      (while (and (or (not (memq (char-after (point)) '(?2 ?3 ?4 ?5)))
+		      (looking-at "48[02]"))
+		  (memq (process-status process) '(open run)))
+        (cond ((looking-at "480")
+	       (nntp-handle-authinfo process))
+	      ((looking-at "482")
+	       (nnheader-report 'nntp "%s"
+			        (get 'nntp-authinfo-rejected 'error-message))
+	       (signal 'nntp-authinfo-rejected nil))
+	      ((looking-at "^.*\n")
+	       (delete-region (point) (progn (forward-line 1) (point)))))
+        (nntp-accept-process-output process)
+        (goto-char (point-min)))
+      (prog1
+	  (cond
+	   ((looking-at "[45]")
+	    (progn
+	      (nntp-snarf-error-message)
+	      nil))
+	   ((not (memq (process-status process) '(open run)))
+	    (nntp-report "NNTP server %S closed connection" nntp-address))
+	   (t
+	    (goto-char (point-max))
+	    (let ((limit (point-min))
+		  response)
+	      (while (not (re-search-backward wait-for limit t))
+	        (nntp-accept-process-output process)
+	        ;; We assume that whatever we wait for is less than 1000
+	        ;; characters long.
+	        (setq limit (max (- (point-max) 1000) (point-min)))
+	        (goto-char (point-max)))
+	      (setq response (match-string 0))
+	      (with-current-buffer nntp-server-buffer
+	        (setq nntp-process-response response)))
+	    (nntp-decode-text (not decode))
+	    (unless discard
+	      (with-current-buffer buffer
+	        (goto-char (point-max))
+	        (nnheader-insert-buffer-substring (process-buffer process))
+	        ;; Nix out "nntp reading...." message.
+	        (when nntp-have-messaged
+		  (setq nntp-have-messaged nil)
+		  (nnheader-message 5 ""))))
+	    t))
+        (unless discard
+	  (erase-buffer))))))
 
 (defun nntp-erase-buffer (buffer)
   "Erase contents of BUFFER."
@@ -450,34 +451,29 @@ report."
                            &optional
                            wait-for callback decode)
   "Use COMMAND to retrieve data into BUFFER from PORT on ADDRESS."
-  (let ((process (nntp-get-process)))
-    (if process
-        (progn
-          (unless (or nntp-inhibit-erase nnheader-callback-function)
-	    (nntp-erase-buffer (process-buffer process)))
-          (condition-case err
-              (progn
-                (when command
-                  (nntp-send-string process command))
-                (cond
-                 ((eq callback 'ignore)
-                  t)
-                 ((and callback wait-for)
-                  (nntp-async-wait process wait-for buffer decode callback)
-                  t)
-                 (wait-for
-                  (nntp-wait-for process wait-for buffer decode))
-                 (t t)))
-	    (nntp-authinfo-rejected
-	     (signal 'nntp-authinfo-rejected (cdr err)))
-            (error
-             (nnheader-report 'nntp "Couldn't open connection to %s: %s"
-                              address err))
-            (quit
-             (message "Quit retrieving data from nntp")
-             (signal 'quit nil)
-             nil)))
-      (nnheader-report 'nntp "Couldn't open connection to %s" address))))
+  (if-let ((process (nntp-get-process)))
+      (condition-case err
+          (progn
+            (when (and (not nntp-inhibit-erase)
+                       (not nnheader-callback-function))
+              (nntp-erase-buffer (process-buffer process)))
+            (when command
+              (nntp-send-string process command))
+            (cond
+             ((eq callback 'ignore)
+              t)
+             ((and callback wait-for)
+              (nntp-async-wait process wait-for buffer decode callback)
+              t)
+             (wait-for
+              (nntp-wait-for process wait-for buffer decode))
+             (t t)))
+        (nntp-authinfo-rejected
+         (signal 'nntp-authinfo-rejected (cdr err)))
+        (error
+         (nnheader-report 'nntp "Couldn't open connection to %s: %s"
+                          address err)))
+    (nnheader-report 'nntp "Couldn't open connection to %s" address)))
 
 (defun nntp-send-command (wait-for &rest strings)
   "Send STRINGS to server and wait until WAIT-FOR returns."
