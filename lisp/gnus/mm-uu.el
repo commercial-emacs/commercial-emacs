@@ -394,7 +394,7 @@ apply the face `mm-uu-extract'."
 
 (defun mm-uu-org-src-code-block-extract ()
   (mm-make-handle (mm-uu-copy-to-buffer start-point end-point)
-		  '("text/x-org" (charset . gnus-decoded))))
+		  '("text/org" (charset . gnus-decoded))))
 
 (defvar gnus-newsgroup-name)
 
