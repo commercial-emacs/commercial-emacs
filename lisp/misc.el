@@ -327,6 +327,53 @@ The return value is always nil."
   (display-buffer buffer)
   nil)
 
+(defun copy-next-command-output ()
+  "Prefix command to add the output of the next command to the `kill-ring`."
+  (interactive)
+  (let ((md (minibuffer-depth))
+        (marker (with-current-buffer "*Messages*"
+                  (point-max-marker))))
+    (cl-labels ((pre ()
+                  (unless (> (minibuffer-depth) md)
+                    (add-hook 'post-command-hook #'post)
+                    (prepare)))
+                (prepare ()
+                  (with-current-buffer "*Messages*"
+                    (move-marker marker (point-max))))
+                (preserve ()
+                  (unless (> (minibuffer-depth) md)
+                    (remove-hook 'post-command-hook #'post)
+                    (add-hook 'pre-command-hook #'pre)))
+                (echo ()
+                  (unless (> (minibuffer-depth) md)
+                    "[copy-output]"))
+                (post ()
+                  (if (> (minibuffer-depth) md)
+                      ;; Prepare, in case there's no pre-command-hook before
+                      ;; the next post-command-hook.  E.g. in the case of
+                      ;; execute-extended-command.
+                      (prepare)
+                    (remove-hook 'pre-command-hook #'pre)
+                    (remove-hook 'post-command-hook #'post)
+                    (remove-hook 'prefix-command-preserve-state-hook
+                                 #'preserve)
+                    (remove-hook 'prefix-command-echo-keystrokes-functions
+                                 #'echo)
+                    (prefix-command-update)
+                    (with-current-buffer (marker-buffer marker)
+                      (when (< marker (point-max))
+                        (kill-new (buffer-substring marker (point-max)))))
+                    (set-marker marker nil))))
+      (add-hook 'prefix-command-preserve-state-hook #'preserve)
+      (add-hook 'prefix-command-echo-keystrokes-functions #'echo)
+      ;; (message "BEFORE: prefix-arg=%S current-prefix-arg=%S"
+      ;;          prefix-arg current-prefix-arg)
+      (prefix-command-preserve-state)
+      ;; (message "AFTER: prefix-arg=%S current-prefix-arg=%S"
+      ;;          prefix-arg current-prefix-arg)
+      )))
+
+
 (provide 'misc)
 
 ;;; misc.el ends here
