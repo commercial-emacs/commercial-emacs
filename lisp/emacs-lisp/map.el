@@ -164,7 +164,11 @@ or array."
                        `(condition-case nil
                             ;; Silence warnings about the hidden 4th arg.
                             (with-no-warnings
-                              (map-put! ,mgetter ,key ,v ,testfn))
+                              ,(macroexp-let2 nil m mgetter
+                                 `(progn
+                                    (map-put! ,m ,key ,v ,testfn)
+                                    ,(funcall msetter m)
+                                    ,v)))
                           (map-not-inplace
                            ,(funcall msetter
                                      `(map-insert ,mgetter ,key ,v))
