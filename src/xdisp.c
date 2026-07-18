@@ -9421,6 +9421,7 @@ move_it_backward (struct it *it, int op_to, int op)
 	  continue;
 	}
       else if (op == MOVE_TO_Y
+	       && slines > 0
 	       && ((op_target - it->current_y) >= actual_line_height (it->w, tpos))
 	       && IT_CHARPOS (*it) < ZV)
 	{
