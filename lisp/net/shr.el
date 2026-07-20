@@ -2027,10 +2027,11 @@ BASE is the URL of the HTML being rendered."
         width (or width 100))
   (when (> (length srcset) 0)
     ;; srcset consists of a series of URL/size specifications separated
-    ;; by the " ," string.
+    ;; by "," followed by whitespace; a bare comma inside a URL (not
+    ;; followed by whitespace) is not a separator.
     (sort (mapcar
            (lambda (elem)
-             (let ((spec (split-string elem "[\t\n\r ]+")))
+             (let ((spec (split-string (string-trim elem) "[\t\n\r ]+")))
                (cond
                 ((= (length spec) 1)
                  ;; Make sure it's well formed.
@@ -2044,17 +2045,7 @@ BASE is the URL of the HTML being rendered."
                 (t
                  (list (car spec)
                        (string-to-number (cadr spec)))))))
-           (with-temp-buffer
-             (insert srcset)
-             (goto-char (point-min))
-             (let ((bits nil))
-               (while (re-search-forward "[^\t\n\r ]+[\t\n\r ]+[^\t\n\r ,]+"
-                                         nil t)
-                 (push (match-string 0) bits)
-                 (if (looking-at "[\t\n\r ]*,[\t\n\r ]*")
-                     (goto-char (match-end 0))
-                   (goto-char (point-max))))
-               bits)))
+           (split-string srcset "[\t\n\r ]*,[\t\n\r ]+"))
           (lambda (e1 e2)
             (> (cadr e1) (cadr e2))))))
 
