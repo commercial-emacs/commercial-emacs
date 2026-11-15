@@ -5797,7 +5797,7 @@ frame.  The selected window is not changed by this function."
 
 	  (run-window-scroll-functions new)
 	  (window--check frame)
-	  ;; Always return the new window.
+          (redisplay) ;Bug#82243 (build_frame_matrix recalcs geometry)
 	  new)))))
 
 (defun split-window-no-error (&optional window size side pixelwise)
