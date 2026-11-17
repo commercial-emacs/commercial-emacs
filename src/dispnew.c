@@ -2513,6 +2513,13 @@ build_frame_matrix_from_leaf_window (struct glyph_matrix *frame_matrix, struct w
 	  memcpy (frame_row->glyphs[TEXT_AREA] + window_matrix->matrix_x,
 		  window_row->glyphs[0],
 		  window_matrix->matrix_w * sizeof (struct glyph));
+
+	  /* Bug#82243 Rectify desired row metadata should the frame row
+	     yield an enabled_p=false desired row.  */
+	  struct glyph_row *w_desired_row = MATRIX_ROW (w->desired_matrix, window_y);
+	  for (int area = 0; area < LAST_AREA; ++area)
+	    w_desired_row->used[area] = window_row->used[area];
+	  w_desired_row->hash = row_hash (w_desired_row);
 	}
       else
 	{
