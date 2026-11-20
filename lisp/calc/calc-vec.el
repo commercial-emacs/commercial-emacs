@@ -1658,9 +1658,10 @@ of two matrices is a matrix."
 	  (math-read-token))
       (while (eq math-exp-token 'space)
 	(math-read-token))
-      (let ((rest (list (math-read-expr-level 0))))
-	(setcdr last rest)
-	(setq last rest)))
+      (when (not (equal math-expr-data math-rb-close))
+        (let ((rest (list (math-read-expr-level 0))))
+	  (setcdr last rest)
+	  (setq last rest))))
     (cons 'vec val)))
 
 (defun math-read-matrix (mat)
@@ -1668,7 +1669,8 @@ of two matrices is a matrix."
     (math-read-token)
     (while (eq math-exp-token 'space)
       (math-read-token))
-    (setq mat (nconc mat (list (math-read-vector)))))
+    (when (not (equal math-expr-data math-rb-close))
+      (setq mat (nconc mat (list (math-read-vector))))))
   mat)
 
 (provide 'calc-vec)
