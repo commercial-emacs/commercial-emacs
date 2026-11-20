@@ -1341,38 +1341,32 @@ POS and RES.")
                                           rule)
   (unless (text-property-not-all (match-beginning 0) (point)
                                  'compilation-message nil)
-    (if file
-        (when (stringp
-               (setq file (if (functionp file) (funcall file)
-                            (match-string-no-properties file))))
-	  (let ((dir
-	         (unless (file-name-absolute-p file)
-                   (let ((pos (compilation--previous-directory
-                               (match-beginning 0))))
-                     (when pos
-                       (or (get-text-property (1- pos) 'compilation-directory)
-                           (get-text-property pos 'compilation-directory)))))))
-	    (setq file (cons file (car dir)))))
-      ;; This message didn't mention one, get it from previous
-      (let ((prev-pos
-	     ;; Find the previous message.
-	     (previous-single-property-change (point) 'compilation-message)))
-	(if prev-pos
-	    ;; Get the file structure that belongs to it.
-	    (let* ((prev
-		    (or (get-text-property (1- prev-pos) 'compilation-message)
-			(get-text-property prev-pos 'compilation-message)))
-		   (prev-file-struct
-		    (and prev
-			 (compilation--loc->file-struct
-			  (compilation--message->loc prev)))))
-
-	      ;; Construct FILE . DIR from that.
-	      (if prev-file-struct
-		  (setq file (cons (caar prev-file-struct)
-				   (cadr (car prev-file-struct)))))))
-	(unless file
-	  (setq file '("*unknown*")))))
+    (setq
+     file
+     (if-let ((filename (cond ((functionp file) (funcall file))
+                              (file (match-string-no-properties file)))))
+         (let ((dir
+                (unless (file-name-absolute-p filename)
+                  (let ((pos (compilation--previous-directory
+                              (match-beginning 0))))
+                    (when pos
+                      (or (get-text-property (1- pos) 'compilation-directory)
+                          (get-text-property pos 'compilation-directory)))))))
+           (cons filename (car dir)))
+       (unless (functionp file)
+         ;; This message didn't mention a file, get it from previous
+         (if-let*
+             ((prev-pos
+               ;; Find the previous message.
+               (previous-single-property-change (point) 'compilation-message))
+              ;; Get the file structure that belongs to it.
+              (prev (or (get-text-property (1- prev-pos) 'compilation-message)
+                        (get-text-property prev-pos 'compilation-message)))
+              (prev-file-struct (compilation--loc->file-struct
+                                 (compilation--message->loc prev))))
+             ;; Construct FILE . DIR from that.
+             (cons (caar prev-file-struct) (cadr (car prev-file-struct)))
+           '("*unknown*")))))
     ;; All of these fields are optional, get them only if we have an index, and
     ;; it matched some part of the message.
     (setq line
