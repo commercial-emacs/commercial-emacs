@@ -35,8 +35,10 @@ install or uninstall packages via this buffer.  @xref{Package Menu}.
 name of a package, and displays a help buffer describing the
 attributes of the package and the features that it implements.
 
-  By default, Emacs downloads packages from a package archive
-maintained by the Emacs developers and hosted by the GNU project.
+  By default, Emacs downloads packages from GNU ELPA
+(@url{https://elpa.gnu.org/}), a package archive maintained by the
+Emacs developers and hosted by the GNU project.  It also downloads
+packages from NonGNU ELPA (@url{https://elpa.nongnu.org/}).
 Optionally, you can also download packages from archives maintained by
 third parties.  @xref{Package Installation}.
 
