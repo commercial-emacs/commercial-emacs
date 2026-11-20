@@ -1983,7 +1983,7 @@ See URL `https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Input'.")
                                   (insert-file-contents file)
                                   (buffer-string)))
                           (cons "name" name)
-                          (cons "filename" file))
+                          (cons "filename" (file-name-nondirectory file)))
                     values)))
 	   ((equal (plist-get input :type) "submit")
 	    ;; We want the values from buttons if we hit a button if
